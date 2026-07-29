@@ -3,6 +3,7 @@
 use crate::diag::{Issue, Issues};
 use crate::list::{Entry, List};
 use crate::module::Module;
+use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::Path;
 
@@ -12,7 +13,13 @@ const FLAVOUR_ARG: &str = "\
 # ---- flavour gate ----
 ARG FLAVOUR";
 
-pub fn section(list: &List, modules: &[Module], root: &Path, issues: &mut Issues) -> String {
+pub fn section(
+    list: &List,
+    modules: &[Module],
+    sinks: &BTreeMap<String, Vec<(String, String)>>,
+    root: &Path,
+    issues: &mut Issues,
+) -> String {
     let mut out = String::new();
     let mut flavour_arg_emitted = false;
     let mut finalize: Vec<String> = Vec::new();
@@ -45,7 +52,7 @@ pub fn section(list: &List, modules: &[Module], root: &Path, issues: &mut Issues
         let block = if inc.is_file() {
             verbatim(entry, &inc, flavour_arg_emitted, list, issues)
         } else {
-            standard(entry, module)
+            standard(entry, module, sinks.get(&entry.path))
         };
         let _ = write!(out, "{block}\n\n");
 
@@ -71,13 +78,24 @@ pub fn section(list: &List, modules: &[Module], root: &Path, issues: &mut Issues
     out
 }
 
-fn standard(entry: &Entry, module: Option<&Module>) -> String {
+fn standard(
+    entry: &Entry,
+    module: Option<&Module>,
+    sinks: Option<&Vec<(String, String)>>,
+) -> String {
     let mut env = String::new();
     if let Some(flavour) = &entry.flavour {
         let _ = write!(env, "FLAVOUR_GATE={flavour} ");
     }
     for (name, value) in module.map(|m| m.resolved.as_slice()).unwrap_or_default() {
         let _ = write!(env, "{name}=\"{value}\" ");
+    }
+    if let Some(sinks) = sinks.filter(|s| !s.is_empty()) {
+        let pairs: Vec<String> = sinks
+            .iter()
+            .map(|(file, path)| format!("{file}={path}"))
+            .collect();
+        let _ = write!(env, "MODULE_SINKS=\"{}\" ", pairs.join(" "));
     }
 
     let path = &entry.path;

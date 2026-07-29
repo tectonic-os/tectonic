@@ -14,6 +14,15 @@ pub struct Decl {
     pub span: SourceSpan,
 }
 
+/// An aggregated file: the consuming module says where it lands and which
+/// filename feeds it.
+pub struct Sink {
+    pub name: String,
+    pub file: String,
+    pub path: String,
+    pub span: SourceSpan,
+}
+
 pub struct Module {
     /// The list path, which is the module's identity everywhere.
     #[allow(dead_code)]
@@ -35,6 +44,7 @@ pub struct Module {
     /// The flavour this module is gated to, from the list rather than the
     /// manifest: a module never names a flavour.
     pub flavour: Option<String>,
+    pub sinks: Vec<Sink>,
     pub options: Vec<Opt>,
     pub variants: Vec<Variant>,
     /// Resolved option name to value, ready to become env on the layer.
@@ -43,6 +53,13 @@ pub struct Module {
 
 /// The only base family today.
 const FAMILIES: [&str; 1] = ["fedora"];
+
+fn prop<'a>(node: &'a KdlNode, key: &str) -> Option<&'a str> {
+    node.entries()
+        .iter()
+        .find(|e| e.name().map(|n| n.value()) == Some(key))
+        .and_then(|e| e.value().as_string())
+}
 
 /// The first unnamed entry of a node, as a string.
 fn string_args(node: &KdlNode) -> Vec<&str> {
@@ -93,6 +110,7 @@ impl Module {
             provides_files: Vec::new(),
             requires_files: Vec::new(),
             flavour: entry.flavour.clone(),
+            sinks: Vec::new(),
             options: Vec::new(),
             variants: Vec::new(),
             resolved: Vec::new(),
@@ -168,6 +186,35 @@ impl Module {
                         } else {
                             module.requires_files.push(decl);
                         }
+                    }
+                }
+                "sink" => {
+                    let sink_name = string_args(node).first().map(|s| s.to_string());
+                    let sink_file = prop(node, "file");
+                    let sink_path = prop(node, "path");
+                    let missing = if sink_name.is_none() {
+                        Some("a name")
+                    } else if sink_file.is_none() {
+                        Some("file=, the filename a contributing module ships")
+                    } else if sink_path.is_none() {
+                        Some("path=, where it lands in the image")
+                    } else if !sink_path.is_some_and(|p| p.starts_with('/')) {
+                        Some("an absolute path=")
+                    } else {
+                        None
+                    };
+                    match missing {
+                        None => module.sinks.push(Sink {
+                            name: sink_name.unwrap_or_default(),
+                            file: sink_file.unwrap_or_default().to_string(),
+                            path: sink_path.unwrap_or_default().to_string(),
+                            span: node.name().span(),
+                        }),
+                        Some(missing) => issues.push(
+                            Issue::new(format!("`sink` needs {missing}"), &file, &text)
+                                .at(node.name().span(), "incomplete sink")
+                                .help("`sink \"justfile\" file=\"justfile.inc\" path=\"/usr/share/goojust/justfile.apps\"`"),
+                        ),
                     }
                 }
                 "option" => {
@@ -391,4 +438,117 @@ pub fn check_graph(modules: &[Module], root: &Path, issues: &mut Issues) {
             }
         }
     }
+}
+
+/// Every sink declared anywhere on disk, as filename to the module that owns
+/// it, so a contribution whose consumer is not in the list can name what to
+/// enable rather than just being dropped.
+fn sinks_on_disk(root: &Path) -> BTreeMap<String, String> {
+    let mut out = BTreeMap::new();
+    let modules = root.join("modules");
+    let mut dirs = vec![modules.clone()];
+    while let Some(dir) = dirs.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_dir() || path.file_name().is_some_and(|n| n == "_template") {
+                continue;
+            }
+            let manifest = path.join("module.kdl");
+            if !manifest.is_file() {
+                dirs.push(path);
+                continue;
+            }
+            let Ok(text) = std::fs::read_to_string(&manifest) else {
+                continue;
+            };
+            let Ok(doc) = text.parse::<KdlDocument>() else {
+                continue;
+            };
+            let name = path
+                .strip_prefix(&modules)
+                .unwrap_or(&path)
+                .display()
+                .to_string();
+            for node in doc.nodes().iter().filter(|n| n.name().value() == "sink") {
+                if let Some(file) = prop(node, "file") {
+                    out.insert(file.to_string(), name.clone());
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Which files each module contributes, and where each lands.
+pub fn resolve_sinks(
+    modules: &[Module],
+    root: &Path,
+    issues: &mut Issues,
+) -> BTreeMap<String, Vec<(String, String)>> {
+    let mut by_name: BTreeMap<&str, &Module> = BTreeMap::new();
+    let mut by_file: BTreeMap<&str, &Module> = BTreeMap::new();
+    for module in modules {
+        for sink in &module.sinks {
+            for (key, map, what) in [
+                (sink.name.as_str(), &mut by_name, "name"),
+                (sink.file.as_str(), &mut by_file, "filename"),
+            ] {
+                if let Some(first) = map.get(key) {
+                    issues.push(
+                        Issue::new(
+                            format!("two enabled modules declare a sink with the {what} `{key}`"),
+                            &module.file,
+                            &module.text,
+                        )
+                        .at(sink.span, "declared again here")
+                        .help(format!("already declared by `{}`", first.path)),
+                    );
+                } else {
+                    map.insert(key, module);
+                }
+            }
+        }
+    }
+
+    let on_disk = sinks_on_disk(root);
+    let mut out: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
+
+    for module in modules {
+        let dir = root.join("modules").join(&module.path);
+        for (file, owner) in &on_disk {
+            if !dir.join(file).is_file() {
+                continue;
+            }
+            match by_file.get(file.as_str()) {
+                Some(sink_owner) => {
+                    let path = sink_owner
+                        .sinks
+                        .iter()
+                        .find(|s| &s.file == file)
+                        .map(|s| s.path.clone())
+                        .unwrap_or_default();
+                    out.entry(module.path.clone())
+                        .or_default()
+                        .push((file.clone(), path));
+                }
+                None => issues.push(
+                    Issue::new(
+                        format!(
+                            "`{}` ships a {file} but nothing enabled aggregates it",
+                            module.path
+                        ),
+                        &module.file,
+                        &module.text,
+                    )
+                    .help(format!(
+                        "`{owner}` declares that sink; add it to modules.kdl, or drop the {file}"
+                    )),
+                ),
+            }
+        }
+    }
+    out
 }

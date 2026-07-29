@@ -49,12 +49,10 @@ if [ -d "$MODDIR/files" ]; then
     cp -rT "$MODDIR/files" /
 fi
 
-if [ -f "$MODDIR/justfile.inc" ]; then
-    mkdir -p /usr/share/goojust
-    cat "$MODDIR/justfile.inc" >> /usr/share/goojust/justfile.apps
-fi
-
-if [ -f "$MODDIR/flatpaks.list" ]; then
-    mkdir -p /usr/share/tectonic
-    cat "$MODDIR/flatpaks.list" >> /usr/share/tectonic/default-flatpaks
-fi
+read -ra sinks <<< "${MODULE_SINKS:-}"
+for sink in "${sinks[@]}"; do
+    src="$MODDIR/${sink%%=*}"
+    dest="${sink#*=}"
+    mkdir -p "$(dirname "$dest")"
+    cat "$src" >> "$dest"
+done

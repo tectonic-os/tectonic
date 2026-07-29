@@ -1,3 +1,5 @@
 description "Flatpak client, first-boot install of the default app set, and a daily update timer"
 
 supports "fedora"
+
+sink "flatpaks" file="flatpaks.list" path="/usr/share/tectonic/default-flatpaks"
