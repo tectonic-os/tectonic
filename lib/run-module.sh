@@ -30,11 +30,6 @@ if [ -f "$MODDIR/versions.sh" ]; then
     source "$MODDIR/versions.sh"
 fi
 
-if [ -n "${MODULE_VARIANT:-}" ]; then
-    # shellcheck source=/dev/null
-    source "$MODDIR/variants/${MODULE_VARIANT}.sh"
-fi
-
 if [ -f "$MODDIR/module.sh" ]; then
     # shellcheck source=/dev/null
     source "$MODDIR/module.sh"

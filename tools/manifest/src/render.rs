@@ -2,6 +2,7 @@
 
 use crate::diag::{Issue, Issues};
 use crate::list::{Entry, List};
+use crate::module::Module;
 use std::fmt::Write as _;
 use std::path::Path;
 
@@ -11,7 +12,7 @@ const FLAVOUR_ARG: &str = "\
 # ---- flavour gate ----
 ARG FLAVOUR";
 
-pub fn section(list: &List, root: &Path, issues: &mut Issues) -> String {
+pub fn section(list: &List, modules: &[Module], root: &Path, issues: &mut Issues) -> String {
     let mut out = String::new();
     let mut flavour_arg_emitted = false;
     let mut finalize: Vec<String> = Vec::new();
@@ -36,11 +37,15 @@ pub fn section(list: &List, root: &Path, issues: &mut Issues) -> String {
             flavour_arg_emitted = true;
         }
 
+        let module = modules
+            .iter()
+            .find(|m| m.path == entry.path && m.flavour == entry.flavour);
+
         let inc = dir.join("Containerfile.inc");
         let block = if inc.is_file() {
             verbatim(entry, &inc, flavour_arg_emitted, list, issues)
         } else {
-            standard(entry)
+            standard(entry, module)
         };
         let _ = write!(out, "{block}\n\n");
 
@@ -66,13 +71,13 @@ pub fn section(list: &List, root: &Path, issues: &mut Issues) -> String {
     out
 }
 
-fn standard(entry: &Entry) -> String {
+fn standard(entry: &Entry, module: Option<&Module>) -> String {
     let mut env = String::new();
-    if let Some(variant) = &entry.variant {
-        let _ = write!(env, "MODULE_VARIANT={variant} ");
-    }
     if let Some(flavour) = &entry.flavour {
         let _ = write!(env, "FLAVOUR_GATE={flavour} ");
+    }
+    for (name, value) in module.map(|m| m.resolved.as_slice()).unwrap_or_default() {
+        let _ = write!(env, "{name}=\"{value}\" ");
     }
 
     let path = &entry.path;

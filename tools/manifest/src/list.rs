@@ -22,7 +22,6 @@ pub struct Entry {
     pub flavour: Option<String>,
     pub variant: Option<String>,
     /// Option name to the values set on it.
-    #[allow(dead_code)]
     pub options: Vec<(String, Vec<KdlValue>, SourceSpan)>,
     pub span: SourceSpan,
 }
