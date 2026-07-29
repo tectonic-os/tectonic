@@ -1,0 +1,20 @@
+module trivalent_local_fixes 1.0;
+
+require {
+	type unconfined_trivalent_t;
+	type unconfined_trivalent_script_t;
+	type cgroup_t;
+	type fusefs_t;
+	type proc_t;
+	type sysctl_dev_t;
+	type unconfined_t;
+	class filesystem { remount associate };
+	class dir search;
+}
+
+allow unconfined_trivalent_script_t cgroup_t:filesystem remount;
+allow unconfined_trivalent_script_t fusefs_t:filesystem remount;
+allow unconfined_trivalent_script_t proc_t:filesystem associate;
+
+allow unconfined_trivalent_t sysctl_dev_t:dir search;
+allow unconfined_trivalent_t unconfined_t:dir search;

@@ -1,0 +1,19 @@
+CLI_PACKAGES=(
+    7zip-standalone
+    bash-completion
+    bc
+    bsdunzip
+    btop
+    htop
+    iw
+    mtr
+    pv
+    rsync
+    tmux
+    tree
+    vim-enhanced
+    whois
+    wl-clipboard
+    zip
+)
+dnf5 install -y "${CLI_PACKAGES[@]}"

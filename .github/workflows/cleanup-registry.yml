@@ -1,0 +1,91 @@
+---
+name: Clean up registry
+
+on:
+  schedule:
+    - cron: '30 14 * * *'  # ~2h after the 12:30 UTC image build so its pushes are settled
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Log deletions without performing them"
+        type: boolean
+        default: false
+
+env:
+  KEEP: "3"  # tagged builds retained per image flavour
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Prune old package versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          DRY_RUN: ${{ inputs.dry-run || 'false' }}
+        run: |
+          set -euo pipefail
+          api="users/${OWNER}/packages/container"
+
+          list_versions() { # pkg -> versions json on stdout
+            if ! gh api "${api}/${1}/versions?per_page=100" --paginate; then
+              echo "::warning::skipping ${1}: could not list its versions" >&2
+              return 1
+            fi
+          }
+
+          delete_version() { # pkg id note
+            if [ "${DRY_RUN}" = "true" ]; then
+              echo "dry run: would delete ${1} version ${2} (${3})"
+            else
+              gh api --method DELETE "${api}/${1}/versions/${2}" >/dev/null
+              echo "deleted ${1} version ${2} (${3})"
+            fi
+          }
+
+          mapfile -t packages < <(./scripts/flavours.sh images)
+          for pkg in "${packages[@]}"; do
+            echo "== ${pkg}"
+            versions="$(list_versions "${pkg}")" || continue
+            deletions="$(printf '%s' "${versions}" | jq -s 'add' | jq -r --argjson keep "${KEEP}" '
+              def is_sig: test("^sha256-[0-9a-f]{64}\\.(sig|att)$");
+              map({id, name, created_at, tags: .metadata.container.tags})
+              | map(. + {kind: (if (.tags | length) == 0 then "untagged"
+                                elif (.tags | all(is_sig)) then "sig"
+                                else "image" end)})
+              | (map(select(.kind == "image")) | sort_by(.created_at) | reverse) as $images
+              | (($images[:$keep] + ($images | map(select(.tags | index("latest"))))) | unique_by(.id)) as $keepimg
+              | ($keepimg | map(.id)) as $keepids
+              | ($keepimg | map((.name | sub(":"; "-")) as $n | $n + ".sig", $n + ".att")) as $keepsigs
+              | map(select(
+                  (.kind == "untagged")
+                  or (.kind == "image" and ((.id as $i | $keepids | index($i)) == null))
+                  or (.kind == "sig" and ((.tags | map(select(. as $t | $keepsigs | index($t) != null)) | length) == 0))
+                ))
+              | .[] | [.id, .kind, (.tags | join(","))] | @tsv')"
+            [ -n "${deletions}" ] || { echo "nothing to delete"; continue; }
+            while IFS=$'\t' read -r id kind tags; do
+              delete_version "${pkg}" "${id}" "${kind}${tags:+, tags: ${tags}}"
+            done <<<"${deletions}"
+          done
+
+          pkg="$(./scripts/flavours.sh cache-image)"
+          live="$(./scripts/flavours.sh list | jq -Rsc 'split("\n") | map(select(length > 0))')"
+          echo "== ${pkg}"
+          if versions="$(list_versions "${pkg}")"; then
+            deletions="$(printf '%s' "${versions}" | jq -s 'add' | jq -r --argjson live "${live}" '
+              map(select((.metadata.container.tags | map(select(. as $t | $live | index($t))) | length) == 0))
+              | .[] | [.id, (.metadata.container.tags | join(","))] | @tsv')"
+            [ -n "${deletions}" ] || echo "nothing to delete"
+            while IFS=$'\t' read -r id tags; do
+              [ -n "${id}" ] || continue
+              delete_version "${pkg}" "${id}" "stale cache${tags:+, tags: ${tags}}"
+            done <<<"${deletions}"
+          fi

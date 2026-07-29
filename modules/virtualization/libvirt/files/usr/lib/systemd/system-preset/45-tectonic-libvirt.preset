@@ -1,0 +1,3 @@
+enable libvirtd.socket
+enable libvirt-relabel.service
+enable libvirt-group-membership.service

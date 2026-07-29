@@ -1,0 +1,45 @@
+#!/usr/bin/bash
+
+export PATH="/usr/bin:/usr/sbin:${PATH}"
+if [ -n "$1" ]; then
+    exec 1>/dev/kmsg; exec 2>&1
+fi
+
+UNIT_DIR="${1:-/tmp}"
+
+set -euo pipefail
+
+have_some_karg() {
+    local args=("$@")
+    IFS=" " read -r -a cmdline <<< "$(</proc/cmdline)"
+    local i
+    for i in "${cmdline[@]}"; do
+        for a in "${args[@]}"; do
+        if [[ "$i" == "$a" ]]; then
+            return 0
+        fi
+        done
+    done
+    return 1
+}
+
+write_dropin() {
+    local service="$1"
+
+    local out_dir="${UNIT_DIR}/${service}.service.d"
+    mkdir -p "${out_dir}"
+
+    TMPDIR=/run
+    cat > "${out_dir}/sulogin-force.conf" <<EOF
+# Automatically created by coreos-sulogin-force-generator
+[Service]
+Environment=SYSTEMD_SULOGIN_FORCE=1
+EOF
+    echo "$(basename "${0}"): set SYSTEMD_SULOGIN_FORCE=1 for ${service}.service"
+}
+
+if have_some_karg 'systemd.unit=rescue.target' rescue single s S 1; then
+    write_dropin rescue
+elif have_some_karg 'systemd.unit=emergency.target' emergency '-b' ; then
+    write_dropin emergency
+fi

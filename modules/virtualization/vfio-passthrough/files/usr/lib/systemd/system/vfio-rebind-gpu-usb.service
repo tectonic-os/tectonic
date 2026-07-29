@@ -1,0 +1,13 @@
+[Unit]
+Description=Rebind NVIDIA GPU USB controller to vfio-pci
+Before=libvirtd.service
+DefaultDependencies=no
+After=sysinit.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c 'for DEV in $(lspci -d 10de:1ad8 -D | cut -d" " -f1); do echo vfio-pci > /sys/bus/pci/devices/$DEV/driver_override; [ -L /sys/bus/pci/devices/$DEV/driver ] && echo $DEV > /sys/bus/pci/devices/$DEV/driver/unbind; echo $DEV > /sys/bus/pci/drivers_probe; done'
+
+[Install]
+WantedBy=multi-user.target

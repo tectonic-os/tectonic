@@ -1,0 +1,6 @@
+#!/usr/bin/bash
+set -euo pipefail
+
+for user in $(getent group wheel | cut -d: -f4 | tr ',' ' '); do
+    usermod -aG libvirt "$user"
+done

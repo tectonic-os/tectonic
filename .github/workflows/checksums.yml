@@ -1,0 +1,78 @@
+---
+name: Checksums
+
+on:
+  pull_request:
+    paths:
+      - 'modules/core/goojust/versions.sh'
+      - 'modules/de/tectonic-plasma-settings/versions.sh'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  update-checksums:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Recompute stale checksums and push fixup
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+
+          entries=(
+            'goojust|modules/core/goojust/versions.sh|GOOJUST_VERSION|GOOJUST_SHA256|sidecar|https://github.com/tectonic-os/goojust/releases/download/v{v}/goojust-v{v}-x86_64-linux-gnu.tar.gz.sha256'
+            'tectonic-bootc-updates|modules/de/tectonic-plasma-settings/versions.sh|TECTONIC_BOOTC_UPDATES_VERSION|TECTONIC_BOOTC_UPDATES_SHA256|download|https://github.com/tectonic-os/plasma-bootc-updates/releases/download/v{v}/tectonic-bootc-updates-{v}-1.fc44.x86_64.rpm'
+          )
+
+          fixed=()
+          for entry in "${entries[@]}"; do
+            IFS='|' read -r name file version_var sha_var mode url <<< "$entry"
+
+            version="$(sed -n "s/^${version_var}=\"\([^\"]*\)\"/\1/p" "$file")"
+            pinned="$(sed -n "s/^${sha_var}=\"\([^\"]*\)\"/\1/p" "$file")"
+            if [ -z "$version" ] || [ -z "$pinned" ]; then
+              echo "::error::${name}: ${version_var} or ${sha_var} not found in ${file}"
+              exit 1
+            fi
+            url="${url//\{v\}/${version}}"
+
+            if [ "$mode" = "sidecar" ]; then
+              actual="$(curl -fsSL --retry 3 "$url" | cut -d' ' -f1)"
+            else
+              curl -fsSL --retry 3 "$url" -o "${RUNNER_TEMP}/asset"
+              actual="$(sha256sum "${RUNNER_TEMP}/asset" | cut -d' ' -f1)"
+              rm -f "${RUNNER_TEMP}/asset"
+            fi
+
+            if [ "$actual" = "$pinned" ]; then
+              echo "${sha_var} already matches ${name} ${version}, nothing to do."
+              continue
+            fi
+
+            sed -i "s/^${sha_var}=.*/${sha_var}=\"${actual}\"/" "$file"
+            fixed+=("${name} ${version}")
+            echo "${sha_var} updated for ${name} ${version}."
+          done
+
+          [ "${#fixed[@]}" -gt 0 ] || exit 0
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "update checksums: $(IFS=', '; echo "${fixed[*]}")"
+          git push origin "HEAD:${BRANCH}"
+
+          gh workflow run build.yml --ref "$BRANCH"
+          gh workflow run lint.yml --ref "$BRANCH"

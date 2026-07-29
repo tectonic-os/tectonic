@@ -1,0 +1,12 @@
+[Unit]
+Description=Add wheel group members to the libvirt group
+After=systemd-sysusers.service
+Requires=systemd-sysusers.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/add-wheel-users-to-libvirt
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

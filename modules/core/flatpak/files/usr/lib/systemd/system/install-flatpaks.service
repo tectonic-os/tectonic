@@ -1,0 +1,15 @@
+[Unit]
+Description=Install default Flatpak apps on first boot
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=!/var/lib/install-flatpaks/done
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+StateDirectory=install-flatpaks
+ExecStart=/usr/libexec/install-flatpaks
+ExecStartPost=/usr/bin/touch /var/lib/install-flatpaks/done
+
+[Install]
+WantedBy=multi-user.target

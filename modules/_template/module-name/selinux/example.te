@@ -1,0 +1,8 @@
+module tectonic_template 1.0;
+
+require {
+	type unconfined_t;
+	class process execmem;
+}
+
+allow unconfined_t self:process execmem;

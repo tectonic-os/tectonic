@@ -1,0 +1,13 @@
+[Unit]
+Description=Install Homebrew on first login
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=!%h/.brew-setup-done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/brew-setup
+ExecStartPost=/usr/bin/touch %h/.brew-setup-done
+
+[Install]
+WantedBy=default.target

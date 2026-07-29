@@ -1,0 +1,64 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices",
+  ],
+
+  "rebaseWhen": "never",
+
+  // One grouped PR per day, created early UTC so the PR build and automerge
+  // finish before the 12:30 UTC scheduled image build, which then picks up
+  // the merged bumps together with any upstream drift. Merges by
+  // renovate[bot] are excluded from the push build in build.yml for the
+  // same reason.
+  "timezone": "Etc/UTC",
+  "schedule": ["before 6am"],
+
+  "packageRules": [
+    {
+      "matchPackageNames": ["*"],
+      "groupName": "scheduled updates",
+      "automerge": true,
+    },
+    {
+      "enabled": false,
+      "matchUpdateTypes": ["digest", "pinDigest", "pin"],
+      "matchDepTypes": ["container"],
+      "matchFileNames": [".github/workflows/**.yaml", ".github/workflows/**.yml"],
+    },
+    {
+      // quay.io/fedora prunes old untagged manifests within days, so a
+      // pinned digest 404s before the next Renovate bump lands and breaks
+      // the scheduled builds. Track the tag instead.
+      "matchPackageNames": ["quay.io/fedora/fedora-bootc"],
+      "pinDigests": false,
+    },
+  ],
+
+  "customManagers": [
+    {
+      "customType": "regex",
+      // Path segments must start with a lowercase letter, which excludes
+      // modules/_template — its annotation names a placeholder upstream
+      // that would fail every lookup. RE2 has no negative lookahead, so the
+      // exclusion is expressed in the character class.
+      "description": "Version-tagged pins in module versions.sh",
+      "managerFilePatterns": ["/^modules/([a-z][^/]*/)?[a-z][^/]*/versions\\.sh$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>github-releases|github-tags) depName=(?<depName>\\S+)(?: extractVersion=(?<extractVersion>\\S+))?\\n\\w+=\"(?<currentValue>[^\"]+)\"",
+      ],
+    },
+    {
+      "customType": "regex",
+      "description": "Commit-pinned deps in module versions.sh",
+      "managerFilePatterns": ["/^modules/([a-z][^/]*/)?[a-z][^/]*/versions\\.sh$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>git-refs) depName=(?<depName>\\S+)\\n\\w+=\"(?<currentDigest>[^\"]+)\"",
+      ],
+      // Both commit-pinned deps (xone, Ant) track their default branch,
+      // which is `master` for both — Renovate's regex manager requires a
+      // currentValue (or this template) even for a digest-only pin.
+      "currentValueTemplate": "master",
+    },
+  ],
+}

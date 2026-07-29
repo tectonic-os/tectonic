@@ -1,0 +1,139 @@
+---
+name: Kernel freshness
+
+on:
+  schedule:
+    - cron: '15 9 * * *'  # daily freshness check
+    - cron: '45 9 1 * *'  # monthly stock-kernel fallback validation build
+  workflow_dispatch:
+
+env:
+  GH_TOKEN: ${{ github.token }}
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  check:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '15 9 * * *'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Discover and run kernel freshness scripts
+        id: fresh
+        run: |
+          set -euo pipefail
+          mapfile -t scripts < <(find modules -name kernel_freshness.py -type f | sort)
+          if [ "${#scripts[@]}" -eq 0 ]; then
+            echo "No kernel_freshness.py scripts found — nothing to check."
+            echo "count=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "count=${#scripts[@]}" >> "$GITHUB_OUTPUT"
+          for script in "${scripts[@]}"; do
+            mod_dir="$(dirname "$script")"
+            kernel_id="$(basename "$mod_dir")"
+            echo "==> Running ${script}..."
+            python3 "$script" "$RUNNER_TEMP/report-${kernel_id}.md"
+          done
+
+      - name: Escalate or stand down (per kernel)
+        if: steps.fresh.outputs.count != '0'
+        run: |
+          set -euo pipefail
+          for json in "$RUNNER_TEMP"/report-*.json; do
+            [ -f "$json" ] || continue
+            kernel_id="$(jq -r .kernel_id "$json")"
+            mod_path="$(jq -r .module_path "$json")"
+            status="$(jq -r .status "$json")"
+            copr_ver="$(jq -r .copr_version "$json")"
+            report="${json%.json}.md"
+
+            echo "==> ${kernel_id}: status=${status}"
+
+            part_file="${mod_path}/Containerfile.inc"
+            fallback_branch="kernel-${kernel_id}-stock-fallback"
+            restore_branch="kernel-${kernel_id}-restore"
+            label="kernel-freshness-${kernel_id}"
+
+            default_kernel="custom"
+            if grep -qx 'ARG KERNEL=stock' "$part_file"; then
+              default_kernel="stock"
+            fi
+
+            issue="$(gh issue list --label "$label" --state open --json number --jq '.[0].number // empty')"
+            fallback_pr="$(gh pr list --head "$fallback_branch" --state open --json number --jq '.[0].number // empty')"
+            restore_pr="$(gh pr list --head "$restore_branch" --state open --json number --jq '.[0].number // empty')"
+
+            flip_kernel_pr() {
+              local branch="$1" from="$2" to="$3" title="$4"
+              git config user.name "github-actions[bot]"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git checkout -B "$branch"
+              sed -i "s/^ARG KERNEL=${from}\$/ARG KERNEL=${to}/" "$part_file"
+              if git diff --quiet "$part_file"; then
+                echo "expected 'ARG KERNEL=${from}' in ${part_file}" >&2
+                exit 1
+              fi
+              git commit -am "$title"
+              git push -f origin "$branch"
+              {
+                echo "Automated by the kernel-freshness workflow. Merging switches the ${kernel_id} module to the ${to} kernel."
+                echo
+                cat "$report"
+              } > "$RUNNER_TEMP/pr-body.md"
+              gh pr create --head "$branch" --title "$title" \
+                --label "$label" --body-file "$RUNNER_TEMP/pr-body.md"
+              gh workflow run build.yml --ref "$branch"
+              git checkout -
+            }
+
+            gh label create "$label" \
+              --description "${kernel_id} kernel freshness tracking" \
+              --color D93F0B --force
+
+            case "$status" in
+              current)
+                if [ -n "$issue" ]; then
+                  gh issue close "$issue" \
+                    --comment "Upstream caught up (now on ${copr_ver})."
+                fi
+                if [ -n "$fallback_pr" ]; then
+                  gh pr close "$fallback_pr" --delete-branch \
+                    --comment "Upstream caught up before the fallback was needed."
+                fi
+                if [ "$default_kernel" = "stock" ] && [ -z "$restore_pr" ]; then
+                  flip_kernel_pr "$restore_branch" stock "$kernel_id" \
+                    "kernel: restore ${kernel_id} kernel, upstream caught up"
+                fi
+                ;;
+              lagging|stale)
+                if [ -n "$issue" ]; then
+                  gh issue edit "$issue" --body-file "$report"
+                else
+                  gh issue create --title "${kernel_id} kernel is behind upstream" \
+                    --label "$label" --body-file "$report"
+                fi
+                if [ "$status" = "stale" ] && [ "$default_kernel" != "stock" ] && [ -z "$fallback_pr" ]; then
+                  flip_kernel_pr "$fallback_branch" "$kernel_id" stock \
+                    "kernel: temporary stock-kernel fallback, ${kernel_id} upstream stale"
+                fi
+                if [ "$status" = "stale" ] && [ -n "$restore_pr" ]; then
+                  gh pr close "$restore_pr" --delete-branch \
+                    --comment "Upstream fell behind again before this was merged."
+                fi
+                ;;
+            esac
+          done
+
+  stock-rot-check:
+    if: github.event.schedule == '45 9 1 * *'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Dispatch stock-kernel validation build
+        run: gh workflow run build.yml --ref main -f kernel=stock -R "$GITHUB_REPOSITORY"
