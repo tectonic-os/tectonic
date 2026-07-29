@@ -20,9 +20,9 @@ check:
 fix:
     just --unstable --fmt -f Justfile
 
-# Generate Containerfile.generated from the Containerfile skeleton +
-# modules.kdl. Every build regenerates it first, so this is only for
-# inspecting what a build would use.
+# Regenerate Containerfile.generated from the Containerfile skeleton and
+# modules.kdl, then commit it: it is tracked, and lint fails on a stale
+# one. Builds regenerate it too, so no build can use a stale one.
 [group('Utility')]
 generate:
     ./scripts/gen-containerfile.sh
@@ -32,7 +32,7 @@ generate:
 clean:
     #!/usr/bin/bash
     set -eoux pipefail
-    rm -rf _build* output/ Containerfile.generated
+    rm -rf _build* output/
 
 # Sudo Clean Repo
 [group('Utility')]

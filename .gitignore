@@ -4,6 +4,5 @@ _build_*
 output
 _build-*/**
 __pycache__/
-Containerfile.generated
 build/
 tools/*/target/

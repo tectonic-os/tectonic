@@ -3,4 +3,5 @@
 output
 _build*
 build
+Containerfile.generated
 tools
