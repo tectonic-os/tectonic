@@ -2,4 +2,4 @@ description "goojust, the OS TUI, plus the just engine and fastfetch it builds o
 
 supports "fedora"
 
-sink "justfile" file="justfile.inc" path="/usr/share/goojust/justfile.apps"
+collects "justfile.inc" into="/usr/share/goojust/justfile.apps"

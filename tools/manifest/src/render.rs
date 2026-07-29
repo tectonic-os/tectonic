@@ -16,7 +16,7 @@ ARG FLAVOUR";
 pub fn section(
     list: &List,
     modules: &[Module],
-    sinks: &BTreeMap<String, Vec<(String, String)>>,
+    collected: &BTreeMap<String, Vec<(String, String)>>,
     root: &Path,
     issues: &mut Issues,
 ) -> String {
@@ -52,7 +52,7 @@ pub fn section(
         let block = if inc.is_file() {
             verbatim(entry, &inc, flavour_arg_emitted, list, issues)
         } else {
-            standard(entry, module, sinks.get(&entry.path))
+            standard(entry, module, collected.get(&entry.path))
         };
         let _ = write!(out, "{block}\n\n");
 
@@ -81,7 +81,7 @@ pub fn section(
 fn standard(
     entry: &Entry,
     module: Option<&Module>,
-    sinks: Option<&Vec<(String, String)>>,
+    collected: Option<&Vec<(String, String)>>,
 ) -> String {
     let mut env = String::new();
     if let Some(flavour) = &entry.flavour {
@@ -90,12 +90,12 @@ fn standard(
     for (name, value) in module.map(|m| m.resolved.as_slice()).unwrap_or_default() {
         let _ = write!(env, "{name}=\"{value}\" ");
     }
-    if let Some(sinks) = sinks.filter(|s| !s.is_empty()) {
-        let pairs: Vec<String> = sinks
+    if let Some(collected) = collected.filter(|c| !c.is_empty()) {
+        let pairs: Vec<String> = collected
             .iter()
-            .map(|(file, path)| format!("{file}={path}"))
+            .map(|(file, into)| format!("{file}={into}"))
             .collect();
-        let _ = write!(env, "MODULE_SINKS=\"{}\" ", pairs.join(" "));
+        let _ = write!(env, "MODULE_COLLECT=\"{}\" ", pairs.join(" "));
     }
 
     let mut secrets = String::new();

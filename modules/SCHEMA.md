@@ -11,7 +11,7 @@
 | `selinux/*.te` | compiled and installed at priority 200 |
 | `files/` | copied verbatim into the image |
 | `finalize.sh` | sourced by the finalize phase, in resolved order |
-| a file matching a declared `sink` | appended to that sink |
+| a file another module `collects` | handed to that module |
 
 ## modules.kdl
 
@@ -111,18 +111,18 @@ arg "KERNEL"
 | `provides-file "<abs-path>"` | this module writes it |
 | `requires-file "<abs-path>"` | this module reads it, and fails without it |
 
-### Aggregation sinks
+### Collecting
 
 ```kdl
-sink "justfile" file="justfile.inc" path="/usr/share/goojust/justfile.apps"
+collects "justfile.inc" into="/usr/share/goojust/justfile.apps"
 
-sink "flatpaks" file="flatpaks.list" path="/usr/share/tectonic/default-flatpaks"
+collects "flatpaks.list" into="/usr/share/tectonic/default-flatpaks"
 ```
 
-| Property | Meaning |
+| Part | Meaning |
 | --- | --- |
-| `file=` | filename in a contributing module's directory |
-| `path=` | absolute destination in the image, created if needed |
+| argument | filename in a contributing module's directory |
+| `into=` | absolute destination in the image, created if needed |
 
 ### Options
 
@@ -176,7 +176,7 @@ variant "wine-only" {
 | --- | --- |
 | `FLAVOUR_GATE=<flavour>` | the entry is inside a `flavour` block |
 | `OPT_<NAME>=<value>` | one per declared option, always, defaults included |
-| `MODULE_SINKS="<file>=<path> ..."` | this module ships a file some sink aggregates |
+| `MODULE_COLLECT="<file>=<dest> ..."` | this module ships a file another module collects |
 | `<NAME>=${<NAME>}` | one per `arg` |
 
 ## Validation
@@ -194,8 +194,8 @@ variant "wine-only" {
 - a `requires-file` no enabled module provides
 - two enabled modules providing the same capability or contract file
 
-- a `contributes`-shaped file matching no declared sink
-- two enabled modules declaring the same sink name or sink filename
+- shipping a collected filename while the module that collects it is not
+- two enabled modules collecting the same filename
 
 - setting an option the module does not declare, or setting one twice
 - a value that does not match the declared type

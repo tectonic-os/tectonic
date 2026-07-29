@@ -49,10 +49,10 @@ if [ -d "$MODDIR/files" ]; then
     cp -rT "$MODDIR/files" /
 fi
 
-read -ra sinks <<< "${MODULE_SINKS:-}"
-for sink in "${sinks[@]}"; do
-    src="$MODDIR/${sink%%=*}"
-    dest="${sink#*=}"
+read -ra collected <<< "${MODULE_COLLECT:-}"
+for pair in "${collected[@]}"; do
+    src="$MODDIR/${pair%%=*}"
+    dest="${pair#*=}"
     mkdir -p "$(dirname "$dest")"
     cat "$src" >> "$dest"
 done

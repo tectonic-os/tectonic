@@ -64,7 +64,7 @@ fn main() -> ExitCode {
         .filter_map(|entry| module::Module::load(entry, &list, &root, &mut issues))
         .collect();
     module::check_graph(&modules, &root, &mut issues);
-    let sinks = module::resolve_sinks(&modules, &root, &mut issues);
+    let collected = module::resolve_collects(&modules, &root, &mut issues);
 
     let output = match command {
         "flavours" => lines(list.flavours.iter().map(|f| f.name.clone())),
@@ -72,7 +72,7 @@ fn main() -> ExitCode {
         "pr-flavour" => lines(list.pr_flavour().map(str::to_string)),
         "targets" => lines(list.targets()),
         "section" | "check" => {
-            let section = render::section(&list, &modules, &sinks, &root, &mut issues);
+            let section = render::section(&list, &modules, &collected, &root, &mut issues);
             if command == "check" {
                 String::new()
             } else {
