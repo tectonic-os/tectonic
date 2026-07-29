@@ -1,7 +1,7 @@
 #!/bin/bash
 
 brand_os_release() {
-    local name="Tectonic" pretty_name="" default_hostname="${FLAVOUR:-laptop}" image_version="${IMAGE_VERSION:-dev}" arg
+    local name="Tectonic" pretty_name="" default_hostname="" image_version="${IMAGE_VERSION:-dev}" arg
     for arg in "$@"; do
         case "$arg" in
             NAME=*) name="${arg#NAME=}" ;;
@@ -16,6 +16,9 @@ brand_os_release() {
     done
     if [ -z "$pretty_name" ]; then
         pretty_name="Tectonic ${image_version}"
+    fi
+    if [ -z "$default_hostname" ]; then
+        default_hostname="${name,,}"
     fi
 
     sed -i \

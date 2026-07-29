@@ -14,8 +14,7 @@ usage() {
     cat >&2 <<'EOF'
 usage: scripts/render-iso-config.sh [options]
 
-  --flavour <name>   flavour the ISO installs (default:
-                    scripts/flavours.sh installer)
+  --flavour <name>   target the ISO installs (default: the ungated build)
   --tag <tag>       tag it tracks (default: $DEFAULT_TAG, else latest)
 
 Environment:
@@ -49,7 +48,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-flavour="${flavour:-$(./scripts/flavours.sh installer)}"
+flavour="${flavour:-none}"
 ./scripts/flavours.sh check "$flavour"
 
 IMAGE_REF="$(./scripts/registry.sh ref "$(./scripts/flavours.sh image "$flavour")"):${tag}"

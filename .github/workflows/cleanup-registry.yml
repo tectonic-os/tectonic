@@ -12,7 +12,7 @@ on:
         default: false
 
 env:
-  KEEP: "3"  # tagged builds retained per image flavour
+  KEEP: "3"  # tagged builds retained per image
 
 jobs:
   cleanup:
@@ -77,7 +77,7 @@ jobs:
           done
 
           pkg="$(./scripts/flavours.sh cache-image)"
-          live="$(./scripts/flavours.sh list | jq -Rsc 'split("\n") | map(select(length > 0))')"
+          live="$(./scripts/flavours.sh targets | jq -Rsc 'split("\n") | map(select(length > 0))')"
           echo "== ${pkg}"
           if versions="$(list_versions "${pkg}")"; then
             deletions="$(printf '%s' "${versions}" | jq -s 'add' | jq -r --argjson live "${live}" '

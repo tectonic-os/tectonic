@@ -20,7 +20,9 @@ usage() {
     cat >&2 <<'EOF'
 usage: scripts/build.sh [options]
 
-  --flavour <name>     flavour to build (default: scripts/flavours.sh default)
+  --flavour <name>     target to build: a flavour, or `none` for the
+                      ungated set published unsuffixed (default:
+                      scripts/flavours.sh default)
   --kernel <name>     KERNEL build arg (default: unset, the Containerfile
                       decides, which is how the kernel-freshness fallback
                       switches the whole pipeline to the stock kernel)
@@ -124,6 +126,9 @@ fi
 flavour="${flavour:-$(./scripts/flavours.sh default)}"
 ./scripts/flavours.sh check "$flavour"
 
+flavour_arg="$flavour"
+[ "$flavour" != none ] || flavour_arg=""
+
 image_version="${IMAGE_VERSION:-$(date -u +%Y%m%d)}"
 
 while IFS= read -r line; do
@@ -161,7 +166,7 @@ fi
 ./scripts/gen-containerfile.sh
 
 build_args=(
-    "FLAVOUR=${flavour}"
+    "FLAVOUR=${flavour_arg}"
     "IMAGE_VERSION=${image_version}"
 )
 [ -z "$kernel" ] || build_args+=("KERNEL=${kernel}")

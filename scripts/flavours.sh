@@ -2,9 +2,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-prefix=tectonic
+none=none
 
-installer=laptop
+prefix=tectonic
 
 die() {
     echo "flavours: $*" >&2
@@ -17,37 +17,48 @@ usage: scripts/flavours.sh <command> [flavour]
 
 All output is one item per line, in declaration order.
 
-  list                every flavour
+  list                every declared flavour
+  targets             every build target: the ungated `none`, then flavours
   default             the flavour marked default in modules.kdl, which
                       builds use when none is given
   pr                  the flavour a pull request builds
-  installer           the flavour a fresh installer ISO lays down
-  check <flavour>      succeeds if <flavour> is declared, fails loudly if not
-  siblings <flavour>   every flavour except <flavour>
-  image [<flavour>]    published image name for a flavour (default: default)
-  images              published image name for every flavour
+  check <target>      succeeds if <target> is buildable, fails loudly if not
+  siblings <target>   every target except <target>
+  image [<target>]    published image name (default: the default flavour)
+  images              published image name for every target
   cache-image         image name of the shared build cache
 EOF
 }
 
 mapfile -t flavours < <(./scripts/manifest.sh flavours)
-[ "${#flavours[@]}" -gt 0 ] || die "no flavours declared in modules.kdl"
+mapfile -t targets < <(./scripts/manifest.sh targets)
 
-declare -A seen=()
-for name in "${flavours[@]}"; do
-    seen["$name"]=1
+declare -A buildable=()
+for name in "${targets[@]}"; do
+    buildable["$name"]=1
 done
 
-require_flavour() {
+require_target() {
     local wanted="${1:-}"
-    [ -n "$wanted" ] || die "expected a flavour name"
-    [ -n "${seen[$wanted]:-}" ] \
-        || die "'${wanted}' is not a flavour in modules.kdl (have: ${flavours[*]})"
+    [ -n "$wanted" ] || die "expected a target name"
+    [ -n "${buildable[$wanted]:-}" ] \
+        || die "'${wanted}' is not a build target (have: ${targets[*]})"
+}
+
+image_name() {
+    if [ "$1" = "$none" ]; then
+        printf '%s\n' "$prefix"
+    else
+        printf '%s-%s\n' "$prefix" "$1"
+    fi
 }
 
 case "${1:-}" in
     list)
-        printf '%s\n' "${flavours[@]}"
+        [ "${#flavours[@]}" -eq 0 ] || printf '%s\n' "${flavours[@]}"
+        ;;
+    targets)
+        printf '%s\n' "${targets[@]}"
         ;;
     default)
         ./scripts/manifest.sh default-flavour
@@ -55,28 +66,23 @@ case "${1:-}" in
     pr)
         ./scripts/manifest.sh pr-flavour
         ;;
-    installer)
-        [ -n "${seen[$installer]:-}" ] \
-            || die "the installer flavour '${installer}' is not in modules.kdl (have: ${flavours[*]})"
-        printf '%s\n' "$installer"
-        ;;
     check)
-        require_flavour "${2:-}"
+        require_target "${2:-}"
         ;;
     siblings)
-        require_flavour "${2:-}"
-        for name in "${flavours[@]}"; do
+        require_target "${2:-}"
+        for name in "${targets[@]}"; do
             [ "$name" = "$2" ] || printf '%s\n' "$name"
         done
         ;;
     image)
         name="${2:-$(./scripts/manifest.sh default-flavour)}"
-        require_flavour "$name"
-        printf '%s-%s\n' "$prefix" "$name"
+        require_target "$name"
+        image_name "$name"
         ;;
     images)
-        for name in "${flavours[@]}"; do
-            printf '%s-%s\n' "$prefix" "$name"
+        for name in "${targets[@]}"; do
+            image_name "$name"
         done
         ;;
     cache-image)

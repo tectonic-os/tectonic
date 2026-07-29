@@ -73,32 +73,32 @@ jobs:
     if: github.event_name != 'push' || github.actor != 'renovate[bot]'
     runs-on: ubuntu-24.04
     outputs:
-      flavours: ${{ steps.set.outputs.flavours }}
+      targets: ${{ steps.set.outputs.targets }}
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - id: set
         run: |
-          selection=list
+          selection="targets"
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            selection=pr
+            selection="pr"
           fi
-          flavours="$(./scripts/flavours.sh "$selection" \
+          targets="$(./scripts/flavours.sh "$selection" \
             | jq -Rsc 'split("\n") | map(select(length > 0))')"
-          echo "flavours=${flavours}" >> "$GITHUB_OUTPUT"
+          echo "targets=${targets}" >> "$GITHUB_OUTPUT"
 
   build_push:
     needs: compute-matrix
-    name: Build and push image (${{ matrix.flavour }})
+    name: Build and push image (${{ matrix.target }})
     runs-on: ubuntu-24.04
 
     strategy:
       matrix:
-        flavour: ${{ fromJson(needs.compute-matrix.outputs.flavours) }}
+        target: ${{ fromJson(needs.compute-matrix.outputs.targets) }}
       fail-fast: false
 
     concurrency:
-      group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref || github.run_id }}-${{ matrix.flavour }}
+      group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref || github.run_id }}-${{ matrix.target }}
       cancel-in-progress: true
 
     permissions:
@@ -111,10 +111,10 @@ jobs:
 
       - name: Prepare environment
         env:
-          FLAVOUR: ${{ matrix.flavour }}
+          TARGET: ${{ matrix.target }}
         run: |
           echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> "${GITHUB_ENV}"
-          echo "IMAGE_NAME=$(./scripts/flavours.sh image "$FLAVOUR")" >> "${GITHUB_ENV}"
+          echo "IMAGE_NAME=$(./scripts/flavours.sh image "$TARGET")" >> "${GITHUB_ENV}"
           if [ "${{ github.event_name }}" != "pull_request" ] \
              && [ "${{ github.ref }}" = "refs/heads/${{ github.event.repository.default_branch }}" ] \
              && [ "${{ github.event.inputs.kernel }}" != "stock" ]; then
@@ -154,7 +154,7 @@ jobs:
           labels: |
             io.artifacthub.package.readme-url=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.sha }}/README.md
             org.opencontainers.image.created=${{ steps.date.outputs.date }}
-            org.opencontainers.image.description=${{ env.IMAGE_DESC }} (${{ matrix.flavour }})
+            org.opencontainers.image.description=${{ env.IMAGE_DESC }} (${{ matrix.target }})
             org.opencontainers.image.documentation=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.sha }}/README.md
             org.opencontainers.image.source=https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/blob/${{ github.sha }}/Containerfile.template
             org.opencontainers.image.title=${{ env.IMAGE_NAME }}
@@ -191,7 +191,7 @@ jobs:
 
       - name: Build image
         env:
-          FLAVOUR: ${{ matrix.flavour }}
+          TARGET: ${{ matrix.target }}
           KERNEL_INPUT: ${{ github.event.inputs.kernel }}
           EVENT: ${{ github.event_name }}
           ON_DEFAULT_BRANCH: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
@@ -200,7 +200,7 @@ jobs:
           LABELS: ${{ steps.metadata.outputs.labels }}
           MOK_KEY_PATH: ${{ env.PUBLISH == 'true' && format('{0}/mok_privkey.pem', runner.temp) || '' }}
         run: |
-          args=(--backend buildx --flavour "$FLAVOUR")
+          args=(--backend buildx --flavour "$TARGET")
           if [ -n "$KERNEL_INPUT" ]; then
             args+=(--kernel "$KERNEL_INPUT")
           fi

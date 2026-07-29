@@ -42,8 +42,7 @@ jobs:
           USER_UID=$(id -u)
           USER_GID=$(id -g)
           DISK_TYPE=$(echo "${{ matrix.disk-type }}" | tr ' ' '-')
-          FLAVOUR="$(./scripts/flavours.sh installer)"
-          IMAGE_NAME="$(./scripts/flavours.sh image "$FLAVOUR")"
+          IMAGE_NAME="$(./scripts/flavours.sh image none)"
           IMAGE_REF="$(./scripts/registry.sh ref "$IMAGE_NAME"):${DEFAULT_TAG}"
           {
             echo "IMAGE_REF=${IMAGE_REF}"

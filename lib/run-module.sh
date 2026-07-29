@@ -7,9 +7,9 @@ export MODDIR
 
 if [ -n "${FLAVOUR_GATE:-}" ]; then
     case ",${FLAVOUR_GATE}," in
-        *",${FLAVOUR:?},"*) ;;
+        *",${FLAVOUR:-},"*) ;;
         *)
-            echo "Skipping $(basename "$MODDIR"): not built for flavour '${FLAVOUR}'"
+            echo "Skipping $(basename "$MODDIR"): not built for '${FLAVOUR:-the ungated build}'"
             exit 0
             ;;
     esac

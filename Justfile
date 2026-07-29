@@ -215,7 +215,7 @@ rebuild-raw $target_image=("localhost/" + image_name) $tag=default_tag: && (_reb
 
 # Rebuild an ISO installer image
 [group('Build Virtual Machine Image')]
-rebuild-iso $target_image=("localhost/" + image_name) $tag=default_tag $flavour=`./scripts/flavours.sh installer`: (build target_image tag flavour)
+rebuild-iso $target_image=("localhost/" + image_name) $tag=default_tag $flavour="none": (build target_image tag flavour)
     just build-iso "${target_image}" "${tag}" "${flavour}"
 
 # Run a virtual machine with the specified image type
