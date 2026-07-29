@@ -1,0 +1,3 @@
+description "bootc updates panel for KDE System Settings, with its notifier"
+
+supports "fedora"

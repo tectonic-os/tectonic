@@ -1,0 +1,3 @@
+description "Example module showing every optional piece a module can ship"
+
+supports "fedora"

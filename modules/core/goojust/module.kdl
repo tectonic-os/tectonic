@@ -1,0 +1,3 @@
+description "goojust, the OS TUI, plus the just engine and fastfetch it builds on"
+
+supports "fedora"

@@ -1,0 +1,3 @@
+description "GrapheneOS hardened_malloc, preloaded system wide"
+
+supports "fedora"

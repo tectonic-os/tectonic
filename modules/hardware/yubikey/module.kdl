@@ -1,0 +1,3 @@
+description "Hardware token and smartcard auth: YubiKey, FIDO2, PAM and PC/SC"
+
+supports "fedora"

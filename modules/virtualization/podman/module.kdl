@@ -1,0 +1,3 @@
+description "Podman extras: compose, machine and the TUI"
+
+supports "fedora"

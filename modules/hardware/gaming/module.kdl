@@ -1,0 +1,3 @@
+description "Xbox controller support via the xone driver, plus gamemode"
+
+supports "fedora"
