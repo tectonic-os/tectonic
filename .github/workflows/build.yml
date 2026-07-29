@@ -81,7 +81,7 @@ jobs:
         run: |
           selection=list
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            selection=default
+            selection=pr
           fi
           flavours="$(./scripts/flavours.sh "$selection" \
             | jq -Rsc 'split("\n") | map(select(length > 0))')"

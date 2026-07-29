@@ -1,0 +1,50 @@
+flavours {
+    dev
+}
+
+modules {
+    module "base"
+    module "core/auto-updates"
+    module "core/system-just-scripts"
+    module "core/goojust"
+    module "core/flatpak"
+    module "core/brew"
+    module "core/cli-tools"
+
+    module "kernel/cachyos-kernel"
+
+    module "hardening/hardened-malloc"
+    module "hardening/sudo-hardening"
+
+    module "backup/backup-tools"
+
+    module "hardware/intel-wifi"
+    module "hardware/gaming"
+    module "hardware/hardware-tools"
+    module "hardware/logitech"
+    module "hardware/yubikey"
+
+    module "de/kde-desktop"
+    module "de/tectonic-plasma-settings"
+    module "de/bazaar"
+
+    module "media-codecs"
+    module "networking"
+
+    module "virtualization/libvirt"
+    module "virtualization/incus"
+    module "virtualization/podman"
+
+    module "vpn/netbird"
+    module "vpn/tailscale"
+
+    module "apps/trivalent"
+    module "apps/vscodium"
+    module "apps/bitwarden"
+
+    flavour "dev" {
+        module "dev-tools"
+    }
+
+    module "core/power-just-scripts"
+}

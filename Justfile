@@ -21,7 +21,7 @@ fix:
     just --unstable --fmt -f Justfile
 
 # Generate Containerfile.generated from the Containerfile skeleton +
-# modules.list. Every build regenerates it first, so this is only for
+# modules.kdl. Every build regenerates it first, so this is only for
 # inspecting what a build would use.
 [group('Utility')]
 generate:
@@ -290,7 +290,7 @@ spawn-vm rebuild="0" type="qcow2" ram="6G":
       --vsock=false --pass-ssh-key=false \
       -i ./output/**/*.{{ type }}
 
-# Runs shellcheck over every Bash script, validates modules.list and
+# Runs shellcheck over every Bash script, validates modules.kdl and
 # renders the installer config, the same script the build workflow gates on
 lint:
     ./scripts/lint.sh

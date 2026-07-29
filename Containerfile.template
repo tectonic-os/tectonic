@@ -6,8 +6,6 @@ COPY modules/ /modules/
 
 FROM quay.io/fedora/fedora-bootc:44
 
-ARG FLAVOURS="desktop,laptop"
-
 ARG KERNEL=stock
 
 RUN --mount=type=bind,from=ctx,source=/00-setup.sh,target=/ctx/00-setup.sh \
@@ -16,7 +14,7 @@ RUN --mount=type=bind,from=ctx,source=/00-setup.sh,target=/ctx/00-setup.sh \
     --mount=type=tmpfs,target=/tmp \
     /ctx/00-setup.sh
 
-# ---- BEGIN MODULES (generated at build time from modules.list; see scripts/gen-containerfile.sh) ----
+# ---- BEGIN MODULES (generated at build time from modules.kdl; see scripts/gen-containerfile.sh) ----
 # ---- END MODULES ----
 
 ARG IMAGE_VERSION=dev

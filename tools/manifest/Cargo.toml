@@ -1,0 +1,18 @@
+[package]
+name = "manifest"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Reads modules.kdl and the per-module module.kdl manifests"
+
+[dependencies]
+kdl = "6.3.4"
+miette = { version = "7.6.0", features = ["fancy"] }
+
+[profile.release]
+opt-level = 1
+debug = false
+lto = false
+codegen-units = 16
+panic = "abort"
+strip = true

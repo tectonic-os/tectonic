@@ -15,8 +15,10 @@ mapfile -t scripts < <(
 shellcheck -s bash "${scripts[@]}"
 echo "lint: shellcheck passed on ${#scripts[@]} scripts"
 
+./scripts/manifest.sh check
+
 ./scripts/gen-containerfile.sh > /dev/null
-echo "lint: modules.list resolves"
+echo "lint: the Containerfile generates"
 
 IMAGE_REGISTRY=lint.invalid ./scripts/render-iso-config.sh > /dev/null
 echo "lint: installer config renders"
