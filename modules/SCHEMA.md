@@ -161,12 +161,6 @@ variant "wine-only" {
 | `secret "<id>"` | `--mount=type=secret,id=<id>,target=/run/secrets/<id>,required=false` |
 | `arg "<NAME>"` | `<NAME>=${<NAME>}` in the layer's env prefix |
 
-### Overlay overrides
-
-```kdl
-overrides "core/goojust"
-```
-
 ### Raw fragments
 
 ## Build targets
@@ -182,7 +176,7 @@ overrides "core/goojust"
 | --- | --- |
 | `FLAVOUR_GATE=<flavour>` | the entry is inside a `flavour` block |
 | `OPT_<NAME>=<value>` | one per declared option, always, defaults included |
-| `MODULE_SINKS="<file>=<path> ..."` | any enabled module declares a sink |
+| `MODULE_SINKS="<file>=<path> ..."` | this module ships a file some sink aggregates |
 | `<NAME>=${<NAME>}` | one per `arg` |
 
 ## Validation
@@ -217,7 +211,7 @@ overrides "core/goojust"
 
 - **Ordering by the graph.** The build order is document order today. A
 - **Additive fragments.** `Containerfile.inc` gains a declared position
-- **The overlay collision check** that gives `overrides` its purpose.
+- **The overlay collision check**, and with it an `overrides` node
 - **`asset` blocks replacing `versions.sh`**: datasource, version,
 - **`packages { fedora "..." }`**, declaring packages instead of calling
 - **`source`, `ref` and `sha256`** on list entries, for out-of-tree
