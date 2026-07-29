@@ -1,3 +1,7 @@
 description "CachyOS kernel and companions, with Secure Boot module signing"
 
 supports "fedora"
+
+provides "kernel-devel"
+provides-file "/usr/share/tectonic/sb_cert.der"
+provides-file "/usr/lib/tectonic/kernel-package"

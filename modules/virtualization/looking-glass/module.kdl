@@ -1,3 +1,6 @@
 description "kvmfr DKMS kernel module, for Looking Glass frame relay from a passed-through GPU"
 
 supports "fedora"
+
+requires "kernel-devel"
+requires-file "/usr/share/tectonic/sb_cert.der"

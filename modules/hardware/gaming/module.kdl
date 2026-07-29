@@ -1,3 +1,6 @@
 description "Xbox controller support via the xone driver, plus gamemode"
 
 supports "fedora"
+
+requires "kernel-devel"
+requires-file "/usr/share/tectonic/sb_cert.der"
