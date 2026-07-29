@@ -60,30 +60,17 @@ apply_tectonic_presets system /usr/lib/systemd/system-preset
 apply_tectonic_presets user /usr/lib/systemd/user-preset
 
 run_module_finalize() {
-    local current_flavour="" line entry name d dir
-    while IFS= read -r line; do
-        entry="${line%%#*}"
-        entry="${entry//[[:space:]]/}"
-        [ -z "$entry" ] && continue
-        if [[ "$entry" =~ ^\[([a-z][a-z0-9-]*)\]$ ]]; then
-            section_name="${BASH_REMATCH[1]}"
-            if [ "$section_name" = "common" ]; then
-                current_flavour=""
-            else
-                current_flavour="$section_name"
-            fi
-            continue
-        fi
-        [ -n "$current_flavour" ] && [ "$current_flavour" != "${FLAVOUR:?}" ] && continue
-        name="${entry%%@*}"
-        d="/ctx/modules/${name}"
-        dir=""
-        [ -d "$d" ] && dir="$d"
-        if [ -n "$dir" ] && [ -f "$dir/finalize.sh" ]; then
-            MODDIR="$dir"; export MODDIR
-            # shellcheck source=/dev/null
-            source "$dir/finalize.sh"
-        fi
-    done < /ctx/modules.list
+    local entry name gate dir entries=()
+    read -ra entries <<< "${FINALIZE_ORDER:-}"
+    for entry in "${entries[@]}"; do
+        name="${entry%%:*}"
+        gate=""
+        [ "$entry" = "$name" ] || gate="${entry#*:}"
+        [ -z "$gate" ] || [ "$gate" = "${FLAVOUR:-}" ] || continue
+        dir="/ctx/modules/${name}"
+        MODDIR="$dir"; export MODDIR
+        # shellcheck source=/dev/null
+        source "$dir/finalize.sh"
+    done
 }
 run_module_finalize

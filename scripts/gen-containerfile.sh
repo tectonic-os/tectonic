@@ -82,6 +82,7 @@ EOF
 
 # ---- parse modules.list -----------------------------------------------
 current_flavour=""
+finalize_order=()
 while IFS= read -r line; do
     entry="${line%%#*}"
     entry="${entry//[[:space:]]/}"
@@ -110,11 +111,23 @@ while IFS= read -r line; do
         flavour_arg_emitted=1
     fi
     section+="$(emit_block "$name" "$variant" "$current_flavour")"$'\n\n'
+
+    if [ -f "modules/${name}/finalize.sh" ]; then
+        finalize_order+=("${name}${current_flavour:+:${current_flavour}}")
+    fi
 done < "$list"
 
 if [ "$flavour_arg_emitted" = 0 ]; then
     section+="$(emit_flavour_arg)"$'\n\n'
 fi
+
+section+="$(
+    cat <<EOF
+# ---- finalize hook order ----
+# Modules shipping a finalize.sh, in list order, resolved on the host.
+ARG FINALIZE_ORDER="${finalize_order[*]}"
+EOF
+)"$'\n\n'
 
 # ---- splice into skeleton -----------------------------------------------
 if ! grep -qxF "$begin" "$skeleton" || ! grep -qxF "$end" "$skeleton"; then
