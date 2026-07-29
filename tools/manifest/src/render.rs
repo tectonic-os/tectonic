@@ -98,6 +98,24 @@ fn standard(
         let _ = write!(env, "MODULE_SINKS=\"{}\" ", pairs.join(" "));
     }
 
+    let mut secrets = String::new();
+    for decl in module.map(|m| m.secrets.as_slice()).unwrap_or_default() {
+        let id = &decl.name;
+        let _ = write!(
+            secrets,
+            "--mount=type=secret,id={id},target=/run/secrets/{id},required=false \\\n    "
+        );
+    }
+    for decl in module
+        .map(|m| m.args.as_slice())
+        .unwrap_or_default()
+        .iter()
+        .rev()
+    {
+        let name = &decl.name;
+        env.insert_str(0, &format!("{name}=${{{name}}} "));
+    }
+
     let path = &entry.path;
     let mut out = String::new();
     if let Some(flavour) = &entry.flavour {
@@ -111,7 +129,7 @@ fn standard(
          --mount=type=cache,target=/var/cache \\\n    \
          --mount=type=cache,target=/var/log \\\n    \
          --mount=type=tmpfs,target=/tmp \\\n    \
-         {env}bash /ctx/lib/run-module.sh /ctx/modules/{path}"
+         {secrets}{env}bash /ctx/lib/run-module.sh /ctx/modules/{path}"
     );
     out
 }

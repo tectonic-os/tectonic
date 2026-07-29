@@ -45,6 +45,10 @@ pub struct Module {
     /// manifest: a module never names a flavour.
     pub flavour: Option<String>,
     pub sinks: Vec<Sink>,
+    /// Build inputs the field sets cover, so that needing a secret or a build
+    /// arg does not force a module to hand-write a whole RUN block.
+    pub secrets: Vec<Decl>,
+    pub args: Vec<Decl>,
     pub options: Vec<Opt>,
     pub variants: Vec<Variant>,
     /// Resolved option name to value, ready to become env on the layer.
@@ -111,6 +115,8 @@ impl Module {
             requires_files: Vec::new(),
             flavour: entry.flavour.clone(),
             sinks: Vec::new(),
+            secrets: Vec::new(),
+            args: Vec::new(),
             options: Vec::new(),
             variants: Vec::new(),
             resolved: Vec::new(),
@@ -185,6 +191,26 @@ impl Module {
                             module.provides_files.push(decl);
                         } else {
                             module.requires_files.push(decl);
+                        }
+                    }
+                }
+                kind @ ("secret" | "arg") => {
+                    let names = string_args(node);
+                    if names.is_empty() {
+                        issues.push(
+                            Issue::new(format!("`{kind}` needs a name"), &file, &text)
+                                .at(node.name().span(), "nothing named"),
+                        );
+                    }
+                    for name in names {
+                        let decl = Decl {
+                            name: name.to_string(),
+                            span: node.name().span(),
+                        };
+                        if kind == "secret" {
+                            module.secrets.push(decl);
+                        } else {
+                            module.args.push(decl);
                         }
                     }
                 }
@@ -263,6 +289,23 @@ impl Module {
                     .help("one line, present tense, no trailing period; it names the module in the resolved build summary"),
             );
         }
+        if dir.join("Containerfile.inc").is_file() {
+            for decl in module.secrets.iter().chain(module.args.iter()) {
+                issues.push(
+                    Issue::new(
+                        format!(
+                            "`{}` declares `{}` alongside a Containerfile.inc",
+                            entry.path, decl.name
+                        ),
+                        &file,
+                        &text,
+                    )
+                    .at(decl.span, "would be silently ignored")
+                    .help("a fragment replaces the generated block, so it has to carry its own mounts and args; drop one or the other"),
+                );
+            }
+        }
+
         if module.supports.is_empty() {
             issues.push(
                 Issue::new(format!("`{}` declares no `supports`", entry.path), &file, &text)

@@ -4,3 +4,6 @@ supports "fedora"
 
 requires "kernel-devel"
 requires-file "/usr/share/tectonic/sb_cert.der"
+
+arg "KERNEL"
+secret "mok_privkey"
