@@ -49,12 +49,22 @@ pub fn section(
             .find(|m| m.path == entry.path && m.flavour == entry.flavour);
 
         let inc = dir.join("Containerfile.inc");
-        let block = if inc.is_file() {
-            verbatim(entry, &inc, flavour_arg_emitted, list, issues)
-        } else {
-            standard(entry, module, collected.get(&entry.path))
-        };
-        let _ = write!(out, "{block}\n\n");
+        let mut blocks: Vec<String> = Vec::new();
+        let fragment_after = module.is_some_and(|m| m.fragment_after);
+        if inc.is_file() && !fragment_after {
+            blocks.push(fragment(entry, &inc, flavour_arg_emitted, list, issues));
+        }
+        if module.is_none_or(|m| m.standard_layer) {
+            blocks.push(standard(entry, module, collected.get(&entry.path)));
+        }
+        if inc.is_file() && fragment_after {
+            blocks.push(fragment(entry, &inc, flavour_arg_emitted, list, issues));
+        }
+
+        if let Some(flavour) = &entry.flavour {
+            let _ = writeln!(out, "# ---- [{flavour}] ----");
+        }
+        let _ = write!(out, "{}\n\n", blocks.join("\n\n"));
 
         if dir.join("finalize.sh").is_file() {
             finalize.push(match &entry.flavour {
@@ -176,9 +186,6 @@ fn standard(
 
     let path = &entry.path;
     let mut out = String::new();
-    if let Some(flavour) = &entry.flavour {
-        let _ = writeln!(out, "# ---- [{flavour}] ----");
-    }
     let _ = write!(
         out,
         "# ---- {path} ----\n\
@@ -192,9 +199,10 @@ fn standard(
     out
 }
 
-/// A module whose needs the field sets cannot express ships a fragment, which
-/// replaces the standard block rather than adding to it.
-fn verbatim(
+/// A module whose needs the field sets cannot express ships a fragment,
+/// inlined verbatim above the standard block, or below it when the manifest
+/// says `position "after"`.
+fn fragment(
     entry: &Entry,
     inc: &Path,
     flavour_arg_emitted: bool,
@@ -216,7 +224,8 @@ fn verbatim(
         );
     }
 
-    if let Some(flavour) = &entry.flavour {
+    let runs = body.lines().any(|l| l.trim_start().starts_with("RUN "));
+    if let Some(flavour) = entry.flavour.as_ref().filter(|_| runs) {
         let declared = body
             .split("FLAVOUR_GATE=")
             .nth(1)
@@ -241,16 +250,13 @@ fn verbatim(
                 )
                 .at(entry.span, "the flavour gate would be silently ignored")
                 .help(
-                    "a fragment replaces the generated block, so it has to carry the gate itself",
+                    "a fragment is emitted unconditionally, so anything it runs has to carry the gate itself",
                 ),
             ),
         }
     }
 
     let mut out = String::new();
-    if let Some(flavour) = &entry.flavour {
-        let _ = writeln!(out, "# ---- [{flavour}] ----");
-    }
     let _ = write!(
         out,
         "# ---- {path} (verbatim from modules/{path}/Containerfile.inc) ----\n{}",

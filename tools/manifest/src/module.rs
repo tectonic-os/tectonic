@@ -52,6 +52,10 @@ pub struct Module {
     pub variants: Vec<Variant>,
     /// Resolved option name to value, ready to become env on the layer.
     pub resolved: Vec<(String, String)>,
+    /// Where a Containerfile.inc goes relative to the generated block, and
+    /// whether that block is emitted at all.
+    pub fragment_after: bool,
+    pub standard_layer: bool,
 }
 
 /// The only base family today.
@@ -119,10 +123,13 @@ impl Module {
             options: Vec::new(),
             variants: Vec::new(),
             resolved: Vec::new(),
+            fragment_after: false,
+            standard_layer: true,
             file: file.clone(),
             text: text.clone(),
         };
 
+        let mut fragment_span: Option<SourceSpan> = None;
         for node in doc.nodes() {
             match node.name().value() {
                 "description" => match string_args(node).first() {
@@ -240,6 +247,29 @@ impl Module {
                         }
                     }
                 }
+                "fragment" => {
+                    if let Some(first) = fragment_span {
+                        issues.push(
+                            Issue::new("`fragment` is declared twice", &file, &text)
+                                .at(first, "first here")
+                                .at(node.name().span(), "and again here"),
+                        );
+                        continue;
+                    }
+                    fragment_span = Some(node.name().span());
+                    if !dir.join("Containerfile.inc").is_file() {
+                        issues.push(
+                            Issue::new(
+                                format!("`{}` declares `fragment` but ships no Containerfile.inc", entry.path),
+                                &file,
+                                &text,
+                            )
+                            .at(node.name().span(), "nothing to place")
+                            .help("shipping the file is what adds a fragment; this node only says where it goes"),
+                        );
+                    }
+                    module.parse_fragment(node, &file, &text, issues);
+                }
                 "option" => {
                     if let Some(opt) = options::parse_option(node, &file, &text, issues) {
                         if module.options.iter().any(|o| o.name == opt.name) {
@@ -286,19 +316,30 @@ impl Module {
                     .help("one line, present tense, no trailing period; it names the module in the resolved build summary"),
             );
         }
-        if dir.join("Containerfile.inc").is_file() {
-            for decl in module.secrets.iter().chain(module.args.iter()) {
+        if !module.standard_layer {
+            let dropped = module
+                .secrets
+                .iter()
+                .map(|d| ("secret", d.name.as_str(), d.span))
+                .chain(module.args.iter().map(|d| ("arg", d.name.as_str(), d.span)))
+                .chain(
+                    module
+                        .options
+                        .iter()
+                        .map(|o| ("option", o.name.as_str(), o.span)),
+                );
+            for (kind, name, span) in dropped {
                 issues.push(
                     Issue::new(
                         format!(
-                            "`{}` declares `{}` alongside a Containerfile.inc",
-                            entry.path, decl.name
+                            "`{}` declares `{kind} \"{name}\"` with no standard layer to carry it",
+                            entry.path
                         ),
                         &file,
                         &text,
                     )
-                    .at(decl.span, "would be silently ignored")
-                    .help("a fragment replaces the generated block, so it has to carry its own mounts and args; drop one or the other"),
+                    .at(span, "nowhere to land")
+                    .help("`standard-layer #false` makes the fragment the whole layer, so it has to spell out its own mounts, args and env; drop one or the other"),
                 );
             }
         }
@@ -321,6 +362,62 @@ impl Module {
         );
 
         Some(module)
+    }
+
+    /// `fragment position="after" standard-layer=#false` Defaults are the
+    /// additive case: the fragment goes above the generated block and the
+    /// block is still emitted.
+    fn parse_fragment(&mut self, node: &KdlNode, file: &str, text: &str, issues: &mut Issues) {
+        let mut position_span = None;
+        for prop in node.entries() {
+            let Some(key) = prop.name().map(|n| n.value()) else {
+                issues.push(
+                    Issue::new("`fragment` takes no arguments", file, text)
+                        .at(prop.span(), "unexpected value")
+                        .help("`fragment position=\"after\"`"),
+                );
+                continue;
+            };
+            match key {
+                "position" => match prop.value().as_string() {
+                    Some(p @ ("before" | "after")) => {
+                        self.fragment_after = p == "after";
+                        position_span = Some(prop.span());
+                    }
+                    _ => issues.push(
+                        Issue::new("`position` must be \"before\" or \"after\"", file, text)
+                            .at(prop.span(), "not a position")
+                            .help("before, the default, puts the fragment above the generated block; after puts it below"),
+                    ),
+                },
+                "standard-layer" => match prop.value().as_bool() {
+                    Some(v) => self.standard_layer = v,
+                    None => issues.push(
+                        Issue::new("`standard-layer` must be #true or #false", file, text)
+                            .at(prop.span(), "not a boolean"),
+                    ),
+                },
+                other => issues.push(
+                    Issue::new(format!("unknown fragment property `{other}`"), file, text)
+                        .at(prop.span(), "not part of the schema")
+                        .help("a fragment accepts `position` and `standard-layer`"),
+                ),
+            }
+        }
+
+        if !self.standard_layer {
+            if let Some(span) = position_span {
+                issues.push(
+                    Issue::new(
+                        "`position` says nothing without a standard layer",
+                        file,
+                        text,
+                    )
+                    .at(span, "there is nothing to be before or after")
+                    .help("`standard-layer #false` makes the fragment the only thing this module emits"),
+                );
+            }
+        }
     }
 }
 
@@ -568,6 +665,22 @@ pub fn resolve_collects(
                         .find(|c| &c.file == file)
                         .map(|c| c.into.clone())
                         .unwrap_or_default();
+                    if !module.standard_layer {
+                        issues.push(
+                            Issue::new(
+                                format!(
+                                    "`{}` ships a {file} with no standard layer to collect it from",
+                                    module.path
+                                ),
+                                &module.file,
+                                &module.text,
+                            )
+                            .help(format!(
+                                "`standard-layer #false` makes the fragment the whole layer, so it has to append the file to {into} itself"
+                            )),
+                        );
+                        continue;
+                    }
                     out.entry(module.path.clone())
                         .or_default()
                         .push((file.clone(), into));

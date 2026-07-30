@@ -163,6 +163,15 @@ variant "wine-only" {
 
 ### Raw fragments
 
+```kdl
+fragment position="after" standard-layer=#false
+```
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `position=` | `"before"` | where the fragment goes relative to the generated block |
+| `standard-layer=` | `#true` | whether that block is emitted at all |
+
 ## Build targets
 
 | Target | Image | Cache tag | `FLAVOUR` |
@@ -202,15 +211,17 @@ variant "wine-only" {
 - a `list` value containing whitespace
 - selecting an undeclared variant, or a variant setting an undeclared
 
-- a module declaring `secret` or `arg` alongside a `Containerfile.inc`
+- a `fragment` node in a module that ships no `Containerfile.inc`, or
+- a `position` other than `before` or `after`, or one declared alongside
+- a `secret`, `arg`, `option` or collected file declared alongside
 - a `Containerfile.inc` expanding `FLAVOUR` above the `ARG FLAVOUR`
+- a gated module whose fragment runs a command without carrying the
 
 - `source`, `ref` or `sha256` on a list entry
 
 ## Not implemented yet
 
 - **Ordering by the graph.** The build order is document order today. A
-- **Additive fragments.** `Containerfile.inc` gains a declared position
 - **The overlay collision check**, and with it an `overrides` node
 - **`asset` blocks replacing `versions.sh`**: datasource, version,
 - **`packages { fedora "..." }`**, declaring packages instead of calling

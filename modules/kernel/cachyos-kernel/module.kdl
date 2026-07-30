@@ -5,3 +5,6 @@ supports "fedora"
 provides "kernel-devel"
 provides-file "/usr/share/tectonic/sb_cert.der"
 provides-file "/usr/lib/tectonic/kernel-package"
+
+arg "KERNEL"
+secret "mok_privkey"
