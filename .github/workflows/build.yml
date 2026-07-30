@@ -400,7 +400,7 @@ jobs:
         run: |
           IMAGE_DIGEST="${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}"
           cosign verify --key cosign.pub --insecure-ignore-tlog=true \
-            "${IMAGE_DIGEST}"
+            "${IMAGE_DIGEST}" > /dev/null
           cosign verify-attestation --key cosign.pub --type spdxjson \
-            --insecure-ignore-tlog=true "${IMAGE_DIGEST}"
+            --insecure-ignore-tlog=true "${IMAGE_DIGEST}" > /dev/null
 
