@@ -377,7 +377,7 @@ fn standard(
          --mount=type=cache,target=/var/cache \\\n    \
          --mount=type=cache,target=/var/log \\\n    \
          --mount=type=tmpfs,target=/tmp \\\n    \
-         {secrets}{assets}{env}{packages_cmd}bash /ctx/lib/run-module.sh /ctx/modules/{path}"
+         {secrets}{packages_cmd}{assets}{env}bash /ctx/lib/run-module.sh /ctx/modules/{path}"
     );
     out
 }
@@ -393,10 +393,13 @@ fn packages_install(module: Option<&Module>) -> String {
         let pkgs = group.packages.join(" ");
         match &group.enablerepo {
             Some(repo) => {
-                let _ = write!(out, "dnf5 install -y --enablerepo='{repo}' {pkgs} && ");
+                let _ = write!(
+                    out,
+                    "dnf5 install -y --enablerepo='{repo}' {pkgs} && \\\n    "
+                );
             }
             None => {
-                let _ = write!(out, "dnf5 install -y {pkgs} && ");
+                let _ = write!(out, "dnf5 install -y {pkgs} && \\\n    ");
             }
         }
     }
