@@ -468,20 +468,17 @@ fn providers_on_disk(root: &Path) -> BTreeMap<String, Vec<String>> {
 
 /// Single pass over the resolved graph.
 pub fn check_graph(modules: &[Module], root: &Path, issues: &mut Issues) {
-    let mut offered: BTreeMap<&str, Vec<(usize, &Module)>> = BTreeMap::new();
-    for (index, module) in modules.iter().enumerate() {
+    let mut offered: BTreeMap<&str, Vec<&Module>> = BTreeMap::new();
+    for module in modules {
         for decl in module.provides.iter().chain(module.provides_files.iter()) {
-            offered
-                .entry(decl.name.as_str())
-                .or_default()
-                .push((index, module));
+            offered.entry(decl.name.as_str()).or_default().push(module);
         }
     }
 
     for (capability, providers) in &offered {
         if providers.len() > 1 {
-            let names: Vec<&str> = providers.iter().map(|(_, m)| m.path.as_str()).collect();
-            let (_, first) = providers[0];
+            let names: Vec<&str> = providers.iter().map(|m| m.path.as_str()).collect();
+            let first = providers[0];
             issues.push(
                 Issue::new(
                     format!("`{capability}` is provided by more than one enabled module"),
@@ -505,7 +502,7 @@ pub fn check_graph(modules: &[Module], root: &Path, issues: &mut Issues) {
 
     let on_disk = providers_on_disk(root);
 
-    for (index, module) in modules.iter().enumerate() {
+    for module in modules {
         let hard = module
             .requires
             .iter()
@@ -539,23 +536,7 @@ pub fn check_graph(modules: &[Module], root: &Path, issues: &mut Issues) {
                 continue;
             };
 
-            if let Some((provider_index, provider)) = providers.first() {
-                if *provider_index > index {
-                    issues.push(
-                        Issue::new(
-                            format!(
-                                "`{}` {kind} `{}`, which `{}` provides further down the list",
-                                module.path, decl.name, provider.path
-                            ),
-                            &module.file,
-                            &module.text,
-                        )
-                        .at(decl.span, "provided too late to be usable")
-                        .help("a requirement implies ordering: move the provider above the module that needs it"),
-                    );
-                    continue;
-                }
-
+            if let Some(provider) = providers.first() {
                 if let Some(provider_flavour) = &provider.flavour {
                     if module.flavour.as_ref() != Some(provider_flavour) {
                         issues.push(

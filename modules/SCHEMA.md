@@ -172,6 +172,8 @@ fragment position="after" standard-layer=#false
 | `position=` | `"before"` | where the fragment goes relative to the generated block |
 | `standard-layer=` | `#true` | whether that block is emitted at all |
 
+## Build order
+
 ## Build targets
 
 | Target | Image | Cache tag | `FLAVOUR` |
@@ -202,6 +204,8 @@ fragment position="after" standard-layer=#false
 - a `requires` no enabled module provides, listing every module that
 - a `requires-file` no enabled module provides
 - two enabled modules providing the same capability or contract file
+- a requirement satisfied only by a module gated to another flavour
+- a cycle, naming the edges that close it
 
 - shipping a collected filename while the module that collects it is not
 - two enabled modules collecting the same filename
@@ -221,7 +225,6 @@ fragment position="after" standard-layer=#false
 
 ## Not implemented yet
 
-- **Ordering by the graph.** The build order is document order today. A
 - **The overlay collision check**, and with it an `overrides` node
 - **`asset` blocks replacing `versions.sh`**: datasource, version,
 - **`packages { fedora "..." }`**, declaring packages instead of calling
