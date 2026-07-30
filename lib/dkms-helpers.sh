@@ -4,6 +4,8 @@
 source "$(dirname "${BASH_SOURCE[0]}")/kernel-helpers.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/sign-helpers.sh"
 
+source /usr/libexec/kernel-devel-helpers.sh
+
 DKMS_BUILD_DEPS=(dkms gcc make git sbsigntools openssl)
 DKMS_BUILD_DEPS_REMOVE=(dkms gcc make sbsigntools)
 
