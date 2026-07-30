@@ -13,6 +13,14 @@ const FLAVOUR_ARG: &str = "\
 # ---- flavour gate ----
 ARG FLAVOUR";
 
+/// CI passes the build date, so this changes every day.
+const IMAGE_VERSION_ARG: &str = "\
+# ---- image version ----
+ARG IMAGE_VERSION=dev";
+
+/// Where the module layers sit among the build phases.
+const MODULE_SLOT: u32 = 50;
+
 pub fn section(
     list: &List,
     modules: &[Module],
@@ -23,6 +31,11 @@ pub fn section(
     let mut out = String::new();
     let mut flavour_arg_emitted = false;
     let mut finalize: Vec<String> = Vec::new();
+
+    let phases = phases(root, issues);
+    for (_, file) in phases.iter().filter(|(number, _)| *number < MODULE_SLOT) {
+        let _ = write!(out, "{}\n\n", phase(file, false));
+    }
 
     for entry in &list.entries {
         let dir = root.join("modules").join(&entry.path);
@@ -85,6 +98,69 @@ pub fn section(
         finalize.join(" ")
     );
 
+    let _ = write!(out, "{IMAGE_VERSION_ARG}\n\n");
+
+    for (_, file) in phases.iter().filter(|(number, _)| *number >= MODULE_SLOT) {
+        let _ = write!(out, "{}\n\n", phase(file, true));
+    }
+
+    out
+}
+
+/// Every build-phases/*.sh, as its number and filename, in build order.
+fn phases(root: &Path, issues: &mut Issues) -> Vec<(u32, String)> {
+    let dir = root.join("build-phases");
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return Vec::new();
+    };
+
+    let mut out: Vec<(u32, String)> = Vec::new();
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !name.ends_with(".sh") || !entry.path().is_file() {
+            continue;
+        }
+        let number = name
+            .split_once('-')
+            .and_then(|(prefix, _)| prefix.parse::<u32>().ok());
+        match number {
+            Some(number) => out.push((number, name)),
+            None => {
+                let file = dir.join(&name).display().to_string();
+                issues.push(
+                    Issue::new(format!("`{name}` has no phase number"), &file, "")
+                        .help(format!(
+                            "name it <number>-{name}: below {MODULE_SLOT} to run before the module layers, {MODULE_SLOT} or above to run after"
+                        )),
+                );
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// One phase layer.
+fn phase(file: &str, below_modules: bool) -> String {
+    let mut out = format!(
+        "# ---- phase {file} ----\n\
+         RUN --mount=type=bind,from=ctx,source=/{file},target=/ctx/{file} \\\n    "
+    );
+    if below_modules {
+        out.push_str("--mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \\\n    ");
+        out.push_str("--mount=type=bind,from=ctx,source=/modules,target=/ctx/modules \\\n    ");
+    }
+    out.push_str(
+        "--mount=type=cache,target=/var/cache \\\n    \
+         --mount=type=cache,target=/var/log \\\n    \
+         --mount=type=tmpfs,target=/tmp \\\n    ",
+    );
+    if below_modules {
+        out.push_str(
+            "FLAVOUR=${FLAVOUR} IMAGE_VERSION=${IMAGE_VERSION} FINALIZE_ORDER=\"${FINALIZE_ORDER}\" ",
+        );
+    }
+    let _ = write!(out, "/ctx/{file}");
     out
 }
 
