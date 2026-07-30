@@ -217,6 +217,23 @@ jobs:
           fi
           ./scripts/build.sh "${args[@]}"
 
+      - name: Summarize the resolved build
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          {
+            echo "## ${IMAGE_NAME}"
+            echo
+            ./scripts/manifest.sh summary "$TARGET"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the generated Containerfile
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: containerfile-${{ env.IMAGE_NAME }}
+          path: Containerfile.generated
+          retention-days: 30
+
       - name: Setup Syft
         id: setup-syft
         if: env.PUBLISH == 'true'

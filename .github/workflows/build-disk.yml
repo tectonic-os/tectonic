@@ -60,6 +60,29 @@ jobs:
         if: matrix.disk-type == 'anaconda-iso'
         run: echo "ISO_CONFIG=$(./scripts/render-iso-config.sh)" >> "${GITHUB_ENV}"
 
+      - name: Login to GitHub Container Registry (root)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | sudo podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Check the target image is published
+        run: |
+          if sudo skopeo inspect --raw "docker://${IMAGE_REF}" > /dev/null 2>&1; then
+            echo "${IMAGE_REF} is pullable"
+            exit 0
+          fi
+          echo "${IMAGE_REF} cannot be pulled. Two things cause this:" >&2
+          echo >&2
+          echo "  * It has never been published. Image packages are created" >&2
+          echo "    by a push to the default branch, so a new target has" >&2
+          echo "    nothing to build from until that push happens." >&2
+          echo "  * It is published but private. GitHub makes a package" >&2
+          echo "    private on first publish, and ghcr answers an" >&2
+          echo "    unauthorised request with 403 rather than 404, so this" >&2
+          echo "    looks identical to the case above. Flip it to public." >&2
+          echo "::error::${IMAGE_REF} is not published or not readable; see the log above"
+          exit 1
+
       - name: Build disk images
         id: build
         uses: osbuild/bootc-image-builder-action@30960621b85c9e76c653082f9ef4cab5a10210d5 # main

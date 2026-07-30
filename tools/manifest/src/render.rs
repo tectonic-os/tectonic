@@ -1,7 +1,7 @@
 //! The generated Containerfile section.
 
 use crate::diag::{Issue, Issues};
-use crate::list::{Entry, List};
+use crate::list::{Entry, List, NO_FLAVOUR};
 use crate::module::Module;
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -76,6 +76,64 @@ pub fn section(
     );
 
     out
+}
+
+/// What a target is made of, as markdown, in the order the layers build.
+pub fn summary(list: &List, modules: &[Module], target: Option<&str>) -> String {
+    let included: Vec<&Entry> = list
+        .entries
+        .iter()
+        .filter(|e| match (&e.flavour, target) {
+            (None, _) => true,
+            (Some(_), None) => true,
+            (Some(gate), Some(target)) => gate == target,
+        })
+        .collect();
+    let gated = included.iter().filter(|e| e.flavour.is_some()).count();
+
+    let mut out = String::new();
+    let count = included.len();
+    let _ = match target {
+        Some(NO_FLAVOUR) => writeln!(out, "{count} modules, the ungated set."),
+        Some(target) => writeln!(out, "{count} modules, {gated} of them gated to `{target}`."),
+        None => writeln!(out, "{count} modules, {gated} of them gated to a flavour."),
+    };
+    let _ = write!(
+        out,
+        "\n| Module | Description | Options |\n| --- | --- | --- |\n"
+    );
+
+    for entry in included {
+        let module = modules
+            .iter()
+            .find(|m| m.path == entry.path && m.flavour == entry.flavour);
+        let mut name = format!("`{}`", entry.path);
+        if let Some(flavour) = &entry.flavour {
+            let _ = write!(name, " `[{flavour}]`");
+        }
+        if let Some(variant) = &entry.variant {
+            let _ = write!(name, " `variant={variant}`");
+        }
+        let options: Vec<String> = module
+            .map(|m| m.resolved.as_slice())
+            .unwrap_or_default()
+            .iter()
+            .map(|(name, value)| format!("`{name}=\"{}\"`", cell(value)))
+            .collect();
+        let _ = writeln!(
+            out,
+            "| {name} | {} | {} |",
+            cell(module.map(|m| m.description.as_str()).unwrap_or_default()),
+            options.join(" ")
+        );
+    }
+    out
+}
+
+/// A pipe would end the column, and neither a description nor an option value
+/// is stopped from holding one.
+fn cell(text: &str) -> String {
+    text.replace('|', "\\|")
 }
 
 fn standard(

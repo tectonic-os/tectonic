@@ -13,7 +13,8 @@ use std::process::ExitCode;
 const USAGE: &str = "\
 usage: manifest <command>
 
-All output is one item per line, in declaration order.
+Output is one item per line, in declaration order, except where a command
+says otherwise.
 
   flavours           every declared flavour
   default-flavour    the flavour marked default, which builds use when none
@@ -21,6 +22,8 @@ All output is one item per line, in declaration order.
   pr-flavour         the flavour a pull request builds
   targets           every build target: the ungated `none`, then flavours
   section           the generated Containerfile module section
+  summary [target]  what a target is made of, as markdown; every entry
+                    when no target is given
   check             validate every manifest, printing what is wrong
 
 Run from the repository root, or set TECTONIC_ROOT.
@@ -39,8 +42,13 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    if args.len() > 1 {
+    let target = args.get(1).map(String::as_str);
+    if target.is_some() && command != "summary" {
         eprintln!("manifest: `{command}` takes no arguments");
+        return ExitCode::FAILURE;
+    }
+    if args.len() > 2 {
+        eprintln!("manifest: `summary` takes at most one target");
         return ExitCode::FAILURE;
     }
 
@@ -78,6 +86,19 @@ fn main() -> ExitCode {
             } else {
                 section
             }
+        }
+        "summary" => {
+            if let Some(unknown) = target.filter(|t| !list.targets().iter().any(|have| have == t)) {
+                issues.push(
+                    diag::Issue::new(
+                        format!("`{unknown}` is not a build target"),
+                        &list_display,
+                        &list.text,
+                    )
+                    .help(format!("targets: {}", list.targets().join(", "))),
+                );
+            }
+            render::summary(&list, &modules, target)
         }
         other => {
             eprintln!("manifest: unknown command `{other}`");
