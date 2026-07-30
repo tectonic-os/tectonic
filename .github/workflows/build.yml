@@ -125,6 +125,7 @@ jobs:
           fi
 
       - name: Select a working container runtime
+        id: runtime
         run: |
           echo "podman: $(podman --version)"
           for rt in crun runc; do
@@ -136,6 +137,7 @@ jobs:
           done
           if sudo podman run --rm --runtime crun "$PROBE_IMAGE" > /dev/null 2>&1; then
             echo "crun works; leaving the default alone"
+            echo "flag=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "::warning::crun cannot start a container on this runner; falling back to runc"
@@ -143,14 +145,9 @@ jobs:
             echo "::error::crun cannot start a container and runc is not installed, so there is no working OCI runtime on this runner"
             exit 1
           fi
-          sudo mkdir -p /etc/containers/containers.conf.d
-          printf '[engine]\nruntime = "runc"\n' \
-            | sudo tee /etc/containers/containers.conf.d/99-oci-runtime.conf > /dev/null
-          sudo podman run --rm "$PROBE_IMAGE" > /dev/null
+          sudo podman run --rm --runtime runc "$PROBE_IMAGE" > /dev/null
+          echo "flag=--runtime=runc" >> "$GITHUB_OUTPUT"
           echo "runc can start a container"
-
-      - name: Maximize build space
-        uses: ublue-os/remove-unwanted-software@cc0becac701cf642c8f0a6613bbdaf5dc36b259e # v9
 
       - name: Get current date
         id: date
@@ -200,14 +197,14 @@ jobs:
         if: env.PUBLISH == 'true'
         env:
           TARGET: ${{ matrix.target }}
-          ALL_SECRETS: ${{ toJSON(secrets) }}
+          MOK_PRIVKEY: ${{ secrets.MOK_PRIVKEY }}
         run: |
           umask 077
           mkdir -p "${RUNNER_TEMP}/build-secrets"
           while IFS= read -r id; do
             [ -n "$id" ] || continue
             name="${id^^}"
-            value="$(jq -r --arg n "$name" '.[$n] // empty' <<< "$ALL_SECRETS")"
+            value="${!name}"
             if [ -z "$value" ]; then
               echo "::warning::a module declares the build secret '${id}'," \
                 "but this repository has no '${name}' secret. Building without it."
@@ -351,7 +348,7 @@ jobs:
       - name: Rechunk image
         if: env.PUBLISH == 'true'
         run: |
-          sudo podman run --rm --privileged \
+          sudo podman run --rm --privileged ${{ steps.runtime.outputs.flag }} \
             --volume /var/lib/containers:/var/lib/containers \
             "localhost/${IMAGE_NAME}:raw" \
             rpm-ostree compose build-chunked-oci \
