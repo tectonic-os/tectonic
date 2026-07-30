@@ -5,15 +5,6 @@ set -ouex pipefail
 rm /usr/bin/systemctl
 mv /usr/bin/systemctl.bak /usr/bin/systemctl
 
-KERNEL_PKG="$(cat /usr/lib/tectonic/kernel-package 2>/dev/null || echo 'kernel-core')"
-KVER="$(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}' "$KERNEL_PKG")"
-DRACUT_MODULES="ostree crypt"
-rpm -q plymouth &>/dev/null && DRACUT_MODULES+=" plymouth"
-export DRACUT_NO_XATTR=1
-dracut --force --no-hostonly --reproducible --add "$DRACUT_MODULES" \
-    --kver "$KVER" \
-    "/usr/lib/modules/${KVER}/initramfs.img"
-
 mkdir -p /usr/lib/opt
 tmpfiles="/usr/lib/tmpfiles.d/zz-opt-symlinks.conf"
 printf 'd /var/opt 0755 root root -\n' > "$tmpfiles"
