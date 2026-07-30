@@ -5,6 +5,7 @@ mod list;
 mod module;
 mod options;
 mod order;
+mod overlay;
 mod render;
 
 use list::List;
@@ -76,6 +77,7 @@ fn main() -> ExitCode {
     let order = order::sort(&list, &modules, &mut issues);
     order::apply(&mut list, &mut modules, &order);
     module::check_graph(&modules, &root, &mut issues);
+    overlay::check(&modules, &root, &mut issues);
     let collected = module::resolve_collects(&modules, &root, &mut issues);
 
     let output = match command {

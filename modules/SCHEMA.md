@@ -111,6 +111,12 @@ arg "KERNEL"
 | `provides-file "<abs-path>"` | this module writes it |
 | `requires-file "<abs-path>"` | this module reads it, and fails without it |
 
+### Overlay collisions
+
+| Node | Meaning |
+| --- | --- |
+| `overrides "<abs-path>"` | this module's overlay knowingly replaces a path an earlier module ships |
+
 ### Collecting
 
 ```kdl
@@ -207,6 +213,9 @@ fragment position="after" standard-layer=#false
 - a requirement satisfied only by a module gated to another flavour
 - a cycle, naming the edges that close it
 
+- two enabled modules that land in the same image shipping the same
+- an `overrides` for a path no earlier module ships
+
 - shipping a collected filename while the module that collects it is not
 - two enabled modules collecting the same filename
 
@@ -225,7 +234,6 @@ fragment position="after" standard-layer=#false
 
 ## Not implemented yet
 
-- **The overlay collision check**, and with it an `overrides` node
 - **`asset` blocks replacing `versions.sh`**: datasource, version,
 - **`packages { fedora "..." }`**, declaring packages instead of calling
 - **`source`, `ref` and `sha256`** on list entries, for out-of-tree
