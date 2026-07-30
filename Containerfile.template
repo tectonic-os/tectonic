@@ -8,28 +8,8 @@ FROM quay.io/fedora/fedora-bootc:44
 
 ARG KERNEL=stock
 
-RUN --mount=type=bind,from=ctx,source=/00-setup.sh,target=/ctx/00-setup.sh \
-    --mount=type=cache,target=/var/cache \
-    --mount=type=cache,target=/var/log \
-    --mount=type=tmpfs,target=/tmp \
-    /ctx/00-setup.sh
-
-# ---- BEGIN MODULES (generated at build time from modules.kdl; see scripts/gen-containerfile.sh) ----
-# ---- END MODULES ----
-
-ARG IMAGE_VERSION=dev
-
-RUN --mount=type=bind,from=ctx,source=/50-flavour.sh,target=/ctx/50-flavour.sh \
-    --mount=type=bind,from=ctx,source=/lib/brand-helpers.sh,target=/ctx/lib/brand-helpers.sh \
-    --mount=type=cache,target=/var/cache \
-    --mount=type=cache,target=/var/log \
-    --mount=type=tmpfs,target=/tmp \
-    FLAVOUR=${FLAVOUR} IMAGE_VERSION=${IMAGE_VERSION} /ctx/50-flavour.sh
-
-RUN --mount=type=bind,from=ctx,source=/99-finalize.sh,target=/ctx/99-finalize.sh \
-    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
-    --mount=type=bind,from=ctx,source=/modules,target=/ctx/modules \
-    FLAVOUR=${FLAVOUR} FINALIZE_ORDER="${FINALIZE_ORDER}" /ctx/99-finalize.sh
+# ---- BEGIN GENERATED (build phases and modules; see scripts/gen-containerfile.sh) ----
+# ---- END GENERATED ----
 
 COPY cosign.pub /etc/pki/containers/cosign.pub
 

@@ -13,6 +13,14 @@ const FLAVOUR_ARG: &str = "\
 # ---- flavour gate ----
 ARG FLAVOUR";
 
+/// CI passes the build date, so this changes every day.
+const IMAGE_VERSION_ARG: &str = "\
+# ---- image version ----
+ARG IMAGE_VERSION=dev";
+
+/// Where the module layers sit among the build phases.
+const MODULE_SLOT: u32 = 50;
+
 pub fn section(
     list: &List,
     modules: &[Module],
@@ -23,6 +31,11 @@ pub fn section(
     let mut out = String::new();
     let mut flavour_arg_emitted = false;
     let mut finalize: Vec<String> = Vec::new();
+
+    let phases = phases(root, issues);
+    for (_, file) in phases.iter().filter(|(number, _)| *number < MODULE_SLOT) {
+        let _ = write!(out, "{}\n\n", phase(file, false));
+    }
 
     for entry in &list.entries {
         let dir = root.join("modules").join(&entry.path);
@@ -49,12 +62,23 @@ pub fn section(
             .find(|m| m.path == entry.path && m.flavour == entry.flavour);
 
         let inc = dir.join("Containerfile.inc");
-        let block = if inc.is_file() {
-            verbatim(entry, &inc, flavour_arg_emitted, list, issues)
-        } else {
-            standard(entry, module, collected.get(&entry.path))
-        };
-        let _ = write!(out, "{block}\n\n");
+        let mut blocks: Vec<String> = Vec::new();
+        let fragment_after = module.is_some_and(|m| m.fragment_after);
+        if inc.is_file() && !fragment_after {
+            blocks.push(fragment(entry, &inc, flavour_arg_emitted, list, issues));
+        }
+        if module.is_none_or(|m| m.standard_layer) {
+            blocks.push(standard(entry, module, collected.get(&entry.path)));
+        }
+        if inc.is_file() && fragment_after {
+            blocks.push(fragment(entry, &inc, flavour_arg_emitted, list, issues));
+        }
+
+        if let Some(flavour) = &entry.flavour {
+            let _ = writeln!(out, "# ---- [{flavour}] ----");
+        }
+        let _ = writeln!(out, "# ---- {} ----", entry.path);
+        let _ = write!(out, "{}\n\n", blocks.join("\n\n"));
 
         if dir.join("finalize.sh").is_file() {
             finalize.push(match &entry.flavour {
@@ -75,6 +99,69 @@ pub fn section(
         finalize.join(" ")
     );
 
+    let _ = write!(out, "{IMAGE_VERSION_ARG}\n\n");
+
+    for (_, file) in phases.iter().filter(|(number, _)| *number >= MODULE_SLOT) {
+        let _ = write!(out, "{}\n\n", phase(file, true));
+    }
+
+    out
+}
+
+/// Every build-phases/*.sh, as its number and filename, in build order.
+fn phases(root: &Path, issues: &mut Issues) -> Vec<(u32, String)> {
+    let dir = root.join("build-phases");
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return Vec::new();
+    };
+
+    let mut out: Vec<(u32, String)> = Vec::new();
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !name.ends_with(".sh") || !entry.path().is_file() {
+            continue;
+        }
+        let number = name
+            .split_once('-')
+            .and_then(|(prefix, _)| prefix.parse::<u32>().ok());
+        match number {
+            Some(number) => out.push((number, name)),
+            None => {
+                let file = dir.join(&name).display().to_string();
+                issues.push(
+                    Issue::new(format!("`{name}` has no phase number"), &file, "")
+                        .help(format!(
+                            "name it <number>-{name}: below {MODULE_SLOT} to run before the module layers, {MODULE_SLOT} or above to run after"
+                        )),
+                );
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// One phase layer.
+fn phase(file: &str, below_modules: bool) -> String {
+    let mut out = format!(
+        "# ---- phase {file} ----\n\
+         RUN --mount=type=bind,from=ctx,source=/{file},target=/ctx/{file} \\\n    "
+    );
+    if below_modules {
+        out.push_str("--mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \\\n    ");
+        out.push_str("--mount=type=bind,from=ctx,source=/modules,target=/ctx/modules \\\n    ");
+    }
+    out.push_str(
+        "--mount=type=cache,target=/var/cache \\\n    \
+         --mount=type=cache,target=/var/log \\\n    \
+         --mount=type=tmpfs,target=/tmp \\\n    ",
+    );
+    if below_modules {
+        out.push_str(
+            "FLAVOUR=${FLAVOUR} IMAGE_VERSION=${IMAGE_VERSION} FINALIZE_ORDER=\"${FINALIZE_ORDER}\" ",
+        );
+    }
+    let _ = write!(out, "/ctx/{file}");
     out
 }
 
@@ -176,13 +263,9 @@ fn standard(
 
     let path = &entry.path;
     let mut out = String::new();
-    if let Some(flavour) = &entry.flavour {
-        let _ = writeln!(out, "# ---- [{flavour}] ----");
-    }
     let _ = write!(
         out,
-        "# ---- {path} ----\n\
-         RUN --mount=type=bind,from=ctx,source=/modules/{path},target=/ctx/modules/{path} \\\n    \
+        "RUN --mount=type=bind,from=ctx,source=/modules/{path},target=/ctx/modules/{path} \\\n    \
          --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \\\n    \
          --mount=type=cache,target=/var/cache \\\n    \
          --mount=type=cache,target=/var/log \\\n    \
@@ -192,9 +275,10 @@ fn standard(
     out
 }
 
-/// A module whose needs the field sets cannot express ships a fragment, which
-/// replaces the standard block rather than adding to it.
-fn verbatim(
+/// A module whose needs the field sets cannot express ships a fragment,
+/// inlined verbatim above the standard block, or below it when the manifest
+/// says `position "after"`.
+fn fragment(
     entry: &Entry,
     inc: &Path,
     flavour_arg_emitted: bool,
@@ -216,7 +300,8 @@ fn verbatim(
         );
     }
 
-    if let Some(flavour) = &entry.flavour {
+    let runs = body.lines().any(|l| l.trim_start().starts_with("RUN "));
+    if let Some(flavour) = entry.flavour.as_ref().filter(|_| runs) {
         let declared = body
             .split("FLAVOUR_GATE=")
             .nth(1)
@@ -241,19 +326,16 @@ fn verbatim(
                 )
                 .at(entry.span, "the flavour gate would be silently ignored")
                 .help(
-                    "a fragment replaces the generated block, so it has to carry the gate itself",
+                    "a fragment is emitted unconditionally, so anything it runs has to carry the gate itself",
                 ),
             ),
         }
     }
 
     let mut out = String::new();
-    if let Some(flavour) = &entry.flavour {
-        let _ = writeln!(out, "# ---- [{flavour}] ----");
-    }
     let _ = write!(
         out,
-        "# ---- {path} (verbatim from modules/{path}/Containerfile.inc) ----\n{}",
+        "# verbatim from modules/{path}/Containerfile.inc:\n{}",
         body.trim_end_matches('\n')
     );
     out

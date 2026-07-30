@@ -4,6 +4,8 @@ mod diag;
 mod list;
 mod module;
 mod options;
+mod order;
+mod overlay;
 mod render;
 
 use list::List;
@@ -56,7 +58,7 @@ fn main() -> ExitCode {
     let list_path = root.join("modules.kdl");
     let list_display = list_path.display().to_string();
 
-    let (list, mut issues) = match List::load(&list_display) {
+    let (mut list, mut issues) = match List::load(&list_display) {
         Ok(v) => v,
         Err(issue) => {
             let mut issues = diag::Issues::default();
@@ -66,12 +68,16 @@ fn main() -> ExitCode {
         }
     };
 
-    let modules: Vec<module::Module> = list
+    let mut modules: Vec<module::Module> = list
         .entries
         .iter()
         .filter_map(|entry| module::Module::load(entry, &list, &root, &mut issues))
         .collect();
+
+    let order = order::sort(&list, &modules, &mut issues);
+    order::apply(&mut list, &mut modules, &order);
     module::check_graph(&modules, &root, &mut issues);
+    overlay::check(&modules, &root, &mut issues);
     let collected = module::resolve_collects(&modules, &root, &mut issues);
 
     let output = match command {

@@ -3,14 +3,14 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # shellcheck disable=SC2016  # the marker is literal text, not an expansion
-begin='# ---- BEGIN MODULES (generated at build time from modules.kdl; see scripts/gen-containerfile.sh) ----'
-end='# ---- END MODULES ----'
+begin='# ---- BEGIN GENERATED (build phases and modules; see scripts/gen-containerfile.sh) ----'
+end='# ---- END GENERATED ----'
 
 skeleton=Containerfile.template
 out=Containerfile.generated
 
 if ! grep -qxF "$begin" "$skeleton" || ! grep -qxF "$end" "$skeleton"; then
-    echo "gen-containerfile: BEGIN/END MODULES markers not found in ${skeleton}" >&2
+    echo "gen-containerfile: BEGIN/END GENERATED markers not found in ${skeleton}" >&2
     exit 1
 fi
 
@@ -42,4 +42,5 @@ esac
     ' "$skeleton"
 } > "$out"
 
-echo "gen-containerfile: wrote ${out} ($(grep -c 'run-module.sh /ctx' "$out") module RUN layers)"
+echo "gen-containerfile: wrote ${out} ($(grep -c 'run-module.sh /ctx' "$out") module layers,\
+ $(grep -c '^# ---- phase ' "$out") build phases)"

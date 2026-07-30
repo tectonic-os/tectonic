@@ -111,6 +111,12 @@ arg "KERNEL"
 | `provides-file "<abs-path>"` | this module writes it |
 | `requires-file "<abs-path>"` | this module reads it, and fails without it |
 
+### Overlay collisions
+
+| Node | Meaning |
+| --- | --- |
+| `overrides "<abs-path>"` | this module's overlay knowingly replaces a path an earlier module ships |
+
 ### Collecting
 
 ```kdl
@@ -163,6 +169,17 @@ variant "wine-only" {
 
 ### Raw fragments
 
+```kdl
+fragment position="after" standard-layer=#false
+```
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `position=` | `"before"` | where the fragment goes relative to the generated block |
+| `standard-layer=` | `#true` | whether that block is emitted at all |
+
+## Build order
+
 ## Build targets
 
 | Target | Image | Cache tag | `FLAVOUR` |
@@ -193,6 +210,11 @@ variant "wine-only" {
 - a `requires` no enabled module provides, listing every module that
 - a `requires-file` no enabled module provides
 - two enabled modules providing the same capability or contract file
+- a requirement satisfied only by a module gated to another flavour
+- a cycle, naming the edges that close it
+
+- two enabled modules that land in the same image shipping the same
+- an `overrides` for a path no earlier module ships
 
 - shipping a collected filename while the module that collects it is not
 - two enabled modules collecting the same filename
@@ -202,16 +224,16 @@ variant "wine-only" {
 - a `list` value containing whitespace
 - selecting an undeclared variant, or a variant setting an undeclared
 
-- a module declaring `secret` or `arg` alongside a `Containerfile.inc`
+- a `fragment` node in a module that ships no `Containerfile.inc`, or
+- a `position` other than `before` or `after`, or one declared alongside
+- a `secret`, `arg`, `option` or collected file declared alongside
 - a `Containerfile.inc` expanding `FLAVOUR` above the `ARG FLAVOUR`
+- a gated module whose fragment runs a command without carrying the
 
 - `source`, `ref` or `sha256` on a list entry
 
 ## Not implemented yet
 
-- **Ordering by the graph.** The build order is document order today. A
-- **Additive fragments.** `Containerfile.inc` gains a declared position
-- **The overlay collision check**, and with it an `overrides` node
 - **`asset` blocks replacing `versions.sh`**: datasource, version,
 - **`packages { fedora "..." }`**, declaring packages instead of calling
 - **`source`, `ref` and `sha256`** on list entries, for out-of-tree
