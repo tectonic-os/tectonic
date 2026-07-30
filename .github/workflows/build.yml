@@ -196,24 +196,26 @@ jobs:
             io.artifacthub.package.prerelease=false
             containers.bootc=1
 
-      - name: Check whether this target needs the MOK signing key
-        id: mok
+      - name: Write the declared build secrets
+        if: env.PUBLISH == 'true'
         env:
           TARGET: ${{ matrix.target }}
-        run: |
-          if ./scripts/manifest.sh secrets "$TARGET" | grep -qx 'mok_privkey'; then
-            echo "needed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "needed=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Write MOK signing key
-        if: env.PUBLISH == 'true' && steps.mok.outputs.needed == 'true'
+          ALL_SECRETS: ${{ toJSON(secrets) }}
         run: |
           umask 077
-          printf '%s' "$MOK_PRIVATE_KEY" > "${RUNNER_TEMP}/mok_privkey.pem"
-        env:
-          MOK_PRIVATE_KEY: ${{ secrets.MOK_PRIVATE_KEY }}
+          mkdir -p "${RUNNER_TEMP}/build-secrets"
+          while IFS= read -r id; do
+            [ -n "$id" ] || continue
+            name="${id^^}"
+            value="$(jq -r --arg n "$name" '.[$n] // empty' <<< "$ALL_SECRETS")"
+            if [ -z "$value" ]; then
+              echo "::warning::a module declares the build secret '${id}'," \
+                "but this repository has no '${name}' secret. Building without it."
+              continue
+            fi
+            printf '%s' "$value" > "${RUNNER_TEMP}/build-secrets/${id}"
+            echo "wrote build secret ${id} from ${name}"
+          done < <(./scripts/manifest.sh secrets "$TARGET")
 
       - name: Setup Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -235,9 +237,12 @@ jobs:
           IMAGE_VERSION: ${{ steps.date.outputs.version }}
           TAGS: ${{ steps.metadata.outputs.tags }}
           LABELS: ${{ steps.metadata.outputs.labels }}
-          MOK_KEY_PATH: ${{ env.PUBLISH == 'true' && steps.mok.outputs.needed == 'true' && format('{0}/mok_privkey.pem', runner.temp) || '' }}
         run: |
           args=(--backend buildx --flavour "$TARGET")
+          for secret in "${RUNNER_TEMP}"/build-secrets/*; do
+            [ -f "$secret" ] || continue
+            args+=(--secret "$(basename "$secret")=${secret}")
+          done
           if [ -n "$KERNEL_INPUT" ]; then
             args+=(--kernel "$KERNEL_INPUT")
           fi
