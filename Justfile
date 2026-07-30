@@ -110,7 +110,13 @@ generate-mok-key dir=(env("HOME") + "/.local/share/tectonic"):
     echo "Public cert: $CERT"
     echo
     echo "Next steps:"
-    echo "  1. cp $CERT modules/kernel/cachyos-kernel/files/usr/share/tectonic/sb_cert.der"
+    cert_path="$(./scripts/manifest.sh find-provider "/usr/share/tectonic/sb_cert.der")"
+    if [ -n "${cert_path}" ]; then
+        echo "  1. cp $CERT modules/${cert_path}/files/usr/share/tectonic/sb_cert.der"
+    else
+        echo "  1. No module provides /usr/share/tectonic/sb_cert.der — copy the cert into the"
+        echo "     kernel module's files/ overlay at the path it declares."
+    fi
     echo "  2. Commit that cert, and add MOK_PRIVATE_KEY as a GitHub Actions secret (contents of $KEY)."
     echo "  3. After deploying a signed image, on the target machine run:"
     echo "       sudo mokutil --import /usr/share/tectonic/sb_cert.der"

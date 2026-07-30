@@ -196,8 +196,19 @@ jobs:
             io.artifacthub.package.prerelease=false
             containers.bootc=1
 
+      - name: Check whether this target needs the MOK signing key
+        id: mok
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          if ./scripts/manifest.sh secrets "$TARGET" | grep -qx 'mok_privkey'; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Write MOK signing key
-        if: env.PUBLISH == 'true'
+        if: env.PUBLISH == 'true' && steps.mok.outputs.needed == 'true'
         run: |
           umask 077
           printf '%s' "$MOK_PRIVATE_KEY" > "${RUNNER_TEMP}/mok_privkey.pem"
@@ -224,7 +235,7 @@ jobs:
           IMAGE_VERSION: ${{ steps.date.outputs.version }}
           TAGS: ${{ steps.metadata.outputs.tags }}
           LABELS: ${{ steps.metadata.outputs.labels }}
-          MOK_KEY_PATH: ${{ env.PUBLISH == 'true' && format('{0}/mok_privkey.pem', runner.temp) || '' }}
+          MOK_KEY_PATH: ${{ env.PUBLISH == 'true' && steps.mok.outputs.needed == 'true' && format('{0}/mok_privkey.pem', runner.temp) || '' }}
         run: |
           args=(--backend buildx --flavour "$TARGET")
           if [ -n "$KERNEL_INPUT" ]; then

@@ -261,6 +261,40 @@ pub fn assets(list: &List, modules: &[Module], target: Option<&str>) -> String {
     out
 }
 
+/// The module that provides a contract file path.
+pub fn find_provider(list: &List, modules: &[Module], file_path: &str) -> String {
+    for module in modules {
+        for decl in &module.provides_files {
+            if decl.name == file_path {
+                return format!("{}\n", module.path);
+            }
+        }
+    }
+    String::new()
+}
+
+/// Unique secret IDs the enabled modules declare, one per line.
+pub fn secrets(list: &List, modules: &[Module], target: Option<&str>) -> String {
+    let mut seen: Vec<&str> = Vec::new();
+    let mut out = String::new();
+    for entry in list.entries.iter().filter(|e| in_target(e, target)) {
+        let Some(module) = modules
+            .iter()
+            .find(|m| m.path == entry.path && m.flavour == entry.flavour)
+        else {
+            continue;
+        };
+        for decl in &module.secrets {
+            if seen.contains(&decl.name.as_str()) {
+                continue;
+            }
+            seen.push(&decl.name);
+            let _ = writeln!(out, "{}", decl.name);
+        }
+    }
+    out
+}
+
 fn standard(
     entry: &Entry,
     module: Option<&Module>,
