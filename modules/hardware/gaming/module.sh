@@ -3,14 +3,14 @@ dnf5 install -y gamemode
 source /ctx/lib/dkms-helpers.sh
 kernel_devel_install "${DKMS_BUILD_DEPS[@]}" cabextract
 
-XONE_VERSION="0.0.0+${XONE_COMMIT:0:12}"
+XONE_DKMS_VERSION="0.0.0+${ASSET_XONE_VERSION:0:12}"
 
 git clone --quiet https://github.com/medusalix/xone.git /tmp/xone
-git -C /tmp/xone checkout --quiet "$XONE_COMMIT"
+git -C /tmp/xone checkout --quiet "$ASSET_XONE_VERSION"
 
-sed -i "s/#VERSION#/${XONE_VERSION}/g" /tmp/xone/dkms.conf
+sed -i "s/#VERSION#/${XONE_DKMS_VERSION}/g" /tmp/xone/dkms.conf
 
-dkms_build_module xone "$XONE_VERSION" /tmp/xone
+dkms_build_module xone "$XONE_DKMS_VERSION" /tmp/xone
 
 install -D -m 0644 /tmp/xone/install/modprobe.conf /usr/lib/modprobe.d/xone-blacklist.conf
 

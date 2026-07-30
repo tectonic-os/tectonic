@@ -25,11 +25,6 @@ if [ -f "$MODDIR/repo" ]; then
     fi
 fi
 
-if [ -f "$MODDIR/versions.sh" ]; then
-    # shellcheck source=/dev/null
-    source "$MODDIR/versions.sh"
-fi
-
 if [ -f "$MODDIR/module.sh" ]; then
     # shellcheck source=/dev/null
     source "$MODDIR/module.sh"

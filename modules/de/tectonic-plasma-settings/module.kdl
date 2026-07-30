@@ -3,3 +3,10 @@ description "bootc updates panel for KDE System Settings, with its notifier"
 supports "fedora"
 
 requires "plasma-desktop"
+
+asset "tectonic-bootc-updates" {
+    renovate datasource="github-releases" depName="tectonic-os/plasma-bootc-updates" extractVersion="^v(?<version>.*)$"
+    version "0.1.1"
+    url "https://github.com/tectonic-os/plasma-bootc-updates/releases/download/v{version}/tectonic-bootc-updates-{version}-1.fc44.x86_64.rpm"
+    sha256 "2272f4682aff39bd0bff7b2b13db71854da971eda99b6e84653ba1da32d94b7a"
+}

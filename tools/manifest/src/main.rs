@@ -1,5 +1,6 @@
 //! The only reader of modules.kdl and the per-module module.kdl files.
 
+mod asset;
 mod diag;
 mod list;
 mod module;
@@ -26,6 +27,8 @@ says otherwise.
   section           the generated Containerfile module section
   summary [target]  what a target is made of, as markdown; every entry
                     when no target is given
+  assets [target]   every pinned asset, tab separated: module, name,
+                    manifest, version, sha256, hash source, resolved URL
   check             validate every manifest, printing what is wrong
 
 Run from the repository root, or set TECTONIC_ROOT.
@@ -44,13 +47,14 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    const PER_TARGET: [&str; 2] = ["summary", "assets"];
     let target = args.get(1).map(String::as_str);
-    if target.is_some() && command != "summary" {
+    if target.is_some() && !PER_TARGET.contains(&command) {
         eprintln!("manifest: `{command}` takes no arguments");
         return ExitCode::FAILURE;
     }
     if args.len() > 2 {
-        eprintln!("manifest: `summary` takes at most one target");
+        eprintln!("manifest: `{command}` takes at most one target");
         return ExitCode::FAILURE;
     }
 
@@ -93,7 +97,7 @@ fn main() -> ExitCode {
                 section
             }
         }
-        "summary" => {
+        "summary" | "assets" => {
             if let Some(unknown) = target.filter(|t| !list.targets().iter().any(|have| have == t)) {
                 issues.push(
                     diag::Issue::new(
@@ -104,7 +108,11 @@ fn main() -> ExitCode {
                     .help(format!("targets: {}", list.targets().join(", "))),
                 );
             }
-            render::summary(&list, &modules, target)
+            if command == "summary" {
+                render::summary(&list, &modules, target)
+            } else {
+                render::assets(&list, &modules, target)
+            }
         }
         other => {
             eprintln!("manifest: unknown command `{other}`");

@@ -3,3 +3,10 @@ description "goojust, the OS TUI, plus the just engine and fastfetch it builds o
 supports "fedora"
 
 collects "justfile.inc" into="/usr/share/goojust/justfile.apps"
+
+asset "goojust" {
+    renovate datasource="github-releases" depName="tectonic-os/goojust"
+    version "0.1.5"
+    url "https://github.com/tectonic-os/goojust/releases/download/v{version}/goojust-v{version}-x86_64-linux-gnu.tar.gz"
+    sha256 "b5555c822de33e74793d43d99df27adaebc9f4be08dc956e8d7cbfb2a5121375" from="sidecar"
+}
