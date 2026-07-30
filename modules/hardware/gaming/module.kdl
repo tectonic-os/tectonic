@@ -7,3 +7,8 @@ requires-file "/usr/share/tectonic/sb_cert.der"
 
 arg "KERNEL"
 secret "mok_privkey"
+
+asset "xone" {
+    renovate datasource="git-refs" depName="https://github.com/medusalix/xone"
+    version "3484f603484782dd7551c64e5a33fc602b127051"
+}

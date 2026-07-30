@@ -7,3 +7,8 @@ requires-file "/usr/share/tectonic/sb_cert.der"
 
 arg "KERNEL"
 secret "mok_privkey"
+
+asset "looking-glass" {
+    renovate datasource="github-releases" depName="gnif/LookingGlass"
+    version "B7"
+}

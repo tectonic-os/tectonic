@@ -4,8 +4,7 @@ name: Checksums
 on:
   pull_request:
     paths:
-      - 'modules/core/goojust/versions.sh'
-      - 'modules/de/tectonic-plasma-settings/versions.sh'
+      - 'modules/**/module.kdl'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
@@ -24,55 +23,73 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
 
       - name: Recompute stale checksums and push fixup
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ github.event.pull_request.head.ref }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
           set -euo pipefail
 
-          entries=(
-            'goojust|modules/core/goojust/versions.sh|GOOJUST_VERSION|GOOJUST_SHA256|sidecar|https://github.com/tectonic-os/goojust/releases/download/v{v}/goojust-v{v}-x86_64-linux-gnu.tar.gz.sha256'
-            'tectonic-bootc-updates|modules/de/tectonic-plasma-settings/versions.sh|TECTONIC_BOOTC_UPDATES_VERSION|TECTONIC_BOOTC_UPDATES_SHA256|download|https://github.com/tectonic-os/plasma-bootc-updates/releases/download/v{v}/tectonic-bootc-updates-{v}-1.fc44.x86_64.rpm'
-          )
+          base="$(git merge-base "origin/${BASE_REF}" HEAD)"
+          changed="$(git diff --name-only "$base" HEAD \
+            | grep -E '^modules/.*/module\.kdl$' || true)"
+          if [ -z "$changed" ]; then
+            echo "No module manifest changed against ${BASE_REF}, nothing to do."
+            exit 0
+          fi
+          echo "Changed manifests:"
+          echo "$changed"
 
           fixed=()
-          for entry in "${entries[@]}"; do
-            IFS='|' read -r name file version_var sha_var mode url <<< "$entry"
-
-            version="$(sed -n "s/^${version_var}=\"\([^\"]*\)\"/\1/p" "$file")"
-            pinned="$(sed -n "s/^${sha_var}=\"\([^\"]*\)\"/\1/p" "$file")"
-            if [ -z "$version" ] || [ -z "$pinned" ]; then
-              echo "::error::${name}: ${version_var} or ${sha_var} not found in ${file}"
-              exit 1
-            fi
-            url="${url//\{v\}/${version}}"
-
-            if [ "$mode" = "sidecar" ]; then
-              actual="$(curl -fsSL --retry 3 "$url" | cut -d' ' -f1)"
-            else
-              curl -fsSL --retry 3 "$url" -o "${RUNNER_TEMP}/asset"
-              actual="$(sha256sum "${RUNNER_TEMP}/asset" | cut -d' ' -f1)"
-              rm -f "${RUNNER_TEMP}/asset"
-            fi
-
-            if [ "$actual" = "$pinned" ]; then
-              echo "${sha_var} already matches ${name} ${version}, nothing to do."
+          while IFS='|' read -r module name file version pinned from url; do
+            grep -qxF "$file" <<< "$changed" || continue
+            [ -n "$pinned" ] || continue
+            if [ "$from" = "manual" ]; then
+              echo "${module} ${name}: hash is maintained by hand, skipping."
               continue
             fi
 
-            sed -i "s/^${sha_var}=.*/${sha_var}=\"${actual}\"/" "$file"
-            fixed+=("${name} ${version}")
-            echo "${sha_var} updated for ${name} ${version}."
-          done
+            target="$url"
+            [ "$from" != "sidecar" ] || target="${url}.sha256"
+            if ! curl -fsSL --retry 3 "$target" -o "${RUNNER_TEMP}/asset"; then
+              echo "::error file=${file}::${name} ${version}: ${target} did not download. A version bump whose asset filename does not follow from the version needs the url in ${file} updated by hand."
+              exit 1
+            fi
+            if [ "$from" = "sidecar" ]; then
+              actual="$(cut -d' ' -f1 < "${RUNNER_TEMP}/asset")"
+            else
+              actual="$(sha256sum "${RUNNER_TEMP}/asset" | cut -d' ' -f1)"
+            fi
+            rm -f "${RUNNER_TEMP}/asset"
 
-          [ "${#fixed[@]}" -gt 0 ] || exit 0
+            if [ "$actual" = "$pinned" ]; then
+              echo "${module} ${name} ${version}: hash already matches."
+              continue
+            fi
+            sed -i "s/sha256 \"${pinned}\"/sha256 \"${actual}\"/" "$file"
+            fixed+=("${name} ${version}")
+            echo "${module} ${name} ${version}: hash updated."
+          done < <(./scripts/manifest.sh assets)
+
+          ./scripts/gen-containerfile.sh
+
+          if git diff --quiet; then
+            echo "Nothing to fix up."
+            exit 0
+          fi
+
+          if [ "${#fixed[@]}" -gt 0 ]; then
+            message="update checksums: $(IFS=', '; echo "${fixed[*]}")"
+          else
+            message="regenerate the Containerfile for the bumped pins"
+          fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "update checksums: $(IFS=', '; echo "${fixed[*]}")"
+          git commit -am "$message"
           git push origin "HEAD:${BRANCH}"
 
           gh workflow run build.yml --ref "$BRANCH"
-          gh workflow run lint.yml --ref "$BRANCH"

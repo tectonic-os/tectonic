@@ -7,7 +7,6 @@
 | --- | --- |
 | `module.sh` | sourced as the install logic |
 | `repo` | sourced once, idempotent via its `REPO_ID` |
-| `versions.sh` | sourced for Renovate-tracked pins |
 | `selinux/*.te` | compiled and installed at priority 200 |
 | `files/` | copied verbatim into the image |
 | `finalize.sh` | sourced by the finalize phase, in resolved order |
@@ -160,6 +159,39 @@ variant "wine-only" {
 }
 ```
 
+### Asset pins
+
+```kdl
+asset "starship" {
+    renovate datasource="github-releases" depName="starship/starship"
+    version "1.26.0"
+    url "https://github.com/starship/starship/releases/download/v{version}/starship-x86_64-unknown-linux-musl.tar.gz"
+    sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3" from="sidecar"
+}
+```
+
+| Node | Arity | Meaning |
+| --- | --- | --- |
+| `renovate` | 0 or 1 | Renovate tracks this pin. Mutually exclusive with `manual`. |
+| `manual "<why>"` | 0 or 1 | nothing tracks it, and this is why. Mutually exclusive with `renovate`. |
+| `version "<pin>"` | 0 or 1 | the pinned ref: a version, a tag or a commit. Required with `renovate`. |
+| `url "<template>"` | 0 or 1 | download URL. `{version}` is the only expansion. |
+| `sha256 "<hex>"` | 0 or 1 | what the fetched bytes must hash to. |
+
+| `from=` | Where the hash comes from |
+| --- | --- |
+| `"asset"` (default) | hashing the asset itself. Trust-on-first-use, taken at PR time, which still catches an asset swapped after the pin was made. |
+| `"sidecar"` | the `<url>.sha256` upstream publishes beside it, so the pin is accurate from the start. |
+| `"manual"` | a human. For an asset whose filename does not follow from its version, or that has no version at all. |
+
+#### What Renovate reads
+
+| Property | Meaning |
+| --- | --- |
+| `datasource=` | `github-releases`, `github-tags` or `git-refs` — the three the custom managers match |
+| `depName=` | `owner/repo`, or the clone URL for `git-refs` |
+| `extractVersion=` | Renovate's capture turning an upstream tag into the value pinned here, e.g. `^v(?<version>.*)$` |
+
 ### Build inputs
 
 | Node | Emits |
@@ -193,6 +225,7 @@ fragment position="after" standard-layer=#false
 | --- | --- |
 | `FLAVOUR_GATE=<flavour>` | the entry is inside a `flavour` block |
 | `OPT_<NAME>=<value>` | one per declared option, always, defaults included |
+| `ASSET_<NAME>_VERSION`, `_URL`, `_SHA256` | one per declared asset field, URL already resolved |
 | `MODULE_COLLECT="<file>=<dest> ..."` | this module ships a file another module collects |
 | `<NAME>=${<NAME>}` | one per `arg` |
 
@@ -219,6 +252,16 @@ fragment position="after" standard-layer=#false
 - shipping a collected filename while the module that collects it is not
 - two enabled modules collecting the same filename
 
+- an asset declaring neither `renovate` nor `manual`, or both
+- a `renovate` with no `depName`, or a datasource no custom manager
+- a `renovate` with no `version` below it, or with something between the
+- a `manual` with no reason
+- a `url` without a `sha256`, or a `sha256` without a `url`
+- a `sha256` that is not 64 lowercase hex digits
+- a `url` holding a placeholder other than `{version}`, or holding
+- two assets in one module under the same name
+- a `version` or `url` containing a shell metacharacter, which the env
+
 - setting an option the module does not declare, or setting one twice
 - a value that does not match the declared type
 - a `list` value containing whitespace
@@ -226,7 +269,7 @@ fragment position="after" standard-layer=#false
 
 - a `fragment` node in a module that ships no `Containerfile.inc`, or
 - a `position` other than `before` or `after`, or one declared alongside
-- a `secret`, `arg`, `option` or collected file declared alongside
+- a `secret`, `arg`, `option`, `asset` or collected file declared
 - a `Containerfile.inc` expanding `FLAVOUR` above the `ARG FLAVOUR`
 - a gated module whose fragment runs a command without carrying the
 
@@ -234,6 +277,5 @@ fragment position="after" standard-layer=#false
 
 ## Not implemented yet
 
-- **`asset` blocks replacing `versions.sh`**: datasource, version,
 - **`packages { fedora "..." }`**, declaring packages instead of calling
 - **`source`, `ref` and `sha256`** on list entries, for out-of-tree

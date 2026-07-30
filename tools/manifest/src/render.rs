@@ -167,15 +167,7 @@ fn phase(file: &str, below_modules: bool) -> String {
 
 /// What a target is made of, as markdown, in the order the layers build.
 pub fn summary(list: &List, modules: &[Module], target: Option<&str>) -> String {
-    let included: Vec<&Entry> = list
-        .entries
-        .iter()
-        .filter(|e| match (&e.flavour, target) {
-            (None, _) => true,
-            (Some(_), None) => true,
-            (Some(gate), Some(target)) => gate == target,
-        })
-        .collect();
+    let included: Vec<&Entry> = list.entries.iter().filter(|e| in_target(e, target)).collect();
     let gated = included.iter().filter(|e| e.flavour.is_some()).count();
 
     let mut out = String::new();
@@ -223,6 +215,52 @@ fn cell(text: &str) -> String {
     text.replace('|', "\\|")
 }
 
+/// Whether an entry lands in a target's image.
+fn in_target(entry: &Entry, target: Option<&str>) -> bool {
+    match (&entry.flavour, target) {
+        (None, _) => true,
+        (Some(_), None) => true,
+        (Some(gate), Some(target)) => gate == target,
+    }
+}
+
+/// Every pinned asset, pipe separated, one per line:
+/// <module>|<name>|<manifest>|<version>|<sha256>|<from>|<url> Two consumers,
+/// neither of which should be carrying a table of its own: the checksum
+/// workflow, which recomputes a stale hash and needs the manifest to rewrite,
+/// and the SBOM supplement, which needs the payloads an RPM inventory cannot
+/// see.
+pub fn assets(list: &List, modules: &[Module], target: Option<&str>) -> String {
+    let mut out = String::new();
+    let mut seen: Vec<(&str, &str)> = Vec::new();
+    for entry in list.entries.iter().filter(|e| in_target(e, target)) {
+        let Some(module) = modules
+            .iter()
+            .find(|m| m.path == entry.path && m.flavour == entry.flavour)
+        else {
+            continue;
+        };
+        for asset in &module.assets {
+            if seen.contains(&(module.path.as_str(), asset.name.as_str())) {
+                continue;
+            }
+            seen.push((module.path.as_str(), asset.name.as_str()));
+            let _ = writeln!(
+                out,
+                "{}|{}|modules/{}/module.kdl|{}|{}|{}|{}",
+                module.path,
+                asset.name,
+                module.path,
+                asset.version.as_deref().unwrap_or_default(),
+                asset.sha256.as_deref().unwrap_or_default(),
+                asset.from.as_str(),
+                asset.url_resolved().unwrap_or_default(),
+            );
+        }
+    }
+    out
+}
+
 fn standard(
     entry: &Entry,
     module: Option<&Module>,
@@ -241,6 +279,13 @@ fn standard(
             .map(|(file, into)| format!("{file}={into}"))
             .collect();
         let _ = write!(env, "MODULE_COLLECT=\"{}\" ", pairs.join(" "));
+    }
+
+    let mut assets = String::new();
+    for asset in module.map(|m| m.assets.as_slice()).unwrap_or_default() {
+        for (name, value) in asset.env() {
+            let _ = write!(assets, "{name}=\"{value}\" \\\n    ");
+        }
     }
 
     let mut secrets = String::new();
@@ -270,7 +315,7 @@ fn standard(
          --mount=type=cache,target=/var/cache \\\n    \
          --mount=type=cache,target=/var/log \\\n    \
          --mount=type=tmpfs,target=/tmp \\\n    \
-         {secrets}{env}bash /ctx/lib/run-module.sh /ctx/modules/{path}"
+         {secrets}{assets}{env}bash /ctx/lib/run-module.sh /ctx/modules/{path}"
     );
     out
 }
