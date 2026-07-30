@@ -27,7 +27,7 @@ says otherwise.
   section           the generated Containerfile module section
   summary [target]  what a target is made of, as markdown; every entry
                     when no target is given
-  assets [target]   every pinned asset, tab separated: module, name,
+  assets [target]   every pinned asset, pipe separated: module, name,
                     manifest, version, sha256, hash source, resolved URL
   check             validate every manifest, printing what is wrong
 

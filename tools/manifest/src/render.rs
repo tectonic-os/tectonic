@@ -224,11 +224,12 @@ fn in_target(entry: &Entry, target: Option<&str>) -> bool {
     }
 }
 
-/// Every pinned asset, tab separated, one per line: <module> <name> <manifest>
-/// <version> <sha256> <from> <url> Two consumers, neither of which should be
-/// carrying a table of its own: the checksum workflow, which recomputes a
-/// stale hash and needs the manifest to rewrite, and the SBOM supplement,
-/// which needs the payloads an RPM inventory cannot see.
+/// Every pinned asset, pipe separated, one per line:
+/// <module>|<name>|<manifest>|<version>|<sha256>|<from>|<url> Two consumers,
+/// neither of which should be carrying a table of its own: the checksum
+/// workflow, which recomputes a stale hash and needs the manifest to rewrite,
+/// and the SBOM supplement, which needs the payloads an RPM inventory cannot
+/// see.
 pub fn assets(list: &List, modules: &[Module], target: Option<&str>) -> String {
     let mut out = String::new();
     let mut seen: Vec<(&str, &str)> = Vec::new();
@@ -246,7 +247,7 @@ pub fn assets(list: &List, modules: &[Module], target: Option<&str>) -> String {
             seen.push((module.path.as_str(), asset.name.as_str()));
             let _ = writeln!(
                 out,
-                "{}\t{}\tmodules/{}/module.kdl\t{}\t{}\t{}\t{}",
+                "{}|{}|modules/{}/module.kdl|{}|{}|{}|{}",
                 module.path,
                 asset.name,
                 module.path,

@@ -44,7 +44,7 @@ jobs:
           echo "$changed"
 
           fixed=()
-          while IFS=$'\t' read -r module name file version pinned from url; do
+          while IFS='|' read -r module name file version pinned from url; do
             grep -qxF "$file" <<< "$changed" || continue
             [ -n "$pinned" ] || continue
             if [ "$from" = "manual" ]; then

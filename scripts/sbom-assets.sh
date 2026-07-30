@@ -7,7 +7,7 @@ target="${1:?usage: sbom-assets.sh <target>}"
 ./scripts/manifest.sh assets "$target" | jq -Rs '
     [ split("\n")[]
       | select(length > 0)
-      | split("\t")
+      | split("|")
       | { module: .[0], name: .[1], version: .[3], sha256: .[4], url: .[6] }
       | select(.url != "")
       | . + { id: ("SPDXRef-Package-asset-"
