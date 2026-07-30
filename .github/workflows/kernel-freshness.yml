@@ -80,6 +80,7 @@ jobs:
                 echo "expected 'ARG KERNEL=${from}' in ${part_file}" >&2
                 exit 1
               fi
+              ./scripts/gen-containerfile.sh
               git commit -am "$title"
               git push -f origin "$branch"
               {
