@@ -1,3 +1,7 @@
 description "NetBird mesh VPN client"
 
 supports "fedora"
+
+packages {
+    fedora "netbird"
+}

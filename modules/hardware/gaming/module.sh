@@ -1,5 +1,3 @@
-dnf5 install -y gamemode
-
 source /ctx/lib/dkms-helpers.sh
 kernel_devel_install "${DKMS_BUILD_DEPS[@]}" cabextract
 

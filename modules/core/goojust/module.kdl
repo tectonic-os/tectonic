@@ -4,6 +4,10 @@ supports "fedora"
 
 collects "justfile.inc" into="/usr/share/goojust/justfile.apps"
 
+packages {
+    fedora "just" "fastfetch"
+}
+
 asset "goojust" {
     renovate datasource="github-releases" depName="tectonic-os/goojust"
     version "0.1.5"

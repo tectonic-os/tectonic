@@ -193,6 +193,19 @@ asset "starship" {
 | `depName=` | `owner/repo`, or the clone URL for `git-refs` |
 | `extractVersion=` | Renovate's capture turning an upstream tag into the value pinned here, e.g. `^v(?<version>.*)$` |
 
+### Packages
+
+```kdl
+packages {
+    fedora "just" "fastfetch"
+    fedora "tailscale" enablerepo="tailscale-stable"
+}
+```
+
+| Property | Meaning |
+| --- | --- |
+| `enablerepo=` | install from a repo that was added disabled (the `repo` file pattern). **Not yet usable**: the repo is configured inside `run-module.sh`, after the generated `dnf5 install` runs. For now, `--enablerepo` packages must stay in `module.sh`. |
+
 ### Build inputs
 
 | Node | Emits |
@@ -278,5 +291,4 @@ fragment position="after" standard-layer=#false
 
 ## Not implemented yet
 
-- **`packages { fedora "..." }`**, declaring packages instead of calling
 - **`source`, `ref` and `sha256`** on list entries, for out-of-tree

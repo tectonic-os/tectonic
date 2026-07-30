@@ -1,3 +1,8 @@
 description "Networking tools and policy: avahi, wireguard-tools, tcpdump, and LLMNR disabled"
 
 supports "fedora"
+
+packages {
+    fedora "avahi-gobject" "avahi-tools" "cifs-utils" "nmap-ncat" "tcpdump" \
+            "traceroute" "wireguard-tools"
+}
