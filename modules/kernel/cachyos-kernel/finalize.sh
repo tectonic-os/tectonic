@@ -19,3 +19,5 @@ dracut --force --no-hostonly --reproducible \
     --add "${DRACUT_MODULES[*]}" \
     --kver "$KVER" \
     "/usr/lib/modules/${KVER}/initramfs.img"
+
+rm -f /usr/libexec/kernel-devel-helpers.sh
