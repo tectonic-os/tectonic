@@ -5,4 +5,5 @@ output
 _build-*/**
 __pycache__/
 build/
+modules/.remote/
 tools/*/target/

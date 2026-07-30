@@ -14,6 +14,8 @@ if ! grep -qxF "$begin" "$skeleton" || ! grep -qxF "$end" "$skeleton"; then
     exit 1
 fi
 
+./scripts/fetch-modules.sh
+
 section_file="$(mktemp)"
 trap 'rm -f "$section_file"' EXIT
 ./scripts/manifest.sh section > "$section_file"

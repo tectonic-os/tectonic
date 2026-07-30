@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - 'modules/**/module.kdl'
+      - 'modules.kdl'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
@@ -35,15 +36,36 @@ jobs:
 
           base="$(git merge-base "origin/${BASE_REF}" HEAD)"
           changed="$(git diff --name-only "$base" HEAD \
-            | grep -E '^modules/.*/module\.kdl$' || true)"
+            | grep -E '^(modules/.*/module\.kdl|modules\.kdl)$' || true)"
           if [ -z "$changed" ]; then
-            echo "No module manifest changed against ${BASE_REF}, nothing to do."
+            echo "No manifest changed against ${BASE_REF}, nothing to do."
             exit 0
           fi
           echo "Changed manifests:"
           echo "$changed"
 
           fixed=()
+
+          if grep -qxF modules.kdl <<< "$changed"; then
+            while IFS='|' read -r name _ ref pinned url _; do
+              if ! curl -fsSL --retry 3 "$url" -o "${RUNNER_TEMP}/module"; then
+                echo "::error file=modules.kdl::${name} ${ref}: ${url} did not download. A ref whose archive URL does not follow from it needs the source template in modules.kdl updated by hand."
+                exit 1
+              fi
+              actual="$(sha256sum "${RUNNER_TEMP}/module" | cut -d' ' -f1)"
+              rm -f "${RUNNER_TEMP}/module"
+
+              if [ "$actual" = "$pinned" ]; then
+                echo "${name} ${ref}: hash already matches."
+                continue
+              fi
+              sed -i "s/sha256 \"${pinned}\"/sha256 \"${actual}\"/" modules.kdl
+              fixed+=("${name} ${ref}")
+              echo "${name} ${ref}: hash updated."
+            done < <(./scripts/manifest.sh remotes)
+          fi
+
+          ./scripts/fetch-modules.sh
           while IFS='|' read -r module name file version pinned from url; do
             grep -qxF "$file" <<< "$changed" || continue
             [ -n "$pinned" ] || continue
