@@ -23,6 +23,7 @@ on:
         default: ''
 
 env:
+  PROBE_IMAGE: "quay.io/podman/hello:latest"
   IMAGE_DESC: "Custom Fedora bootc image"
   IMAGE_KEYWORDS: "bootc,fedora"
   IMAGE_LOGO_URL: "https://avatars.githubusercontent.com/u/99842644?v=4"
@@ -122,6 +123,31 @@ jobs:
           else
             echo "PUBLISH=false" >> "${GITHUB_ENV}"
           fi
+
+      - name: Select a working container runtime
+        run: |
+          echo "podman: $(podman --version)"
+          for rt in crun runc; do
+            if command -v "$rt" > /dev/null; then
+              echo "${rt}: $("$rt" --version | head -1)"
+            else
+              echo "${rt}: absent"
+            fi
+          done
+          if sudo podman run --rm --runtime crun "$PROBE_IMAGE" > /dev/null 2>&1; then
+            echo "crun works; leaving the default alone"
+            exit 0
+          fi
+          echo "::warning::crun cannot start a container on this runner; falling back to runc"
+          if ! command -v runc > /dev/null; then
+            echo "::error::crun cannot start a container and runc is not installed, so there is no working OCI runtime on this runner"
+            exit 1
+          fi
+          sudo mkdir -p /etc/containers/containers.conf.d
+          printf '[engine]\nruntime = "runc"\n' \
+            | sudo tee /etc/containers/containers.conf.d/99-oci-runtime.conf > /dev/null
+          sudo podman run --rm "$PROBE_IMAGE" > /dev/null
+          echo "runc can start a container"
 
       - name: Maximize build space
         uses: ublue-os/remove-unwanted-software@cc0becac701cf642c8f0a6613bbdaf5dc36b259e # v9
