@@ -37,6 +37,8 @@ pub struct Module {
     /// The list path, which is the module's identity everywhere.
     #[allow(dead_code)]
     pub path: String,
+    /// Where the directory actually is, relative to `modules/`.
+    pub dir: String,
     #[allow(dead_code)]
     pub file: String,
     #[allow(dead_code)]
@@ -120,7 +122,22 @@ fn string_args(node: &KdlNode) -> Vec<&str> {
 
 impl Module {
     pub fn load(entry: &Entry, list: &List, root: &Path, issues: &mut Issues) -> Option<Self> {
-        let dir = root.join("modules").join(&entry.path);
+        if entry.remote.is_some() && root.join("modules").join(&entry.path).is_dir() {
+            issues.push(
+                Issue::new(
+                    format!("`{}` is pinned but also exists in tree", entry.path),
+                    &list.file,
+                    &list.text,
+                )
+                .at(entry.span, "two modules would answer to this name")
+                .help(format!(
+                    "rename the pinned one, or drop modules/{}",
+                    entry.path
+                )),
+            );
+        }
+
+        let dir = root.join("modules").join(entry.dir());
         let path = dir.join("module.kdl");
         let file = path.display().to_string();
 
@@ -132,9 +149,13 @@ impl Module {
                     &list.text,
                 )
                 .at(entry.span, "every module needs a manifest")
-                .help(format!(
-                    "create {file}; modules/_template/module-name/module.kdl is a copy-me reference"
-                )),
+                .help(match entry.remote {
+                    Some(_) => "run ./scripts/fetch-modules.sh to fetch what modules.kdl pins"
+                        .to_string(),
+                    None => format!(
+                        "create {file}; modules/_template/module-name/module.kdl is a copy-me reference"
+                    ),
+                }),
             );
             return None;
         };
@@ -150,6 +171,7 @@ impl Module {
 
         let mut module = Module {
             path: entry.path.clone(),
+            dir: entry.dir(),
             description: String::new(),
             supports: Vec::new(),
             provides: Vec::new(),
@@ -780,7 +802,7 @@ pub fn check_graph(modules: &[Module], list: &List, root: &Path, issues: &mut Is
 
     const MAC_POLICY: &str = "mac-policy";
     for module in modules {
-        let dir = root.join("modules").join(&module.path);
+        let dir = root.join("modules").join(&module.dir);
         let has_policy = std::fs::read_dir(dir.join("selinux"))
             .into_iter()
             .flatten()
@@ -941,7 +963,7 @@ pub fn resolve_collects(
     let mut out: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
 
     for module in modules {
-        let dir = root.join("modules").join(&module.path);
+        let dir = root.join("modules").join(&module.dir);
         for (file, collector) in &on_disk {
             if !dir.join(file).is_file() {
                 continue;

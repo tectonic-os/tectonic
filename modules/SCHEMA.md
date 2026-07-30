@@ -74,11 +74,31 @@ module "<path>" variant="<name>" {
 }
 ```
 
-| Property | Will mean |
-| --- | --- |
-| `source=` | repository to fetch the module from |
-| `ref=` | exact commit or tag |
-| `sha256=` | hash of the fetched archive |
+### Out-of-tree modules
+
+```kdl
+module "steam-tweaks" {
+    source "https://github.com/owner/tectonic-modules/archive/refs/tags/{ref}.tar.gz" {
+        renovate datasource="github-tags" depName="owner/tectonic-modules"
+        ref "steam-tweaks/v1.2.0"
+        sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+        path "modules/steam-tweaks"
+    }
+}
+```
+
+| Node | Arity | Meaning |
+| --- | --- | --- |
+| `source "<template>"` | 0 or 1 | the archive to fetch. `{ref}` is the only expansion. |
+| `renovate` | 0 or 1 | Renovate tracks this pin. Mutually exclusive with `manual`. |
+| `manual "<why>"` | 0 or 1 | nothing tracks it, and this is why. Mutually exclusive with `renovate`. |
+| `ref "<pin>"` | exactly 1 | the exact tag or commit the URL resolves against |
+| `sha256 "<hex>"` | exactly 1 | what the fetched archive must hash to |
+| `path "<subtree>"` | 0 or 1 | the module's directory inside the archive. Absent means the archive root is the module. |
+
+- the generator emits the same RUN block as for an in-tree module, so
+- a remote module ships the same required `module.kdl` and is validated
+- **no transitive fetching.** A remote module may `requires` a
 
 ### `flavour`
 
@@ -305,8 +325,16 @@ fragment position="after" standard-layer=#false
 - a `Containerfile.inc` expanding `FLAVOUR` above the `ARG FLAVOUR`
 - a gated module whose fragment runs a command without carrying the
 
-- `source`, `ref` or `sha256` on a list entry
+- a pin declaring neither `renovate` nor `manual`, or both
+- a `renovate` with something between it and the `ref` below it, or
+- a pin with no `ref`, or no `sha256`
+- a `sha256` that is not 64 lowercase hex digits
+- a source URL that is not https or file, is not a tar archive, holds a
+- a subtree `path` that is absolute or holds a `..` segment
+- a pinned name that is not one lowercase path segment, or that is also
+- a URL, ref or path holding a character the fetch could not carry
+- an option named `source`, which a list entry's pin already claims
 
 ## Not implemented yet
 
-- **`source`, `ref` and `sha256`** on list entries, for out-of-tree
+- **A variant overriding an asset pin.** A pin is not an option, and no
