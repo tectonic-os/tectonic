@@ -6,5 +6,7 @@ provides "kernel-devel"
 provides-file "/usr/share/tectonic/sb_cert.der"
 provides-file "/usr/lib/tectonic/kernel-package"
 
+collects "dracut.modules" into="/usr/lib/tectonic/dracut.modules"
+
 arg "KERNEL"
 secret "mok_privkey"
