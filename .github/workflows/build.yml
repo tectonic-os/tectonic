@@ -197,17 +197,23 @@ jobs:
         if: env.PUBLISH == 'true'
         env:
           TARGET: ${{ matrix.target }}
-          MOK_PRIVKEY: ${{ secrets.MOK_PRIVKEY }}
+          SECRET_MOK_PRIVKEY: ${{ secrets.MOK_PRIVKEY }}
         run: |
           umask 077
           mkdir -p "${RUNNER_TEMP}/build-secrets"
           while IFS= read -r id; do
             [ -n "$id" ] || continue
-            name="${id^^}"
-            value="${!name}"
+            case "$id" in
+              *[!a-z0-9_]*)
+                echo "::warning::build secret id '${id}' is not [a-z0-9_], ignoring it"
+                continue
+                ;;
+            esac
+            name="SECRET_${id^^}"
+            value="${!name:-}"
             if [ -z "$value" ]; then
               echo "::warning::a module declares the build secret '${id}'," \
-                "but this repository has no '${name}' secret. Building without it."
+                "but this workflow passes no ${name}. Building without it."
               continue
             fi
             printf '%s' "$value" > "${RUNNER_TEMP}/build-secrets/${id}"
@@ -373,12 +379,12 @@ jobs:
           while IFS= read -r tag; do
             [ -n "$tag" ] || continue
             if [ -z "$digest" ]; then
-              sudo skopeo copy --retry-times 3 \
+              sudo skopeo copy --retry-times 5 \
                 "containers-storage:localhost/${IMAGE_NAME}:chunked" \
                 "docker://${tag}" --digestfile "${RUNNER_TEMP}/digestfile"
               digest="$(cat "${RUNNER_TEMP}/digestfile")"
             else
-              sudo skopeo copy --retry-times 3 \
+              sudo skopeo copy --retry-times 5 \
                 "docker://${IMAGE_REGISTRY}/${IMAGE_NAME}@${digest}" \
                 "docker://${tag}"
             fi
