@@ -1,3 +1,5 @@
-description "Staged bootc auto-update timer and the sigstore signature policy it verifies against"
+description "Staged bootc auto-update timer"
 
 supports "fedora"
+
+requires "signature-policy"

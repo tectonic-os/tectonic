@@ -438,6 +438,8 @@ jobs:
         if: env.PUBLISH == 'true'
         run: |
           IMAGE_DIGEST="${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}"
+          key="modules/$(./scripts/manifest.sh find-provider /etc/pki/containers/cosign.pub)/files/etc/pki/containers/cosign.pub"
+          [ -f "$key" ] || { echo "no module provides the cosign key" >&2; exit 1; }
           cosign verify --key cosign.pub --insecure-ignore-tlog=true \
             "${IMAGE_DIGEST}" > /dev/null
           cosign verify-attestation --key cosign.pub --type spdxjson \
