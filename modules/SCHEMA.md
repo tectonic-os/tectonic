@@ -204,7 +204,7 @@ packages {
 
 | Property | Meaning |
 | --- | --- |
-| `enablerepo=` | install from a repo that was added disabled (the `repo` file pattern). **Not yet usable**: the repo is configured inside `run-module.sh`, after the generated `dnf5 install` runs. For now, `--enablerepo` packages must stay in `module.sh`. |
+| `enablerepo=` | install from a repo the base image already carries disabled. Not the module's own `repo` file: that is sourced by `run-module.sh`, after the generated install runs. |
 
 ### Build inputs
 

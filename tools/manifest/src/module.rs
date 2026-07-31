@@ -435,6 +435,20 @@ impl Module {
             );
         }
 
+        if dir.join("repo").is_file() {
+            for group in &module.packages {
+                issues.push(
+                    Issue::new(
+                        format!("`{}` declares both a `repo` file and `packages`", entry.path),
+                        &file,
+                        &text,
+                    )
+                    .at(group.span, "installed before the repo file is sourced")
+                    .help("run-module.sh sources `repo` after the generated install, so call `dnf5 install -y` in module.sh instead"),
+                );
+            }
+        }
+
         module.resolved = options::resolve(
             &module.options,
             &module.variants,
