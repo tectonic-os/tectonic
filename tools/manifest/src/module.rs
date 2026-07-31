@@ -534,6 +534,14 @@ impl Module {
                 );
                 continue;
             }
+            if !FAMILIES.contains(&family.as_str()) {
+                issues.push(
+                    Issue::new(format!("unknown base family `{family}`"), file, text)
+                        .at(child.name().span(), "not a family this repository builds on")
+                        .help(format!("known families: {}", FAMILIES.join(", "))),
+                );
+                continue;
+            }
             let packages: Vec<String> = child
                 .entries()
                 .iter()
