@@ -75,6 +75,7 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       targets: ${{ steps.set.outputs.targets }}
+      base_provides: ${{ steps.set.outputs.base_provides }}
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -87,6 +88,10 @@ jobs:
           targets="$(./scripts/flavours.sh "$selection" \
             | jq -Rsc 'split("\n") | map(select(length > 0))')"
           echo "targets=${targets}" >> "$GITHUB_OUTPUT"
+
+          provides="$(./scripts/manifest.sh base-provides \
+            | jq -Rsc 'split("\n") | map(select(length > 0))')"
+          echo "base_provides=${provides}" >> "$GITHUB_OUTPUT"
 
   build_push:
     needs: compute-matrix
@@ -159,7 +164,7 @@ jobs:
         id: base
         run: |
           set -euo pipefail
-          base="$(grep -oP '^FROM \Kquay\.io/fedora/fedora-bootc:\S+' Containerfile.template | head -1)"
+          base="$(./scripts/manifest.sh base-image)"
           digest="$(skopeo inspect --format '{{.Digest}}' "docker://${base}")"
           echo "name=${base}" >> "$GITHUB_OUTPUT"
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
@@ -179,7 +184,7 @@ jobs:
             org.opencontainers.image.created=${{ steps.date.outputs.date }}
             org.opencontainers.image.description=${{ env.IMAGE_DESC }} (${{ matrix.target }})
             org.opencontainers.image.documentation=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.sha }}/README.md
-            org.opencontainers.image.source=https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/blob/${{ github.sha }}/Containerfile.template
+            org.opencontainers.image.source=https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/blob/${{ github.sha }}/Containerfile.generated
             org.opencontainers.image.title=${{ env.IMAGE_NAME }}
             org.opencontainers.image.url=https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/tree/${{ github.sha }}
             org.opencontainers.image.vendor=${{ github.repository_owner }}
@@ -352,7 +357,8 @@ jobs:
           retention-days: 30
 
       - name: Rechunk image
-        if: env.PUBLISH == 'true'
+        id: rechunk
+        if: env.PUBLISH == 'true' && contains(fromJSON(needs.compute-matrix.outputs.base_provides), 'rechunking')
         run: |
           sudo podman run --rm --privileged ${{ steps.runtime.outputs.flag }} \
             --volume /var/lib/containers:/var/lib/containers \
@@ -364,6 +370,7 @@ jobs:
           echo "==> Disk at peak (raw + chunked both present)"
           df -h /
           sudo podman rmi "localhost/${IMAGE_NAME}:raw"
+          echo "tag=chunked" >> "$GITHUB_OUTPUT"
 
       - name: Login to GitHub Container Registry (root)
         if: env.PUBLISH == 'true'
@@ -371,16 +378,18 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" \
             | sudo podman login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-      - name: Push chunked image
+      - name: Push image
         id: push
         if: env.PUBLISH == 'true'
+        env:
+          SOURCE_TAG: ${{ steps.rechunk.outputs.tag || 'raw' }}
         run: |
           digest=""
           while IFS= read -r tag; do
             [ -n "$tag" ] || continue
             if [ -z "$digest" ]; then
               sudo skopeo copy --retry-times 5 \
-                "containers-storage:localhost/${IMAGE_NAME}:chunked" \
+                "containers-storage:localhost/${IMAGE_NAME}:${SOURCE_TAG}" \
                 "docker://${tag}" --digestfile "${RUNNER_TEMP}/digestfile"
               digest="$(cat "${RUNNER_TEMP}/digestfile")"
             else
@@ -429,6 +438,8 @@ jobs:
         if: env.PUBLISH == 'true'
         run: |
           IMAGE_DIGEST="${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}"
+          key="modules/$(./scripts/manifest.sh find-provider /etc/pki/containers/cosign.pub)/files/etc/pki/containers/cosign.pub"
+          [ -f "$key" ] || { echo "no module provides the cosign key" >&2; exit 1; }
           cosign verify --key cosign.pub --insecure-ignore-tlog=true \
             "${IMAGE_DIGEST}" > /dev/null
           cosign verify-attestation --key cosign.pub --type spdxjson \

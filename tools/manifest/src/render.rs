@@ -26,12 +26,27 @@ pub fn section(
     modules: &[Module],
     collected: &BTreeMap<String, Vec<(String, String)>>,
     root: &Path,
-    base_family: &str,
     issues: &mut Issues,
 ) -> String {
     let mut out = String::new();
     let mut flavour_arg_emitted = false;
     let mut finalize: Vec<String> = Vec::new();
+
+    let base_family = list.base.as_ref().map_or("", |b| b.family.as_str());
+
+    if let Some(base) = &list.base {
+        let _ = write!(
+            out,
+            "### Base Image\n\
+             FROM {}\n\n",
+            base.image
+        );
+    }
+
+    let _ = write!(
+        out,
+        "## Build phases and modules\n\n"
+    );
 
     let phases = phases(root, issues);
     for (_, file) in phases.iter().filter(|(number, _)| *number < MODULE_SLOT) {
@@ -268,12 +283,21 @@ pub fn assets(list: &List, modules: &[Module], target: Option<&str>) -> String {
 }
 
 /// The module that provides a contract file path.
-pub fn find_provider(list: &List, modules: &[Module], file_path: &str) -> String {
-    for module in modules {
-        for decl in &module.provides_files {
-            if decl.name == file_path {
-                return format!("{}\n", module.path);
-            }
+pub fn find_provider(
+    list: &List,
+    modules: &[Module],
+    file_path: &str,
+    target: Option<&str>,
+) -> String {
+    for entry in list.entries.iter().filter(|e| in_target(e, target)) {
+        let Some(module) = modules
+            .iter()
+            .find(|m| m.path == entry.path && m.flavour == entry.flavour)
+        else {
+            continue;
+        };
+        if module.provides_files.iter().any(|d| d.name == file_path) {
+            return format!("{}\n", module.path);
         }
     }
     String::new()
@@ -301,11 +325,18 @@ pub fn secrets(list: &List, modules: &[Module], target: Option<&str>) -> String 
     out
 }
 
-/// Contract file paths the enabled modules declare and the finished image
-/// still carries, one per line.
+/// Contract file paths the finished image still carries, one per line: what
+/// the base image guarantees, then what the enabled modules declare.
 pub fn contract_files(list: &List, modules: &[Module], target: Option<&str>) -> String {
     let mut seen: Vec<&str> = Vec::new();
     let mut out = String::new();
+    for decl in list.base.iter().flat_map(|b| b.provides_files.iter()) {
+        if seen.contains(&decl.name.as_str()) {
+            continue;
+        }
+        seen.push(&decl.name);
+        let _ = writeln!(out, "{}", decl.name);
+    }
     for entry in list.entries.iter().filter(|e| in_target(e, target)) {
         let Some(module) = modules
             .iter()

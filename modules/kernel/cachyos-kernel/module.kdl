@@ -8,6 +8,7 @@ provides-file "/usr/lib/tectonic/kernel-package"
 
 provides-file "/usr/libexec/kernel-devel-helpers.sh" build-only=#true
 
+requires "initramfs-generation"
 collects "dracut.modules" into="/usr/lib/tectonic/dracut.modules"
 
 arg "KERNEL"

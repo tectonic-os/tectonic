@@ -15,6 +15,12 @@
 ## modules.kdl
 
 ```kdl
+base "quay.io/fedora/fedora-bootc:44" {
+    family "fedora"
+    provides "rechunking" "initramfs-generation" "mac-policy"
+    provides-file "/usr/bin/bootc" "/usr/bin/systemctl" "/usr/bin/rpm-ostree"
+}
+
 flavours {
     dev
 }
@@ -34,6 +40,14 @@ modules {
     module "core/power-just-scripts"
 }
 ```
+
+### `base`
+
+| Child | Meaning |
+| --- | --- |
+| `family` | which distro's packaging and tooling modules may assume. Checked against every enabled module's `supports`. Required. |
+| `provides` | capabilities the base satisfies that no module could implement portably. A module may `require` one; nothing has to provide it. |
+| `provides-file` | absolute paths to binaries the base guarantees. Checked on the finished image alongside the modules' own [contract files](#contract-files). |
 
 ### `flavours`
 
@@ -248,6 +262,8 @@ fragment position="after" standard-layer=#false
 - either file unparseable, or carrying a node or property this schema
 - a `modules.kdl` entry that does not resolve to a module directory
 - a module directory without a `module.kdl`, or one missing
+- no `base` node, a `base` declared twice, one with no image reference or
+- an enabled module whose `supports` does not include the base `family`
 
 - a flavour name outside `^[a-z][a-z0-9-]*$`, duplicated, or named `none`
 - a `flavours` block with no `default=#true`, or with more than one
@@ -257,6 +273,8 @@ fragment position="after" standard-layer=#false
 - a `requires` no enabled module provides, listing every module that
 - a `requires-file` no enabled module provides
 - two enabled modules providing the same capability or contract file
+- a module providing something the `base` node already provides
+- a module shipping `selinux/*.te` without `requires "mac-policy"`
 - a requirement satisfied only by a module gated to another flavour
 - a cycle, naming the edges that close it
 

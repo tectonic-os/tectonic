@@ -1,0 +1,7 @@
+description "Sigstore signature verification for the image's own updates"
+
+supports "fedora"
+
+provides "signature-policy"
+
+provides-file "/etc/pki/containers/cosign.pub"
