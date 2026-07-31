@@ -72,16 +72,26 @@ else
 fi
 
 enablement_links() {
-	local root="$1" unit="$2" link
+	local root="$1" unit="$2" link target
 	[ -d "$root" ] || return 0
 	while IFS= read -r link; do
 		[ -n "$link" ] || continue
-		[ "$(readlink "$link")" = /dev/null ] && continue
-		printf '%s\n' "$link"
-	done < <(find "$root" -maxdepth 2 -name "$unit" -type l 2>/dev/null || true)
+		target="$(readlink "$link")"
+		[ "$target" = /dev/null ] && continue
+		if [ "${link##*/}" = "$unit" ] || [ "${target##*/}" = "$unit" ]; then
+			printf '%s\n' "$link"
+		fi
+	done < <(find "$root" -maxdepth 2 -type l 2>/dev/null || true)
 }
 
-verify_allowed='Failed to create .*: Unit [^ ]+\.(mount|swap) not found\.$'
+verify_allowed_patterns=(
+	'Failed to create .*: Unit [^ ]+\.(mount|swap) not found\.$'
+	"Command 'man [^']*' failed with code [0-9]+\$"
+)
+verify_allowed="$(
+	IFS='|'
+	printf '%s' "${verify_allowed_patterns[*]}"
+)"
 echo "==> systemd unit verification"
 checked=0
 for scope in system user; do
