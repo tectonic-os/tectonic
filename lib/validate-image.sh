@@ -66,6 +66,7 @@ enablement_links() {
     done < <(find "$root" -maxdepth 2 -name "$unit" -type l 2>/dev/null || true)
 }
 
+verify_allowed='Failed to create .*: Unit [^ ]+\.(mount|swap) not found\.$'
 echo "==> systemd unit verification"
 checked=0
 for scope in system user; do
@@ -103,10 +104,19 @@ for scope in system user; do
             if [ "$scope" = "system" ] && [ "$verb" = "enable" ]; then
                 if out="$(systemd-analyze verify --no-pager "$unit" 2>&1)"; then
                     echo "        ${unit} enabled"
+                elif [ -z "${out//[[:space:]]/}" ]; then
+                    fail "${unit}: systemd-analyze verify failed without saying why"
                 else
-                    echo "        ${unit} enabled, verify notes:"
-                    # shellcheck disable=SC2001
-                    echo "$out" | sed 's/^/          /' >&2 || true
+                    unexpected="$(printf '%s\n' "$out" \
+                        | grep -Ev "$verify_allowed" \
+                        | grep -Ev '^[[:space:]]*$' || true)"
+                    if [ -n "$unexpected" ]; then
+                        fail "${unit}: systemd-analyze verify"
+                        # shellcheck disable=SC2001
+                        echo "$unexpected" | sed 's/^/          /' >&2
+                    else
+                        echo "        ${unit} enabled (verify: mount/swap notes only)"
+                    fi
                 fi
             else
                 echo "        ${unit} ${verb}d"
