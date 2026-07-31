@@ -47,16 +47,7 @@ else
 	echo "    (no /usr/lib/opt symlinks declared)"
 fi
 
-echo "==> base image contract"
-for bin in bootc systemctl rpm-ostree; do
-	if command -v "$bin" >/dev/null 2>&1; then
-		echo "    ${bin} ok"
-	else
-		fail "${bin} not on PATH"
-	fi
-done
-
-echo "==> module contract files"
+echo "==> contract files"
 if [ -z "${CONTRACT_FILES:-}" ]; then
 	echo "    (none declared)"
 else
@@ -66,7 +57,7 @@ else
 		if [ -e "$path" ]; then
 			echo "    ${path} ok"
 		else
-			fail "${path}: a module declares it, the image does not have it"
+			fail "${path}: the manifest declares it, the image does not have it"
 		fi
 	done
 fi

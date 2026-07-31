@@ -316,11 +316,18 @@ pub fn secrets(list: &List, modules: &[Module], target: Option<&str>) -> String 
     out
 }
 
-/// Contract file paths the enabled modules declare and the finished image
-/// still carries, one per line.
+/// Contract file paths the finished image still carries, one per line: what
+/// the base image guarantees, then what the enabled modules declare.
 pub fn contract_files(list: &List, modules: &[Module], target: Option<&str>) -> String {
     let mut seen: Vec<&str> = Vec::new();
     let mut out = String::new();
+    for decl in list.base.iter().flat_map(|b| b.provides_files.iter()) {
+        if seen.contains(&decl.name.as_str()) {
+            continue;
+        }
+        seen.push(&decl.name);
+        let _ = writeln!(out, "{}", decl.name);
+    }
     for entry in list.entries.iter().filter(|e| in_target(e, target)) {
         let Some(module) = modules
             .iter()
