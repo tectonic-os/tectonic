@@ -1,3 +1,9 @@
+base "quay.io/fedora/fedora-bootc:44" {
+    family "fedora"
+    provides "rechunking" "initramfs-generation" "mac-policy"
+    provides-file "/usr/bin/bootc" "/usr/bin/systemctl" "/usr/bin/rpm-ostree"
+}
+
 flavours {
     dev
 }

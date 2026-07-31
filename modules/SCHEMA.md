@@ -15,6 +15,12 @@
 ## modules.kdl
 
 ```kdl
+base "quay.io/fedora/fedora-bootc:44" {
+    family "fedora"
+    provides "rechunking" "initramfs-generation" "mac-policy"
+    provides-file "/usr/bin/bootc" "/usr/bin/systemctl" "/usr/bin/rpm-ostree"
+}
+
 flavours {
     dev
 }
@@ -34,6 +40,14 @@ modules {
     module "core/power-just-scripts"
 }
 ```
+
+### `base`
+
+| Child | Meaning |
+| --- | --- |
+| `family` | which distro's packaging and tooling modules may assume. Checked against every enabled module's `supports`. Required. |
+| `provides` | capabilities the base satisfies that no module could implement portably. A module may `require` one; nothing has to provide it. |
+| `provides-file` | absolute paths to binaries the base guarantees. Checked on the finished image alongside the modules' own [contract files](#contract-files). |
 
 ### `flavours`
 

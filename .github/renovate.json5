@@ -44,6 +44,21 @@
   "customManagers": [
     {
       "customType": "regex",
+      // The base image moved out of Containerfile.template and into the
+      // `base` node in modules.kdl, which the generated FROM is emitted
+      // from. Renovate's dockerfile manager still matches the FROM in
+      // Containerfile.generated, and both carry the same depName and
+      // version, so a bump updates the declaration and the generated file
+      // together in one PR and the drift check stays happy.
+      "description": "Base image reference in modules.kdl",
+      "managerFilePatterns": ["/^modules\\.kdl$/"],
+      "datasourceTemplate": "docker",
+      "matchStrings": [
+        "base \"(?<depName>[^\":]+):(?<currentValue>[^\"]+)\"",
+      ],
+    },
+    {
+      "customType": "regex",
       // Path segments must start with a lowercase letter, which excludes
       // modules/_template — its examples name a placeholder upstream that
       // would fail every lookup. RE2 has no negative lookahead, so the

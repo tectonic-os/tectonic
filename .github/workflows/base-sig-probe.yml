@@ -23,7 +23,7 @@ jobs:
       - name: Resolve base image
         id: base
         run: |
-          base="$(grep -oP '^FROM \Kquay\.io/fedora/fedora-bootc:\S+' Containerfile.template | head -1)"
+          base="$(./scripts/manifest.sh base-image)"
           echo "image=${base}" >> "$GITHUB_OUTPUT"
 
       - name: Probe for a cosign signature

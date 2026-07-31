@@ -684,7 +684,7 @@ fn providers_on_disk(root: &Path) -> BTreeMap<String, Vec<String>> {
 const BASE_CAPABILITIES: [&str; 3] = ["rechunking", "initramfs-generation", "mac-policy"];
 
 /// Single pass over the resolved graph.
-pub fn check_graph(modules: &[Module], root: &Path, base_family: &str, issues: &mut Issues) {
+pub fn check_graph(modules: &[Module], list: &List, root: &Path, issues: &mut Issues) {
     let mut offered: BTreeMap<&str, Vec<&Module>> = BTreeMap::new();
     for module in modules {
         for decl in module.provides.iter().chain(module.provides_files.iter()) {
@@ -696,7 +696,13 @@ pub fn check_graph(modules: &[Module], root: &Path, base_family: &str, issues: &
         offered.entry(cap).or_default();
     }
 
+    let base_family = list
+        .base
+        .as_ref()
+        .map(|b| b.family.as_str())
+        .filter(|f| !f.is_empty());
     for module in modules {
+        let Some(base_family) = base_family else { break };
         if !module.supports.iter().any(|f| f == base_family) {
             let supported = module.supports.join(", ");
             issues.push(

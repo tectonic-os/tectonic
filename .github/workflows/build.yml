@@ -159,7 +159,7 @@ jobs:
         id: base
         run: |
           set -euo pipefail
-          base="$(grep -oP '^FROM \Kquay\.io/fedora/fedora-bootc:\S+' Containerfile.template | head -1)"
+          base="$(./scripts/manifest.sh base-image)"
           digest="$(skopeo inspect --format '{{.Digest}}' "docker://${base}")"
           echo "name=${base}" >> "$GITHUB_OUTPUT"
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"

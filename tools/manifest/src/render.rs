@@ -26,12 +26,27 @@ pub fn section(
     modules: &[Module],
     collected: &BTreeMap<String, Vec<(String, String)>>,
     root: &Path,
-    base_family: &str,
     issues: &mut Issues,
 ) -> String {
     let mut out = String::new();
     let mut flavour_arg_emitted = false;
     let mut finalize: Vec<String> = Vec::new();
+
+    let base_family = list.base.as_ref().map_or("", |b| b.family.as_str());
+
+    if let Some(base) = &list.base {
+        let _ = write!(
+            out,
+            "### Base Image\n\
+             FROM {}\n\n",
+            base.image
+        );
+    }
+
+    let _ = write!(
+        out,
+        "## Build phases and modules\n\n"
+    );
 
     let phases = phases(root, issues);
     for (_, file) in phases.iter().filter(|(number, _)| *number < MODULE_SLOT) {
