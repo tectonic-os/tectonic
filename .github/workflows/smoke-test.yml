@@ -42,7 +42,7 @@ jobs:
             --type qcow2 \
             --use-librepo=True \
             --rootfs=btrfs \
-            "localhost/${IMAGE_NAME}:latest"
+            "${IMAGE_REGISTRY}/${IMAGE_NAME}:latest"
           ls -lh "${RUNNER_TEMP}/qcow2/"
 
       - name: Generate SSH key for VM access
