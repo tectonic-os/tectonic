@@ -56,6 +56,16 @@ for bin in bootc systemctl rpm-ostree; do
     fi
 done
 
+enablement_links() {
+    local root="$1" unit="$2" link
+    [ -d "$root" ] || return 0
+    while IFS= read -r link; do
+        [ -n "$link" ] || continue
+        [ "$(readlink "$link")" = /dev/null ] && continue
+        printf '%s\n' "$link"
+    done < <(find "$root" -maxdepth 2 -name "$unit" -type l 2>/dev/null || true)
+}
+
 echo "==> systemd unit verification"
 checked=0
 for scope in system user; do
@@ -81,16 +91,25 @@ for scope in system user; do
                 continue
             fi
 
+            config_root="/etc/systemd/${scope}"
+            links="$(enablement_links "$config_root" "$unit")"
+            if [ "$verb" = "enable" ] && [ -z "$links" ]; then
+                fail "${unit}: preset enables it, but nothing under ${config_root} does"
+            elif [ "$verb" = "disable" ] && [ -n "$links" ]; then
+                fail "${unit}: preset disables it, but ${config_root} still enables it:" \
+                    "$(echo "$links" | tr '\n' ' ')"
+            fi
+
             if [ "$scope" = "system" ] && [ "$verb" = "enable" ]; then
                 if out="$(systemd-analyze verify --no-pager "$unit" 2>&1)"; then
-                    echo "        ${unit} ok"
+                    echo "        ${unit} enabled"
                 else
-                    echo "        ${unit} verify notes:"
+                    echo "        ${unit} enabled, verify notes:"
                     # shellcheck disable=SC2001
                     echo "$out" | sed 's/^/          /' >&2 || true
                 fi
             else
-                echo "        ${unit} ok (exists)"
+                echo "        ${unit} ${verb}d"
             fi
         done < "$preset"
     done
