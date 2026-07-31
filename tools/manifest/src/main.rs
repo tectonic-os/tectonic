@@ -57,13 +57,12 @@ fn main() -> ExitCode {
         }
     };
     const PER_TARGET: [&str; 4] = ["summary", "assets", "secrets", "contract-files"];
-    const ONE_ARG: [&str; 6] = [
+    const ONE_ARG: [&str; 5] = [
         "summary",
         "assets",
         "secrets",
         "contract-files",
         "find-provider",
-        "check",
     ];
     let target = args.get(1).map(String::as_str);
     if target.is_some() && !ONE_ARG.contains(&command) {
@@ -103,6 +102,19 @@ fn main() -> ExitCode {
     overlay::check(&modules, &root, &mut issues);
     let collected = module::resolve_collects(&modules, &root, &mut issues);
 
+    if PER_TARGET.contains(&command) {
+        if let Some(unknown) = target.filter(|t| !list.targets().iter().any(|have| have == t)) {
+            issues.push(
+                diag::Issue::new(
+                    format!("`{unknown}` is not a build target"),
+                    &list_display,
+                    &list.text,
+                )
+                .help(format!("targets: {}", list.targets().join(", "))),
+            );
+        }
+    }
+
     let output = match command {
         "flavours" => lines(list.flavours.iter().map(|f| f.name.clone())),
         "default-flavour" => lines(list.default_flavour().map(str::to_string)),
@@ -124,49 +136,10 @@ fn main() -> ExitCode {
             };
             render::find_provider(&list, &modules, path)
         }
-        "secrets" => {
-            if let Some(unknown) = target.filter(|t| !list.targets().iter().any(|have| have == t)) {
-                issues.push(
-                    diag::Issue::new(
-                        format!("`{unknown}` is not a build target"),
-                        &list_display,
-                        &list.text,
-                    )
-                    .help(format!("targets: {}", list.targets().join(", "))),
-                );
-            }
-            render::secrets(&list, &modules, target)
-        }
-        "contract-files" => {
-            if let Some(unknown) = target.filter(|t| !list.targets().iter().any(|have| have == t)) {
-                issues.push(
-                    diag::Issue::new(
-                        format!("`{unknown}` is not a build target"),
-                        &list_display,
-                        &list.text,
-                    )
-                    .help(format!("targets: {}", list.targets().join(", "))),
-                );
-            }
-            render::contract_files(&list, &modules, target)
-        }
-        "summary" | "assets" => {
-            if let Some(unknown) = target.filter(|t| !list.targets().iter().any(|have| have == t)) {
-                issues.push(
-                    diag::Issue::new(
-                        format!("`{unknown}` is not a build target"),
-                        &list_display,
-                        &list.text,
-                    )
-                    .help(format!("targets: {}", list.targets().join(", "))),
-                );
-            }
-            if command == "summary" {
-                render::summary(&list, &modules, target)
-            } else {
-                render::assets(&list, &modules, target)
-            }
-        }
+        "secrets" => render::secrets(&list, &modules, target),
+        "contract-files" => render::contract_files(&list, &modules, target),
+        "summary" => render::summary(&list, &modules, target),
+        "assets" => render::assets(&list, &modules, target),
         other => {
             eprintln!("manifest: unknown command `{other}`");
             eprint!("{USAGE}");
