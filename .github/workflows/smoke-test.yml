@@ -1,0 +1,139 @@
+---
+name: VM boot smoke test
+on:
+  schedule:
+    - cron: '30 3 * * 1'
+  workflow_dispatch:
+
+env:
+  IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
+  IMAGE_NAME: tectonic
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Check /dev/kvm
+        run: test -e /dev/kvm
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Maximize build space
+        uses: ublue-os/remove-unwanted-software@cc0becac701cf642c8f0a6613bbdaf5dc36b259e # v9
+
+      - name: Pull published image
+        run: |
+          sudo podman pull "${IMAGE_REGISTRY}/${IMAGE_NAME}:latest"
+
+      - name: Build qcow2 disk image
+        run: |
+          sudo podman run --rm --privileged \
+            --pull=newer \
+            --net=host \
+            --security-opt label=type:unconfined_t \
+            -v "${PWD}/disk_config/disk.toml":/config.toml:ro \
+            -v "${RUNNER_TEMP}":/output \
+            -v /var/lib/containers/storage:/var/lib/containers/storage \
+            quay.io/centos-bootc/bootc-image-builder:latest \
+            --type qcow2 \
+            --use-librepo=True \
+            --rootfs=btrfs \
+            "${IMAGE_REGISTRY}/${IMAGE_NAME}:latest"
+          ls -lh "${RUNNER_TEMP}/qcow2/"
+
+      - name: Generate SSH key for VM access
+        run: |
+          ssh-keygen -t ed25519 -f "${RUNNER_TEMP}/smoke-key" -N '' -C 'tectonic-smoke-test'
+          chmod 600 "${RUNNER_TEMP}/smoke-key"
+
+      - name: Inject SSH key into disk image
+        run: |
+          sudo virt-customize -a "${RUNNER_TEMP}/qcow2/disk.qcow2" \
+            --ssh-inject "root:file:${RUNNER_TEMP}/smoke-key.pub" \
+            --selinux-relabel
+
+      - name: Boot VM under qemu
+        run: |
+          qemu-img create -f qcow2 \
+            -b "${RUNNER_TEMP}/qcow2/disk.qcow2" \
+            -F qcow2 \
+            "${RUNNER_TEMP}/overlay.qcow2"
+
+          qemu-system-x86_64 \
+            -m 4096 \
+            -smp 2 \
+            -cpu host \
+            -enable-kvm \
+            -display none \
+            -serial "file:${RUNNER_TEMP}/console.log" \
+            -drive file="${RUNNER_TEMP}/overlay.qcow2",if=virtio,format=qcow2 \
+            -nic user,hostfwd=tcp::2222-:22 \
+            &
+          QEMU_PID=$!
+          echo "qemu_pid=${QEMU_PID}" >> "$GITHUB_ENV"
+
+      - name: Wait for SSH
+        timeout-minutes: 10
+        run: |
+          for i in $(seq 30); do
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
+                -i "${RUNNER_TEMP}/smoke-key" \
+                -p 2222 root@localhost 'echo ok' 2>/dev/null; then
+              echo "SSH ready after ${i} attempts"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "SSH did not come up" >&2
+          exit 1
+
+      - name: Assertions
+        run: |
+          s() {
+            ssh -o StrictHostKeyChecking=no \
+              -i "${RUNNER_TEMP}/smoke-key" \
+              -p 2222 root@localhost "$@"
+          }
+
+          echo "==> bootc status"
+          s bootc status || { echo "FAIL: bootc status"; exit 1; }
+
+          echo "==> systemctl is-system-running"
+          state="$(s systemctl is-system-running)" || true
+          case "$state" in
+            running)
+              echo "system state: ${state}"
+              ;;
+            *)
+              echo "FAIL: system state is '${state}', expected running" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "==> systemctl --failed"
+          failed="$(s systemctl --failed --no-legend | wc -l)" || true
+          if [ "$failed" -gt 0 ]; then
+            echo "FAIL: ${failed} failed units:" >&2
+            s systemctl --failed --no-legend >&2 || true
+            exit 1
+          fi
+          echo "No failed units"
+
+      - name: Serial console
+        if: failure()
+        run: |
+          if [ -s "${RUNNER_TEMP}/console.log" ]; then
+            cat "${RUNNER_TEMP}/console.log"
+          else
+            echo "the VM wrote nothing to the serial console"
+          fi
+
+      - name: Stop qemu
+        if: always()
+        run: |
+          kill "${qemu_pid}" 2>/dev/null || true
+          wait "${qemu_pid}" 2>/dev/null || true

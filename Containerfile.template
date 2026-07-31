@@ -11,4 +11,7 @@ FROM quay.io/fedora/fedora-bootc:44
 
 COPY cosign.pub /etc/pki/containers/cosign.pub
 
+ARG CONTRACT_FILES=""
 RUN bootc container lint
+RUN --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    CONTRACT_FILES="${CONTRACT_FILES}" bash /ctx/lib/validate-image.sh
