@@ -81,6 +81,14 @@ pub fn parse_option(node: &KdlNode, file: &str, text: &str, issues: &mut Issues)
         );
     }
 
+    if name == "source" {
+        issues.push(
+            Issue::new("`source` is not usable as an option name", file, text)
+                .at(node.name().span(), "reserved")
+                .help("a `source` child of a list entry is the out-of-tree module pin, so this option could never be set"),
+        );
+    }
+
     let ty = match prop(node, "type").and_then(|v| v.as_string()) {
         Some(t) => match OptType::parse(t) {
             Some(ty) => ty,

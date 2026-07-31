@@ -81,5 +81,18 @@
       // currentValue (or this template) even for a digest-only pin.
       "currentValueTemplate": "master",
     },
+    {
+      "customType": "regex",
+      // Out-of-tree modules: the `renovate` node inside a `source` block
+      // and the `ref` line directly below it, the same shape and the same
+      // adjacency rule as an asset pin. Tags only, since a module is
+      // published as a per-module tag; the parser rejects git-refs here
+      // rather than leaving a branch-tracked pin unmatched.
+      "description": "Out-of-tree module pins in modules.kdl",
+      "managerFilePatterns": ["/^modules\\.kdl$/"],
+      "matchStrings": [
+        "renovate datasource=\"(?<datasource>github-releases|github-tags)\" depName=\"(?<depName>[^\"]+)\"(?: extractVersion=\"(?<extractVersion>[^\"]+)\")?\\s*\\n\\s*ref \"(?<currentValue>[^\"]+)\"",
+      ],
+    },
   ],
 }

@@ -322,7 +322,7 @@ pub fn parse(node: &KdlNode, file: &str, text: &str, issues: &mut Issues) -> Opt
 /// this node out of the manifest itself, so what it needs is data rather than
 /// a comment: a comment cannot be checked, and the annotations these replace
 /// silently stopped matching the last two times a path moved.
-fn check_renovate(node: &KdlNode, file: &str, text: &str, issues: &mut Issues) {
+pub fn check_renovate(node: &KdlNode, file: &str, text: &str, issues: &mut Issues) {
     let span = node.name().span();
     let mut datasource = None;
     let mut dep_name = None;

@@ -7,10 +7,13 @@ if ! command -v shellcheck > /dev/null 2>&1; then
     exit 1
 fi
 
+./scripts/fetch-modules.sh
+
 mapfile -t scripts < <(
-    find build-phases scripts lib modules -name '*.sh' -type f
-    find modules -path '*/files/*' -type f \
-        \( -path '*/libexec/*' -o -path '*/system-generators/*' \)
+    find build-phases scripts lib modules -path modules/.remote -prune -o \
+        -name '*.sh' -type f -print
+    find modules -path modules/.remote -prune -o -path '*/files/*' -type f \
+        \( -path '*/libexec/*' -o -path '*/system-generators/*' \) -print
 )
 shellcheck -s bash "${scripts[@]}"
 echo "lint: shellcheck passed on ${#scripts[@]} scripts"
