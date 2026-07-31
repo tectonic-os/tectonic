@@ -1,3 +1,0 @@
-description "Base system policy: sshd off, coredumps disabled, faillock and pwquality, sulogin generator and os-release branding"
-
-supports "fedora"

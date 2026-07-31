@@ -18,8 +18,6 @@ done
 rm -rf /opt
 mv /opt.bak /opt
 
-echo 'GRUB_DISABLE_OS_PROBER=false' >> /etc/default/grub
-
 cat <<'EOF' > /tmp/composefs_execmem.te
 module composefs_execmem 0.1;
 
@@ -33,10 +31,10 @@ EOF
 source /ctx/lib/selinux-helpers.sh
 install_selinux_module /tmp/composefs_execmem.te
 
-apply_tectonic_presets() {
+apply_module_presets() {
     local scope="$1" dir="$2" flag=() f verb unit
     [ "$scope" = "user" ] && flag=(--global)
-    for f in "$dir"/*tectonic*.preset; do
+    for f in "$dir"/45-module-*.preset; do
         [ -f "$f" ] || continue
         while read -r verb unit; do
             case "$verb" in
@@ -47,8 +45,8 @@ apply_tectonic_presets() {
         done < "$f"
     done
 }
-apply_tectonic_presets system /usr/lib/systemd/system-preset
-apply_tectonic_presets user /usr/lib/systemd/user-preset
+apply_module_presets system /usr/lib/systemd/system-preset
+apply_module_presets user /usr/lib/systemd/user-preset
 
 run_module_finalize() {
     local entry name gate dir entries=()

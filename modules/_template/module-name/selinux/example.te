@@ -1,4 +1,4 @@
-module tectonic_template 1.0;
+module example 1.0;
 
 require {
 	type unconfined_t;

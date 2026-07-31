@@ -51,7 +51,7 @@ KEV_LOOKBACK_DAYS = int(os.environ.get("KEV_LOOKBACK_DAYS", "180"))
 
 def fetch_json(url):
     req = urllib.request.Request(
-        url, headers={"User-Agent": "tectonic-kernel-freshness"}
+        url, headers={"User-Agent": "kernel-freshness-probe"}
     )
     with urllib.request.urlopen(req, timeout=30) as resp:
         return json.load(resp)

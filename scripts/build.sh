@@ -4,10 +4,13 @@ cd "$(dirname "$0")/.."
 
 containerfile=Containerfile.generated
 
+image_id="$(./scripts/manifest.sh image-id)"
+
 # renovate: datasource=docker depName=docker.io/moby/buildkit
 buildkit_image="docker.io/moby/buildkit:v0.31.2"
-buildkit_container=tectonic-buildkitd
-buildkit_volume=tectonic-buildkit
+buildkit_container="${image_id}-buildkitd"
+buildkit_volume="${image_id}-buildkit"
+buildkit_label="${image_id}.buildkitd"
 buildkit_context=/build
 buildkit_secret_dir=/run/secrets
 
@@ -144,7 +147,7 @@ image_version="${IMAGE_VERSION:-$(date -u +%Y%m%d)}"
 while IFS= read -r line; do
 	if [ -n "$line" ]; then tags+=("$line"); fi
 done <<<"${TAGS:-}"
-[ "${#tags[@]}" -gt 0 ] || tags=("${IMAGE_NAME:-tectonic}:${DEFAULT_TAG:-latest}")
+[ "${#tags[@]}" -gt 0 ] || tags=("${IMAGE_NAME:-$image_id}:${DEFAULT_TAG:-latest}")
 
 while IFS= read -r line; do
 	if [ -n "$line" ]; then labels+=("$line"); fi
@@ -191,6 +194,7 @@ fi
 build_args=(
 	"FLAVOUR=${flavour_arg}"
 	"IMAGE_VERSION=${image_version}"
+	"IMAGE_REGISTRY=$(./scripts/registry.sh namespace 2>/dev/null || true)"
 	"CONTRACT_FILES=$(./scripts/manifest.sh contract-files "$flavour" | tr '\n' ' ')"
 )
 [ -z "$kernel" ] || build_args+=("KERNEL=${kernel}")
@@ -219,12 +223,12 @@ buildkitd_ensure() {
 	local want have
 	want="$(printf '%s\n' "$buildkit_image" "${run_args[@]}" | sha256sum | cut -d' ' -f1)"
 	have="$(podman inspect --format \
-		'{{index .Config.Labels "tectonic.buildkitd"}} {{.State.Running}}' \
+		"{{index .Config.Labels \"${buildkit_label}\"}} {{.State.Running}}" \
 		"$buildkit_container" 2>/dev/null || true)"
 	[ "$have" = "${want} true" ] && return 0
 
 	podman rm --force "$buildkit_container" >/dev/null 2>&1 || true
-	podman run "${run_args[@]}" --label "tectonic.buildkitd=${want}" \
+	podman run "${run_args[@]}" --label "${buildkit_label}=${want}" \
 		"$buildkit_image" >/dev/null
 
 	for _ in $(seq 30); do

@@ -1,4 +1,4 @@
-export image_name := env("IMAGE_NAME", "tectonic") # output image name, usually same as repo name, change as needed
+export image_name := env("IMAGE_NAME", `./scripts/flavours.sh image none`) # output image name, declared in image.kdl
 export default_tag := env("DEFAULT_TAG", "latest")
 export bib_image := env("BIB_IMAGE", "quay.io/centos-bootc/bootc-image-builder:latest")
 
@@ -84,7 +84,7 @@ buildkit-reset:
 # Generate a one-time Secure Boot (MOK) module-signing key pair. Keep the
 # private key out of the repo; commit the public cert.
 [group('Secure Boot')]
-generate-mok-key dir=(env("HOME") + "/.local/share/tectonic"):
+generate-mok-key dir=(env("HOME") + "/.local/share/" + `./scripts/manifest.sh image-id`):
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -101,7 +101,7 @@ generate-mok-key dir=(env("HOME") + "/.local/share/tectonic"):
     openssl req -x509 -newkey rsa:2048 \
         -keyout "$KEY" -nodes -days 36500 \
         -outform DER -out "$CERT" \
-        -subj "/CN=tectonic Secure Boot Module Signing/"
+        -subj "/CN=$(./scripts/manifest.sh image-name) Secure Boot Module Signing/"
     chmod 600 "$KEY"
 
     echo
@@ -110,16 +110,16 @@ generate-mok-key dir=(env("HOME") + "/.local/share/tectonic"):
     echo "Public cert: $CERT"
     echo
     echo "Next steps:"
-    cert_path="$(./scripts/manifest.sh find-provider "/usr/share/tectonic/sb_cert.der")"
+    cert_path="$(./scripts/manifest.sh find-provider "/usr/share/secureboot/sb_cert.der")"
     if [ -n "${cert_path}" ]; then
-        echo "  1. cp $CERT modules/${cert_path}/files/usr/share/tectonic/sb_cert.der"
+        echo "  1. cp $CERT modules/${cert_path}/files/usr/share/secureboot/sb_cert.der"
     else
-        echo "  1. No module provides /usr/share/tectonic/sb_cert.der — copy the cert into the"
+        echo "  1. No module provides /usr/share/secureboot/sb_cert.der — copy the cert into the"
         echo "     kernel module's files/ overlay at the path it declares."
     fi
     echo "  2. Commit that cert, and add MOK_PRIVKEY as a GitHub Actions secret (contents of $KEY)."
     echo "  3. After deploying a signed image, on the target machine run:"
-    echo "       sudo mokutil --import /usr/share/tectonic/sb_cert.der"
+    echo "       sudo mokutil --import /usr/share/secureboot/sb_cert.der"
     echo "     then reboot and follow the MokManager enrollment prompt."
 
 # Copy the image from user podman storage into rootful podman (which BIB

@@ -3,13 +3,13 @@ description "CachyOS kernel and companions, with Secure Boot module signing"
 supports "fedora"
 
 provides "kernel-devel"
-provides-file "/usr/share/tectonic/sb_cert.der"
-provides-file "/usr/lib/tectonic/kernel-package"
+provides-file "/usr/share/secureboot/sb_cert.der"
+provides-file "/usr/lib/kernel-build/kernel-package"
 
 provides-file "/usr/libexec/kernel-devel-helpers.sh" build-only=#true
 
 requires "initramfs-generation"
-collects "dracut.modules" into="/usr/lib/tectonic/dracut.modules"
+collects "dracut.modules" into="/usr/lib/kernel-build/dracut.modules"
 
 arg "KERNEL"
 secret "mok_privkey"
