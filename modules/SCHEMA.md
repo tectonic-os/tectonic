@@ -193,6 +193,19 @@ asset "starship" {
 | `depName=` | `owner/repo`, or the clone URL for `git-refs` |
 | `extractVersion=` | Renovate's capture turning an upstream tag into the value pinned here, e.g. `^v(?<version>.*)$` |
 
+### Packages
+
+```kdl
+packages {
+    fedora "just" "fastfetch"
+    fedora "tailscale" enablerepo="tailscale-stable"
+}
+```
+
+| Property | Meaning |
+| --- | --- |
+| `enablerepo=` | install from a repo the base image already carries disabled. Not the module's own `repo` file: that is sourced by `run-module.sh`, after the generated install runs. |
+
 ### Build inputs
 
 | Node | Emits |
@@ -278,5 +291,4 @@ fragment position="after" standard-layer=#false
 
 ## Not implemented yet
 
-- **`packages { fedora "..." }`**, declaring packages instead of calling
 - **`source`, `ref` and `sha256`** on list entries, for out-of-tree

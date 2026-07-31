@@ -9,6 +9,16 @@ use miette::SourceSpan;
 use std::collections::BTreeMap;
 use std::path::Path;
 
+/// A batch of packages keyed to a base family, with an optional repo to enable
+/// for just this install.
+#[derive(Debug)]
+pub struct PackageGroup {
+    pub family: String,
+    pub packages: Vec<String>,
+    pub enablerepo: Option<String>,
+    pub span: SourceSpan,
+}
+
 /// A capability or contract path, and where it was declared.
 pub struct Decl {
     pub name: String,
@@ -59,6 +69,9 @@ pub struct Module {
     pub variants: Vec<Variant>,
     /// Pinned upstream payloads, resolved into env on the layer.
     pub assets: Vec<Asset>,
+    /// Packages keyed to base family, installed by the generator before
+    /// module.sh runs.
+    pub packages: Vec<PackageGroup>,
     /// Resolved option name to value, ready to become env on the layer.
     pub resolved: Vec<(String, String)>,
     /// Where a Containerfile.inc goes relative to the generated block, and
@@ -69,6 +82,25 @@ pub struct Module {
 
 /// The only base family today.
 const FAMILIES: [&str; 1] = ["fedora"];
+
+const TOKEN_HELP: &str = "package names and repo IDs are emitted straight into the RUN line, so they are limited to letters, digits and . _ + : -; anything else belongs in module.sh, where it can be quoted deliberately";
+
+/// Why a package name or repo ID is not safe to emit, or None when it is.
+fn bad_token(value: &str) -> Option<&'static str> {
+    if value.is_empty() {
+        return Some("is empty");
+    }
+    if value.starts_with('-') {
+        return Some("starts with a dash");
+    }
+    if !value
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || "._+:-".contains(c))
+    {
+        return Some("has a character that is not allowed");
+    }
+    None
+}
 
 fn prop<'a>(node: &'a KdlNode, key: &str) -> Option<&'a str> {
     node.entries()
@@ -134,6 +166,7 @@ impl Module {
             options: Vec::new(),
             variants: Vec::new(),
             assets: Vec::new(),
+            packages: Vec::new(),
             resolved: Vec::new(),
             fragment_after: false,
             standard_layer: true,
@@ -365,6 +398,7 @@ impl Module {
                         }
                     }
                 }
+                "packages" => module.parse_packages(node, &file, &text, issues),
                 other => issues.push(
                     Issue::new(format!("unknown node `{other}`"), &file, &text)
                         .at(node.name().span(), "not part of the schema")
@@ -418,6 +452,20 @@ impl Module {
                 Issue::new(format!("`{}` declares no `supports`", entry.path), &file, &text)
                     .help("a module has to say which base families it can build on, so a portability gap surfaces at lint rather than mid-build"),
             );
+        }
+
+        if dir.join("repo").is_file() {
+            for group in &module.packages {
+                issues.push(
+                    Issue::new(
+                        format!("`{}` declares both a `repo` file and `packages`", entry.path),
+                        &file,
+                        &text,
+                    )
+                    .at(group.span, "installed before the repo file is sourced")
+                    .help("run-module.sh sources `repo` after the generated install, so call `dnf5 install -y` in module.sh instead"),
+                );
+            }
         }
 
         module.resolved = options::resolve(
@@ -488,6 +536,101 @@ impl Module {
             }
         }
     }
+
+    /// `packages { fedora "pkg1" "pkg2" }` Each child node names a base family
+    /// and carries the package names as positional arguments.
+    fn parse_packages(&mut self, node: &KdlNode, file: &str, text: &str, issues: &mut Issues) {
+        let Some(children) = node.children() else {
+            return;
+        };
+        for child in children.nodes() {
+            let family = child.name().value().to_string();
+            if family.is_empty() {
+                issues.push(
+                    Issue::new("a family name is required inside `packages`", file, text)
+                        .at(child.name().span(), "empty name")
+                        .help("`packages { fedora \"pkg1\" \"pkg2\" }`"),
+                );
+                continue;
+            }
+            if !FAMILIES.contains(&family.as_str()) {
+                issues.push(
+                    Issue::new(format!("unknown base family `{family}`"), file, text)
+                        .at(child.name().span(), "not a family this repository builds on")
+                        .help(format!("known families: {}", FAMILIES.join(", "))),
+                );
+                continue;
+            }
+            let mut packages: Vec<String> = Vec::new();
+            for arg in child.entries().iter().filter(|e| e.name().is_none()) {
+                let Some(value) = arg.value().as_string() else {
+                    issues.push(
+                        Issue::new("a package name has to be a string", file, text)
+                            .at(arg.span(), "not a string")
+                            .help("quote it: `fedora \"7zip\"`"),
+                    );
+                    continue;
+                };
+                if let Some(problem) = bad_token(value) {
+                    issues.push(
+                        Issue::new(format!("package name `{value}` {problem}"), file, text)
+                            .at(arg.span(), "would not survive the RUN line")
+                            .help(TOKEN_HELP),
+                    );
+                    continue;
+                }
+                packages.push(value.to_string());
+            }
+            if packages.is_empty() {
+                issues.push(
+                    Issue::new(
+                        format!("`{family}` has no packages listed"),
+                        file,
+                        text,
+                    )
+                    .at(child.name().span(), "nothing to install"),
+                );
+                continue;
+            }
+            let mut enablerepo: Option<String> = None;
+            for entry in child.entries() {
+                let Some(key) = entry.name().map(|n| n.value()) else {
+                    continue;
+                };
+                match key {
+                    "enablerepo" => match entry.value().as_string() {
+                        Some(v) if !v.is_empty() => match bad_token(v) {
+                            Some(problem) => issues.push(
+                                Issue::new(format!("repo ID `{v}` {problem}"), file, text)
+                                    .at(entry.span(), "would not survive the RUN line")
+                                    .help(TOKEN_HELP),
+                            ),
+                            None => enablerepo = Some(v.to_string()),
+                        },
+                        _ => issues.push(
+                            Issue::new("`enablerepo` needs a repo ID string", file, text)
+                                .at(entry.span(), "not a string"),
+                        ),
+                    },
+                    other => issues.push(
+                        Issue::new(
+                            format!("unknown property `{other}` in packages block"),
+                            file,
+                            text,
+                        )
+                        .at(entry.span(), "not part of the schema")
+                        .help("a family entry in `packages` accepts `enablerepo`"),
+                    ),
+                }
+            }
+            self.packages.push(PackageGroup {
+                family,
+                packages,
+                enablerepo,
+                span: child.name().span(),
+            });
+        }
+    }
 }
 
 /// Every module on disk, whether or not the list enables it.
@@ -535,12 +678,42 @@ fn providers_on_disk(root: &Path) -> BTreeMap<String, Vec<String>> {
     out
 }
 
+/// Capabilities the base family itself provides implicitly — things that
+/// cannot be abstracted across distros (rechunking, initramfs, MAC policy) and
+/// that the base image ships.
+const BASE_CAPABILITIES: [&str; 3] = ["rechunking", "initramfs-generation", "mac-policy"];
+
 /// Single pass over the resolved graph.
-pub fn check_graph(modules: &[Module], root: &Path, issues: &mut Issues) {
+pub fn check_graph(modules: &[Module], root: &Path, base_family: &str, issues: &mut Issues) {
     let mut offered: BTreeMap<&str, Vec<&Module>> = BTreeMap::new();
     for module in modules {
         for decl in module.provides.iter().chain(module.provides_files.iter()) {
             offered.entry(decl.name.as_str()).or_default().push(module);
+        }
+    }
+
+    for cap in BASE_CAPABILITIES {
+        offered.entry(cap).or_default();
+    }
+
+    for module in modules {
+        if !module.supports.iter().any(|f| f == base_family) {
+            let supported = module.supports.join(", ");
+            issues.push(
+                Issue::new(
+                    format!(
+                        "`{}` does not support the `{base_family}` base family",
+                        module.path
+                    ),
+                    &module.file,
+                    &module.text,
+                )
+                .help(if supported.is_empty() {
+                    "add `supports \"fedora\"` to the manifest".to_string()
+                } else {
+                    format!("it declares support for: {supported}")
+                }),
+            );
         }
     }
 

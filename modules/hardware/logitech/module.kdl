@@ -1,3 +1,7 @@
 description "Solaar udev rules for Logitech wireless peripherals"
 
 supports "fedora"
+
+packages {
+    fedora "solaar-udev"
+}

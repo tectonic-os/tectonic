@@ -1,5 +1,3 @@
-dnf5 install -y just fastfetch
-
 source /ctx/lib/fetch-helpers.sh
 
 fetch_extract "$ASSET_GOOJUST_URL" "$ASSET_GOOJUST_SHA256" /tmp
