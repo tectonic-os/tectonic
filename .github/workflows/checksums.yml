@@ -5,7 +5,7 @@ on:
   pull_request:
     paths:
       - 'modules/**/module.kdl'
-      - 'modules.kdl'
+      - 'image.kdl'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
@@ -46,10 +46,10 @@ jobs:
 
           fixed=()
 
-          if grep -qxF modules.kdl <<< "$changed"; then
+          if grep -qxF image.kdl <<< "$changed"; then
             while IFS='|' read -r name _ ref pinned url _; do
               if ! curl -fsSL --retry 3 "$url" -o "${RUNNER_TEMP}/module"; then
-                echo "::error file=modules.kdl::${name} ${ref}: ${url} did not download. A ref whose archive URL does not follow from it needs the source template in modules.kdl updated by hand."
+                echo "::error file=image.kdl::${name} ${ref}: ${url} did not download. A ref whose archive URL does not follow from it needs the source template in image.kdl updated by hand."
                 exit 1
               fi
               actual="$(sha256sum "${RUNNER_TEMP}/module" | cut -d' ' -f1)"
@@ -59,7 +59,7 @@ jobs:
                 echo "${name} ${ref}: hash already matches."
                 continue
               fi
-              sed -i "s/sha256 \"${pinned}\"/sha256 \"${actual}\"/" modules.kdl
+              sed -i "s/sha256 \"${pinned}\"/sha256 \"${actual}\"/" image.kdl
               fixed+=("${name} ${ref}")
               echo "${name} ${ref}: hash updated."
             done < <(./scripts/manifest.sh remotes)

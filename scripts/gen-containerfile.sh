@@ -28,7 +28,7 @@ esac
 {
     [ -z "$directive" ] || echo "$directive"
     echo '# GENERATED FILE — do not edit. Produced by scripts/gen-containerfile.sh'
-    echo '# from the Containerfile skeleton and modules.kdl.'
+    echo '# from the Containerfile skeleton and image.kdl.'
     echo
     awk -v begin="$begin" -v end="$end" -v sec="$section_file" -v directive="$directive" '
         NR == 1 && directive != "" && $0 == directive { next }

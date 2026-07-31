@@ -19,7 +19,7 @@ All output is one item per line, in declaration order.
 
   list                every declared flavour
   targets             every build target: the ungated `none`, then flavours
-  default             the flavour marked default in modules.kdl, which
+  default             the flavour marked default in image.kdl, which
                       builds use when none is given
   pr                  the flavour a pull request builds
   check <target>      succeeds if <target> is buildable, fails loudly if not

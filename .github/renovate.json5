@@ -45,13 +45,13 @@
     {
       "customType": "regex",
       // The base image moved out of the Containerfile skeleton and into the
-      // `base` node in modules.kdl, which the generated FROM is emitted
+      // `base` node in image.kdl, which the generated FROM is emitted
       // from. Renovate's dockerfile manager still matches the FROM in
       // Containerfile.generated, and both carry the same depName and
       // version, so a bump updates the declaration and the generated file
       // together in one PR and the drift check stays happy.
-      "description": "Base image reference in modules.kdl",
-      "managerFilePatterns": ["/^modules\\.kdl$/"],
+      "description": "Base image reference in image.kdl",
+      "managerFilePatterns": ["/^image\\.kdl$/"],
       "datasourceTemplate": "docker",
       "matchStrings": [
         "base \"(?<depName>[^\":]+):(?<currentValue>[^\"]+)\"",
@@ -88,8 +88,8 @@
       // adjacency rule as an asset pin. Tags only, since a module is
       // published as a per-module tag; the parser rejects git-refs here
       // rather than leaving a branch-tracked pin unmatched.
-      "description": "Out-of-tree module pins in modules.kdl",
-      "managerFilePatterns": ["/^modules\\.kdl$/"],
+      "description": "Out-of-tree module pins in image.kdl",
+      "managerFilePatterns": ["/^image\\.kdl$/"],
       "matchStrings": [
         "renovate datasource=\"(?<datasource>github-releases|github-tags)\" depName=\"(?<depName>[^\"]+)\"(?: extractVersion=\"(?<extractVersion>[^\"]+)\")?\\s*\\n\\s*ref \"(?<currentValue>[^\"]+)\"",
       ],

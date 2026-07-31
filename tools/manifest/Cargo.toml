@@ -3,7 +3,7 @@ name = "manifest"
 version = "0.0.0"
 edition = "2021"
 publish = false
-description = "Reads modules.kdl and the per-module module.kdl manifests"
+description = "Reads image.kdl and the per-module module.kdl manifests"
 
 [dependencies]
 kdl = "6.3.4"

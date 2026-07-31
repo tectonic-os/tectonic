@@ -1,4 +1,4 @@
-- **[modules.kdl](../modules.kdl)** — the image author's file. Which
+- **[image.kdl](../image.kdl)** — the image author's file. Which
 - **`modules/<path>/module.kdl`** — the module author's file, required
 
 ## What is not declared
@@ -12,7 +12,7 @@
 | `finalize.sh` | sourced by the finalize phase, in resolved order |
 | a file another module `collects` | handed to that module |
 
-## modules.kdl
+## image.kdl
 
 ```kdl
 base "quay.io/fedora/fedora-bootc:44" {
@@ -280,7 +280,7 @@ fragment position="after" standard-layer=#false
 ## Validation
 
 - either file unparseable, or carrying a node or property this schema
-- a `modules.kdl` entry that does not resolve to a module directory
+- an `image.kdl` entry that does not resolve to a module directory
 - a module directory without a `module.kdl`, or one missing
 - no `base` node, a `base` declared twice, one with no image reference or
 - an enabled module whose `supports` does not include the base `family`

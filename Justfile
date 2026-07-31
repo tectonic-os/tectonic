@@ -21,7 +21,7 @@ fix:
     just --unstable --fmt -f Justfile
 
 # Regenerate Containerfile.generated from the Containerfile skeleton and
-# modules.kdl, then commit it: it is tracked, and lint fails on a stale
+# image.kdl, then commit it: it is tracked, and lint fails on a stale
 # one. Builds regenerate it too, so no build can use a stale one.
 [group('Utility')]
 generate:
@@ -296,7 +296,7 @@ spawn-vm rebuild="0" type="qcow2" ram="6G":
       --vsock=false --pass-ssh-key=false \
       -i ./output/**/*.{{ type }}
 
-# Runs shellcheck over every Bash script, validates modules.kdl and
+# Runs shellcheck over every Bash script, validates image.kdl and
 # renders the installer config, the same script the build workflow gates on
 lint:
     ./scripts/lint.sh

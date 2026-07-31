@@ -1,4 +1,4 @@
-//! The only reader of modules.kdl and the per-module module.kdl files.
+//! The only reader of image.kdl and the per-module module.kdl files.
 
 mod asset;
 mod diag;
@@ -82,7 +82,7 @@ fn main() -> ExitCode {
     let target = args.get(1 + usize::from(path_first)).map(String::as_str);
 
     let root = PathBuf::from(std::env::var("TECTONIC_ROOT").unwrap_or_else(|_| ".".into()));
-    let list_path = root.join("modules.kdl");
+    let list_path = root.join("image.kdl");
     let list_display = list_path.display().to_string();
 
     let (mut list, mut issues) = match List::load(&list_display) {
@@ -90,7 +90,7 @@ fn main() -> ExitCode {
         Err(issue) => {
             let mut issues = diag::Issues::default();
             issues.push(*issue);
-            issues.report("modules.kdl");
+            issues.report("image.kdl");
             return ExitCode::FAILURE;
         }
     };

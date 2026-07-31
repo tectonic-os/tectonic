@@ -291,7 +291,7 @@ pub fn env_name(option: &str) -> String {
 }
 
 /// Single pass, in one order, with no merging: the module's default, then the
-/// selected variant, then the value in modules.kdl.
+/// selected variant, then the value in image.kdl.
 pub fn resolve(
     options: &[Opt],
     variants: &[Variant],

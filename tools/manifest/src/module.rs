@@ -150,7 +150,7 @@ impl Module {
                 )
                 .at(entry.span, "every module needs a manifest")
                 .help(match entry.remote {
-                    Some(_) => "run ./scripts/fetch-modules.sh to fetch what modules.kdl pins"
+                    Some(_) => "run ./scripts/fetch-modules.sh to fetch what image.kdl pins"
                         .to_string(),
                     None => format!(
                         "create {file}; modules/_template/module-name/module.kdl is a copy-me reference"
@@ -843,7 +843,7 @@ pub fn check_graph(modules: &[Module], list: &List, root: &Path, issues: &mut Is
             let Some(providers) = offered.get(decl.name.as_str()) else {
                 let help = match on_disk.get(&decl.name) {
                     Some(candidates) => format!(
-                        "{} would satisfy it; add it to modules.kdl. Nothing is included automatically, so the list stays the complete statement of what is in the image",
+                        "{} would satisfy it; add it to image.kdl. Nothing is included automatically, so the list stays the complete statement of what is in the image",
                         candidates.join(" or ")
                     ),
                     None => format!(
@@ -1006,7 +1006,7 @@ pub fn resolve_collects(
                         &module.text,
                     )
                     .help(format!(
-                        "`{collector}` collects it; add it to modules.kdl, or drop the {file}"
+                        "`{collector}` collects it; add it to image.kdl, or drop the {file}"
                     )),
                 ),
             }
