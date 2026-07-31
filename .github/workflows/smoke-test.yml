@@ -68,7 +68,8 @@ jobs:
             -smp 2 \
             -cpu host \
             -enable-kvm \
-            -nographic \
+            -display none \
+            -serial "file:${RUNNER_TEMP}/console.log" \
             -drive file="${RUNNER_TEMP}/overlay.qcow2",if=virtio,format=qcow2 \
             -nic user,hostfwd=tcp::2222-:22 \
             &
@@ -76,7 +77,7 @@ jobs:
           echo "qemu_pid=${QEMU_PID}" >> "$GITHUB_ENV"
 
       - name: Wait for SSH
-        timeout-minutes: 5
+        timeout-minutes: 10
         run: |
           for i in $(seq 30); do
             if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
@@ -104,11 +105,11 @@ jobs:
           echo "==> systemctl is-system-running"
           state="$(s systemctl is-system-running)" || true
           case "$state" in
-            running | degraded)
+            running)
               echo "system state: ${state}"
               ;;
             *)
-              echo "FAIL: system state is '${state}', expected running or degraded" >&2
+              echo "FAIL: system state is '${state}', expected running" >&2
               exit 1
               ;;
           esac
@@ -121,6 +122,15 @@ jobs:
             exit 1
           fi
           echo "No failed units"
+
+      - name: Serial console
+        if: failure()
+        run: |
+          if [ -s "${RUNNER_TEMP}/console.log" ]; then
+            cat "${RUNNER_TEMP}/console.log"
+          else
+            echo "the VM wrote nothing to the serial console"
+          fi
 
       - name: Stop qemu
         if: always()
