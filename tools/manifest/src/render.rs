@@ -283,12 +283,21 @@ pub fn assets(list: &List, modules: &[Module], target: Option<&str>) -> String {
 }
 
 /// The module that provides a contract file path.
-pub fn find_provider(list: &List, modules: &[Module], file_path: &str) -> String {
-    for module in modules {
-        for decl in &module.provides_files {
-            if decl.name == file_path {
-                return format!("{}\n", module.path);
-            }
+pub fn find_provider(
+    list: &List,
+    modules: &[Module],
+    file_path: &str,
+    target: Option<&str>,
+) -> String {
+    for entry in list.entries.iter().filter(|e| in_target(e, target)) {
+        let Some(module) = modules
+            .iter()
+            .find(|m| m.path == entry.path && m.flavour == entry.flavour)
+        else {
+            continue;
+        };
+        if module.provides_files.iter().any(|d| d.name == file_path) {
+            return format!("{}\n", module.path);
         }
     }
     String::new()

@@ -33,9 +33,11 @@ says otherwise.
                     when no target is given
   assets [target]   every pinned asset, pipe separated: module, name,
                     manifest, version, sha256, hash source, resolved URL
-  find-provider <abs-path>
+  find-provider <abs-path> [target]
                     the module that provides a contract file path; nothing
-                    when none does
+                    when none does. Per target when one is given, because
+                    a path provided only by a gated module is not provided
+                    on every target
   secrets [target]  every secret ID an enabled module declares, unique;
                     per target when one is given
   contract-files [target]
@@ -61,22 +63,20 @@ fn main() -> ExitCode {
         }
     };
     const PER_TARGET: [&str; 4] = ["summary", "assets", "secrets", "contract-files"];
-    const ONE_ARG: [&str; 5] = [
-        "summary",
-        "assets",
-        "secrets",
-        "contract-files",
-        "find-provider",
-    ];
-    let target = args.get(1).map(String::as_str);
-    if target.is_some() && !ONE_ARG.contains(&command) {
-        eprintln!("manifest: `{command}` takes no arguments");
+    let path_first = command == "find-provider";
+    let max_args = usize::from(path_first) + usize::from(path_first || PER_TARGET.contains(&command));
+    if args.len() - 1 > max_args {
+        eprintln!(
+            "manifest: `{command}` takes {}",
+            match max_args {
+                0 => "no arguments".to_string(),
+                1 => "at most one argument".to_string(),
+                n => format!("at most {n} arguments"),
+            }
+        );
         return ExitCode::FAILURE;
     }
-    if args.len() > 2 {
-        eprintln!("manifest: `{command}` takes at most one argument");
-        return ExitCode::FAILURE;
-    }
+    let target = args.get(1 + usize::from(path_first)).map(String::as_str);
 
     let root = PathBuf::from(std::env::var("TECTONIC_ROOT").unwrap_or_else(|_| ".".into()));
     let list_path = root.join("modules.kdl");
@@ -104,17 +104,15 @@ fn main() -> ExitCode {
     overlay::check(&modules, &root, &mut issues);
     let collected = module::resolve_collects(&modules, &root, &mut issues);
 
-    if PER_TARGET.contains(&command) {
-        if let Some(unknown) = target.filter(|t| !list.targets().iter().any(|have| have == t)) {
-            issues.push(
-                diag::Issue::new(
-                    format!("`{unknown}` is not a build target"),
-                    &list_display,
-                    &list.text,
-                )
-                .help(format!("targets: {}", list.targets().join(", "))),
-            );
-        }
+    if let Some(unknown) = target.filter(|t| !list.targets().iter().any(|have| have == t)) {
+        issues.push(
+            diag::Issue::new(
+                format!("`{unknown}` is not a build target"),
+                &list_display,
+                &list.text,
+            )
+            .help(format!("targets: {}", list.targets().join(", "))),
+        );
     }
 
     let output = match command {
@@ -139,11 +137,11 @@ fn main() -> ExitCode {
             }
         }
         "find-provider" => {
-            let Some(path) = target else {
+            let Some(path) = args.get(1) else {
                 eprintln!("manifest: find-provider needs an absolute path");
                 return ExitCode::FAILURE;
             };
-            render::find_provider(&list, &modules, path)
+            render::find_provider(&list, &modules, path, target)
         }
         "secrets" => render::secrets(&list, &modules, target),
         "contract-files" => render::contract_files(&list, &modules, target),
