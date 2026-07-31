@@ -44,7 +44,7 @@
   "customManagers": [
     {
       "customType": "regex",
-      // The base image moved out of Containerfile.template and into the
+      // The base image moved out of the Containerfile skeleton and into the
       // `base` node in modules.kdl, which the generated FROM is emitted
       // from. Renovate's dockerfile manager still matches the FROM in
       // Containerfile.generated, and both carry the same depName and

@@ -184,7 +184,7 @@ jobs:
             org.opencontainers.image.created=${{ steps.date.outputs.date }}
             org.opencontainers.image.description=${{ env.IMAGE_DESC }} (${{ matrix.target }})
             org.opencontainers.image.documentation=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.sha }}/README.md
-            org.opencontainers.image.source=https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/blob/${{ github.sha }}/Containerfile.template
+            org.opencontainers.image.source=https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/blob/${{ github.sha }}/Containerfile.generated
             org.opencontainers.image.title=${{ env.IMAGE_NAME }}
             org.opencontainers.image.url=https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/tree/${{ github.sha }}
             org.opencontainers.image.vendor=${{ github.repository_owner }}

@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 begin='# ---- BEGIN GENERATED (build phases and modules; see scripts/gen-containerfile.sh) ----'
 end='# ---- END GENERATED ----'
 
-skeleton=Containerfile.template
+skeleton=scripts/Containerfile.skeleton
 out=Containerfile.generated
 
 if ! grep -qxF "$begin" "$skeleton" || ! grep -qxF "$end" "$skeleton"; then
