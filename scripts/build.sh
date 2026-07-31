@@ -191,6 +191,7 @@ fi
 build_args=(
     "FLAVOUR=${flavour_arg}"
     "IMAGE_VERSION=${image_version}"
+    "CONTRACT_FILES=$(./scripts/manifest.sh contract-files "$flavour" | tr '\n' ' ')"
 )
 [ -z "$kernel" ] || build_args+=("KERNEL=${kernel}")
 

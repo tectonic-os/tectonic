@@ -108,6 +108,7 @@ arg "KERNEL"
 | Node | Meaning |
 | --- | --- |
 | `provides-file "<abs-path>"` | this module writes it |
+| `provides-file "<abs-path>" build-only=#true` | it writes it for other build layers, then removes it again |
 | `requires-file "<abs-path>"` | this module reads it, and fails without it |
 
 ### Overlay collisions

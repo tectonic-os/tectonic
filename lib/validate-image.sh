@@ -47,7 +47,7 @@ else
     echo "    (no /usr/lib/opt symlinks declared)"
 fi
 
-echo "==> expected binaries"
+echo "==> base image contract"
 for bin in bootc systemctl rpm-ostree; do
     if command -v "$bin" > /dev/null 2>&1; then
         echo "    ${bin} ok"
@@ -55,6 +55,21 @@ for bin in bootc systemctl rpm-ostree; do
         fail "${bin} not on PATH"
     fi
 done
+
+echo "==> module contract files"
+if [ -z "${CONTRACT_FILES:-}" ]; then
+    echo "    (none declared)"
+else
+    # shellcheck disable=SC2086
+    set -- $CONTRACT_FILES
+    for path in "$@"; do
+        if [ -e "$path" ]; then
+            echo "    ${path} ok"
+        else
+            fail "${path}: a module declares it, the image does not have it"
+        fi
+    done
+fi
 
 enablement_links() {
     local root="$1" unit="$2" link

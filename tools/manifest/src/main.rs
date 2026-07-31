@@ -34,6 +34,10 @@ says otherwise.
                     when none does
   secrets [target]  every secret ID an enabled module declares, unique;
                     per target when one is given
+  contract-files [target]
+                    every contract file path an enabled module provides and
+                    the finished image still carries, unique; per target
+                    when one is given. Excludes `build-only` paths
   check             validate every manifest, printing what is wrong
 
 Run from the repository root, or set TECTONIC_ROOT.
@@ -52,8 +56,15 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    const PER_TARGET: [&str; 3] = ["summary", "assets", "secrets"];
-    const ONE_ARG: [&str; 5] = ["summary", "assets", "secrets", "find-provider", "check"];
+    const PER_TARGET: [&str; 4] = ["summary", "assets", "secrets", "contract-files"];
+    const ONE_ARG: [&str; 6] = [
+        "summary",
+        "assets",
+        "secrets",
+        "contract-files",
+        "find-provider",
+        "check",
+    ];
     let target = args.get(1).map(String::as_str);
     if target.is_some() && !ONE_ARG.contains(&command) {
         eprintln!("manifest: `{command}` takes no arguments");
@@ -122,6 +133,19 @@ fn main() -> ExitCode {
                 );
             }
             render::secrets(&list, &modules, target)
+        }
+        "contract-files" => {
+            if let Some(unknown) = target.filter(|t| !list.targets().iter().any(|have| have == t)) {
+                issues.push(
+                    diag::Issue::new(
+                        format!("`{unknown}` is not a build target"),
+                        &list_display,
+                        &list.text,
+                    )
+                    .help(format!("targets: {}", list.targets().join(", "))),
+                );
+            }
+            render::contract_files(&list, &modules, target)
         }
         "summary" | "assets" => {
             if let Some(unknown) = target.filter(|t| !list.targets().iter().any(|have| have == t)) {
