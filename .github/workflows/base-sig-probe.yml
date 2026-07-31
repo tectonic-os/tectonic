@@ -28,11 +28,17 @@ jobs:
 
       - name: Probe for a cosign signature
         id: probe
-        continue-on-error: true
         run: |
-          cosign verify --insecure-ignore-tlog=true \
-            "${{ steps.base.outputs.image }}"
-          echo "signed=true" >> "$GITHUB_OUTPUT"
+          image="${{ steps.base.outputs.image }}"
+          sig="$(cosign triangulate "$image")"
+          echo "a signature for ${image} would be published at ${sig}"
+          if cosign download signature "$image" > /dev/null 2>&1; then
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+            echo "one is there: fedora-bootc has started signing"
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "nothing there, which is the expected answer today"
+          fi
 
       - name: Check for existing tracking issue
         id: existing
@@ -62,7 +68,7 @@ jobs:
               title: 'fedora-bootc base image is now cosign signed',
               labels: ['base-image-signing'],
               body: [
-                '`cosign verify` succeeded on `${{ steps.base.outputs.image }}`.',
+                'A cosign signature is published for `${{ steps.base.outputs.image }}`.',
                 '',
                 '## What to do',
                 '',
