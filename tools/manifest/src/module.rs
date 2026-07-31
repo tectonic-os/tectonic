@@ -678,11 +678,6 @@ fn providers_on_disk(root: &Path) -> BTreeMap<String, Vec<String>> {
     out
 }
 
-/// Capabilities the base family itself provides implicitly — things that
-/// cannot be abstracted across distros (rechunking, initramfs, MAC policy) and
-/// that the base image ships.
-const BASE_CAPABILITIES: [&str; 3] = ["rechunking", "initramfs-generation", "mac-policy"];
-
 /// Single pass over the resolved graph.
 pub fn check_graph(modules: &[Module], list: &List, root: &Path, issues: &mut Issues) {
     let mut offered: BTreeMap<&str, Vec<&Module>> = BTreeMap::new();
@@ -692,8 +687,43 @@ pub fn check_graph(modules: &[Module], list: &List, root: &Path, issues: &mut Is
         }
     }
 
-    for cap in BASE_CAPABILITIES {
-        offered.entry(cap).or_default();
+    let base_caps: BTreeMap<&str, &crate::list::Decl> = list
+        .base
+        .iter()
+        .flat_map(|b| b.provides.iter().chain(b.provides_files.iter()))
+        .map(|decl| (decl.name.as_str(), decl))
+        .collect();
+
+    for cap in base_caps.keys() {
+        let Some(providers) = offered.get(cap) else {
+            continue;
+        };
+        for module in providers {
+            issues.push(
+                Issue::new(
+                    format!(
+                        "`{}` provides `{cap}`, which the base image already provides",
+                        module.path
+                    ),
+                    &module.file,
+                    &module.text,
+                )
+                .at(
+                    module
+                        .provides
+                        .iter()
+                        .chain(module.provides_files.iter())
+                        .find(|d| &d.name == cap)
+                        .map(|d| d.span)
+                        .unwrap_or_else(|| (0usize, 0usize).into()),
+                    "already provided by the base",
+                )
+                .help(format!(
+                    "the `base` node in {} declares it. Drop it from the module, or drop it from the base if the base no longer carries it",
+                    list.file
+                )),
+            );
+        }
     }
 
     let base_family = list
@@ -748,6 +778,32 @@ pub fn check_graph(modules: &[Module], list: &List, root: &Path, issues: &mut Is
         }
     }
 
+    const MAC_POLICY: &str = "mac-policy";
+    for module in modules {
+        let dir = root.join("modules").join(&module.path);
+        let has_policy = std::fs::read_dir(dir.join("selinux"))
+            .into_iter()
+            .flatten()
+            .flatten()
+            .any(|e| e.path().extension().is_some_and(|ext| ext == "te"));
+        if !has_policy || module.requires.iter().any(|d| d.name == MAC_POLICY) {
+            continue;
+        }
+        issues.push(
+            Issue::new(
+                format!(
+                    "`{}` ships SELinux policy without requiring `{MAC_POLICY}`",
+                    module.path
+                ),
+                &module.file,
+                &module.text,
+            )
+            .help(format!(
+                "add `requires \"{MAC_POLICY}\"`; lib/run-module.sh compiles selinux/*.te against the base image's policy store"
+            )),
+        );
+    }
+
     let on_disk = providers_on_disk(root);
 
     for module in modules {
@@ -758,6 +814,10 @@ pub fn check_graph(modules: &[Module], list: &List, root: &Path, issues: &mut Is
             .chain(module.requires_files.iter().map(|d| (d, "requires-file")));
 
         for (decl, kind) in hard {
+            if base_caps.contains_key(decl.name.as_str()) {
+                continue;
+            }
+
             let Some(providers) = offered.get(decl.name.as_str()) else {
                 let help = match on_disk.get(&decl.name) {
                     Some(candidates) => format!(
@@ -765,8 +825,8 @@ pub fn check_graph(modules: &[Module], list: &List, root: &Path, issues: &mut Is
                         candidates.join(" or ")
                     ),
                     None => format!(
-                        "no module in the repository declares `provides {:?}`",
-                        decl.name
+                        "no module in the repository declares `provides {:?}`, and neither does the `base` node in {}",
+                        decl.name, list.file
                     ),
                 };
                 issues.push(

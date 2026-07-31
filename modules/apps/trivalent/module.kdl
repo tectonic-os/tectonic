@@ -1,3 +1,5 @@
 description "Trivalent, secureblue's hardened Chromium fork"
 
 supports "fedora"
+
+requires "mac-policy"

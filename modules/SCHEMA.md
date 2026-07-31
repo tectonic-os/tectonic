@@ -262,6 +262,8 @@ fragment position="after" standard-layer=#false
 - either file unparseable, or carrying a node or property this schema
 - a `modules.kdl` entry that does not resolve to a module directory
 - a module directory without a `module.kdl`, or one missing
+- no `base` node, a `base` declared twice, one with no image reference or
+- an enabled module whose `supports` does not include the base `family`
 
 - a flavour name outside `^[a-z][a-z0-9-]*$`, duplicated, or named `none`
 - a `flavours` block with no `default=#true`, or with more than one
@@ -271,6 +273,8 @@ fragment position="after" standard-layer=#false
 - a `requires` no enabled module provides, listing every module that
 - a `requires-file` no enabled module provides
 - two enabled modules providing the same capability or contract file
+- a module providing something the `base` node already provides
+- a module shipping `selinux/*.te` without `requires "mac-policy"`
 - a requirement satisfied only by a module gated to another flavour
 - a cycle, naming the edges that close it
 
