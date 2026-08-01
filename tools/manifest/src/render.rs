@@ -442,6 +442,31 @@ pub fn contract_files(list: &List, modules: &[Module], target: Option<&str>) -> 
     out
 }
 
+/// Every verify diagnostic the enabled modules accept, unique, one per line,
+/// pipe separated: <class>|<unit> Resolved per target for the same reason
+/// `contract-files` is: an exception belongs to the module that ships the
+/// unit, so an image without that module must not carry it.
+pub fn verify_exceptions(list: &List, modules: &[Module], target: Option<&str>) -> String {
+    let mut seen: Vec<(&str, &str)> = Vec::new();
+    let mut out = String::new();
+    for entry in list.entries.iter().filter(|e| in_target(e, target)) {
+        let Some(module) = modules
+            .iter()
+            .find(|m| m.path == entry.path && m.flavour == entry.flavour)
+        else {
+            continue;
+        };
+        for exception in &module.verify_exceptions {
+            if seen.contains(&(exception.class.as_str(), exception.unit.as_str())) {
+                continue;
+            }
+            seen.push((exception.class.as_str(), exception.unit.as_str()));
+            let _ = writeln!(out, "{}|{}", exception.class, exception.unit);
+        }
+    }
+    out
+}
+
 fn standard(
     entry: &Entry,
     module: Option<&Module>,

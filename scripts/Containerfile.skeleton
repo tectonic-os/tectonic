@@ -8,6 +8,8 @@ COPY modules/ /modules/
 # ---- END GENERATED ----
 
 ARG CONTRACT_FILES=""
+ARG VERIFY_EXCEPTIONS=""
 RUN bootc container lint
 RUN --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
-    CONTRACT_FILES="${CONTRACT_FILES}" bash /ctx/lib/validate-image.sh
+    CONTRACT_FILES="${CONTRACT_FILES}" \
+    VERIFY_EXCEPTIONS="${VERIFY_EXCEPTIONS}" bash /ctx/lib/validate-image.sh

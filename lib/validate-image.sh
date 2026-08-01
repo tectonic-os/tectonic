@@ -75,14 +75,41 @@ enablement_links() {
 	done < <(find "$root" -maxdepth 2 -type l 2>/dev/null || true)
 }
 
-verify_allowed_patterns=(
-	'Failed to create .*: Unit [^ ]+\.(mount|swap) not found\.$'
-	"Command 'man [^']*' failed with code [0-9]+\$"
+declare -A verify_class=(
+	[mount-not-found]='Failed to create .*: Unit [^ ]+\.(mount|swap) not found\.$'
+	[man-page-missing]="Command 'man [^']*' failed with code [0-9]+\$"
 )
-verify_allowed="$(
-	IFS='|'
-	printf '%s' "${verify_allowed_patterns[*]}"
-)"
+
+verify_classes_known="$(printf '%s ' "${!verify_class[@]}")"
+verify_classes_known="${verify_classes_known% }"
+for token in ${VERIFY_EXCEPTIONS:-}; do
+	class="${token%%|*}"
+	if [ -z "${verify_class[$class]+set}" ]; then
+		fail "allow-verify \"${class}\": not a diagnostic class this image knows;" \
+			"known: ${verify_classes_known}"
+	fi
+done
+
+verify_allowed_for() {
+	local unit="$1" token class allowed=""
+	for token in ${VERIFY_EXCEPTIONS:-}; do
+		[ "${token#*|}" = "$unit" ] || continue
+		class="${token%%|*}"
+		[ -n "${verify_class[$class]+set}" ] || continue
+		allowed="${allowed:+${allowed}|}${verify_class[$class]}"
+	done
+	printf '%s' "$allowed"
+}
+
+verify_classify() {
+	local line="$1" class
+	for class in "${!verify_class[@]}"; do
+		if printf '%s\n' "$line" | grep -Eq "${verify_class[$class]}"; then
+			printf '%s' "$class"
+			return 0
+		fi
+	done
+}
 echo "==> systemd unit verification"
 checked=0
 for scope in system user; do
@@ -123,15 +150,29 @@ for scope in system user; do
 				elif [ -z "${out//[[:space:]]/}" ]; then
 					fail "${unit}: systemd-analyze verify failed without saying why"
 				else
-					unexpected="$(printf '%s\n' "$out" |
-						grep -Ev "$verify_allowed" |
-						grep -Ev '^[[:space:]]*$' || true)"
+					allowed="$(verify_allowed_for "$unit")"
+					if [ -n "$allowed" ]; then
+						unexpected="$(printf '%s\n' "$out" |
+							grep -Ev "$allowed" |
+							grep -Ev '^[[:space:]]*$' || true)"
+					else
+						unexpected="$(printf '%s\n' "$out" |
+							grep -Ev '^[[:space:]]*$' || true)"
+					fi
 					if [ -n "$unexpected" ]; then
 						fail "${unit}: systemd-analyze verify"
-						# shellcheck disable=SC2001
-						echo "$unexpected" | sed 's/^/          /' >&2
+						while IFS= read -r line; do
+							[ -n "$line" ] || continue
+							echo "          ${line}" >&2
+							class="$(verify_classify "$line")"
+							if [ -n "$class" ]; then
+								echo "            this is the known class '${class}'. If it is expected here," >&2
+								echo "            declare it in the module shipping ${preset##*/}:" >&2
+								echo "              allow-verify \"${class}\" unit=\"${unit}\"" >&2
+							fi
+						done <<< "$unexpected"
 					else
-						echo "        ${unit} enabled (verify: mount/swap notes only)"
+						echo "        ${unit} enabled (verify: declared exceptions only)"
 					fi
 				fi
 			else
