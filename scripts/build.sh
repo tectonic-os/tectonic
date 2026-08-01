@@ -196,6 +196,7 @@ build_args=(
 	"IMAGE_VERSION=${image_version}"
 	"IMAGE_REGISTRY=$(./scripts/registry.sh namespace 2>/dev/null || true)"
 	"CONTRACT_FILES=$(./scripts/manifest.sh contract-files "$flavour" | tr '\n' ' ')"
+	"VERIFY_EXCEPTIONS=$(./scripts/manifest.sh verify-exceptions "$flavour" | tr '\n' ' ')"
 )
 [ -z "$kernel" ] || build_args+=("KERNEL=${kernel}")
 

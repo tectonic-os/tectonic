@@ -20,6 +20,23 @@ echo "lint: shellcheck passed on ${#scripts[@]} scripts"
 
 ./scripts/manifest.sh check
 
+shell_classes="$(sed -n 's/^\t\[\([a-z-]*\)\]=.*/\1/p' lib/validate-image.sh | sort)"
+parser_classes="$(sed -n 's/^const VERIFY_CLASSES[^=]*= \[\(.*\)\];$/\1/p' \
+    tools/manifest/src/module.rs | tr -d '" ' | tr ',' '\n' | sort)"
+if [ -z "$shell_classes" ]; then
+    echo "lint: no verify classes found in lib/validate-image.sh" >&2
+    exit 1
+elif [ -z "$parser_classes" ]; then
+    echo "lint: no VERIFY_CLASSES found in tools/manifest/src/module.rs" >&2
+    exit 1
+elif [ "$shell_classes" != "$parser_classes" ]; then
+    echo "lint: the verify diagnostic classes disagree" >&2
+    diff <(echo "$shell_classes") <(echo "$parser_classes") |
+        sed 's/^</  only in validate-image.sh: /; s/^>/  only in module.rs:        /' >&2
+    exit 1
+fi
+echo "lint: verify classes agree ($(echo "$shell_classes" | tr '\n' ' ' | sed 's/ *$//'))"
+
 ./scripts/gen-containerfile.sh > /dev/null
 if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
     echo "lint: the Containerfile generates (no checkout, so no drift check)"

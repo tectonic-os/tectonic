@@ -179,6 +179,25 @@ arg "KERNEL"
 | --- | --- |
 | `overrides "<abs-path>"` | this module's overlay knowingly replaces a path an earlier module ships |
 
+### Verify exceptions
+
+| Node | Meaning |
+| --- | --- |
+| `allow-verify "<class>" unit="<unit>"` | this diagnostic class is expected on this unit |
+
+| Class | What it is |
+| --- | --- |
+| `mount-not-found` | a unit ordered against a `.mount` or `.swap` unit, which a container build has not got |
+| `man-page-missing` | a `Documentation=` man page this image does not carry, which verify checks by running `man` against it |
+
+```
+FAIL: tuned.service: systemd-analyze verify
+      tuned.service: Command 'man tuned(8)' failed with code 16
+        this is the known class 'man-page-missing'. If it is expected here,
+        declare it in the module shipping 45-module-kde-desktop.preset:
+          allow-verify "man-page-missing" unit="tuned.service"
+```
+
 ### Collecting
 
 ```kdl
@@ -334,6 +353,11 @@ fragment position="after" standard-layer=#false
 
 - two enabled modules that land in the same image shipping the same
 - an `overrides` for a path no earlier module ships
+
+- an `allow-verify` naming a class outside the known set, listing them
+- an `allow-verify` with no class, or no `unit=`
+- the same class allowed twice on the same unit in one module
+- the class list in `lib/validate-image.sh` disagreeing with the one in
 
 - shipping a collected filename while the module that collects it is not
 - two enabled modules collecting the same filename

@@ -54,6 +54,10 @@ says otherwise.
                     every contract file path an enabled module provides and
                     the finished image still carries, unique; per target
                     when one is given. Excludes `build-only` paths
+  verify-exceptions [target]
+                    every systemd-analyze verify diagnostic an enabled
+                    module accepts on one of its own units, pipe
+                    separated: class, unit; per target when one is given
   check             validate every manifest, printing what is wrong
 
 Run from the repository root, or set MANIFEST_ROOT.
@@ -72,7 +76,13 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    const PER_TARGET: [&str; 4] = ["summary", "assets", "secrets", "contract-files"];
+    const PER_TARGET: [&str; 5] = [
+        "summary",
+        "assets",
+        "secrets",
+        "contract-files",
+        "verify-exceptions",
+    ];
     let path_first = command == "find-provider";
     let max_args = usize::from(path_first) + usize::from(path_first || PER_TARGET.contains(&command));
     if args.len() - 1 > max_args {
@@ -176,6 +186,7 @@ fn main() -> ExitCode {
         }
         "secrets" => render::secrets(&list, &modules, target),
         "contract-files" => render::contract_files(&list, &modules, target),
+        "verify-exceptions" => render::verify_exceptions(&list, &modules, target),
         "summary" => render::summary(&list, &modules, target),
         "assets" => render::assets(&list, &modules, target),
         other => {
