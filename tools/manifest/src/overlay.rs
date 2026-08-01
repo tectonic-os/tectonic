@@ -5,18 +5,49 @@ use crate::module::Module;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-pub fn check(modules: &[Module], root: &Path, issues: &mut Issues) {
-    let mut shipped: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+/// Every path an overlay puts in the image, to the modules shipping it, as
+/// indices into `modules` in build order.
+pub type Index = BTreeMap<String, Vec<usize>>;
+
+/// Built once and handed to both readers.
+pub fn index(modules: &[Module], root: &Path) -> Index {
+    let mut shipped: Index = BTreeMap::new();
     for (index, module) in modules.iter().enumerate() {
         let overlay = root.join("modules").join(&module.dir).join("files");
         for path in overlay_paths(&overlay) {
             shipped.entry(path).or_default().push(index);
         }
     }
+    shipped
+}
 
+/// The module whose overlay actually puts a file at `path` in a target's
+/// image.
+pub fn owns(modules: &[Module], shipped: &Index, path: &str, target: Option<&str>) -> String {
+    let Some(owners) = shipped.get(path) else {
+        return String::new();
+    };
+    owners
+        .iter()
+        .rev()
+        .find(|&&owner| in_target(&modules[owner], target))
+        .map(|&owner| format!("{}\n", modules[owner].path))
+        .unwrap_or_default()
+}
+
+/// Whether a module lands in a target's image.
+fn in_target(module: &Module, target: Option<&str>) -> bool {
+    match (&module.flavour, target) {
+        (None, _) => true,
+        (Some(_), None) => true,
+        (Some(gate), Some(target)) => gate == target,
+    }
+}
+
+pub fn check(modules: &[Module], shipped: &Index, issues: &mut Issues) {
     let mut used: Vec<BTreeSet<&str>> = vec![BTreeSet::new(); modules.len()];
 
-    for (path, owners) in &shipped {
+    for (path, owners) in shipped {
         for (position, &later) in owners.iter().enumerate() {
             let Some(&earlier) = owners[..position]
                 .iter()

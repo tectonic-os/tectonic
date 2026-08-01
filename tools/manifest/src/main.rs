@@ -48,6 +48,12 @@ says otherwise.
                     when none does. Per target when one is given, because
                     a path provided only by a gated module is not provided
                     on every target
+  owns <abs-path> [target]
+                    the module whose files/ overlay puts a path in the
+                    image; nothing when none does. Per target for the same
+                    reason find-provider is. Overlay-shipped paths only: a
+                    package-installed one is not in the index and could
+                    not be without rpm -qf on a built image
   secrets [target]  every secret ID an enabled module declares, unique;
                     per target when one is given
   contract-files [target]
@@ -83,7 +89,7 @@ fn main() -> ExitCode {
         "contract-files",
         "verify-exceptions",
     ];
-    let path_first = command == "find-provider";
+    let path_first = matches!(command, "find-provider" | "owns");
     let max_args = usize::from(path_first) + usize::from(path_first || PER_TARGET.contains(&command));
     if args.len() - 1 > max_args {
         eprintln!(
@@ -140,7 +146,8 @@ fn main() -> ExitCode {
     let order = order::sort(&list, &modules, &mut issues);
     order::apply(&mut list, &mut modules, &order);
     module::check_graph(&modules, &list, &root, &mut issues);
-    overlay::check(&modules, &root, &mut issues);
+    let shipped = overlay::index(&modules, &root);
+    overlay::check(&modules, &shipped, &mut issues);
     let collected = module::resolve_collects(&modules, &root, &mut issues);
 
     if let Some(unknown) = target.filter(|t| !list.targets().iter().any(|have| have == t)) {
@@ -183,6 +190,13 @@ fn main() -> ExitCode {
                 return ExitCode::FAILURE;
             };
             render::find_provider(&list, &modules, path, target)
+        }
+        "owns" => {
+            let Some(path) = args.get(1) else {
+                eprintln!("manifest: owns needs an absolute path");
+                return ExitCode::FAILURE;
+            };
+            overlay::owns(&modules, &shipped, path, target)
         }
         "secrets" => render::secrets(&list, &modules, target),
         "contract-files" => render::contract_files(&list, &modules, target),
