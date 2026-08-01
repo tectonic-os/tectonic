@@ -31,6 +31,10 @@ flavours {
     dev
 }
 
+workflows {
+    smoke-test enabled=#false
+}
+
 modules {
     module "core/bootloader"
     module "core/auto-updates"
@@ -72,6 +76,13 @@ modules {
 | --- | --- |
 | `default=#true` | the flavour built when none is named. Exactly one, required when the block is present. |
 | `pr-build=#true` | the single flavour a pull request builds. At most one; falls back to the default. |
+
+### `workflows`
+
+| Property | Meaning |
+| --- | --- |
+| `enabled=#false` | the workflow does not run |
+| `enabled=#true` | the workflow runs, which is also what silence means |
 
 ### `module`
 
@@ -167,6 +178,30 @@ arg "KERNEL"
 | Node | Meaning |
 | --- | --- |
 | `overrides "<abs-path>"` | this module's overlay knowingly replaces a path an earlier module ships |
+
+```
+$ manifest owns /usr/lib/modprobe.d/vfio.conf dev
+virtualization/vfio-passthrough
+```
+
+### Verify exceptions
+
+| Node | Meaning |
+| --- | --- |
+| `allow-verify "<class>" unit="<unit>"` | this diagnostic class is expected on this unit |
+
+| Class | What it is |
+| --- | --- |
+| `mount-not-found` | a unit ordered against a `.mount` or `.swap` unit, which a container build has not got |
+| `man-page-missing` | a `Documentation=` man page this image does not carry, which verify checks by running `man` against it |
+
+```
+FAIL: tuned.service: systemd-analyze verify
+      tuned.service: Command 'man tuned(8)' failed with code 16
+        this is the known class 'man-page-missing'. If it is expected here,
+        declare it in the module shipping 45-module-kde-desktop.preset:
+          allow-verify "man-page-missing" unit="tuned.service"
+```
 
 ### Collecting
 
@@ -309,6 +344,10 @@ fragment position="after" standard-layer=#false
 - more than one `pr-build=#true`
 - a `flavour` block naming an undeclared flavour
 
+- a `workflows` entry naming no file under `.github/workflows/`, listing
+- a workflow declared twice, or one with no `enabled`
+- an empty `workflows` block
+
 - a `requires` no enabled module provides, listing every module that
 - a `requires-file` no enabled module provides
 - two enabled modules providing the same capability or contract file
@@ -319,6 +358,11 @@ fragment position="after" standard-layer=#false
 
 - two enabled modules that land in the same image shipping the same
 - an `overrides` for a path no earlier module ships
+
+- an `allow-verify` naming a class outside the known set, listing them
+- an `allow-verify` with no class, or no `unit=`
+- the same class allowed twice on the same unit in one module
+- the class list in `lib/validate-image.sh` disagreeing with the one in
 
 - shipping a collected filename while the module that collects it is not
 - two enabled modules collecting the same filename

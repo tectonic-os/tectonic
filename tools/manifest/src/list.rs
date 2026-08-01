@@ -53,6 +53,14 @@ pub struct Flavour {
     pub span: SourceSpan,
 }
 
+/// One workflow the image author has decided about, named by its file stem
+/// under `.github/workflows/`.
+pub struct WorkflowToggle {
+    pub name: String,
+    pub enabled: bool,
+    pub span: SourceSpan,
+}
+
 /// One entry in the list: a module, and the decisions the image author makes
 /// about it.
 pub struct Entry {
@@ -86,6 +94,8 @@ pub struct List {
     /// already an issue: nothing downstream invents a default for it.
     pub base: Option<Base>,
     pub flavours: Vec<Flavour>,
+    /// Only the workflows named here.
+    pub workflows: Vec<WorkflowToggle>,
     pub entries: Vec<Entry>,
 }
 
@@ -132,6 +142,7 @@ impl List {
             image: None,
             base: None,
             flavours: Vec::new(),
+            workflows: Vec::new(),
             entries: Vec::new(),
         };
 
@@ -149,12 +160,13 @@ impl List {
                 "image" => list.parse_image(node, &mut issues),
                 "base" => list.parse_base(node, &mut issues),
                 "flavours" => list.parse_flavours(node, &mut issues),
+                "workflows" => list.parse_workflows(node, &mut issues),
                 "modules" => list.parse_modules(node, &mut issues),
                 other => issues.push(
                     Issue::new(format!("unknown top-level node `{other}`"), file, &text)
                         .at(node.name().span(), "not part of the schema")
                         .help(
-                            "image.kdl holds an `image` node, a `base` node, an optional `flavours` block and a `modules` block",
+                            "image.kdl holds an `image` node, a `base` node, optional `flavours` and `workflows` blocks and a `modules` block",
                         ),
                 ),
             }
@@ -441,6 +453,88 @@ impl List {
                 continue;
             }
             self.flavours.push(flavour);
+        }
+    }
+
+    /// `workflows { smoke-test enabled=#false }` Each child names a workflow
+    /// by its file stem.
+    fn parse_workflows(&mut self, block: &KdlNode, issues: &mut Issues) {
+        let (file, text) = (self.file.clone(), self.text.clone());
+        let Some(children) = block.children() else {
+            issues.push(
+                Issue::new("`workflows` has no workflows in it", &file, &text)
+                    .at(block.name().span(), "empty block")
+                    .help("omit the block entirely; every workflow in .github/workflows/ runs unless something here says otherwise"),
+            );
+            return;
+        };
+
+        for node in children.nodes() {
+            let name = node.name().value().to_string();
+            let span = node.name().span();
+
+            if let Some(dup) = self.workflows.iter().find(|w| w.name == name) {
+                issues.push(
+                    Issue::new(format!("workflow `{name}` is declared twice"), &file, &text)
+                        .at(dup.span, "first here")
+                        .at(span, "and again here")
+                        .help("one workflow is either on or off; two answers means the file below wins silently"),
+                );
+                continue;
+            }
+
+            let mut enabled: Option<bool> = None;
+            let mut stated = false;
+            for entry in node.entries() {
+                let Some(key) = entry.name().map(|n| n.value()) else {
+                    issues.push(
+                        Issue::new("a workflow takes no arguments", &file, &text)
+                            .at(entry.span(), "unexpected value")
+                            .help("the file stem is the node name: `smoke-test enabled=#false`"),
+                    );
+                    continue;
+                };
+                match key {
+                    "enabled" => {
+                        stated = true;
+                        match entry.value().as_bool() {
+                            Some(v) => enabled = Some(v),
+                            None => issues.push(
+                                Issue::new("`enabled` must be #true or #false", &file, &text)
+                                    .at(entry.span(), "not a boolean"),
+                            ),
+                        }
+                    }
+                    other => issues.push(
+                        Issue::new(format!("unknown workflow property `{other}`"), &file, &text)
+                            .at(entry.span(), "not part of the schema")
+                            .help("a workflow accepts `enabled`"),
+                    ),
+                }
+            }
+
+            let Some(enabled) = enabled else {
+                if !stated {
+                    issues.push(
+                        Issue::new(
+                            format!("`{name}` says nothing about whether it runs"),
+                            &file,
+                            &text,
+                        )
+                        .at(span, "no `enabled`")
+                        .help(format!(
+                            "`{name} enabled=#false` turns it off; a workflow nobody wants to change belongs outside this block"
+                        )),
+                    );
+                }
+                continue;
+            };
+
+            self.workflows.push(WorkflowToggle {
+                name,
+                enabled,
+                span,
+            });
         }
     }
 
