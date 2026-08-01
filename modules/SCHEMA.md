@@ -31,6 +31,10 @@ flavours {
     dev
 }
 
+workflows {
+    smoke-test enabled=#false
+}
+
 modules {
     module "core/bootloader"
     module "core/auto-updates"
@@ -72,6 +76,13 @@ modules {
 | --- | --- |
 | `default=#true` | the flavour built when none is named. Exactly one, required when the block is present. |
 | `pr-build=#true` | the single flavour a pull request builds. At most one; falls back to the default. |
+
+### `workflows`
+
+| Property | Meaning |
+| --- | --- |
+| `enabled=#false` | the workflow does not run |
+| `enabled=#true` | the workflow runs, which is also what silence means |
 
 ### `module`
 
@@ -308,6 +319,10 @@ fragment position="after" standard-layer=#false
 - a `flavours` block with no `default=#true`, or with more than one
 - more than one `pr-build=#true`
 - a `flavour` block naming an undeclared flavour
+
+- a `workflows` entry naming no file under `.github/workflows/`, listing
+- a workflow declared twice, or one with no `enabled`
+- an empty `workflows` block
 
 - a `requires` no enabled module provides, listing every module that
 - a `requires-file` no enabled module provides

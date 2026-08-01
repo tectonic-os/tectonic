@@ -9,6 +9,7 @@ mod order;
 mod overlay;
 mod remote;
 mod render;
+mod workflow;
 
 use list::List;
 use std::path::PathBuf;
@@ -39,6 +40,9 @@ says otherwise.
                     manifest, version, sha256, hash source, resolved URL
   remotes           every out-of-tree module pin, pipe separated: name,
                     directory, ref, sha256, resolved URL, subtree path
+  workflows         every file in .github/workflows/ and whether the
+                    declaration says it runs, pipe separated: file,
+                    enabled. Undeclared is enabled
   find-provider <abs-path> [target]
                     the module that provides a contract file path; nothing
                     when none does. Per target when one is given, because
@@ -100,6 +104,16 @@ fn main() -> ExitCode {
 
     if command == "remotes" {
         let output = render::remotes(&list);
+        if issues.report(&list_display) {
+            return ExitCode::FAILURE;
+        }
+        print!("{output}");
+        return ExitCode::SUCCESS;
+    }
+
+    let workflows = workflow::resolve(&list, &root, &mut issues);
+    if command == "workflows" {
+        let output = workflow::render(&workflows);
         if issues.report(&list_display) {
             return ExitCode::FAILURE;
         }
