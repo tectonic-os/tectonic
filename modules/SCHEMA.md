@@ -179,6 +179,11 @@ arg "KERNEL"
 | --- | --- |
 | `overrides "<abs-path>"` | this module's overlay knowingly replaces a path an earlier module ships |
 
+```
+$ manifest owns /usr/lib/modprobe.d/vfio.conf dev
+virtualization/vfio-passthrough
+```
+
 ### Verify exceptions
 
 | Node | Meaning |
