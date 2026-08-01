@@ -1,7 +1,7 @@
 #!/bin/bash
 
 MOK_KEY="/run/secrets/mok_privkey"
-MOK_CERT_DER="/usr/share/tectonic/sb_cert.der"
+MOK_CERT_DER="/usr/share/secureboot/sb_cert.der"
 
 mok_signing_available() {
     [ -s "$MOK_KEY" ] && [ -f "$MOK_CERT_DER" ]

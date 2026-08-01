@@ -1,0 +1,3 @@
+description "GRUB dual boot discovery and the on-demand grub.cfg regeneration recipe"
+
+supports "fedora"

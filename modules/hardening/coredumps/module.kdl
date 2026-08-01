@@ -1,0 +1,3 @@
+description "Coredump lockdown: no storage, no size, no rlimit"
+
+supports "fedora"

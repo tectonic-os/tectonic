@@ -1,11 +1,11 @@
 source /ctx/lib/kernel-helpers.sh
 
-install -Dm644 "$MODDIR/files/usr/share/tectonic/sb_cert.der" /usr/share/tectonic/sb_cert.der
+install -Dm644 "$MODDIR/files/usr/share/secureboot/sb_cert.der" /usr/share/secureboot/sb_cert.der
 
-mkdir -p /usr/lib/tectonic
+mkdir -p /usr/lib/kernel-build
 if [ "$KERNEL" = "stock" ]; then
     echo "KERNEL=stock: keeping the Fedora base kernel, skipping CachyOS packages."
-    echo "kernel-core" > /usr/lib/tectonic/kernel-package
+    echo "kernel-core" > /usr/lib/kernel-build/kernel-package
 else
     dnf5 -y copr enable bieszczaders/kernel-cachyos
     dnf5 -y copr enable bieszczaders/kernel-cachyos-addons
@@ -16,7 +16,7 @@ else
         kernel-cachyos-modules \
         kernel-cachyos-devel-matched
 
-    echo "kernel-cachyos-core" > /usr/lib/tectonic/kernel-package
+    echo "kernel-cachyos-core" > /usr/lib/kernel-build/kernel-package
 
     dnf5 -y install --enablerepo="copr:copr.fedorainfracloud.org:bieszczaders:kernel-cachyos-addons" \
         ananicy-cpp \

@@ -16,7 +16,7 @@ else
 fi
 
 echo "==> initramfs"
-kernel_pkg="$(cat /usr/lib/tectonic/kernel-package 2>/dev/null || echo 'kernel-core')"
+kernel_pkg="$(cat /usr/lib/kernel-build/kernel-package 2>/dev/null || echo 'kernel-core')"
 if kver="$(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}' "$kernel_pkg" 2>/dev/null)"; then
 	initramfs="/usr/lib/modules/${kver}/initramfs.img"
 	if [ -f "$initramfs" ]; then
@@ -87,7 +87,7 @@ echo "==> systemd unit verification"
 checked=0
 for scope in system user; do
 	unit_dirs="/usr/lib/systemd/${scope} /etc/systemd/${scope}"
-	for preset in "/usr/lib/systemd/${scope}-preset/"*tectonic*.preset; do
+	for preset in "/usr/lib/systemd/${scope}-preset/"45-module-*.preset; do
 		[ -f "$preset" ] || continue
 		echo "    ${preset}"
 		while read -r verb unit; do
@@ -142,7 +142,7 @@ for scope in system user; do
 done
 
 if [ "$checked" -eq 0 ]; then
-	fail "no tectonic preset files found"
+	fail "no module preset files found"
 fi
 
 echo

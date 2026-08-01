@@ -3,7 +3,7 @@ set -euo pipefail
 
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
-FLATPAK_LIST="/usr/share/tectonic/default-flatpaks"
+FLATPAK_LIST="/usr/share/flatpak-defaults/apps.list"
 if [ -f "$FLATPAK_LIST" ]; then
     while IFS= read -r flatpak_id; do
         [[ -z "$flatpak_id" || "$flatpak_id" == \#* ]] && continue

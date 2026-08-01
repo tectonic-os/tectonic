@@ -7,7 +7,6 @@ on:
 
 env:
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
-  IMAGE_NAME: tectonic
 
 jobs:
   smoke-test:
@@ -24,6 +23,9 @@ jobs:
 
       - name: Maximize build space
         uses: ublue-os/remove-unwanted-software@cc0becac701cf642c8f0a6613bbdaf5dc36b259e # v9
+
+      - name: Resolve image name
+        run: echo "IMAGE_NAME=$(./scripts/flavours.sh image none)" >> "${GITHUB_ENV}"
 
       - name: Pull published image
         run: |

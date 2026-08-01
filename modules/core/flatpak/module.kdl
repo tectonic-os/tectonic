@@ -6,6 +6,6 @@ packages {
     fedora "flatpak"
 }
 
-collects "flatpaks.list" into="/usr/share/tectonic/default-flatpaks"
+collects "flatpaks.list" into="/usr/share/flatpak-defaults/apps.list"
 
 provides "flatpak"

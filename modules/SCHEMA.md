@@ -15,6 +15,12 @@
 ## image.kdl
 
 ```kdl
+image "tectonic" {
+    name "Tectonic"
+    url "https://github.com/tectonic-os/tectonic"
+    issues-url "https://github.com/tectonic-os/tectonic/issues"
+}
+
 base "quay.io/fedora/fedora-bootc:44" {
     family "fedora"
     provides "rechunking" "initramfs-generation" "mac-policy"
@@ -26,7 +32,7 @@ flavours {
 }
 
 modules {
-    module "base"
+    module "core/bootloader"
     module "core/auto-updates"
     module "kernel/cachyos-kernel"
 
@@ -40,6 +46,17 @@ modules {
     module "core/power-just-scripts"
 }
 ```
+
+### `image`
+
+| Child | Meaning |
+| --- | --- |
+| `name` | os-release `NAME`, the human one. Required. |
+| `pretty-name` | os-release `PRETTY_NAME`. Defaults to `<name> <version>`. |
+| `url` | os-release `HOME_URL` and `DOCUMENTATION_URL`. |
+| `issues-url` | os-release `SUPPORT_URL` and `BUG_REPORT_URL`. |
+| `logo` | scalable icon, installed into the hicolor theme. Its filename without the extension becomes os-release `LOGO`, so the two cannot name different icons. |
+| `watermark` | plymouth boot splash watermark. |
 
 ### `base`
 
@@ -78,8 +95,8 @@ module "<path>" variant="<name>" {
 
 ```kdl
 module "steam-tweaks" {
-    source "https://github.com/owner/tectonic-modules/archive/refs/tags/{ref}.tar.gz" {
-        renovate datasource="github-tags" depName="owner/tectonic-modules"
+    source "https://github.com/owner/bootc-modules/archive/refs/tags/{ref}.tar.gz" {
+        renovate datasource="github-tags" depName="owner/bootc-modules"
         ref "steam-tweaks/v1.2.0"
         sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
         path "modules/steam-tweaks"
@@ -156,7 +173,7 @@ arg "KERNEL"
 ```kdl
 collects "justfile.inc" into="/usr/share/goojust/justfile.apps"
 
-collects "flatpaks.list" into="/usr/share/tectonic/default-flatpaks"
+collects "flatpaks.list" into="/usr/share/flatpak-defaults/apps.list"
 ```
 
 | Part | Meaning |
@@ -264,8 +281,9 @@ fragment position="after" standard-layer=#false
 
 | Target | Image | Cache tag | `FLAVOUR` |
 | --- | --- | --- | --- |
-| `none` | `tectonic` | `none` | unset |
-| `dev` | `tectonic-dev` | `dev` | `dev` |
+| `none` | `<image>` | `none` | unset |
+| `dev` | `<image>-desktop` | `dev` | `dev` |
+| `laptop` | `<image>-laptop` | `laptop` | `laptop` |
 
 ## What the layer sees
 
@@ -282,6 +300,7 @@ fragment position="after" standard-layer=#false
 - either file unparseable, or carrying a node or property this schema
 - an `image.kdl` entry that does not resolve to a module directory
 - a module directory without a `module.kdl`, or one missing
+- no `image` node, an `image` declared twice, one with no name, no
 - no `base` node, a `base` declared twice, one with no image reference or
 - an enabled module whose `supports` does not include the base `family`
 

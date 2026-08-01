@@ -4,7 +4,7 @@ cd "$(dirname "$0")/.."
 
 none=none
 
-prefix=tectonic
+prefix="$(./scripts/manifest.sh image-id)"
 
 die() {
     echo "flavours: $*" >&2
