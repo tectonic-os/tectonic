@@ -96,7 +96,14 @@ fn main() -> ExitCode {
         "contract-files",
         "verify-exceptions",
     ];
-    const PER_IMAGE: [&str; 1] = ["section"];
+    const PER_IMAGE: [&str; 6] = [
+        "section",
+        "image-name",
+        "base-image",
+        "base-family",
+        "base-provides",
+        "flavours",
+    ];
     let path_first = matches!(command, "find-provider" | "owns");
     let takes_name = path_first || PER_TARGET.contains(&command) || PER_IMAGE.contains(&command);
     let max_args = usize::from(path_first) + usize::from(takes_name);
@@ -149,18 +156,27 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
-    let mut modules: Vec<module::Module> = list
-        .entries
-        .iter()
-        .filter_map(|entry| module::Module::load(entry, &list, &root, &mut issues))
-        .collect();
+    let mut resolved: Vec<Resolved> = Vec::new();
+    for image in &mut list.images {
+        let mut modules: Vec<module::Module> = image
+            .entries
+            .iter()
+            .filter_map(|entry| module::Module::load(entry, image, &root, &mut issues))
+            .collect();
 
-    let order = order::sort(&list, &modules, &mut issues);
-    order::apply(&mut list, &mut modules, &order);
-    module::check_graph(&modules, &list, &root, &mut issues);
-    let shipped = overlay::index(&modules, &root);
-    overlay::check(&modules, &shipped, &mut issues);
-    let collected = module::resolve_collects(&modules, &root, &mut issues);
+        let order = order::sort(image, &modules, &mut issues);
+        order::apply(image, &mut modules, &order);
+        module::check_graph(&modules, image, &root, &mut issues);
+        let shipped = overlay::index(&modules, &root);
+        overlay::check(&modules, &shipped, &mut issues);
+        let collected = module::resolve_collects(&modules, &root, &mut issues);
+
+        resolved.push(Resolved {
+            modules,
+            shipped,
+            collected,
+        });
+    }
 
     let known: Vec<String> = list.targets().iter().map(Target::to_string).collect();
     let target = target.and_then(|name| {
@@ -192,49 +208,112 @@ fn main() -> ExitCode {
         );
     }
 
+    let selected: Vec<usize> = if let Some(t) = &target {
+        list.images.iter().position(|i| i.id == t.image).into_iter().collect()
+    } else if per_image {
+        match image_arg {
+            Some(id) => list.images.iter().position(|i| i.id == id).into_iter().collect(),
+            None => list
+                .default_image()
+                .and_then(|d| list.images.iter().position(|i| i.id == d.id))
+                .into_iter()
+                .collect(),
+        }
+    } else {
+        (0..list.images.len()).collect()
+    };
+    let one = selected.first().copied();
+
     let output = match command {
-        "images" => lines(list.images().iter().map(|i| i.id.clone())),
+        "images" => lines(list.images.iter().map(|i| i.id.clone())),
         "default-image" => lines(list.default_image().map(|i| i.id.clone())),
-        "image-name" => lines(list.default_image().map(|i| i.name.clone())),
-        "base-image" => lines(list.base.as_ref().map(|b| b.image.clone())),
-        "base-family" => lines(list.base.as_ref().map(|b| b.family.clone())),
+        "image-name" => lines(one.map(|i| list.images[i].name.clone())),
+        "base-image" => lines(
+            one.and_then(|i| list.images[i].base.as_ref())
+                .map(|b| b.image.clone()),
+        ),
+        "base-family" => lines(
+            one.and_then(|i| list.images[i].base.as_ref())
+                .map(|b| b.family.clone()),
+        ),
         "base-provides" => lines(
-            list.base
-                .iter()
+            one.and_then(|i| list.images[i].base.as_ref())
+                .into_iter()
                 .flat_map(|b| b.provides.iter())
                 .map(|d| d.name.clone()),
         ),
-        "flavours" => lines(list.flavours.iter().map(|f| f.name.clone())),
+        "flavours" => lines(
+            one.into_iter()
+                .flat_map(|i| list.images[i].flavours.iter())
+                .map(|f| f.name.clone()),
+        ),
         "targets" => lines(list.targets().iter().map(Target::to_string)),
         "default-target" => lines(list.default_target().map(|t| t.to_string())),
         "pr-target" => lines(list.pr_target().map(|t| t.to_string())),
-        "section" | "check" => {
-            let section = render::section(&list, &modules, &collected, &root, &mut issues);
-            if command == "check" {
-                String::new()
-            } else {
-                section
+        "section" => match one {
+            Some(i) => render::section(
+                &list.images[i],
+                &resolved[i].modules,
+                &resolved[i].collected,
+                &root,
+                &mut issues,
+            ),
+            None => String::new(),
+        },
+        "check" => {
+            for (i, image) in list.images.iter().enumerate() {
+                let _ = render::section(
+                    image,
+                    &resolved[i].modules,
+                    &resolved[i].collected,
+                    &root,
+                    &mut issues,
+                );
             }
+            String::new()
         }
         "find-provider" => {
             let Some(path) = args.get(1) else {
                 eprintln!("manifest: find-provider needs an absolute path");
                 return ExitCode::FAILURE;
             };
-            render::find_provider(&list, &modules, path, flavour)
+            over(&selected, |i| {
+                render::find_provider(&list.images[i], &resolved[i].modules, path, flavour)
+            })
         }
         "owns" => {
             let Some(path) = args.get(1) else {
                 eprintln!("manifest: owns needs an absolute path");
                 return ExitCode::FAILURE;
             };
-            overlay::owns(&modules, &shipped, path, flavour)
+            over(&selected, |i| {
+                overlay::owns(&resolved[i].modules, &resolved[i].shipped, path, flavour)
+            })
         }
-        "secrets" => render::secrets(&list, &modules, flavour),
-        "contract-files" => render::contract_files(&list, &modules, flavour),
-        "verify-exceptions" => render::verify_exceptions(&list, &modules, flavour),
-        "summary" => render::summary(&list, &modules, flavour),
-        "assets" => render::assets(&list, &modules, flavour),
+        "secrets" => over(&selected, |i| {
+            render::secrets(&list.images[i], &resolved[i].modules, flavour)
+        }),
+        "contract-files" => over(&selected, |i| {
+            render::contract_files(&list.images[i], &resolved[i].modules, flavour)
+        }),
+        "verify-exceptions" => over(&selected, |i| {
+            render::verify_exceptions(&list.images[i], &resolved[i].modules, flavour)
+        }),
+        "summary" => selected
+            .iter()
+            .map(|&i| {
+                let body = render::summary(&list.images[i], &resolved[i].modules, flavour);
+                if selected.len() > 1 {
+                    format!("## {}\n\n{body}", list.images[i].id)
+                } else {
+                    body
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
+        "assets" => over(&selected, |i| {
+            render::assets(&list.images[i], &resolved[i].modules, flavour)
+        }),
         other => {
             eprintln!("manifest: unknown command `{other}`");
             eprint!("{USAGE}");
@@ -248,12 +327,34 @@ fn main() -> ExitCode {
     print!("{output}");
     if command == "check" {
         eprintln!(
-            "manifest: {} modules, {} flavours",
-            modules.len(),
-            list.flavours.len()
+            "manifest: {} images, {} modules, {} flavours",
+            list.images.len(),
+            resolved.iter().map(|r| r.modules.len()).sum::<usize>(),
+            list.images.iter().map(|i| i.flavours.len()).sum::<usize>()
         );
     }
     ExitCode::SUCCESS
+}
+
+/// One image, resolved: the manifests its entries name, loaded and checked
+/// together, and the two indexes built while doing it.
+struct Resolved {
+    modules: Vec<module::Module>,
+    shipped: overlay::Index,
+    collected: std::collections::BTreeMap<String, Vec<(String, String)>>,
+}
+
+/// A per-image answer, over however many images the command selected.
+fn over(selected: &[usize], mut answer: impl FnMut(usize) -> String) -> String {
+    let mut seen: Vec<String> = Vec::new();
+    for &index in selected {
+        for line in answer(index).lines() {
+            if !seen.iter().any(|had| had == line) {
+                seen.push(line.to_string());
+            }
+        }
+    }
+    lines(seen)
 }
 
 fn lines(items: impl IntoIterator<Item = String>) -> String {
