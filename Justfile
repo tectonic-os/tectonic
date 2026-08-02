@@ -20,7 +20,7 @@ check:
 fix:
     just --unstable --fmt -f Justfile
 
-# Regenerate Containerfile.generated from the Containerfile skeleton and
+# Regenerate the Containerfiles from the Containerfile skeleton and
 # image.kdl, then commit it: it is tracked, and lint fails on a stale
 # one. Builds regenerate it too, so no build can use a stale one.
 [group('Utility')]

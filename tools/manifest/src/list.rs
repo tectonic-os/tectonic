@@ -737,6 +737,17 @@ impl List {
         }
     }
 
+    /// Every image the repository declares, in declaration order.
+    pub fn images(&self) -> Vec<&Image> {
+        self.image.iter().collect()
+    }
+
+    /// The image a command answers about when it is given no image, and the
+    /// one a bare build builds.
+    pub fn default_image(&self) -> Option<&Image> {
+        self.image.as_ref()
+    }
+
     pub fn default_flavour(&self) -> Option<&str> {
         self.flavours
             .iter()

@@ -35,6 +35,17 @@
     },
   ],
 
+  // The generated Containerfiles, one per image, carry the same base
+  // image reference as the declaration the custom manager below matches.
+  // They used to be one file at the repository root, which the dockerfile
+  // manager matched by default; `containerfiles/<image>.generated` is not
+  // a name it recognises, so it is named here. Without this the
+  // declaration bumps and the generated FROM does not, and every base
+  // image PR fails the drift check in scripts/lint.sh.
+  "dockerfile": {
+    "managerFilePatterns": ["/^containerfiles/[^/]+\\.generated$/"],
+  },
+
   // The `renovate` node inside an `asset` block, and the `version` line
   // directly below it. What Renovate needs is declared as data rather than
   // written in a comment, so the manifest parser validates it: an
@@ -46,10 +57,11 @@
       "customType": "regex",
       // The base image moved out of the Containerfile skeleton and into the
       // `base` node in image.kdl, which the generated FROM is emitted
-      // from. Renovate's dockerfile manager still matches the FROM in
-      // Containerfile.generated, and both carry the same depName and
-      // version, so a bump updates the declaration and the generated file
-      // together in one PR and the drift check stays happy.
+      // from. The dockerfile manager configured above still matches the
+      // FROM in the generated Containerfiles, and both carry the same
+      // depName and version, so a bump updates the declaration and the
+      // generated files together in one PR and the drift check stays
+      // happy.
       "description": "Base image reference in image.kdl",
       "managerFilePatterns": ["/^image\\.kdl$/"],
       "datasourceTemplate": "docker",

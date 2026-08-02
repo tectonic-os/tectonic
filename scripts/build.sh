@@ -2,9 +2,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-containerfile=Containerfile.generated
-
 image_id="$(./scripts/manifest.sh image-id)"
+
+containerfile="containerfiles/${image_id}.generated"
 
 # renovate: datasource=docker depName=docker.io/moby/buildkit
 buildkit_image="docker.io/moby/buildkit:v0.31.2"
