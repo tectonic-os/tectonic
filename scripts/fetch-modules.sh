@@ -36,7 +36,7 @@ tmp=""
 trap '[ -z "$tmp" ] || rm -rf "$tmp"' EXIT
 
 for pin in "${pins[@]}"; do
-    IFS='|' read -r name dir ref sha256 url path <<< "$pin"
+    IFS='|' read -r name dir ref sha256 url path _file <<< "$pin"
     [ "$dir" = "${remote_root}/${name}" ] || die "${name}: unexpected fetch directory ${dir}"
 
     stamp="${stamp_root}/${name}.pin"

@@ -1,4 +1,5 @@
-- **[image.kdl](../image.kdl)** — the image author's file. Which
+- **`<anything>.kdl` at the repository root** — one image apiece, and the
+- **[repo.kdl](../repo.kdl)** — repo context, and the one root `.kdl` that
 - **`modules/<path>/module.kdl`** — the module author's file, required
 
 ## What is not declared
@@ -12,50 +13,82 @@
 | `finalize.sh` | sourced by the finalize phase, in resolved order |
 | a file another module `collects` | handed to that module |
 
-## image.kdl
+## The image files
 
 ```kdl
-image "tectonic" {
+image {
     name "Tectonic"
     url "https://github.com/tectonic-os/tectonic"
     issues-url "https://github.com/tectonic-os/tectonic/issues"
-}
 
-base "quay.io/fedora/fedora-bootc:44" {
-    family "fedora"
-    provides "rechunking" "initramfs-generation" "mac-policy"
-    provides-file "/usr/bin/bootc" "/usr/bin/systemctl" "/usr/bin/rpm-ostree"
-}
-
-flavours {
-    dev
-}
-
-workflows {
-    smoke-test enabled=#false
-}
-
-modules {
-    module "core/bootloader"
-    module "core/auto-updates"
-    module "kernel/cachyos-kernel"
-
-        fonts "JetBrainsMono" "FiraCode"
+    base "quay.io/fedora/fedora-bootc:44" {
+        family "fedora"
+        provides "rechunking" "initramfs-generation" "mac-policy"
+        provides-file "/usr/bin/bootc" "/usr/bin/systemctl" "/usr/bin/rpm-ostree"
     }
 
-    flavour "dev" {
-        module "dev-tools"
+    flavours {
+        dev
     }
 
-    module "core/power-just-scripts"
+    modules {
+        module "core/bootloader"
+        module "core/auto-updates"
+        module "kernel/cachyos-kernel"
+
+            fonts "JetBrainsMono" "FiraCode"
+        }
+
+        flavour "dev" {
+            module "dev-tools"
+        }
+
+        module "core/power-just-scripts"
+    }
 }
 ```
+
+```kdl
+image {
+    name "Tectonic Server"
+    id "tectonic-server"
+
+    base "quay.io/centos-bootc/centos-bootc:stream10" {
+        family "centos"
+        provides "rechunking" "initramfs-generation" "mac-policy"
+        provides-file "/usr/bin/bootc" "/usr/bin/systemctl"
+    }
+
+    modules {
+        module "core/bootloader"
+        module "core/signature-policy"
+        module "hardening/login-policy"
+        module "virtualization/podman"
+    }
+}
+```
+
+```console
+$ manifest targets
+tectonic/none
+tectonic/dev
+tectonic-server/none
+```
+
+### The three names
+
+| | where it comes from | where it goes |
+| --- | --- | --- |
+| the file name | you | nowhere. Not the build, not the artifact |
+| `id` | `name` lowercased, or declared | published image name, cache tag, build target, os-release `DEFAULT_HOSTNAME`, MOK key directory |
+| `name` | declared | os-release `NAME`, and `PRETTY_NAME` through its default |
 
 ### `image`
 
 | Child | Meaning |
 | --- | --- |
 | `name` | os-release `NAME`, the human one. Required. |
+| `id` | the machine name, matching `^[a-z][a-z0-9-]*$` because it becomes an image tag, a cache tag and the default hostname. Derived from `name` when absent. |
 | `pretty-name` | os-release `PRETTY_NAME`. Defaults to `<name> <version>`. |
 | `url` | os-release `HOME_URL` and `DOCUMENTATION_URL`. |
 | `issues-url` | os-release `SUPPORT_URL` and `BUG_REPORT_URL`. |
@@ -76,13 +109,6 @@ modules {
 | --- | --- |
 | `default=#true` | the flavour built when none is named. Exactly one, required when the block is present. |
 | `pr-build=#true` | the single flavour a pull request builds. At most one; falls back to the default. |
-
-### `workflows`
-
-| Property | Meaning |
-| --- | --- |
-| `enabled=#false` | the workflow does not run |
-| `enabled=#true` | the workflow runs, which is also what silence means |
 
 ### `module`
 
@@ -135,6 +161,26 @@ flavour "<name>" {
     module "<path>"
 }
 ```
+
+## repo.kdl
+
+```kdl
+default-image "tectonic"
+pr-image "tectonic"
+
+workflows {
+    smoke-test enabled=#false
+}
+```
+
+### `default-image` and `pr-image`
+
+### `workflows`
+
+| Property | Meaning |
+| --- | --- |
+| `enabled=#false` | the workflow does not run |
+| `enabled=#true` | the workflow runs, which is also what silence means |
 
 ## module.kdl
 
@@ -316,9 +362,9 @@ fragment position="after" standard-layer=#false
 
 | Target | Image | Cache tag | `FLAVOUR` |
 | --- | --- | --- | --- |
-| `none` | `<image>` | `none` | unset |
-| `dev` | `<image>-desktop` | `dev` | `dev` |
-| `laptop` | `<image>-laptop` | `laptop` | `laptop` |
+| `tectonic/none` | `tectonic` | `tectonic` | unset |
+| `tectonic/dev` | `tectonic-dev` | `tectonic-dev` | `dev` |
+| `tectonic-server/none` | `tectonic-server` | `tectonic-server` | unset |
 
 ## What the layer sees
 
@@ -332,11 +378,14 @@ fragment position="after" standard-layer=#false
 
 ## Validation
 
-- either file unparseable, or carrying a node or property this schema
-- an `image.kdl` entry that does not resolve to a module directory
+- any file unparseable, or carrying a node or property this schema
+- an image file entry that does not resolve to a module directory
 - a module directory without a `module.kdl`, or one missing
-- no `image` node, an `image` declared twice, one with no name, no
-- no `base` node, a `base` declared twice, one with no image reference or
+- a repository declaring no image, or a root `.kdl` that declares none
+- an `image` node with an argument, no `name` child, an `id` outside
+- two images declaring the same `id`, or two builds that would publish
+- `default-image` missing with more than one image declared, or either it
+- an image with no `base`, a `base` declared twice, one with no image
 - an enabled module whose `supports` does not include the base `family`
 
 - a flavour name outside `^[a-z][a-z0-9-]*$`, duplicated, or named `none`

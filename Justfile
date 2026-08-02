@@ -1,4 +1,4 @@
-export image_name := env("IMAGE_NAME", `./scripts/flavours.sh image none`) # output image name, declared in image.kdl
+export image_name := env("IMAGE_NAME", `./scripts/targets.sh image "$(./scripts/targets.sh ungated)"`) # published name of the default image, ungated
 export default_tag := env("DEFAULT_TAG", "latest")
 export bib_image := env("BIB_IMAGE", "quay.io/centos-bootc/bootc-image-builder:latest")
 
@@ -20,9 +20,9 @@ check:
 fix:
     just --unstable --fmt -f Justfile
 
-# Regenerate Containerfile.generated from the Containerfile skeleton and
-# image.kdl, then commit it: it is tracked, and lint fails on a stale
-# one. Builds regenerate it too, so no build can use a stale one.
+# Regenerate the Containerfiles from the Containerfile skeleton and the
+# image files, then commit them: they are tracked, and lint fails on a
+# stale one. Builds regenerate them too, so no build can use a stale one.
 [group('Utility')]
 generate:
     ./scripts/gen-containerfile.sh
@@ -58,19 +58,19 @@ sudoif command *args:
     }
     sudoif {{ command }} {{ args }}
 
-# Build the image with BuildKit, e.g. `just build tectonic latest desktop stock`
-build $target_image=image_name $tag=default_tag $flavour=`./scripts/flavours.sh default` $kernel="": (_build "buildkit" target_image tag flavour kernel)
+# Build the image with BuildKit, e.g. `just build tectonic latest tectonic/desktop stock`
+build $target_image=image_name $tag=default_tag $target=`./scripts/targets.sh default` $kernel="": (_build "buildkit" target_image tag target kernel)
 
 # Build the image with buildah instead of BuildKit
 [group('Utility')]
-build-buildah $target_image=image_name $tag=default_tag $flavour=`./scripts/flavours.sh default` $kernel="": (_build "buildah" target_image tag flavour kernel)
+build-buildah $target_image=image_name $tag=default_tag $target=`./scripts/targets.sh default` $kernel="": (_build "buildah" target_image tag target kernel)
 
 [private]
-_build backend $target_image $tag $flavour $kernel:
+_build backend $target_image $tag $target $kernel:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    args=(--backend "{{ backend }}" --flavour "${flavour}" --tag "${target_image}:${tag}")
+    args=(--backend "{{ backend }}" --target "${target}" --tag "${target_image}:${tag}")
     if [[ -n "${kernel}" ]]; then
         args+=(--kernel "${kernel}")
     fi
@@ -84,7 +84,7 @@ buildkit-reset:
 # Generate a one-time Secure Boot (MOK) module-signing key pair. Keep the
 # private key out of the repo; commit the public cert.
 [group('Secure Boot')]
-generate-mok-key dir=(env("HOME") + "/.local/share/" + `./scripts/manifest.sh image-id`):
+generate-mok-key dir=(env("HOME") + "/.local/share/" + `./scripts/manifest.sh default-image`):
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -200,13 +200,13 @@ build-raw $target_image=("localhost/" + image_name) $tag=default_tag: && (_build
 
 # Build an ISO installer image
 [group('Build Virtual Machine Image')]
-build-iso $target_image=("localhost/" + image_name) $tag=default_tag $flavour="":
+build-iso $target_image=("localhost/" + image_name) $tag=default_tag $target="":
     #!/usr/bin/env bash
     set -euo pipefail
 
     args=()
-    if [[ -n "${flavour}" ]]; then
-        args+=(--flavour "${flavour}")
+    if [[ -n "${target}" ]]; then
+        args+=(--target "${target}")
     fi
     config="$(./scripts/render-iso-config.sh "${args[@]}")"
     just _build-bib "${target_image}" "${tag}" iso "${config}"
@@ -221,8 +221,8 @@ rebuild-raw $target_image=("localhost/" + image_name) $tag=default_tag: && (_reb
 
 # Rebuild an ISO installer image
 [group('Build Virtual Machine Image')]
-rebuild-iso $target_image=("localhost/" + image_name) $tag=default_tag $flavour="none": (build target_image tag flavour)
-    just build-iso "${target_image}" "${tag}" "${flavour}"
+rebuild-iso $target_image=("localhost/" + image_name) $tag=default_tag $target=`./scripts/targets.sh ungated`: (build target_image tag target)
+    just build-iso "${target_image}" "${tag}" "${target}"
 
 # Run a virtual machine with the specified image type
 _run-vm $target_image $tag $type:
@@ -296,7 +296,7 @@ spawn-vm rebuild="0" type="qcow2" ram="6G":
       --vsock=false --pass-ssh-key=false \
       -i ./output/**/*.{{ type }}
 
-# Runs shellcheck over every Bash script, validates image.kdl and
+# Runs shellcheck over every Bash script, validates the image files and
 # renders the installer config, the same script the build workflow gates on
 lint:
     ./scripts/lint.sh

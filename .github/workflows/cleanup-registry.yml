@@ -50,7 +50,7 @@ jobs:
             fi
           }
 
-          mapfile -t packages < <(./scripts/flavours.sh images)
+          mapfile -t packages < <(./scripts/targets.sh images)
           for pkg in "${packages[@]}"; do
             echo "== ${pkg}"
             versions="$(list_versions "${pkg}")" || continue
@@ -76,8 +76,8 @@ jobs:
             done <<<"${deletions}"
           done
 
-          pkg="$(./scripts/flavours.sh cache-image)"
-          live="$(./scripts/flavours.sh targets | jq -Rsc 'split("\n") | map(select(length > 0))')"
+          pkg="$(./scripts/targets.sh cache-image)"
+          live="$(./scripts/targets.sh images | jq -Rsc 'split("\n") | map(select(length > 0))')"
           echo "== ${pkg}"
           if versions="$(list_versions "${pkg}")"; then
             deletions="$(printf '%s' "${versions}" | jq -s 'add' | jq -r --argjson live "${live}" '

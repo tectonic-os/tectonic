@@ -21,8 +21,8 @@ pub fn resolve(list: &List, root: &Path, issues: &mut Issues) -> Vec<(String, bo
         issues.push(
             Issue::new(
                 format!("`{}` is not a workflow", toggle.name),
-                &list.file,
-                &list.text,
+                &list.repo_file,
+                &list.repo_text,
             )
             .at(toggle.span, format!("no such file under {WORKFLOW_DIR}/"))
             .help(if known.is_empty() {

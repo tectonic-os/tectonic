@@ -1,4 +1,4 @@
-//! The only reader of image.kdl and the per-module module.kdl files.
+//! The only reader of the image files and the per-module module.kdl files.
 
 mod asset;
 mod diag;
@@ -11,7 +11,7 @@ mod remote;
 mod render;
 mod workflow;
 
-use list::List;
+use list::{List, Target};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -21,25 +21,33 @@ usage: manifest <command>
 Output is one item per line, in declaration order, except where a command
 says otherwise.
 
-  image-id          the image's machine name: what it publishes as, and
-                    what a flavour image is prefixed with
+A target is `<image>/<flavour>`, with `<image>/none` for the ungated build
+that publishes unsuffixed.
+
+  images            every image the repository declares, by machine name,
+                    which is what the generator writes one Containerfile
+                    per
+  default-image     the image a build builds when none is named
   image-name        the image's human name, as os-release NAME
   base-image        the base image reference, which the generated FROM uses
   base-family       the base family every module's `supports` is checked
                     against
   base-provides     every capability the base image itself provides
   flavours           every declared flavour
-  default-flavour    the flavour marked default, which builds use when none
-                    is given; nothing when no flavours are declared
-  pr-flavour         the flavour a pull request builds
-  targets           every build target: the ungated `none`, then flavours
-  section           the generated Containerfile module section
+  targets           every build target
+  default-target    what a build with no target named builds: the default
+                    image at its default flavour, or its ungated set when it
+                    declares no flavours
+  pr-target         the one target a pull request builds
+  section [image]   the generated Containerfile module section for an
+                    image; the default image when none is given
   summary [target]  what a target is made of, as markdown; every entry
                     when no target is given
   assets [target]   every pinned asset, pipe separated: module, name,
                     manifest, version, sha256, hash source, resolved URL
   remotes           every out-of-tree module pin, pipe separated: name,
-                    directory, ref, sha256, resolved URL, subtree path
+                    directory, ref, sha256, resolved URL, subtree path, and
+                    the file declaring it
   workflows         every file in .github/workflows/ and whether the
                     declaration says it runs, pipe separated: file,
                     enabled. Undeclared is enabled
@@ -89,8 +97,17 @@ fn main() -> ExitCode {
         "contract-files",
         "verify-exceptions",
     ];
+    const PER_IMAGE: [&str; 6] = [
+        "section",
+        "image-name",
+        "base-image",
+        "base-family",
+        "base-provides",
+        "flavours",
+    ];
     let path_first = matches!(command, "find-provider" | "owns");
-    let max_args = usize::from(path_first) + usize::from(path_first || PER_TARGET.contains(&command));
+    let takes_name = path_first || PER_TARGET.contains(&command) || PER_IMAGE.contains(&command);
+    let max_args = usize::from(path_first) + usize::from(takes_name);
     if args.len() - 1 > max_args {
         eprintln!(
             "manifest: `{command}` takes {}",
@@ -102,20 +119,18 @@ fn main() -> ExitCode {
         );
         return ExitCode::FAILURE;
     }
-    let target = args.get(1 + usize::from(path_first)).map(String::as_str);
+    let named = args.get(1 + usize::from(path_first)).map(String::as_str);
+    let per_image = PER_IMAGE.contains(&command);
+    let target = if per_image { None } else { named };
+    let image_arg = if per_image { named } else { None };
 
     let root = PathBuf::from(std::env::var("MANIFEST_ROOT").unwrap_or_else(|_| ".".into()));
-    let list_path = root.join("image.kdl");
-    let list_display = list_path.display().to_string();
 
-    let (mut list, mut issues) = match List::load(&list_display) {
-        Ok(v) => v,
-        Err(issue) => {
-            let mut issues = diag::Issues::default();
-            issues.push(*issue);
-            issues.report("image.kdl");
-            return ExitCode::FAILURE;
-        }
+    let (mut list, mut issues) = List::load(&root);
+    let list_display = if list.files.is_empty() {
+        root.display().to_string()
+    } else {
+        list.files.join(", ")
     };
 
     if command == "remotes" {
@@ -137,72 +152,156 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
-    let mut modules: Vec<module::Module> = list
-        .entries
-        .iter()
-        .filter_map(|entry| module::Module::load(entry, &list, &root, &mut issues))
-        .collect();
+    let mut resolved: Vec<Resolved> = Vec::new();
+    for image in &mut list.images {
+        let mut modules: Vec<module::Module> = image
+            .entries
+            .iter()
+            .filter_map(|entry| module::Module::load(entry, image, &root, &mut issues))
+            .collect();
 
-    let order = order::sort(&list, &modules, &mut issues);
-    order::apply(&mut list, &mut modules, &order);
-    module::check_graph(&modules, &list, &root, &mut issues);
-    let shipped = overlay::index(&modules, &root);
-    overlay::check(&modules, &shipped, &mut issues);
-    let collected = module::resolve_collects(&modules, &root, &mut issues);
+        let order = order::sort(image, &modules, &mut issues);
+        order::apply(image, &mut modules, &order);
+        module::check_graph(&modules, image, &root, &mut issues);
+        let shipped = overlay::index(&modules, &root);
+        overlay::check(&modules, &shipped, &mut issues);
+        let collected = module::resolve_collects(&modules, &root, &mut issues);
 
-    if let Some(unknown) = target.filter(|t| !list.targets().iter().any(|have| have == t)) {
+        resolved.push(Resolved {
+            modules,
+            shipped,
+            collected,
+        });
+    }
+
+    let known: Vec<String> = list.targets().iter().map(Target::to_string).collect();
+    let target = target.and_then(|name| {
+        let parsed = Target::parse(name).filter(|t| known.iter().any(|have| have == &t.to_string()));
+        if parsed.is_none() {
+            issues.push(
+                diag::Issue::new(format!("`{name}` is not a build target"), &list.repo_file, "")
+                .help(format!("targets: {}", known.join(", "))),
+            );
+        }
+        parsed
+    });
+
+    let flavour = target.as_ref().map(|t| t.flavour.as_str());
+
+    if let Some(unknown) = image_arg.filter(|id| !list.images().iter().any(|i| i.id == *id)) {
+        let known: Vec<&str> = list.images().iter().map(|i| i.id.as_str()).collect();
         issues.push(
-            diag::Issue::new(
-                format!("`{unknown}` is not a build target"),
-                &list_display,
-                &list.text,
-            )
-            .help(format!("targets: {}", list.targets().join(", "))),
+            diag::Issue::new(format!("`{unknown}` is not a declared image"), &list.repo_file, "")
+            .help(format!("images: {}", known.join(", "))),
         );
     }
 
+    let selected: Vec<usize> = if let Some(t) = &target {
+        list.images.iter().position(|i| i.id == t.image).into_iter().collect()
+    } else if per_image {
+        match image_arg {
+            Some(id) => list.images.iter().position(|i| i.id == id).into_iter().collect(),
+            None => list
+                .default_image()
+                .and_then(|d| list.images.iter().position(|i| i.id == d.id))
+                .into_iter()
+                .collect(),
+        }
+    } else {
+        (0..list.images.len()).collect()
+    };
+    let one = selected.first().copied();
+
     let output = match command {
-        "image-id" => lines(list.image.as_ref().map(|i| i.id.clone())),
-        "image-name" => lines(list.image.as_ref().map(|i| i.name.clone())),
-        "base-image" => lines(list.base.as_ref().map(|b| b.image.clone())),
-        "base-family" => lines(list.base.as_ref().map(|b| b.family.clone())),
+        "images" => lines(list.images.iter().map(|i| i.id.clone())),
+        "default-image" => lines(list.default_image().map(|i| i.id.clone())),
+        "image-name" => lines(one.map(|i| list.images[i].name.clone())),
+        "base-image" => lines(
+            one.and_then(|i| list.images[i].base.as_ref())
+                .map(|b| b.image.clone()),
+        ),
+        "base-family" => lines(
+            one.and_then(|i| list.images[i].base.as_ref())
+                .map(|b| b.family.clone()),
+        ),
         "base-provides" => lines(
-            list.base
-                .iter()
+            one.and_then(|i| list.images[i].base.as_ref())
+                .into_iter()
                 .flat_map(|b| b.provides.iter())
                 .map(|d| d.name.clone()),
         ),
-        "flavours" => lines(list.flavours.iter().map(|f| f.name.clone())),
-        "default-flavour" => lines(list.default_flavour().map(str::to_string)),
-        "pr-flavour" => lines(list.pr_flavour().map(str::to_string)),
-        "targets" => lines(list.targets()),
-        "section" | "check" => {
-            let section = render::section(&list, &modules, &collected, &root, &mut issues);
-            if command == "check" {
-                String::new()
-            } else {
-                section
+        "flavours" => lines(
+            one.into_iter()
+                .flat_map(|i| list.images[i].flavours.iter())
+                .map(|f| f.name.clone()),
+        ),
+        "targets" => lines(list.targets().iter().map(Target::to_string)),
+        "default-target" => lines(list.default_target().map(|t| t.to_string())),
+        "pr-target" => lines(list.pr_target().map(|t| t.to_string())),
+        "section" => match one {
+            Some(i) => render::section(
+                &list.images[i],
+                &resolved[i].modules,
+                &resolved[i].collected,
+                &root,
+                &mut issues,
+            ),
+            None => String::new(),
+        },
+        "check" => {
+            for (i, image) in list.images.iter().enumerate() {
+                let _ = render::section(
+                    image,
+                    &resolved[i].modules,
+                    &resolved[i].collected,
+                    &root,
+                    &mut issues,
+                );
             }
+            String::new()
         }
         "find-provider" => {
             let Some(path) = args.get(1) else {
                 eprintln!("manifest: find-provider needs an absolute path");
                 return ExitCode::FAILURE;
             };
-            render::find_provider(&list, &modules, path, target)
+            over(&selected, |i| {
+                render::find_provider(&list.images[i], &resolved[i].modules, path, flavour)
+            })
         }
         "owns" => {
             let Some(path) = args.get(1) else {
                 eprintln!("manifest: owns needs an absolute path");
                 return ExitCode::FAILURE;
             };
-            overlay::owns(&modules, &shipped, path, target)
+            over(&selected, |i| {
+                overlay::owns(&resolved[i].modules, &resolved[i].shipped, path, flavour)
+            })
         }
-        "secrets" => render::secrets(&list, &modules, target),
-        "contract-files" => render::contract_files(&list, &modules, target),
-        "verify-exceptions" => render::verify_exceptions(&list, &modules, target),
-        "summary" => render::summary(&list, &modules, target),
-        "assets" => render::assets(&list, &modules, target),
+        "secrets" => over(&selected, |i| {
+            render::secrets(&list.images[i], &resolved[i].modules, flavour)
+        }),
+        "contract-files" => over(&selected, |i| {
+            render::contract_files(&list.images[i], &resolved[i].modules, flavour)
+        }),
+        "verify-exceptions" => over(&selected, |i| {
+            render::verify_exceptions(&list.images[i], &resolved[i].modules, flavour)
+        }),
+        "summary" => selected
+            .iter()
+            .map(|&i| {
+                let body = render::summary(&list.images[i], &resolved[i].modules, flavour);
+                if selected.len() > 1 {
+                    format!("## {}\n\n{body}", list.images[i].id)
+                } else {
+                    body
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
+        "assets" => over(&selected, |i| {
+            render::assets(&list.images[i], &resolved[i].modules, flavour)
+        }),
         other => {
             eprintln!("manifest: unknown command `{other}`");
             eprint!("{USAGE}");
@@ -216,12 +315,34 @@ fn main() -> ExitCode {
     print!("{output}");
     if command == "check" {
         eprintln!(
-            "manifest: {} modules, {} flavours",
-            modules.len(),
-            list.flavours.len()
+            "manifest: {} images, {} modules, {} flavours",
+            list.images.len(),
+            resolved.iter().map(|r| r.modules.len()).sum::<usize>(),
+            list.images.iter().map(|i| i.flavours.len()).sum::<usize>()
         );
     }
     ExitCode::SUCCESS
+}
+
+/// One image, resolved: the manifests its entries name, loaded and checked
+/// together, and the two indexes built while doing it.
+struct Resolved {
+    modules: Vec<module::Module>,
+    shipped: overlay::Index,
+    collected: std::collections::BTreeMap<String, Vec<(String, String)>>,
+}
+
+/// A per-image answer, over however many images the command selected.
+fn over(selected: &[usize], mut answer: impl FnMut(usize) -> String) -> String {
+    let mut seen: Vec<String> = Vec::new();
+    for &index in selected {
+        for line in answer(index).lines() {
+            if !seen.iter().any(|had| had == line) {
+                seen.push(line.to_string());
+            }
+        }
+    }
+    lines(seen)
 }
 
 fn lines(items: impl IntoIterator<Item = String>) -> String {

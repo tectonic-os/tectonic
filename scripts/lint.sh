@@ -38,17 +38,32 @@ fi
 echo "lint: verify classes agree ($(echo "$shell_classes" | tr '\n' ' ' | sed 's/ *$//'))"
 
 ./scripts/gen-containerfile.sh > /dev/null
+mapfile -t generated < <(./scripts/manifest.sh images \
+    | sed 's#^#containerfiles/#; s#$#.generated#')
 if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
-    echo "lint: the Containerfile generates (no checkout, so no drift check)"
-elif ! git ls-files --error-unmatch Containerfile.generated > /dev/null 2>&1; then
-    echo "lint: Containerfile.generated is untracked, so nothing reviews it" >&2
-    exit 1
-elif ! git diff --quiet -- Containerfile.generated; then
-    echo "lint: Containerfile.generated is stale, stage the regenerated file" >&2
-    git --no-pager diff --stat -- Containerfile.generated >&2
-    exit 1
+    echo "lint: the Containerfiles generate (no checkout, so no drift check)"
 else
-    echo "lint: the Containerfile generates and matches the committed one"
+    for file in "${generated[@]}"; do
+        if ! git ls-files --error-unmatch "$file" > /dev/null 2>&1; then
+            echo "lint: ${file} is untracked, so nothing reviews it" >&2
+            exit 1
+        elif ! git diff --quiet -- "$file"; then
+            echo "lint: ${file} is stale, stage the regenerated file" >&2
+            git --no-pager diff --stat -- "$file" >&2
+            exit 1
+        fi
+    done
+
+    while IFS= read -r file; do
+        [ -n "$file" ] || continue
+        for want in "${generated[@]}"; do
+            [ "$file" != "$want" ] || continue 2
+        done
+        echo "lint: ${file} belongs to no declared image, remove it" >&2
+        exit 1
+    done < <(git ls-files 'containerfiles/*.generated')
+
+    echo "lint: ${#generated[@]} Containerfile(s) generate and match the committed ones"
 fi
 
 IMAGE_REGISTRY=lint.invalid ./scripts/render-iso-config.sh > /dev/null

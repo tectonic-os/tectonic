@@ -1,7 +1,7 @@
 #!/bin/bash
 
 brand_os_release() {
-    local name="${IMAGE_NAME:?IMAGE_NAME is unset: image.kdl declares no name}"
+    local name="${IMAGE_NAME:?IMAGE_NAME is unset: the image declares no name}"
     local image_version="${IMAGE_VERSION:-dev}"
     local pretty_name="${IMAGE_PRETTY_NAME:-${name} ${image_version}}"
     local default_hostname="${IMAGE_ID:-${name,,}}"

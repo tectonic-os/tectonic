@@ -2,7 +2,7 @@
 //! here and passed to the layer as env.
 
 use crate::diag::{Issue, Issues};
-use crate::list::{Entry, List};
+use crate::list::{Entry, Image};
 use kdl::{KdlNode, KdlValue};
 use miette::SourceSpan;
 
@@ -291,20 +291,20 @@ pub fn env_name(option: &str) -> String {
 }
 
 /// Single pass, in one order, with no merging: the module's default, then the
-/// selected variant, then the value in image.kdl.
+/// selected variant, then the value in the image file.
 pub fn resolve(
     options: &[Opt],
     variants: &[Variant],
     file: &str,
     text: &str,
     entry: &Entry,
-    list: &List,
+    image: &Image,
     issues: &mut Issues,
 ) -> Vec<(String, String)> {
     let selected = entry.variant.as_ref();
     let set = &entry.options;
     let module_path = entry.path.as_str();
-    let (list_file, list_text) = (list.file.as_str(), list.text.as_str());
+    let (list_file, list_text) = (image.file.as_str(), image.text.as_str());
 
     let mut resolved: Vec<(String, Vec<KdlValue>)> = options
         .iter()
