@@ -20,9 +20,9 @@ check:
 fix:
     just --unstable --fmt -f Justfile
 
-# Regenerate the Containerfiles from the Containerfile skeleton and
-# the image files, then commit it: they are tracked, and lint fails on a stale
-# one. Builds regenerate it too, so no build can use a stale one.
+# Regenerate the Containerfiles from the Containerfile skeleton and the
+# image files, then commit them: they are tracked, and lint fails on a
+# stale one. Builds regenerate them too, so no build can use a stale one.
 [group('Utility')]
 generate:
     ./scripts/gen-containerfile.sh
