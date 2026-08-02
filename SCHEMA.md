@@ -1,17 +1,8 @@
-- **`<anything>.kdl` at the repository root** — one image apiece, and the
-- **[repo.kdl](../repo.kdl)** — repo context, and the one root `.kdl` that
-- **`modules/<path>/module.kdl`** — the module author's file, required
-
-## What is not declared
-
-| Path | Effect |
+| File | Declares |
 | --- | --- |
-| `module.sh` | sourced as the install logic |
-| `repo` | sourced once, idempotent via its `REPO_ID` |
-| `selinux/*.te` | compiled and installed at priority 200 |
-| `files/` | copied verbatim into the image |
-| `finalize.sh` | sourced by the finalize phase, in resolved order |
-| a file another module `collects` | handed to that module |
+| [`<name>.kdl`](image.kdl) at the root | One image: its name, its base, its flavours, and the modules in it |
+| [`repo.kdl`](repo.kdl) | The repository: which image a bare build builds, and which CI workflows run |
+| `modules/<path>/module.kdl` | One module: what it needs, what it offers, and what an image author may configure |
 
 ## The image files
 
@@ -102,6 +93,7 @@ tectonic-server/none
 | `family` | which distro's packaging and tooling modules may assume. Checked against every enabled module's `supports`. Required. |
 | `provides` | capabilities the base satisfies that no module could implement portably. A module may `require` one; nothing has to provide it. |
 | `provides-file` | absolute paths to binaries the base guarantees. Checked on the finished image alongside the modules' own [contract files](#contract-files). |
+| `signed` | whether the base image publishes a cosign signature. Optional, `#false` when absent. |
 
 ### `flavours`
 
@@ -183,6 +175,15 @@ workflows {
 | `enabled=#true` | the workflow runs, which is also what silence means |
 
 ## module.kdl
+
+| Path | Effect |
+| --- | --- |
+| `module.sh` | sourced as the install logic |
+| `repo` | sourced once, idempotent via its `REPO_ID` |
+| `selinux/*.te` | compiled and installed at priority 200 |
+| `files/` | copied verbatim into the image |
+| `finalize.sh` | sourced by the finalize phase, in resolved order |
+| a file another module `collects` | handed to that module |
 
 ```kdl
 description "kvmfr DKMS module for Looking Glass GPU passthrough"

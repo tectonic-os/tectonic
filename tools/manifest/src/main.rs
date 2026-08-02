@@ -29,10 +29,16 @@ that publishes unsuffixed.
                     per
   default-image     the image a build builds when none is named
   image-name        the image's human name, as os-release NAME
+  image-file        the file the image is declared in, which is what an
+                    edit to that image has to open
   base-image        the base image reference, which the generated FROM uses
   base-family       the base family every module's `supports` is checked
                     against
   base-provides     every capability the base image itself provides
+  base-signatures   every image's base and whether it publishes a cosign
+                    signature, pipe separated: image, base, signed. Every
+                    image, so a repository building on two bases reports
+                    both
   flavours           every declared flavour
   targets           every build target
   default-target    what a build with no target named builds: the default
@@ -97,9 +103,10 @@ fn main() -> ExitCode {
         "contract-files",
         "verify-exceptions",
     ];
-    const PER_IMAGE: [&str; 6] = [
+    const PER_IMAGE: [&str; 7] = [
         "section",
         "image-name",
+        "image-file",
         "base-image",
         "base-family",
         "base-provides",
@@ -216,10 +223,18 @@ fn main() -> ExitCode {
         "images" => lines(list.images.iter().map(|i| i.id.clone())),
         "default-image" => lines(list.default_image().map(|i| i.id.clone())),
         "image-name" => lines(one.map(|i| list.images[i].name.clone())),
+        "image-file" => lines(one.map(|i| list.images[i].file.clone())),
         "base-image" => lines(
             one.and_then(|i| list.images[i].base.as_ref())
                 .map(|b| b.image.clone()),
         ),
+        "base-signatures" => lines(selected.iter().filter_map(|&i| {
+            let image = &list.images[i];
+            image
+                .base
+                .as_ref()
+                .map(|b| format!("{}|{}|{}", image.id, b.image, b.signed))
+        })),
         "base-family" => lines(
             one.and_then(|i| list.images[i].base.as_ref())
                 .map(|b| b.family.clone()),
