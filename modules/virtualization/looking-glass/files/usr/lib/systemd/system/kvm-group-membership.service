@@ -1,0 +1,12 @@
+[Unit]
+Description=Add wheel group members to the kvm group
+After=systemd-sysusers.service
+Requires=systemd-sysusers.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/add-wheel-users-to-kvm
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

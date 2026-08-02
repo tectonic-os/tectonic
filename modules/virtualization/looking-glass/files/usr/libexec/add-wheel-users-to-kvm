@@ -1,0 +1,10 @@
+#!/usr/bin/bash
+set -euo pipefail
+
+if ! grep -q '^kvm:' /etc/group; then
+    getent group kvm >> /etc/group
+fi
+
+for user in $(getent group wheel | cut -d: -f4 | tr ',' ' '); do
+    usermod -aG kvm "$user"
+done
