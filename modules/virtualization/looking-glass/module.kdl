@@ -1,10 +1,12 @@
-description "kvmfr DKMS kernel module, for Looking Glass frame relay from a passed-through GPU"
+description "Looking Glass: the kvmfr DKMS kernel module and the client, for frame relay from a passed-through GPU"
 
 supports "fedora"
 
 requires "kernel-devel"
 requires-file "/usr/share/secureboot/sb_cert.der"
 requires-file "/usr/libexec/kernel-devel-helpers.sh"
+
+provides-file "/usr/bin/looking-glass-client"
 
 arg "KERNEL"
 secret "mok_privkey"
