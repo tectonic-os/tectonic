@@ -31,7 +31,7 @@ EOF
 }
 
 mapfile -t targets < <(./scripts/manifest.sh targets)
-[ "${#targets[@]}" -gt 0 ] || die "nothing is buildable; image.kdl declares no image"
+[ "${#targets[@]}" -gt 0 ] || die "nothing is buildable; no image is declared"
 
 declare -A buildable=()
 for name in "${targets[@]}"; do

@@ -1,4 +1,4 @@
-//! The only reader of image.kdl and the per-module module.kdl files.
+//! The only reader of the image files and the per-module module.kdl files.
 
 mod asset;
 mod diag;
@@ -46,7 +46,8 @@ that publishes unsuffixed.
   assets [target]   every pinned asset, pipe separated: module, name,
                     manifest, version, sha256, hash source, resolved URL
   remotes           every out-of-tree module pin, pipe separated: name,
-                    directory, ref, sha256, resolved URL, subtree path
+                    directory, ref, sha256, resolved URL, subtree path, and
+                    the file declaring it
   workflows         every file in .github/workflows/ and whether the
                     declaration says it runs, pipe separated: file,
                     enabled. Undeclared is enabled
@@ -124,17 +125,12 @@ fn main() -> ExitCode {
     let image_arg = if per_image { named } else { None };
 
     let root = PathBuf::from(std::env::var("MANIFEST_ROOT").unwrap_or_else(|_| ".".into()));
-    let list_path = root.join("image.kdl");
-    let list_display = list_path.display().to_string();
 
-    let (mut list, mut issues) = match List::load(&list_display) {
-        Ok(v) => v,
-        Err(issue) => {
-            let mut issues = diag::Issues::default();
-            issues.push(*issue);
-            issues.report("image.kdl");
-            return ExitCode::FAILURE;
-        }
+    let (mut list, mut issues) = List::load(&root);
+    let list_display = if list.files.is_empty() {
+        root.display().to_string()
+    } else {
+        list.files.join(", ")
     };
 
     if command == "remotes" {
@@ -183,11 +179,7 @@ fn main() -> ExitCode {
         let parsed = Target::parse(name).filter(|t| known.iter().any(|have| have == &t.to_string()));
         if parsed.is_none() {
             issues.push(
-                diag::Issue::new(
-                    format!("`{name}` is not a build target"),
-                    &list_display,
-                    &list.text,
-                )
+                diag::Issue::new(format!("`{name}` is not a build target"), &list.repo_file, "")
                 .help(format!("targets: {}", known.join(", "))),
             );
         }
@@ -199,11 +191,7 @@ fn main() -> ExitCode {
     if let Some(unknown) = image_arg.filter(|id| !list.images().iter().any(|i| i.id == *id)) {
         let known: Vec<&str> = list.images().iter().map(|i| i.id.as_str()).collect();
         issues.push(
-            diag::Issue::new(
-                format!("`{unknown}` is not a declared image"),
-                &list_display,
-                &list.text,
-            )
+            diag::Issue::new(format!("`{unknown}` is not a declared image"), &list.repo_file, "")
             .help(format!("images: {}", known.join(", "))),
         );
     }

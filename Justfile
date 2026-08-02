@@ -1,4 +1,4 @@
-export image_name := env("IMAGE_NAME", `./scripts/targets.sh image "$(./scripts/targets.sh ungated)"`) # output image name, declared in image.kdl
+export image_name := env("IMAGE_NAME", `./scripts/targets.sh image "$(./scripts/targets.sh ungated)"`) # published name of the default image, ungated
 export default_tag := env("DEFAULT_TAG", "latest")
 export bib_image := env("BIB_IMAGE", "quay.io/centos-bootc/bootc-image-builder:latest")
 
@@ -21,7 +21,7 @@ fix:
     just --unstable --fmt -f Justfile
 
 # Regenerate the Containerfiles from the Containerfile skeleton and
-# image.kdl, then commit it: it is tracked, and lint fails on a stale
+# the image files, then commit it: they are tracked, and lint fails on a stale
 # one. Builds regenerate it too, so no build can use a stale one.
 [group('Utility')]
 generate:
@@ -296,7 +296,7 @@ spawn-vm rebuild="0" type="qcow2" ram="6G":
       --vsock=false --pass-ssh-key=false \
       -i ./output/**/*.{{ type }}
 
-# Runs shellcheck over every Bash script, validates image.kdl and
+# Runs shellcheck over every Bash script, validates the image files and
 # renders the installer config, the same script the build workflow gates on
 lint:
     ./scripts/lint.sh

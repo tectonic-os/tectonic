@@ -20,7 +20,7 @@ if stale; then
     command -v cargo > /dev/null 2>&1 || die "$(
         cat <<'EOF'
 cargo not found, and the manifest parser has to be built before anything
-can read image.kdl.
+can read the image files.
 
   rustup:  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
   brew:    brew install rust

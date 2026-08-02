@@ -64,4 +64,3 @@ image {
         module "core/power-just-scripts" // last, so its recipes append last to the collected justfile
     }
 }
-

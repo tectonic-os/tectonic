@@ -55,15 +55,19 @@
   "customManagers": [
     {
       "customType": "regex",
-      // The base image moved out of the Containerfile skeleton and into the
-      // `base` node in image.kdl, which the generated FROM is emitted
-      // from. The dockerfile manager configured above still matches the
-      // FROM in the generated Containerfiles, and both carry the same
-      // depName and version, so a bump updates the declaration and the
-      // generated files together in one PR and the drift check stays
-      // happy.
-      "description": "Base image reference in image.kdl",
-      "managerFilePatterns": ["/^image\\.kdl$/"],
+      // The base image moved out of the Containerfile skeleton and into
+      // the `base` node each image declares, which its generated FROM is
+      // emitted from. The dockerfile manager configured above still
+      // matches that FROM, and both carry the same depName and version, so
+      // a bump updates the declaration and the generated file together in
+      // one PR and the drift check stays happy.
+      //
+      // Every root .kdl but repo.kdl is an image, and each declares its own
+      // base, so the pattern is the layout rather than one file name.
+      // repo.kdl matches too and has nothing in it to match, which costs a
+      // scan and keeps the pattern honest about what the layout is.
+      "description": "Base image reference in an image file",
+      "managerFilePatterns": ["/^[^/]+\\.kdl$/"],
       "datasourceTemplate": "docker",
       "matchStrings": [
         "base \"(?<depName>[^\":]+):(?<currentValue>[^\"]+)\"",
@@ -100,8 +104,8 @@
       // adjacency rule as an asset pin. Tags only, since a module is
       // published as a per-module tag; the parser rejects git-refs here
       // rather than leaving a branch-tracked pin unmatched.
-      "description": "Out-of-tree module pins in image.kdl",
-      "managerFilePatterns": ["/^image\\.kdl$/"],
+      "description": "Out-of-tree module pins in an image file",
+      "managerFilePatterns": ["/^[^/]+\\.kdl$/"],
       "matchStrings": [
         "renovate datasource=\"(?<datasource>github-releases|github-tags)\" depName=\"(?<depName>[^\"]+)\"(?: extractVersion=\"(?<extractVersion>[^\"]+)\")?\\s*\\n\\s*ref \"(?<currentValue>[^\"]+)\"",
       ],

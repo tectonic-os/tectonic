@@ -18,7 +18,7 @@ const IMAGE_VERSION_ARG: &str = "\
 # ---- image version ----
 ARG IMAGE_VERSION=dev";
 
-/// What the image calls itself, from image.kdl, plus the registry the build
+/// What the image calls itself, from its own file, plus the registry the build
 /// was pointed at, as the ARGs the phases below the modules read.
 fn identity(image: &Image) -> Vec<(&'static str, String)> {
     let mut vars: Vec<(&'static str, String)> = Vec::new();
@@ -156,7 +156,7 @@ pub fn section(
     let identity = identity(image);
     let _ = write!(
         out,
-        "# ---- image identity ----\n"
+        "# ---- image identity ----\n",
     );
     for (name, value) in &identity {
         let _ = write!(out, "ARG {name}=\"{value}\"\n");
@@ -334,30 +334,33 @@ pub fn assets(image: &Image, modules: &[Module], target: Option<&str>) -> String
 }
 
 /// Every out-of-tree pin, pipe separated, one per line:
-/// <name>|<dir>|<ref>|<sha256>|<url>|<subtree path> Two consumers: the fetch,
-/// which needs somewhere to put the archive it verifies, and the checksum
-/// workflow, which recomputes a hash a bumped ref made stale.
+/// <name>|<dir>|<ref>|<sha256>|<url>|<subtree path>|<file> Two consumers: the
+/// fetch, which needs somewhere to put the archive it verifies, and the
+/// checksum workflow, which recomputes a hash a bumped ref made stale.
 pub fn remotes(list: &List) -> String {
     let mut out = String::new();
     let mut seen: Vec<&str> = Vec::new();
-    for entry in list.images.iter().flat_map(|i| i.entries.iter()) {
-        let Some(remote) = &entry.remote else {
-            continue;
-        };
-        if seen.contains(&entry.path.as_str()) {
-            continue;
+    for image in &list.images {
+        for entry in &image.entries {
+            let Some(remote) = &entry.remote else {
+                continue;
+            };
+            if seen.contains(&entry.path.as_str()) {
+                continue;
+            }
+            seen.push(&entry.path);
+            let _ = writeln!(
+                out,
+                "{}|modules/{}|{}|{}|{}|{}|{}",
+                entry.path,
+                entry.dir(),
+                remote.git_ref,
+                remote.sha256,
+                remote.url_resolved(),
+                remote.path.clone().unwrap_or_default(),
+                image.file,
+            );
         }
-        seen.push(&entry.path);
-        let _ = writeln!(
-            out,
-            "{}|modules/{}|{}|{}|{}|{}",
-            entry.path,
-            entry.dir(),
-            remote.git_ref,
-            remote.sha256,
-            remote.url_resolved(),
-            remote.path.clone().unwrap_or_default(),
-        );
     }
     out
 }
