@@ -102,10 +102,13 @@ jobs:
           echo "  * It has never been published. Image packages are created" >&2
           echo "    by a push to the default branch, so a new target has" >&2
           echo "    nothing to build from until that push happens." >&2
-          echo "  * It is published but private. GitHub makes a package" >&2
-          echo "    private on first publish, and ghcr answers an" >&2
-          echo "    unauthorised request with 403 rather than 404, so this" >&2
-          echo "    looks identical to the case above. Flip it to public." >&2
+          echo "  * It exists but this repository cannot read it, eg. the" >&2
+          echo "    package is not linked to this repository or its Actions" >&2
+          echo "    access was removed in the package settings." >&2
+          echo >&2
+          echo "ghcr denies a package you cannot read the same way it" >&2
+          echo "denies one that does not exist, so the failure above" >&2
+          echo "cannot tell the two apart. Check the owner's Packages tab." >&2
           echo "::error::${IMAGE_REF} is not published or not readable; see the log above"
           exit 1
 

@@ -73,6 +73,8 @@ pub struct Base {
     pub provides: Vec<Decl>,
     /// Binaries the base guarantees.
     pub provides_files: Vec<Decl>,
+    /// Whether the base image publishes a cosign signature.
+    pub signed: bool,
     pub span: SourceSpan,
 }
 
@@ -161,6 +163,14 @@ fn string_arg(node: &KdlNode) -> Option<&str> {
         .iter()
         .find(|e| e.name().is_none())
         .and_then(|e| e.value().as_string())
+}
+
+/// The first unnamed entry of a node, as a boolean.
+fn bool_arg(node: &KdlNode) -> Option<bool> {
+    node.entries()
+        .iter()
+        .find(|e| e.name().is_none())
+        .and_then(|e| e.value().as_bool())
 }
 
 /// Every unnamed entry of a node, as strings, so `provides "a" "b"` reads as
@@ -553,6 +563,7 @@ impl Image {
             family: String::new(),
             provides: Vec::new(),
             provides_files: Vec::new(),
+            signed: false,
             span: node.name().span(),
         };
 
@@ -577,10 +588,18 @@ impl Image {
                 },
                 "provides" => base.provides.extend(names()),
                 "provides-file" => base.provides_files.extend(names()),
+                "signed" => match bool_arg(child) {
+                    Some(v) => base.signed = v,
+                    None => issues.push(
+                        Issue::new("`signed` needs #true or #false", &file, &text)
+                            .at(child.name().span(), "not a boolean")
+                            .help("`signed #false` records that this base publishes no cosign signature; base-sig-probe.yml keeps it current"),
+                    ),
+                },
                 other => issues.push(
                     Issue::new(format!("unknown base property `{other}`"), &file, &text)
                         .at(child.name().span(), "not part of the schema")
-                        .help("a base accepts `family`, `provides` and `provides-file`"),
+                        .help("a base accepts `family`, `provides`, `provides-file` and `signed`"),
                 ),
             }
         }
