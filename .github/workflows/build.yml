@@ -85,7 +85,7 @@ jobs:
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             selection="pr"
           fi
-          targets="$(./scripts/flavours.sh "$selection" \
+          targets="$(./scripts/targets.sh "$selection" \
             | jq -Rsc 'split("\n") | map(select(length > 0))')"
           echo "targets=${targets}" >> "$GITHUB_OUTPUT"
 
@@ -121,8 +121,8 @@ jobs:
         run: |
           {
             echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}"
-            echo "IMAGE_NAME=$(./scripts/flavours.sh image "$TARGET")"
-            echo "CONTAINERFILE=containerfiles/$(./scripts/manifest.sh image-id).generated"
+            echo "IMAGE_NAME=$(./scripts/targets.sh image "$TARGET")"
+            echo "CONTAINERFILE=containerfiles/${TARGET%%/*}.generated"
           } >> "${GITHUB_ENV}"
           if [ "${{ github.event_name }}" != "pull_request" ] \
              && [ "${{ github.ref }}" = "refs/heads/${{ github.event.repository.default_branch }}" ] \
@@ -249,7 +249,7 @@ jobs:
           TAGS: ${{ steps.metadata.outputs.tags }}
           LABELS: ${{ steps.metadata.outputs.labels }}
         run: |
-          args=(--backend buildx --flavour "$TARGET")
+          args=(--backend buildx --target "$TARGET")
           for secret in "${RUNNER_TEMP}"/build-secrets/*; do
             [ -f "$secret" ] || continue
             args+=(--secret "$(basename "$secret")=${secret}")

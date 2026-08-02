@@ -2,15 +2,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-image_id="$(./scripts/manifest.sh image-id)"
-
-containerfile="containerfiles/${image_id}.generated"
+default_image="$(./scripts/manifest.sh default-image)"
 
 # renovate: datasource=docker depName=docker.io/moby/buildkit
 buildkit_image="docker.io/moby/buildkit:v0.31.2"
-buildkit_container="${image_id}-buildkitd"
-buildkit_volume="${image_id}-buildkit"
-buildkit_label="${image_id}.buildkitd"
+buildkit_container="${default_image}-buildkitd"
+buildkit_volume="${default_image}-buildkit"
+buildkit_label="${default_image}.buildkitd"
 buildkit_context=/build
 buildkit_secret_dir=/run/secrets
 
@@ -23,9 +21,10 @@ usage() {
 	cat >&2 <<'EOF'
 usage: scripts/build.sh [options]
 
-  --flavour <name>     target to build: a flavour, or `none` for the
-                      ungated set published unsuffixed (default:
-                      scripts/flavours.sh default)
+  --target <image/flavour>
+                      what to build, e.g. tectonic/desktop; the flavour half
+                      is `none` for the ungated set, which publishes
+                      unsuffixed (default: scripts/targets.sh default)
   --kernel <name>     KERNEL build arg (default: unset, the Containerfile
                       decides, which is how the kernel-freshness fallback
                       switches the whole pipeline to the stock kernel)
@@ -54,7 +53,7 @@ EOF
 
 # ---- arguments -----------------------------------------------------------
 backend="${BUILD_BACKEND:-buildkit}"
-flavour=""
+target=""
 kernel=""
 oci_output=""
 cache_from=1
@@ -70,9 +69,9 @@ need_value() {
 
 while [ $# -gt 0 ]; do
 	case "$1" in
-	--flavour)
+	--target)
 		need_value "$1" "$#"
-		flavour="$2"
+		target="$2"
 		shift 2
 		;;
 	--kernel)
@@ -136,8 +135,13 @@ if [ "$reset" = 1 ]; then
 fi
 
 # ---- resolved build inputs -----------------------------------------------
-flavour="${flavour:-$(./scripts/flavours.sh default)}"
-./scripts/flavours.sh check "$flavour"
+target="${target:-$(./scripts/targets.sh default)}"
+./scripts/targets.sh check "$target"
+
+image="${target%%/*}"
+flavour="${target#*/}"
+
+containerfile="containerfiles/${image}.generated"
 
 flavour_arg="$flavour"
 [ "$flavour" != none ] || flavour_arg=""
@@ -147,7 +151,8 @@ image_version="${IMAGE_VERSION:-$(date -u +%Y%m%d)}"
 while IFS= read -r line; do
 	if [ -n "$line" ]; then tags+=("$line"); fi
 done <<<"${TAGS:-}"
-[ "${#tags[@]}" -gt 0 ] || tags=("${IMAGE_NAME:-$image_id}:${DEFAULT_TAG:-latest}")
+[ "${#tags[@]}" -gt 0 ] ||
+	tags=("${IMAGE_NAME:-$(./scripts/targets.sh image "$target")}:${DEFAULT_TAG:-latest}")
 
 while IFS= read -r line; do
 	if [ -n "$line" ]; then labels+=("$line"); fi
@@ -174,14 +179,15 @@ done
 cache_import_refs=()
 cache_export_ref=""
 if [ "$cache_from" = 1 ] || [ "$cache_to" = 1 ]; then
-	if repo="$(./scripts/registry.sh ref "$(./scripts/flavours.sh cache-image)")"; then
+	if repo="$(./scripts/registry.sh ref "$(./scripts/targets.sh cache-image)")"; then
+		tag="$(./scripts/targets.sh image "$target")"
 		if [ "$cache_from" = 1 ]; then
-			cache_import_refs+=("${repo}:${flavour}")
+			cache_import_refs+=("${repo}:${tag}")
 			while IFS= read -r sibling; do
-				cache_import_refs+=("${repo}:${sibling}")
-			done < <(./scripts/flavours.sh siblings "$flavour")
+				cache_import_refs+=("${repo}:$(./scripts/targets.sh image "$sibling")")
+			done < <(./scripts/targets.sh siblings "$target")
 		fi
-		[ "$cache_to" = 0 ] || cache_export_ref="${repo}:${flavour},mode=max"
+		[ "$cache_to" = 0 ] || cache_export_ref="${repo}:${tag},mode=max"
 	else
 		[ "$cache_to" = 0 ] || die "--cache-to needs a registry namespace"
 		echo "build: skipping the registry layer cache" >&2
@@ -195,12 +201,12 @@ build_args=(
 	"FLAVOUR=${flavour_arg}"
 	"IMAGE_VERSION=${image_version}"
 	"IMAGE_REGISTRY=$(./scripts/registry.sh namespace 2>/dev/null || true)"
-	"CONTRACT_FILES=$(./scripts/manifest.sh contract-files "$flavour" | tr '\n' ' ')"
-	"VERIFY_EXCEPTIONS=$(./scripts/manifest.sh verify-exceptions "$flavour" | tr '\n' ' ')"
+	"CONTRACT_FILES=$(./scripts/manifest.sh contract-files "$target" | tr '\n' ' ')"
+	"VERIFY_EXCEPTIONS=$(./scripts/manifest.sh verify-exceptions "$target" | tr '\n' ' ')"
 )
 [ -z "$kernel" ] || build_args+=("KERNEL=${kernel}")
 
-echo "build: ${backend} flavour=${flavour} version=${image_version}${kernel:+ kernel=${kernel}}"
+echo "build: ${backend} target=${target} version=${image_version}${kernel:+ kernel=${kernel}}"
 echo "build: tags ${tags[*]}"
 [ "${#cache_import_refs[@]}" -eq 0 ] ||
 	echo "build: importing cache from ${cache_import_refs[*]}"

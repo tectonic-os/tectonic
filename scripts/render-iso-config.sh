@@ -14,7 +14,9 @@ usage() {
     cat >&2 <<'EOF'
 usage: scripts/render-iso-config.sh [options]
 
-  --flavour <name>   target the ISO installs (default: the ungated build)
+  --target <image/flavour>
+                    target the ISO installs (default: the default
+                    image's ungated build)
   --tag <tag>       tag it tracks (default: $DEFAULT_TAG, else latest)
 
 Environment:
@@ -22,14 +24,14 @@ Environment:
 EOF
 }
 
-flavour=""
+target=""
 tag="${DEFAULT_TAG:-latest}"
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --flavour)
-            [ "$#" -ge 2 ] || die "--flavour needs a value"
-            flavour="$2"
+        --target)
+            [ "$#" -ge 2 ] || die "--target needs a value"
+            target="$2"
             shift 2
             ;;
         --tag)
@@ -48,10 +50,10 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-flavour="${flavour:-none}"
-./scripts/flavours.sh check "$flavour"
+target="${target:-$(./scripts/targets.sh ungated)}"
+./scripts/targets.sh check "$target"
 
-IMAGE_REF="$(./scripts/registry.sh ref "$(./scripts/flavours.sh image "$flavour")"):${tag}"
+IMAGE_REF="$(./scripts/registry.sh ref "$(./scripts/targets.sh image "$target")"):${tag}"
 export IMAGE_REF
 
 command -v envsubst > /dev/null 2>&1 \
