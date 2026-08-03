@@ -1,0 +1,15 @@
+[Unit]
+Description=Label the Looking Glass shared memory file for svirt
+After=systemd-tmpfiles-setup.service
+Requires=systemd-tmpfiles-setup.service
+Before=libvirtd.service
+ConditionSecurity=selinux
+ConditionPathExists=/dev/shm/looking-glass
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/chcon -t svirt_tmpfs_t /dev/shm/looking-glass
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

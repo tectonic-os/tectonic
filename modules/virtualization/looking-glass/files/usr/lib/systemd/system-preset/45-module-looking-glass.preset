@@ -1,1 +1,2 @@
 enable kvm-group-membership.service
+enable looking-glass-shm-relabel.service
