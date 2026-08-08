@@ -1,11 +1,16 @@
 //! Reads the arguments, runs the command, prints what it produced.
 
-use std::path::PathBuf;
+use std::io::{IsTerminal, Write};
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const USAGE: &str = "\
 usage: tect [--root <dir>] <command>
 
+  init [name]       write a new repository: the manifests, the module
+                    directory and the scaffolding, into `--root`, else a
+                    directory named for the image, else here. `--owner`
+                    names who it belongs to on github
   plan [--json]     every fact this repository derives, as one JSON
                     document: the images, each image's targets, and what
                     each target is made of. Read a field out of it rather
@@ -30,17 +35,20 @@ fn usage_error(message: String) -> ExitCode {
     ExitCode::from(USAGE_ERROR)
 }
 
-/// Removes `--root <dir>` or `--root=<dir>` from the arguments.
-fn take_root(args: &mut Vec<String>) -> Result<Option<PathBuf>, String> {
-    let mut root = None;
+/// Removes `--<flag> <value>` or `--<flag>=<value>` from the arguments.
+fn take_flag(args: &mut Vec<String>, flag: &str) -> Result<Option<String>, String> {
+    let mut value = None;
     let mut i = 0;
     while i < args.len() {
-        let taken = if let Some(dir) = args[i].strip_prefix("--root=") {
-            root = Some(PathBuf::from(dir));
+        let taken = if let Some(v) = args[i].strip_prefix(&format!("--{flag}=")) {
+            value = Some(v.to_string());
             1
-        } else if args[i] == "--root" {
-            let dir = args.get(i + 1).ok_or("`--root` takes a directory")?;
-            root = Some(PathBuf::from(dir));
+        } else if args[i] == format!("--{flag}") {
+            value = Some(
+                args.get(i + 1)
+                    .ok_or(format!("`--{flag}` takes a value"))?
+                    .clone(),
+            );
             2
         } else {
             i += 1;
@@ -48,13 +56,81 @@ fn take_root(args: &mut Vec<String>) -> Result<Option<PathBuf>, String> {
         };
         args.drain(i..i + taken);
     }
-    Ok(root)
+    Ok(value)
+}
+
+const OWNERSHIP: &str = "your account or org on github (not tectonic-os)";
+
+/// Asks for what no flag gave, when there is someone to ask.
+fn ask(question: &str) -> Result<String, String> {
+    if !std::io::stdin().is_terminal() {
+        return Err(format!("nothing to read an answer from: {question}"));
+    }
+    print!("{question}: ");
+    std::io::stdout().flush().map_err(|err| err.to_string())?;
+    let mut answer = String::new();
+    std::io::stdin()
+        .read_line(&mut answer)
+        .map_err(|err| err.to_string())?;
+    Ok(answer.trim().to_string())
+}
+
+/// Writes the tree, then prints what the tool deliberately does not do: the
+/// repository, the remote and the first commit are the user's.
+fn init(args: &[&str], root_arg: Option<PathBuf>, owner: Option<String>) -> Result<(), String> {
+    let name = match args {
+        [] => None,
+        [name] => Some((*name).to_string()),
+        _ => return Err(format!("`init` takes one name, not {}", args.join(" "))),
+    };
+
+    let root = match (&root_arg, &name) {
+        (Some(root), _) => root.clone(),
+        (None, Some(name)) => PathBuf::from(tect::init::id(name)?),
+        (None, None) => PathBuf::from("."),
+    };
+
+    let name = match name {
+        Some(name) => name,
+        None => std::fs::canonicalize(&root)
+            .ok()
+            .as_deref()
+            .and_then(Path::file_name)
+            .map(|n| n.to_string_lossy().into_owned())
+            .ok_or_else(|| format!("cannot name an image after {}", root.display()))?,
+    };
+
+    let owner = match owner {
+        Some(owner) => owner,
+        None => ask(&format!("owner, {OWNERSHIP}"))?,
+    };
+    if owner.is_empty() {
+        return Err(format!("`--owner` is {OWNERSHIP}"));
+    }
+
+    let assets = tect::init::assets()?;
+    tect::init::write(&root, &name, &owner, &assets)?;
+
+    let id = tect::init::id(&name)?;
+    println!(
+        "wrote {} into {}\n\n\
+         next, in that directory:\n\
+         \x20 git init && git add -A && git commit\n\
+         \x20 gh repo create {owner}/{id} --source=. --push\n",
+        name,
+        root.display()
+    );
+    Ok(())
 }
 
 fn main() -> ExitCode {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
-    let root_arg = match take_root(&mut args) {
-        Ok(root) => root,
+    let root_arg = match take_flag(&mut args, "root") {
+        Ok(root) => root.map(PathBuf::from),
+        Err(message) => return usage_error(message),
+    };
+    let owner_arg = match take_flag(&mut args, "owner") {
+        Ok(owner) => owner,
         Err(message) => return usage_error(message),
     };
 
@@ -71,6 +147,16 @@ fn main() -> ExitCode {
     };
 
     let rest: Vec<&str> = args[1..].iter().map(String::as_str).collect();
+    if command == "init" {
+        return match init(&rest, root_arg, owner_arg) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(message) => usage_error(message),
+        };
+    }
+    if owner_arg.is_some() {
+        return usage_error(format!("`{command}` does not take `--owner`"));
+    }
+
     let image_arg = match (command, rest.as_slice()) {
         ("plan", []) | ("plan", ["--json"]) => None,
         ("check", []) => None,

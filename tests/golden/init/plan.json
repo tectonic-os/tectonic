@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "default_image": "example",
+  "default_image_name": "Example",
+  "pr_image": "example",
+  "default_target": "example/none",
+  "default_published": "example",
+  "pr_target": "example/none",
+  "pr_published": "example",
+  "ungated_target": "example/none",
+  "ungated_published": "example",
+  "cache_image": "example-cache",
+  "workflows": [
+    {
+      "file": "base-sig-probe.yml",
+      "enabled": true
+    },
+    {
+      "file": "build-disk.yml",
+      "enabled": true
+    },
+    {
+      "file": "build.yml",
+      "enabled": true
+    },
+    {
+      "file": "checksums.yml",
+      "enabled": true
+    },
+    {
+      "file": "cleanup-registry.yml",
+      "enabled": true
+    },
+    {
+      "file": "kernel-freshness.yml",
+      "enabled": true
+    },
+    {
+      "file": "reconcile-workflows.yml",
+      "enabled": true
+    },
+    {
+      "file": "smoke-test.yml",
+      "enabled": true
+    }
+  ],
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "example",
+      "name": "Example",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "https://github.com/someone/example",
+      "issues_url": "https://github.com/someone/example/issues",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking",
+          "initramfs-generation",
+          "mac-policy"
+        ],
+        "provides_files": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "example/none",
+          "image": "example",
+          "flavour": null,
+          "published": "example",
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "modules": [],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

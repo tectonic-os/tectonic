@@ -39,6 +39,15 @@ fn capture(name: &str, root: &Path) {
     compare(name, "issues.txt", &tect::run("check", None, here).issues.plain());
 }
 
+/// A repository `tect init` wrote, captured like any other fixture: what it
+/// scaffolds has to resolve, generate and report nothing.
+fn init_repo() -> PathBuf {
+    let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("init");
+    let _ = std::fs::remove_dir_all(&root);
+    tect::init::write(&root, "Example", "someone", &crate_dir().join("assets")).unwrap();
+    root
+}
+
 /// One process, one working directory: every capture runs in turn.
 #[test]
 fn golden() {
@@ -52,7 +61,9 @@ fn golden() {
     names.sort();
     assert!(!names.is_empty());
 
+    let init = init_repo();
     for name in names {
         capture(&name, &dir.join(&name));
     }
+    capture("init", &init);
 }
