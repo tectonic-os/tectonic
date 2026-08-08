@@ -1,7 +1,7 @@
 | File | Declares |
 | --- | --- |
-| [`<name>.kdl`](image.kdl) at the root | One image: its name, its base, its flavours, and the modules in it |
-| [`repo.kdl`](repo.kdl) | The repository: the schema it is written against, which image a bare build builds, and which CI workflows run |
+| `<name>.kdl` at the root | One image: its name, its base, its flavours, and the modules in it |
+| `repo.kdl` | The repository: the schema it is written against, which image a bare build builds, and which CI workflows run |
 | `modules/<path>/module.kdl` | One module: what it needs, what it offers, and what an image author may configure |
 
 ## The image files
