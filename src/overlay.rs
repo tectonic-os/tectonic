@@ -1,22 +1,21 @@
 //! files/ overlay collisions.
 
 use crate::diag::{Issue, Issues};
+use crate::disk::Disk;
 use crate::list::{Entry, Image};
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
 
 /// Every path an overlay puts in the image, to the modules shipping it, as
 /// indices into the image's entries in build order.
 pub type Index = BTreeMap<String, Vec<usize>>;
 
 /// Built once and handed to both readers.
-pub fn index(image: &Image, root: &Path) -> Index {
+pub fn index(image: &Image, disk: &Disk) -> Index {
     let mut shipped: Index = BTreeMap::new();
     for (index, entry) in image.entries.iter().enumerate() {
         let Some(module) = &entry.module else { continue };
-        let overlay = root.join("modules").join(&module.dir).join("files");
-        for path in overlay_paths(&overlay) {
-            shipped.entry(path).or_default().push(index);
+        for path in disk.overlays.get(&module.dir).into_iter().flatten() {
+            shipped.entry(path.clone()).or_default().push(index);
         }
     }
     shipped
@@ -91,27 +90,4 @@ fn coinstalled(a: &Entry, b: &Entry) -> bool {
         (Some(a), Some(b)) => a == b,
         _ => true,
     }
-}
-
-/// Every file in an overlay, as the absolute path it becomes in the image.
-fn overlay_paths(overlay: &Path) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut dirs = vec![overlay.to_path_buf()];
-    while let Some(dir) = dirs.pop() {
-        let Ok(entries) = std::fs::read_dir(&dir) else {
-            continue;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let Ok(meta) = path.symlink_metadata() else {
-                continue;
-            };
-            if meta.is_dir() {
-                dirs.push(path);
-            } else if let Ok(rel) = path.strip_prefix(overlay) {
-                out.push(format!("/{}", rel.display()));
-            }
-        }
-    }
-    out
 }

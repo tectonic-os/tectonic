@@ -2,6 +2,7 @@
 
 pub mod asset;
 pub mod diag;
+pub mod disk;
 pub mod json;
 pub mod list;
 pub mod module;
@@ -43,6 +44,7 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
     };
 
     let workflows = workflow::resolve(&list, root, &mut issues);
+    let disk = disk::Disk::scan(root);
 
     let mut resolved: Vec<Resolved> = Vec::new();
     for image in &mut list.images {
@@ -55,10 +57,10 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
 
         let order = order::sort(image, &mut issues);
         order::apply(image, &order);
-        module::check_graph(image, root, &mut issues);
-        let shipped = overlay::index(image, root);
+        module::check_graph(image, root, &disk, &mut issues);
+        let shipped = overlay::index(image, &disk);
         overlay::check(image, &shipped, &mut issues);
-        let collected = module::resolve_collects(image, root, &mut issues);
+        let collected = module::resolve_collects(image, root, &disk, &mut issues);
 
         resolved.push(Resolved { shipped, collected });
     }
