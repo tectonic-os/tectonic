@@ -2,21 +2,35 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-if ! command -v shellcheck > /dev/null 2>&1; then
-    echo "lint: shellcheck not found, install it first" >&2
-    exit 1
-fi
-
-./scripts/fetch-modules.sh
-
 mapfile -t scripts < <(
     find build-phases scripts lib modules -path modules/.remote -prune -o \
         -name '*.sh' -type f -print
     find modules -path modules/.remote -prune -o -path '*/files/*' -type f \
         \( -path '*/libexec/*' -o -path '*/system-generators/*' \) -print
 )
+shfmt=(shfmt -i 4 -ci -bn -sr)
+
+if [ "${1:-}" = "--fix" ]; then
+    "${shfmt[@]}" -w "${scripts[@]}"
+    echo "lint: formatted ${#scripts[@]} scripts"
+    exit
+fi
+
+for tool in shellcheck shfmt; do
+    command -v "$tool" > /dev/null 2>&1 || {
+        echo "lint: $tool not found, install it first" >&2
+        exit 1
+    }
+done
+
 shellcheck -s bash "${scripts[@]}"
-echo "lint: shellcheck passed on ${#scripts[@]} scripts"
+"${shfmt[@]}" -d "${scripts[@]}" || {
+    echo "lint: unformatted, run ./scripts/lint.sh --fix" >&2
+    exit 1
+}
+echo "lint: ${#scripts[@]} scripts pass shellcheck and shfmt"
+
+./scripts/fetch-modules.sh
 
 ./scripts/tect.sh check
 

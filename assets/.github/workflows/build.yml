@@ -30,7 +30,7 @@ env:
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"  # do not edit
 
 jobs:
-  shellcheck:
+  lint:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -38,7 +38,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      # shellcheck over every Bash script in the repo, then a generator dry
+      - name: Install shfmt
+        env:
+          SHFMT_VERSION: "3.13.1"
+        run: |
+          sudo curl -fsSL -o /usr/local/bin/shfmt \
+            "https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/shfmt_v${SHFMT_VERSION}_linux_amd64"
+          sudo chmod +x /usr/local/bin/shfmt
+
+      # shellcheck and shfmt over every Bash script in the repo, then a
+      # generator dry run
       - name: Run lint
         run: ./scripts/lint.sh
 
@@ -70,7 +79,7 @@ jobs:
           done
 
   compute-matrix:
-    needs: [shellcheck, actionlint, script-tests]
+    needs: [lint, actionlint, script-tests]
     if: github.event_name != 'push' || github.actor != 'renovate[bot]'
     runs-on: ubuntu-24.04
     outputs:
