@@ -255,15 +255,20 @@ FAIL: tuned.service: systemd-analyze verify
 ### Collecting
 
 ```kdl
-collects "justfile.inc" into="/usr/share/goojust/justfile.apps"
+collects "justfile.inc" into="/usr/share/goojust/justfile.apps" priority=500
 
-collects "flatpaks.list" into="/usr/share/flatpak-defaults/apps.list"
+collects "flatpaks.list" into="/usr/share/flatpak-defaults/apps.list" priority=500
 ```
 
 | Part | Meaning |
 | --- | --- |
 | argument | filename in a contributing module's directory |
 | `into=` | absolute destination in the image, created if needed |
+| `priority=` | 0 to 9999, where a contribution that names none lands |
+
+```kdl
+contributes "justfile.inc" priority=900
+```
 
 ### Options
 
@@ -376,7 +381,7 @@ fragment position="after" standard-layer=#false
 | `FLAVOUR_GATE=<flavour>` | the entry is inside a `flavour` block |
 | `OPT_<NAME>=<value>` | one per declared option, always, defaults included |
 | `ASSET_<NAME>_VERSION`, `_URL`, `_SHA256` | one per declared asset field, URL already resolved |
-| `MODULE_COLLECT="<file>=<dest> ..."` | this module ships a file another module collects |
+| `MODULE_COLLECT="<file>=<staged path> ..."` | this module ships a file another module collects |
 | `<NAME>=${<NAME>}` | one per `arg` |
 
 ## Validation
@@ -418,6 +423,10 @@ fragment position="after" standard-layer=#false
 
 - shipping a collected filename while the module that collects it is not
 - two enabled modules collecting the same filename
+- a `collects` with no `into=`, no `priority=`, or a relative `into=`
+- a `contributes` for a filename the module does not ship
+- the same filename ordered twice in one module
+- a `priority` outside 0 to 9999
 
 - an asset declaring neither `renovate` nor `manual`, or both
 - a `renovate` with no `depName`, or a datasource no custom manager

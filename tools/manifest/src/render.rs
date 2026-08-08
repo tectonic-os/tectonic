@@ -2,8 +2,7 @@
 
 use crate::diag::{Issue, Issues};
 use crate::list::{Entry, Image};
-use crate::module::Module;
-use std::collections::BTreeMap;
+use crate::module::{Collected, Collection, Module};
 use std::fmt::Write as _;
 use std::path::Path;
 
@@ -45,7 +44,7 @@ const MODULE_SLOT: u32 = 50;
 pub fn section(
     image: &Image,
     modules: &[Module],
-    collected: &BTreeMap<String, Vec<(String, String)>>,
+    collection: &Collection,
     root: &Path,
     issues: &mut Issues,
 ) -> String {
@@ -108,7 +107,7 @@ pub fn section(
             blocks.push(standard(
                 entry,
                 module,
-                collected.get(&entry.path),
+                collection.by_module.get(&entry.path),
                 base_family,
             ));
         }
@@ -139,6 +138,13 @@ pub fn section(
         "# ---- finalize hook order ----\n\
          ARG FINALIZE_ORDER=\"{}\"\n\n",
         finalize.join(" ")
+    );
+
+    let _ = write!(
+        out,
+        "# ---- collected file destinations ----\n\
+         ARG COLLECT_TARGETS=\"{}\"\n\n",
+        collection.destinations.join(" ")
     );
 
     let _ = write!(out, "{IMAGE_VERSION_ARG}\n\n");
@@ -228,6 +234,7 @@ fn phase(file: &str, below_modules: bool, identity_env: &str) -> String {
         out.push_str(
             "FLAVOUR=${FLAVOUR} IMAGE_VERSION=${IMAGE_VERSION} FINALIZE_ORDER=\"${FINALIZE_ORDER}\" \\\n    ",
         );
+        out.push_str("COLLECT_TARGETS=\"${COLLECT_TARGETS}\" \\\n    ");
         out.push_str(identity_env);
     }
     let _ = write!(out, "/ctx/{file}");
@@ -237,7 +244,7 @@ fn phase(file: &str, below_modules: bool, identity_env: &str) -> String {
 fn standard(
     entry: &Entry,
     module: Option<&Module>,
-    collected: Option<&Vec<(String, String)>>,
+    collected: Option<&Vec<Collected>>,
     base_family: &str,
 ) -> String {
     let mut env = String::new();
@@ -250,7 +257,7 @@ fn standard(
     if let Some(collected) = collected.filter(|c| !c.is_empty()) {
         let pairs: Vec<String> = collected
             .iter()
-            .map(|(file, into)| format!("{file}={into}"))
+            .map(|c| format!("{}={}", c.file, c.staged))
             .collect();
         let _ = write!(env, "MODULE_COLLECT=\"{}\" ", pairs.join(" "));
     }

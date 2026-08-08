@@ -9,7 +9,7 @@ provides-file "/usr/lib/kernel-build/kernel-package"
 provides-file "/usr/libexec/kernel-devel-helpers.sh" build-only=#true
 
 requires "initramfs-generation"
-collects "dracut.modules" into="/usr/lib/kernel-build/dracut.modules"
+collects "dracut.modules" into="/usr/lib/kernel-build/dracut.modules" priority=500
 
 arg "KERNEL"
 secret "mok_privkey"
