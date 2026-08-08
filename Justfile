@@ -12,8 +12,7 @@ check:
 fix:
     just --unstable --fmt -f Justfile
 
-# Runs shellcheck over the scaffolding and the goldens over the binary, the
-# same script CI gates on
+# Shellcheck over the scaffolding and the goldens over the binary, as CI runs it
 lint:
     ./lint.sh
 

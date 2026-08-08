@@ -308,10 +308,8 @@ pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Asset>
     Some(asset)
 }
 
-/// `renovate datasource="github-releases" depName="owner/repo"` Renovate reads
-/// this node out of the manifest itself, so what it needs is data rather than
-/// a comment: a comment cannot be checked, and the annotations these replace
-/// silently stopped matching the last two times a path moved.
+/// `renovate datasource="github-releases" depName="owner/repo"` Declared as
+/// data rather than as a comment, so this can check it.
 pub fn check_renovate(node: &KdlNode, src: &Source, issues: &mut Issues) {
     let span: Span = node.name().span().into();
     let mut datasource = None;

@@ -804,8 +804,6 @@ impl Image {
         }
     }
 
-    /// `workflows { smoke-test enabled=#false }` Each child names a workflow
-    /// by its file stem.
     fn parse_modules(&mut self, block: &KdlNode, issues: &mut Issues) {
         let src = &self.src.clone();
         let Some(children) = block.children() else {
@@ -961,7 +959,6 @@ impl Image {
         })
     }
 
-    /// The marks that replaced "first entry in the list".
     fn check_flavours(&self, issues: &mut Issues) {
         let src = &self.src;
         if self.flavours.is_empty() {
@@ -991,7 +988,6 @@ impl Image {
         }
     }
 
-    /// Every image the repository declares, in declaration order.
     pub fn default_flavour(&self) -> Option<&str> {
         self.flavours
             .iter()
@@ -1011,6 +1007,8 @@ impl Image {
 }
 
 impl List {
+    /// `workflows { smoke-test enabled=#false }` Each child names a workflow
+    /// by its file stem.
     fn parse_workflows(&mut self, block: &KdlNode, src: &Source, issues: &mut Issues) {
         let Some(children) = block.children() else {
             issues.push(

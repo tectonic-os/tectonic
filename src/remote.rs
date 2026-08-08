@@ -44,13 +44,10 @@ fn datasource(node: &KdlNode) -> Option<&str> {
         .and_then(|e| e.value().as_string())
 }
 
-/// ```kdl source
-/// "https://github.com/owner/repo/archive/refs/tags/{ref}.tar.gz" { renovate
-/// datasource="github-tags" depName="owner/repo" ref "module-name/v1.2.0"
-/// sha256 "..." path "modules/module-name" } ``` The same shape as an `asset`
-/// block, and for the same reasons: exactly one of `renovate` and `manual`,
-/// and the tracked line directly below `renovate`, since one regex matches the
-/// two together.
+/// `source "https://host/owner/repo/archive/{ref}.tar.gz" { renovate ...; ref
+/// "..."; sha256 "..."; path "modules/name" }` The same shape as an `asset`
+/// block: exactly one of `renovate` and `manual`, and the tracked line
+/// directly below `renovate`, since one regex matches the two together.
 pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Remote> {
     let span: Span = node.name().span().into();
     let Some(url) = string_arg(node).map(str::to_string) else {
