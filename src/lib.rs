@@ -1,31 +1,24 @@
 //! The only reader of the image files and the per-module module.kdl files.
 
-pub mod asset;
 pub mod diag;
-pub mod disk;
+pub mod emit;
 pub mod init;
-pub mod json;
-pub mod list;
-pub mod module;
-pub mod options;
-pub mod order;
-pub mod overlay;
-pub mod plan;
-pub mod remote;
-pub mod render;
+pub mod model;
+pub mod parse;
+pub mod resolve;
 pub mod runtime;
-pub mod workflow;
 
 use diag::Issue;
 use diag::Issues;
-use list::List;
-use plan::Resolved;
+use model::image::{List, REPO_FILE};
+use model::module::Module;
+use resolve::Resolved;
 use std::path::{Path, PathBuf};
 
 /// The nearest directory at or above `from` holding a repo.kdl.
 pub fn find_root(from: &Path) -> Option<PathBuf> {
     from.ancestors()
-        .find(|dir| dir.join(list::REPO_FILE).is_file())
+        .find(|dir| dir.join(REPO_FILE).is_file())
         .map(Path::to_path_buf)
 }
 
@@ -52,26 +45,26 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
         list.files.join(", ")
     };
 
-    let workflows = workflow::resolve(&list, root, &mut issues);
-    let disk = disk::Disk::scan(root, &mut issues);
-    module::check_unlisted(&list, root, &disk, &mut issues);
+    let workflows = resolve::workflow::resolve(&list, root, &mut issues);
+    let disk = parse::disk::Disk::scan(root, &mut issues);
+    parse::module::check_unlisted(&list, root, &disk, &mut issues);
 
     let mut resolved: Vec<Resolved> = Vec::new();
     for image in &mut list.images {
         // Taken out so a diagnostic can still read the image it was declared in.
         let mut entries = std::mem::take(&mut image.entries);
         for entry in &mut entries {
-            entry.module = module::Module::load(entry, image, root, &mut issues);
+            entry.module = Module::load(entry, image, root, &mut issues);
         }
         image.entries = entries;
 
-        let order = order::sort(image, &mut issues);
-        order::apply(image, &order);
-        module::check_graph(image, root, &disk, &mut issues);
-        module::check_fragments(image, &mut issues);
-        let shipped = overlay::index(image, &disk);
-        overlay::check(image, &shipped, &mut issues);
-        let collected = module::resolve_collects(image, root, &disk, &mut issues);
+        let order = resolve::order::sort(image, &mut issues);
+        resolve::order::apply(image, &order);
+        resolve::graph::check_graph(image, root, &disk, &mut issues);
+        resolve::graph::check_fragments(image, &mut issues);
+        let shipped = resolve::overlay::index(image, &disk);
+        resolve::overlay::check(image, &shipped, &mut issues);
+        let collected = resolve::collect::resolve_collects(image, root, &disk, &mut issues);
 
         resolved.push(Resolved { shipped, collected });
     }
@@ -95,9 +88,14 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
     };
 
     let stdout = match command {
-        "plan" => plan::build(&list, &resolved, &workflows).render(),
+        "plan" => emit::plan::build(&list, &resolved, &workflows).render(),
         "section" => match one {
-            Some(i) => render::section(&list.images[i], &resolved[i].collected, &disk.phases, root),
+            Some(i) => emit::containerfile::section(
+                &list.images[i],
+                &resolved[i].collected,
+                &disk.phases,
+                root,
+            ),
             None => String::new(),
         },
         _ => String::new(),

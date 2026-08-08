@@ -1,41 +1,13 @@
-//! Out-of-tree modules: an exact pin, fetched at generate time.
+//! `source`, the out-of-tree module pin on a list entry.
 
-use crate::asset::check_renovate;
 use crate::diag::{Issue, Issues, Source, Span};
+use crate::model::remote::Remote;
+use crate::parse::asset::check_renovate;
+use crate::parse::string_arg;
 use kdl::KdlNode;
-
-/// Where fetched module trees land, relative to `modules/`.
-pub const REMOTE_DIR: &str = ".remote";
 
 /// The archives the fetch can extract.
 const ARCHIVES: [&str; 5] = [".tar.gz", ".tgz", ".tar.xz", ".tar.zst", ".tar.bz2"];
-
-pub struct Remote {
-    /// Unexpanded, `{ref}` included, because this is what a reviewer reads and
-    /// what the checksum workflow rewrites around.
-    pub url: String,
-    pub git_ref: String,
-    pub sha256: String,
-    /// The module's directory inside the archive, relative to its root once
-    /// the leading directory is stripped.
-    pub path: Option<String>,
-    pub span: Span,
-}
-
-impl Remote {
-    /// The URL the fetch actually requests.
-    pub fn url_resolved(&self) -> String {
-        self.url.replace("{ref}", &self.git_ref)
-    }
-}
-
-/// The first unnamed entry of a node, as a string.
-fn string_arg(node: &KdlNode) -> Option<&str> {
-    node.entries()
-        .iter()
-        .find(|e| e.name().is_none())
-        .and_then(|e| e.value().as_string())
-}
 
 fn datasource(node: &KdlNode) -> Option<&str> {
     node.entries()

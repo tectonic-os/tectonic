@@ -1,7 +1,7 @@
 //! Which workflows run.
 
 use crate::diag::{Issue, Issues};
-use crate::list::List;
+use crate::model::image::List;
 use std::path::Path;
 
 /// GitHub's path, not this repository's choice, which is why it is written

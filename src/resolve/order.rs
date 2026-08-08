@@ -1,7 +1,7 @@
 //! The order the layers build in, resolved from the graph.
 
 use crate::diag::{Issue, Issues};
-use crate::list::{Entry, Image};
+use crate::model::image::{Entry, Image};
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BinaryHeap};
 

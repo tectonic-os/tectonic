@@ -24,6 +24,11 @@ unformatted() {
     exit 1
 }
 
+if grep -rnE 'kdl::|Kdl[A-Z]' src --exclude-dir=parse; then
+    echo "lint: a KDL type outside src/parse/, which is the only place one may appear" >&2
+    exit 1
+fi
+
 shellcheck -s bash "${scripts[@]}"
 "${shfmt[@]}" -d "${scripts[@]}" || unformatted
 cargo fmt --check || unformatted

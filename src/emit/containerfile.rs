@@ -1,8 +1,9 @@
 //! The generated Containerfile section.
 
-use crate::disk::MODULE_SLOT;
-use crate::list::{Entry, Image};
-use crate::module::{Collected, Collection, Module};
+use crate::model::image::{Entry, Image};
+use crate::model::module::Module;
+use crate::parse::disk::MODULE_SLOT;
+use crate::resolve::collect::{Collected, Collection};
 use std::fmt::Write as _;
 use std::path::Path;
 

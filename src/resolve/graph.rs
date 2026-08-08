@@ -1,0 +1,249 @@
+//! The capability graph, and the fragments nothing generated can agree with.
+
+use crate::diag::{Issue, Issues};
+use crate::model::image::Image;
+use crate::model::module::Module;
+use crate::parse::disk::Disk;
+use std::collections::BTreeMap;
+use std::path::Path;
+
+/// Single pass over the resolved graph.
+pub fn check_graph(image: &Image, root: &Path, disk: &Disk, issues: &mut Issues) {
+    let mut offered: BTreeMap<&str, Vec<&Module>> = BTreeMap::new();
+    for module in image.modules() {
+        for decl in module.provides.iter().chain(module.provides_files.iter()) {
+            offered.entry(decl.name.as_str()).or_default().push(module);
+        }
+    }
+
+    let base_caps: BTreeMap<&str, &crate::model::image::Decl> = image
+        .base
+        .iter()
+        .flat_map(|b| b.provides.iter().chain(b.provides_files.iter()))
+        .map(|decl| (decl.name.as_str(), decl))
+        .collect();
+
+    for cap in base_caps.keys() {
+        let Some(providers) = offered.get(cap) else {
+            continue;
+        };
+        for module in providers {
+            issues.push(
+                Issue::new(
+                    format!(
+                        "`{}` provides `{cap}`, which the base image already provides",
+                        module.path
+                    ),
+                    &module.src,
+                )
+                .at(
+                    module
+                        .provides
+                        .iter()
+                        .chain(module.provides_files.iter())
+                        .find(|d| &d.name == cap)
+                        .map(|d| d.span)
+                        .unwrap_or_default(),
+                    "already provided by the base",
+                )
+                .help(format!(
+                    "the `base` node in {} declares it. Drop it from the module, or drop it from the base if the base no longer carries it",
+                    image.src.name()
+                )),
+            );
+        }
+    }
+
+    let base_family = image
+        .base
+        .as_ref()
+        .map(|b| b.family.as_str())
+        .filter(|f| !f.is_empty());
+    for module in image.modules() {
+        let Some(base_family) = base_family else {
+            break;
+        };
+        if !module.supports.iter().any(|f| f == base_family) {
+            let supported = module.supports.join(", ");
+            issues.push(
+                Issue::new(
+                    format!(
+                        "`{}` does not support the `{base_family}` base family",
+                        module.path
+                    ),
+                    &module.src,
+                )
+                .help(if supported.is_empty() {
+                    "add `supports \"fedora\"` to the manifest".to_string()
+                } else {
+                    format!("it declares support for: {supported}")
+                }),
+            );
+        }
+    }
+
+    for (capability, providers) in &offered {
+        if providers.len() > 1 {
+            let names: Vec<&str> = providers.iter().map(|m| m.path.as_str()).collect();
+            let first = providers[0];
+            issues.push(
+                Issue::new(
+                    format!("`{capability}` is provided by more than one enabled module"),
+                    &first.src,
+                )
+                .at(
+                    first.provides.iter().chain(first.provides_files.iter())
+                        .find(|d| d.name == **capability)
+                        .map(|d| d.span)
+                        .unwrap_or_default(),
+                    "also provided elsewhere",
+                )
+                .help(format!(
+                    "provided by: {}. Enable one provider, so that what satisfies a requirement is never ambiguous",
+                    names.join(", ")
+                )),
+            );
+        }
+    }
+
+    const MAC_POLICY: &str = "mac-policy";
+    for module in image.modules() {
+        let dir = root.join("modules").join(&module.dir);
+        let has_policy = std::fs::read_dir(dir.join("selinux"))
+            .into_iter()
+            .flatten()
+            .flatten()
+            .any(|e| e.path().extension().is_some_and(|ext| ext == "te"));
+        if !has_policy || module.requires.iter().any(|d| d.name == MAC_POLICY) {
+            continue;
+        }
+        issues.push(
+            Issue::new(
+                format!(
+                    "`{}` ships SELinux policy without requiring `{MAC_POLICY}`",
+                    module.path
+                ),
+                &module.src,
+            )
+            .help(format!(
+                "add `requires \"{MAC_POLICY}\"`; lib/run-module.sh compiles selinux/*.te against the base image's policy store"
+            )),
+        );
+    }
+
+    for module in image.modules() {
+        let hard = module
+            .requires
+            .iter()
+            .map(|d| (d, "requires"))
+            .chain(module.requires_files.iter().map(|d| (d, "requires-file")));
+
+        for (decl, kind) in hard {
+            if base_caps.contains_key(decl.name.as_str()) {
+                continue;
+            }
+
+            let Some(providers) = offered.get(decl.name.as_str()) else {
+                let help = match disk.providers.get(&decl.name) {
+                    Some(candidates) => format!(
+                        "{} would satisfy it; add it to this image. Nothing is included automatically, so the list stays the complete statement of what is in the image",
+                        candidates.join(" or ")
+                    ),
+                    None => format!(
+                        "no module in the repository declares `provides {:?}`, and neither does the `base` node in {}",
+                        decl.name, image.src.name()
+                    ),
+                };
+                issues.push(
+                    Issue::new(
+                        format!(
+                            "`{}` {kind} `{}`, which nothing enabled provides",
+                            module.path, decl.name
+                        ),
+                        &module.src,
+                    )
+                    .at(decl.span, "unsatisfied")
+                    .help(help),
+                );
+                continue;
+            };
+
+            if let Some(provider) = providers.first() {
+                if let Some(provider_flavour) = &provider.flavour {
+                    if module.flavour.as_ref() != Some(provider_flavour) {
+                        issues.push(
+                            Issue::new(
+                                format!(
+                                    "`{}` {kind} `{}`, which only `{}` provides and only on the `{provider_flavour}` flavour",
+                                    module.path, decl.name, provider.path
+                                ),
+                                &module.src,
+                            )
+                            .at(decl.span, "unsatisfied on every other target")
+                            .help("either gate this module to the same flavour, or move the provider out of the flavour block"),
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// A fragment is inlined verbatim, so nothing the generator does can make it
+/// agree with the entry that carries it. Walks the entries in build order,
+/// which is where `ARG FLAVOUR` lands: directly above the first gated module.
+pub fn check_fragments(image: &Image, issues: &mut Issues) {
+    let mut gated = false;
+    for entry in &image.entries {
+        let Some(module) = &entry.module else {
+            continue;
+        };
+        gated |= entry.flavour.is_some();
+        let Some(body) = &module.fragment else {
+            continue;
+        };
+        let path = &entry.path;
+
+        if !gated && (body.contains("${FLAVOUR}") || body.contains("$FLAVOUR")) {
+            issues.push(
+                Issue::new(
+                    format!("`{path}` expands FLAVOUR above the flavour gate"),
+                    &image.src,
+                )
+                .at(entry.span, "listed above the first flavour-gated module")
+                .help("ARG FLAVOUR is declared directly above the first gated entry, so a fragment before it would expand to an empty string"),
+            );
+        }
+
+        let runs = body.lines().any(|l| l.trim_start().starts_with("RUN "));
+        let Some(flavour) = entry.flavour.as_ref().filter(|_| runs) else {
+            continue;
+        };
+        let declared = body
+            .split("FLAVOUR_GATE=")
+            .nth(1)
+            .map(|rest| rest.split_whitespace().next().unwrap_or_default());
+        match declared {
+            Some(d) if d == flavour => {}
+            Some(d) => issues.push(
+                Issue::new(
+                    format!("`{path}` is listed under `{flavour}` but its fragment gates on `{d}`"),
+                    &image.src,
+                )
+                .at(entry.span, "listed here"),
+            ),
+            None => issues.push(
+                Issue::new(
+                    format!(
+                        "`{path}` is listed under `{flavour}` but its fragment sets no FLAVOUR_GATE"
+                    ),
+                    &image.src,
+                )
+                .at(entry.span, "the flavour gate would be silently ignored")
+                .help(
+                    "a fragment is emitted unconditionally, so anything it runs has to carry the gate itself",
+                ),
+            ),
+        }
+    }
+}
