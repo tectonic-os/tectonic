@@ -1,3 +1,0 @@
-description "Homebrew, set up at first login, with a PATH shim for every shell"
-
-supports "fedora"

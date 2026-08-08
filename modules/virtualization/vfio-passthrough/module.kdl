@@ -1,3 +1,0 @@
-description "VFIO GPU passthrough: kernel arguments, driver binding and a rebind service"
-
-supports "fedora"

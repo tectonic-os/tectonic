@@ -1,5 +1,0 @@
-description "VSCodium, the telemetry-free VS Code build"
-
-supports "fedora"
-
-after "hardened-malloc"

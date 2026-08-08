@@ -1,9 +1,0 @@
-description "Traditional CLI utilities: tmux, htop, rsync, vim and friends"
-
-supports "fedora"
-
-packages {
-    fedora "7zip-standalone" "bash-completion" "bc" "bsdunzip" "btop" "htop" \
-            "iw" "mtr" "pv" "rsync" "tmux" "tree" "vim-enhanced" "whois" \
-            "wl-clipboard" "zip"
-}

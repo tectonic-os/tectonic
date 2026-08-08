@@ -1,7 +1,0 @@
-description "KDE Plasma desktop, its application set and the krunner-bazaar integration"
-
-supports "fedora"
-
-provides "plasma-desktop"
-
-allow-verify "man-page-missing" unit="plasmalogin.service"

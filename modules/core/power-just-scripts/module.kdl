@@ -1,5 +1,0 @@
-description "Power and battery recipes for the goojust menu"
-
-supports "fedora"
-
-contributes "justfile.inc" priority=900

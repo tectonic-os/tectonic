@@ -1,3 +1,0 @@
-description "sudo policy hardening: no session reuse, restricted environment, tty required"
-
-supports "fedora"

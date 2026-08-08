@@ -1,3 +1,0 @@
-REPO_ID="vscodium"
-source /ctx/lib/repo-helpers.sh
-add_disabled_repo "https://repo.vscodium.dev/vscodium.repo"

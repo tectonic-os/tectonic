@@ -1,7 +1,0 @@
-.git
-**/__pycache__
-output
-_build*
-build
-containerfiles
-tools

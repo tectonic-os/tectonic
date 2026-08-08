@@ -1,7 +1,0 @@
-description "Development tooling: git, direnv, git-delta and friends"
-
-supports "fedora"
-
-packages {
-    fedora "direnv" "git" "git-credential-libsecret" "git-delta" "git-lfs"
-}

@@ -1,4 +1,0 @@
-#!/usr/bin/bash
-set -euo pipefail
-
-echo "Hello from a template libexec helper."

@@ -1,0 +1,7 @@
+cosign.key
+MOK.priv
+_build_*
+output
+_build-*/**
+build/
+modules/.remote/

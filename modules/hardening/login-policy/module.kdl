@@ -1,3 +1,0 @@
-description "Login policy: no sshd, faillock lockout, password quality, rescue sulogin"
-
-supports "fedora"

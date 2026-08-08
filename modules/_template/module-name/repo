@@ -1,3 +1,0 @@
-REPO_ID="<repo-id>"
-source /ctx/lib/repo-helpers.sh
-add_disabled_repo "https://example.com/<repo-id>.repo"

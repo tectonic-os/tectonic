@@ -1,9 +1,1 @@
-cosign.key
-MOK.priv
-_build_*
-output
-_build-*/**
-__pycache__/
-build/
-modules/.remote/
 /target

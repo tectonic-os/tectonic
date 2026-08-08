@@ -1,2 +1,0 @@
-enable lm_sensors.service
-enable intel_lpmd.service

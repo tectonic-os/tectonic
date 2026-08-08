@@ -1,0 +1,135 @@
+---
+name: Build disk images
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'disk_config/disk.toml'
+      - 'disk_config/iso.template.toml'
+      - 'scripts/render-iso-config.sh'
+      - '.github/workflows/build-disk.yml'
+
+env:
+  IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"  # do not edit
+  PROBE_IMAGE: "quay.io/podman/hello:latest"
+  DEFAULT_TAG: "latest"
+  BIB_IMAGE: "quay.io/centos-bootc/bootc-image-builder:latest"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build disk images
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        disk-type: ["qcow2", "anaconda-iso"]
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Prepare environment
+        run: |
+          USER_UID=$(id -u)
+          USER_GID=$(id -g)
+          DISK_TYPE=$(echo "${{ matrix.disk-type }}" | tr ' ' '-')
+          IMAGE_NAME="$(tect plan --json | jq -r .ungated_published)"
+          IMAGE_REF="$(./scripts/registry.sh namespace)/${IMAGE_NAME}:${DEFAULT_TAG}"
+          {
+            echo "IMAGE_REF=${IMAGE_REF}"
+            echo "DISK_TYPE=${DISK_TYPE}"
+            echo "USER_UID=${USER_UID}"
+            echo "USER_GID=${USER_GID}"
+          } >> "${GITHUB_ENV}"
+
+      - name: Maximize build space
+        uses: ublue-os/remove-unwanted-software@cc0becac701cf642c8f0a6613bbdaf5dc36b259e # v9
+        with:
+          remove-codeql: true
+
+      - name: Render the installer config
+        if: matrix.disk-type == 'anaconda-iso'
+        run: echo "ISO_CONFIG=$(./scripts/render-iso-config.sh)" >> "${GITHUB_ENV}"
+
+      - name: Select a working container runtime
+        run: |
+          echo "podman: $(podman --version)"
+          for rt in crun runc; do
+            if command -v "$rt" > /dev/null; then
+              echo "${rt}: $("$rt" --version | head -1)"
+            else
+              echo "${rt}: absent"
+            fi
+          done
+          if sudo podman run --rm --runtime crun "$PROBE_IMAGE" > /dev/null 2>&1; then
+            echo "crun works; leaving the default alone"
+            exit 0
+          fi
+          echo "::warning::crun cannot start a container on this runner; falling back to runc"
+          if ! command -v runc > /dev/null; then
+            echo "::error::crun cannot start a container and runc is not installed, so there is no working OCI runtime on this runner"
+            exit 1
+          fi
+          sudo mkdir -p /etc/containers/containers.conf.d
+          printf '[engine]\nruntime = "runc"\n' \
+            | sudo tee /etc/containers/containers.conf.d/99-oci-runtime.conf > /dev/null
+          sudo podman run --rm "$PROBE_IMAGE" > /dev/null
+          echo "runc can start a container"
+
+      - name: Login to GitHub Container Registry (root)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | sudo podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Check the target image is published
+        run: |
+          if sudo skopeo inspect --raw "docker://${IMAGE_REF}" > /dev/null 2>&1; then
+            echo "${IMAGE_REF} is pullable"
+            exit 0
+          fi
+          echo "${IMAGE_REF} cannot be pulled. Two things cause this:" >&2
+          echo >&2
+          echo "  * It has never been published. Image packages are created" >&2
+          echo "    by a push to the default branch, so a new target has" >&2
+          echo "    nothing to build from until that push happens." >&2
+          echo "  * It exists but this repository cannot read it, eg. the" >&2
+          echo "    package is not linked to this repository or its Actions" >&2
+          echo "    access was removed in the package settings." >&2
+          echo >&2
+          echo "ghcr denies a package you cannot read the same way it" >&2
+          echo "denies one that does not exist, so the failure above" >&2
+          echo "cannot tell the two apart. Check the owner's Packages tab." >&2
+          echo "::error::${IMAGE_REF} is not published or not readable; see the log above"
+          exit 1
+
+      - name: Build disk images
+        id: build
+        uses: osbuild/bootc-image-builder-action@30960621b85c9e76c653082f9ef4cab5a10210d5 # main
+        with:
+          builder-image: ${{ env.BIB_IMAGE }}
+          config-file: ${{ matrix.disk-type == 'anaconda-iso' && env.ISO_CONFIG || './disk_config/disk.toml' }}
+          image: ${{ env.IMAGE_REF }}
+          chown: ${{ env.USER_UID }}:${{ env.USER_GID }}
+          types: ${{ matrix.disk-type }}
+          rootfs: btrfs
+          additional-args: --use-librepo=True
+
+      - name: Upload disk images and Checksum to Job Artifacts
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: ${{ steps.build.outputs.output-directory }}
+          if-no-files-found: error
+          retention-days: 0
+          compression-level: 0
+          overwrite: true

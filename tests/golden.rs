@@ -52,9 +52,6 @@ fn golden() {
     names.sort();
     assert!(!names.is_empty());
 
-    // The repository the tool is developed in, which is the only thing proving
-    // the fixtures describe something real.
-    capture("self", &crate_dir());
     for name in names {
         capture(&name, &dir.join(&name));
     }

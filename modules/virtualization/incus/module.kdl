@@ -1,7 +1,0 @@
-description "Incus system container and VM manager"
-
-supports "fedora"
-
-packages {
-    fedora "incus" "incus-agent" "lxc" "systemd-container"
-}

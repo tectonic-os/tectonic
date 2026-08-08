@@ -1,7 +1,0 @@
-description "Intel WiFi firmware for iwlwifi adapters"
-
-supports "fedora"
-
-packages {
-    fedora "iwlwifi-mvm-firmware" "iwlwifi-mld-firmware"
-}
