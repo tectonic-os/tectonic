@@ -58,28 +58,16 @@ sudoif command *args:
     }
     sudoif {{ command }} {{ args }}
 
-# Build the image with BuildKit, e.g. `just build tectonic latest tectonic/desktop stock`
-build $target_image=image_name $tag=default_tag $target=`tect plan --json | jq -r .default_target` $kernel="": (_build "buildkit" target_image tag target kernel)
-
-# Build the image with buildah instead of BuildKit
-[group('Utility')]
-build-buildah $target_image=image_name $tag=default_tag $target=`tect plan --json | jq -r .default_target` $kernel="": (_build "buildah" target_image tag target kernel)
-
-[private]
-_build backend $target_image $tag $target $kernel:
+# Build the image with buildah, e.g. `just build tectonic latest tectonic/desktop stock`
+build $target_image=image_name $tag=default_tag $target=`tect plan --json | jq -r .default_target` $kernel="":
     #!/usr/bin/env bash
     set -euo pipefail
 
-    args=(--backend "{{ backend }}" --target "${target}" --tag "${target_image}:${tag}")
+    args=(--backend buildah --target "${target}" --tag "${target_image}:${tag}")
     if [[ -n "${kernel}" ]]; then
         args+=(--kernel "${kernel}")
     fi
     ./scripts/build.sh "${args[@]}"
-
-# Remove the BuildKit daemon container and its cache volume
-[group('Utility')]
-buildkit-reset:
-    ./scripts/build.sh --reset
 
 # Generate a one-time Secure Boot (MOK) module-signing key pair. Keep the
 # private key out of the repo; commit the public cert.

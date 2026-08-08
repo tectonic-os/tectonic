@@ -3,15 +3,6 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 plan="$(tect plan --json)"
-default_image="$(jq -r '.default_image' <<< "$plan")"
-
-# renovate: datasource=docker depName=docker.io/moby/buildkit
-buildkit_image="docker.io/moby/buildkit:v0.31.2"
-buildkit_container="${default_image}-buildkitd"
-buildkit_volume="${default_image}-buildkit"
-buildkit_label="${default_image}.buildkitd"
-buildkit_context=/build
-buildkit_secret_dir=/run/secrets
 
 die() {
 	echo "build: $*" >&2
@@ -33,13 +24,11 @@ usage: scripts/build.sh [options]
   --secret <id>=<path>
                       mount <path> as the build secret <id>, one of the
                       IDs the plan lists for the target; repeatable
-  --backend <name>    buildkit, buildx or buildah (default: $BUILD_BACKEND,
-                      else buildkit)
+  --backend <name>    buildx or buildah (default: $BUILD_BACKEND, else
+                      buildah)
   --oci-output <path> write an OCI archive here instead of loading the image
   --cache-to          export the layer cache to the registry cache repo
   --no-cache-from     do not import the registry layer cache
-  --reset             remove the BuildKit daemon and its cache volume,
-                      then exit; the next build starts cold
 
 Environment:
   TAGS                newline-separated tags, as the metadata action emits
@@ -53,13 +42,12 @@ EOF
 }
 
 # ---- arguments -----------------------------------------------------------
-backend="${BUILD_BACKEND:-buildkit}"
+backend="${BUILD_BACKEND:-buildah}"
 target=""
 kernel=""
 oci_output=""
 cache_from=1
 cache_to=0
-reset=0
 tags=()
 labels=()
 secrets=()
@@ -108,10 +96,6 @@ while [ $# -gt 0 ]; do
 		cache_from=0
 		shift
 		;;
-	--reset)
-		reset=1
-		shift
-		;;
 	-h | --help)
 		usage
 		exit 0
@@ -124,16 +108,9 @@ while [ $# -gt 0 ]; do
 done
 
 case "$backend" in
-buildkit | buildx | buildah) ;;
-*) die "unknown backend '${backend}' (buildkit, buildx or buildah)" ;;
+buildx | buildah) ;;
+*) die "unknown backend '${backend}' (buildx or buildah)" ;;
 esac
-
-if [ "$reset" = 1 ]; then
-	podman rm --force "$buildkit_container" >/dev/null 2>&1 || true
-	podman volume rm --force "$buildkit_volume" >/dev/null 2>&1 || true
-	echo "build: removed the buildkit daemon and its cache volume"
-	exit 0
-fi
 
 # ---- resolved build inputs -----------------------------------------------
 target="${target:-$(jq -r '.default_target' <<<"$plan")}"
@@ -218,91 +195,6 @@ echo "build: tags ${tags[*]}"
 [ -z "$cache_export_ref" ] || echo "build: exporting cache to ${cache_export_ref}"
 
 # ---- backends ------------------------------------------------------------
-buildkitd_ensure() {
-	local run_args=(
-		--detach
-		--name "$buildkit_container"
-		--privileged
-		--security-opt label=disable
-		--volume "${buildkit_volume}:/var/lib/buildkit"
-		--volume "${PWD}:${buildkit_context}:ro"
-	)
-	local pair
-	for pair in "${secrets[@]}"; do
-		run_args+=(--volume "${pair#*=}:${buildkit_secret_dir}/${pair%%=*}:ro")
-	done
-
-	local want have
-	want="$(printf '%s\n' "$buildkit_image" "${run_args[@]}" | sha256sum | cut -d' ' -f1)"
-	have="$(podman inspect --format \
-		"{{index .Config.Labels \"${buildkit_label}\"}} {{.State.Running}}" \
-		"$buildkit_container" 2>/dev/null || true)"
-	[ "$have" = "${want} true" ] && return 0
-
-	podman rm --force "$buildkit_container" >/dev/null 2>&1 || true
-	podman run "${run_args[@]}" --label "${buildkit_label}=${want}" \
-		"$buildkit_image" >/dev/null
-
-	for _ in $(seq 30); do
-		if podman exec "$buildkit_container" buildctl debug workers >/dev/null 2>&1; then
-			return 0
-		fi
-		sleep 1
-	done
-	podman logs "$buildkit_container" >&2 || true
-	die "buildkitd did not come up"
-}
-
-local_ref() {
-	local first="${1%%/*}"
-	if [ "$first" != "$1" ]; then
-		case "$first" in
-		*.* | *:* | localhost)
-			printf '%s\n' "$1"
-			return
-			;;
-		esac
-	fi
-	printf 'localhost/%s\n' "$1"
-}
-
-build_buildkit() {
-	buildkitd_ensure
-
-	local args=(
-		build
-		--frontend dockerfile.v0
-		--local "context=${buildkit_context}"
-		--local "dockerfile=${buildkit_context}"
-		--opt "filename=${containerfile}"
-	)
-	local arg label ref tag first pair
-
-	for arg in "${build_args[@]}"; do args+=(--opt "build-arg:${arg}"); done
-	for label in "${labels[@]}"; do args+=(--opt "label:${label}"); done
-	for ref in "${cache_import_refs[@]}"; do
-		args+=(--import-cache "type=registry,ref=${ref}")
-	done
-	[ -z "$cache_export_ref" ] ||
-		args+=(--export-cache "type=registry,ref=${cache_export_ref}")
-	for pair in "${secrets[@]}"; do
-		args+=(--secret "id=${pair%%=*},src=${buildkit_secret_dir}/${pair%%=*}")
-	done
-
-	if [ -n "$oci_output" ]; then
-		podman exec "$buildkit_container" buildctl "${args[@]}" \
-			--output "type=oci,name=${tags[0]}" >"$oci_output"
-		return
-	fi
-
-	first="$(local_ref "${tags[0]}")"
-	podman exec "$buildkit_container" buildctl "${args[@]}" \
-		--output "type=docker,name=${first}" | podman load --quiet
-	for tag in "${tags[@]:1}"; do
-		podman tag "$first" "$(local_ref "$tag")"
-	done
-}
-
 build_buildx() {
 	local args=(build --file "$containerfile")
 	local arg tag label ref pair
