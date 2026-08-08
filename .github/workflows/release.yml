@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Build
+        run: cargo build --release --locked
+
+      - name: Package with checksum
+        id: pkg
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          asset="tect-v${version}-x86_64-linux-gnu.tar.gz"
+          # The binary plus the scaffolding `tect init` writes
+          tar -czf "$asset" --transform 's|^target/release/||' \
+            target/release/tect assets
+          sha256sum "$asset" | cut -d' ' -f1 > "${asset}.sha256"
+          echo "asset=${asset}" >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            "${{ steps.pkg.outputs.asset }}" \
+            "${{ steps.pkg.outputs.asset }}.sha256"
