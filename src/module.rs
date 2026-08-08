@@ -214,8 +214,7 @@ impl Module {
         let doc: KdlDocument = match text.parse() {
             Ok(doc) => doc,
             Err(err) => {
-                eprintln!("{:?}", miette::Report::new(err));
-                issues.push(Issue::new(format!("{file} is not valid KDL"), src));
+                issues.push(crate::list::syntax_issue(&err, &file, src));
                 return None;
             }
         };

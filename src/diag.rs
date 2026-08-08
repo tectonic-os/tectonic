@@ -141,7 +141,7 @@ impl Issues {
         }
         if found {
             eprintln!(
-                "manifest: {count} problem{} in {context}",
+                "tect: {count} problem{} in {context}",
                 if count == 1 { "" } else { "s" }
             );
         }

@@ -149,6 +149,24 @@ pub struct List {
 /// Repo context, not an image: the file every image file is not.
 pub const REPO_FILE: &str = "repo.kdl";
 
+/// A syntax error as one issue, carrying what the parser found so it is
+/// reported through the collector rather than beside it.
+pub(crate) fn syntax_issue(err: &kdl::KdlError, file: &str, src: &Source) -> Issue {
+    let mut issue = Issue::new(format!("{file} is not valid KDL"), src);
+    for found in &err.diagnostics {
+        let label = found
+            .message
+            .clone()
+            .or_else(|| found.label.clone())
+            .unwrap_or_else(|| "here".into());
+        issue = issue.at(found.span, label);
+    }
+    match err.diagnostics.iter().find_map(|d| d.help.clone()) {
+        Some(help) => issue.help(help),
+        None => issue,
+    }
+}
+
 /// Lowercase letters, digits and dashes, starting with a letter.
 fn is_flavour_name(name: &str) -> bool {
     let mut chars = name.chars();
@@ -328,8 +346,7 @@ impl List {
         let doc: KdlDocument = match text.parse() {
             Ok(doc) => doc,
             Err(err) => {
-                eprintln!("{:?}", miette::Report::new(err));
-                issues.push(Issue::new(format!("{} is not valid KDL", src.name()), src));
+                issues.push(syntax_issue(&err, src.name(), src));
                 return;
             }
         };
