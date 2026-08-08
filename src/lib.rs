@@ -18,7 +18,14 @@ use diag::Issue;
 use diag::Issues;
 use list::List;
 use plan::Resolved;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+/// The nearest directory at or above `from` holding a repo.kdl.
+pub fn find_root(from: &Path) -> Option<PathBuf> {
+    from.ancestors()
+        .find(|dir| dir.join(list::REPO_FILE).is_file())
+        .map(Path::to_path_buf)
+}
 
 /// What one command produced: its output, everything wrong with the repository,
 /// and the counts `check` reports.
