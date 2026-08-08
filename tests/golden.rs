@@ -34,9 +34,9 @@ fn capture(name: &str, root: &Path) {
     std::env::set_current_dir(root).expect("fixture root exists");
     let here = Path::new(".");
     for (command, file) in [("plan", "plan.json"), ("section", "section.txt")] {
-        compare(name, file, &manifest::run(command, None, here).stdout);
+        compare(name, file, &tect::run(command, None, here).stdout);
     }
-    compare(name, "issues.txt", &manifest::run("check", None, here).issues.plain());
+    compare(name, "issues.txt", &tect::run("check", None, here).issues.plain());
 }
 
 /// One process, one working directory: every capture runs in turn.
@@ -54,7 +54,7 @@ fn golden() {
 
     // The repository the tool is developed in, which is the only thing proving
     // the fixtures describe something real.
-    capture("self", &crate_dir().join("../.."));
+    capture("self", &crate_dir());
     for name in names {
         capture(&name, &dir.join(&name));
     }

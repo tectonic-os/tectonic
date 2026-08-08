@@ -6,4 +6,4 @@ _build-*/**
 __pycache__/
 build/
 modules/.remote/
-tools/*/target/
+/target

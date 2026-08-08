@@ -21,7 +21,7 @@ echo "lint: shellcheck passed on ${#scripts[@]} scripts"
 ./scripts/manifest.sh check
 
 if command -v cargo > /dev/null 2>&1; then
-    cargo test --quiet --manifest-path tools/manifest/Cargo.toml
+    cargo test --quiet --manifest-path Cargo.toml
     echo "lint: the goldens match"
 else
     echo "lint: cargo not found, the goldens were not run" >&2
@@ -29,12 +29,12 @@ fi
 
 shell_classes="$(sed -n 's/^\t\[\([a-z-]*\)\]=.*/\1/p' lib/validate-image.sh | sort)"
 parser_classes="$(sed -n 's/^const VERIFY_CLASSES[^=]*= \[\(.*\)\];$/\1/p' \
-    tools/manifest/src/module.rs | tr -d '" ' | tr ',' '\n' | sort)"
+    src/module.rs | tr -d '" ' | tr ',' '\n' | sort)"
 if [ -z "$shell_classes" ]; then
     echo "lint: no verify classes found in lib/validate-image.sh" >&2
     exit 1
 elif [ -z "$parser_classes" ]; then
-    echo "lint: no VERIFY_CLASSES found in tools/manifest/src/module.rs" >&2
+    echo "lint: no VERIFY_CLASSES found in src/module.rs" >&2
     exit 1
 elif [ "$shell_classes" != "$parser_classes" ]; then
     echo "lint: the verify diagnostic classes disagree" >&2

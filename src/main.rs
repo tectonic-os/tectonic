@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 const USAGE: &str = "\
-usage: manifest <command>
+usage: tect <command>
 
   plan [--json]     every fact this repository derives, as one JSON
                     document: the images, each image's targets, and what
@@ -38,19 +38,19 @@ fn main() -> ExitCode {
         ("section", []) => None,
         ("section", [image]) => Some(*image),
         ("plan" | "check" | "section", _) => {
-            eprintln!("manifest: `{command}` does not take {}", rest.join(" "));
+            eprintln!("tect: `{command}` does not take {}", rest.join(" "));
             eprint!("{USAGE}");
             return ExitCode::FAILURE;
         }
         (other, _) => {
-            eprintln!("manifest: unknown command `{other}`");
+            eprintln!("tect: unknown command `{other}`");
             eprint!("{USAGE}");
             return ExitCode::FAILURE;
         }
     };
 
     let root = PathBuf::from(std::env::var("MANIFEST_ROOT").unwrap_or_else(|_| ".".into()));
-    let run = manifest::run(command, image_arg, &root);
+    let run = tect::run(command, image_arg, &root);
 
     if run.issues.report(&run.context) {
         return ExitCode::FAILURE;
@@ -58,7 +58,7 @@ fn main() -> ExitCode {
     print!("{}", run.stdout);
     if command == "check" {
         eprintln!(
-            "manifest: {} images, {} modules, {} flavours",
+            "tect: {} images, {} modules, {} flavours",
             run.images, run.modules, run.flavours
         );
     }
