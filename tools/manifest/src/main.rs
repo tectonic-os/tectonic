@@ -1,20 +1,5 @@
-//! The only reader of the image files and the per-module module.kdl files.
+//! Reads the arguments, runs the command, prints what it produced.
 
-mod asset;
-mod diag;
-mod json;
-mod list;
-mod module;
-mod options;
-mod order;
-mod overlay;
-mod plan;
-mod remote;
-mod render;
-mod workflow;
-
-use list::List;
-use plan::Resolved;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -65,89 +50,16 @@ fn main() -> ExitCode {
     };
 
     let root = PathBuf::from(std::env::var("MANIFEST_ROOT").unwrap_or_else(|_| ".".into()));
+    let run = manifest::run(command, image_arg, &root);
 
-    let (mut list, mut issues) = List::load(&root);
-    let list_display = if list.files.is_empty() {
-        root.display().to_string()
-    } else {
-        list.files.join(", ")
-    };
-
-    let workflows = workflow::resolve(&list, &root, &mut issues);
-
-    let mut resolved: Vec<Resolved> = Vec::new();
-    for image in &mut list.images {
-        let mut modules: Vec<module::Module> = image
-            .entries
-            .iter()
-            .filter_map(|entry| module::Module::load(entry, image, &root, &mut issues))
-            .collect();
-
-        let order = order::sort(image, &modules, &mut issues);
-        order::apply(image, &mut modules, &order);
-        module::check_graph(&modules, image, &root, &mut issues);
-        let shipped = overlay::index(&modules, &root);
-        overlay::check(&modules, &shipped, &mut issues);
-        let collected = module::resolve_collects(&modules, &root, &mut issues);
-
-        resolved.push(Resolved {
-            modules,
-            shipped,
-            collected,
-        });
-    }
-
-    if let Some(unknown) = image_arg.filter(|id| !list.images.iter().any(|i| i.id == *id)) {
-        let known: Vec<&str> = list.images.iter().map(|i| i.id.as_str()).collect();
-        issues.push(
-            diag::Issue::new(format!("`{unknown}` is not a declared image"), &list.repo_file, "")
-                .help(format!("images: {}", known.join(", "))),
-        );
-    }
-
-    let one = match image_arg {
-        Some(id) => list.images.iter().position(|i| i.id == id),
-        None => list
-            .default_image()
-            .and_then(|d| list.images.iter().position(|i| i.id == d.id)),
-    };
-
-    let output = match command {
-        "plan" => plan::build(&list, &resolved, &workflows).render(),
-        "section" => match one {
-            Some(i) => render::section(
-                &list.images[i],
-                &resolved[i].modules,
-                &resolved[i].collected,
-                &root,
-                &mut issues,
-            ),
-            None => String::new(),
-        },
-        _ => {
-            for (i, image) in list.images.iter().enumerate() {
-                let _ = render::section(
-                    image,
-                    &resolved[i].modules,
-                    &resolved[i].collected,
-                    &root,
-                    &mut issues,
-                );
-            }
-            String::new()
-        }
-    };
-
-    if issues.report(&list_display) {
+    if run.issues.report(&run.context) {
         return ExitCode::FAILURE;
     }
-    print!("{output}");
+    print!("{}", run.stdout);
     if command == "check" {
         eprintln!(
             "manifest: {} images, {} modules, {} flavours",
-            list.images.len(),
-            resolved.iter().map(|r| r.modules.len()).sum::<usize>(),
-            list.images.iter().map(|i| i.flavours.len()).sum::<usize>()
+            run.images, run.modules, run.flavours
         );
     }
     ExitCode::SUCCESS
