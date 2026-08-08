@@ -2,7 +2,7 @@ description "goojust, the OS TUI, plus the just engine and fastfetch it builds o
 
 supports "fedora"
 
-collects "justfile.inc" into="/usr/share/goojust/justfile.apps"
+collects "justfile.inc" into="/usr/share/goojust/justfile.apps" priority=500
 
 packages {
     fedora "just" "fastfetch"

@@ -19,6 +19,7 @@ image {
         module "core/signature-policy"
         module "core/auto-updates"
         module "core/system-just-scripts"
+        module "core/power-just-scripts"
         module "core/flatpak"
         module "core/brew"
         module "core/cli-tools"
@@ -62,6 +63,5 @@ image {
             module "dev-tools"
         }
 
-        module "core/power-just-scripts" // last, so its recipes append last to the collected justfile
     }
 }

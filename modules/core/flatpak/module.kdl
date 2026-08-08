@@ -6,6 +6,6 @@ packages {
     fedora "flatpak"
 }
 
-collects "flatpaks.list" into="/usr/share/flatpak-defaults/apps.list"
+collects "flatpaks.list" into="/usr/share/flatpak-defaults/apps.list" priority=500
 
 provides "flatpak"

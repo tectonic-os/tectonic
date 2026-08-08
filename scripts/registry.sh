@@ -9,10 +9,11 @@ die() {
 
 usage() {
     cat >&2 <<'EOF'
-usage: scripts/registry.sh <command> [name]
+usage: scripts/registry.sh namespace
 
-  namespace       registry and owner, e.g. ghcr.io/someone
-  ref <name>      <namespace>/<name>
+  namespace       registry and owner, e.g. ghcr.io/someone. Joining it to
+                  a published image name is the caller's; every name to
+                  join it to comes out of the plan
 
 Environment:
   IMAGE_REGISTRY  overrides the namespace; CI sets it from the workflow
@@ -36,13 +37,6 @@ namespace() {
 case "${1:-}" in
     namespace)
         namespace
-        ;;
-    ref)
-        if [ "$#" -lt 2 ] || [ -z "$2" ]; then
-            die "ref needs an image name"
-        fi
-        ns="$(namespace)"
-        printf '%s/%s\n' "$ns" "$2"
         ;;
     *)
         usage

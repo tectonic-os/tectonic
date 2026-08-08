@@ -47,7 +47,7 @@ fi
 read -ra collected <<< "${MODULE_COLLECT:-}"
 for pair in "${collected[@]}"; do
     src="$MODDIR/${pair%%=*}"
-    dest="${pair#*=}"
-    mkdir -p "$(dirname "$dest")"
-    cat "$src" >> "$dest"
+    part="${pair#*=}"
+    mkdir -p "$(dirname "$part")"
+    cat "$src" > "$part"
 done

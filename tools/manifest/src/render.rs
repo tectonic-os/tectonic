@@ -1,9 +1,8 @@
 //! The generated Containerfile section.
 
 use crate::diag::{Issue, Issues};
-use crate::list::{Entry, Image, List, NO_FLAVOUR};
-use crate::module::Module;
-use std::collections::BTreeMap;
+use crate::list::{Entry, Image};
+use crate::module::{Collected, Collection, Module};
 use std::fmt::Write as _;
 use std::path::Path;
 
@@ -45,7 +44,7 @@ const MODULE_SLOT: u32 = 50;
 pub fn section(
     image: &Image,
     modules: &[Module],
-    collected: &BTreeMap<String, Vec<(String, String)>>,
+    collection: &Collection,
     root: &Path,
     issues: &mut Issues,
 ) -> String {
@@ -108,7 +107,7 @@ pub fn section(
             blocks.push(standard(
                 entry,
                 module,
-                collected.get(&entry.path),
+                collection.by_module.get(&entry.path),
                 base_family,
             ));
         }
@@ -139,6 +138,13 @@ pub fn section(
         "# ---- finalize hook order ----\n\
          ARG FINALIZE_ORDER=\"{}\"\n\n",
         finalize.join(" ")
+    );
+
+    let _ = write!(
+        out,
+        "# ---- collected file destinations ----\n\
+         ARG COLLECT_TARGETS=\"{}\"\n\n",
+        collection.destinations.join(" ")
     );
 
     let _ = write!(out, "{IMAGE_VERSION_ARG}\n\n");
@@ -228,248 +234,17 @@ fn phase(file: &str, below_modules: bool, identity_env: &str) -> String {
         out.push_str(
             "FLAVOUR=${FLAVOUR} IMAGE_VERSION=${IMAGE_VERSION} FINALIZE_ORDER=\"${FINALIZE_ORDER}\" \\\n    ",
         );
+        out.push_str("COLLECT_TARGETS=\"${COLLECT_TARGETS}\" \\\n    ");
         out.push_str(identity_env);
     }
     let _ = write!(out, "/ctx/{file}");
     out
 }
 
-/// What a target is made of, as markdown, in the order the layers build.
-pub fn summary(image: &Image, modules: &[Module], target: Option<&str>) -> String {
-    let included: Vec<&Entry> = image.entries.iter().filter(|e| in_target(e, target)).collect();
-    let gated = included.iter().filter(|e| e.flavour.is_some()).count();
-
-    let mut out = String::new();
-    let count = included.len();
-    let _ = match target {
-        Some(NO_FLAVOUR) => writeln!(out, "{count} modules, the ungated set."),
-        Some(target) => writeln!(out, "{count} modules, {gated} of them gated to `{target}`."),
-        None => writeln!(out, "{count} modules, {gated} of them gated to a flavour."),
-    };
-    let _ = write!(
-        out,
-        "\n| Module | Description | Options |\n| --- | --- | --- |\n"
-    );
-
-    for entry in included {
-        let module = modules
-            .iter()
-            .find(|m| m.path == entry.path && m.flavour == entry.flavour);
-        let mut name = format!("`{}`", entry.path);
-        if let Some(flavour) = &entry.flavour {
-            let _ = write!(name, " `[{flavour}]`");
-        }
-        if let Some(variant) = &entry.variant {
-            let _ = write!(name, " `variant={variant}`");
-        }
-        if let Some(remote) = &entry.remote {
-            let _ = write!(name, " `remote={}`", remote.git_ref);
-        }
-        let options: Vec<String> = module
-            .map(|m| m.resolved.as_slice())
-            .unwrap_or_default()
-            .iter()
-            .map(|(name, value)| format!("`{name}=\"{}\"`", cell(value)))
-            .collect();
-        let _ = writeln!(
-            out,
-            "| {name} | {} | {} |",
-            cell(module.map(|m| m.description.as_str()).unwrap_or_default()),
-            options.join(" ")
-        );
-    }
-    out
-}
-
-/// A pipe would end the column, and neither a description nor an option value
-/// is stopped from holding one.
-fn cell(text: &str) -> String {
-    text.replace('|', "\\|")
-}
-
-/// Whether an entry lands in a target's image.
-fn in_target(entry: &Entry, target: Option<&str>) -> bool {
-    match (&entry.flavour, target) {
-        (None, _) => true,
-        (Some(_), None) => true,
-        (Some(gate), Some(target)) => gate == target,
-    }
-}
-
-/// Every pinned asset, pipe separated, one per line:
-/// <module>|<name>|<manifest>|<version>|<sha256>|<from>|<url> Two consumers,
-/// neither of which should be carrying a table of its own: the checksum
-/// workflow, which recomputes a stale hash and needs the manifest to rewrite,
-/// and the SBOM supplement, which needs the payloads an RPM inventory cannot
-/// see.
-pub fn assets(image: &Image, modules: &[Module], target: Option<&str>) -> String {
-    let mut out = String::new();
-    let mut seen: Vec<(&str, &str)> = Vec::new();
-    for entry in image.entries.iter().filter(|e| in_target(e, target)) {
-        let Some(module) = modules
-            .iter()
-            .find(|m| m.path == entry.path && m.flavour == entry.flavour)
-        else {
-            continue;
-        };
-        for asset in &module.assets {
-            if seen.contains(&(module.path.as_str(), asset.name.as_str())) {
-                continue;
-            }
-            seen.push((module.path.as_str(), asset.name.as_str()));
-            let _ = writeln!(
-                out,
-                "{}|{}|modules/{}/module.kdl|{}|{}|{}|{}",
-                module.path,
-                asset.name,
-                module.dir,
-                asset.version.as_deref().unwrap_or_default(),
-                asset.sha256.as_deref().unwrap_or_default(),
-                asset.from.as_str(),
-                asset.url_resolved().unwrap_or_default(),
-            );
-        }
-    }
-    out
-}
-
-/// Every out-of-tree pin, pipe separated, one per line:
-/// <name>|<dir>|<ref>|<sha256>|<url>|<subtree path>|<file> Two consumers: the
-/// fetch, which needs somewhere to put the archive it verifies, and the
-/// checksum workflow, which recomputes a hash a bumped ref made stale.
-pub fn remotes(list: &List) -> String {
-    let mut out = String::new();
-    let mut seen: Vec<&str> = Vec::new();
-    for image in &list.images {
-        for entry in &image.entries {
-            let Some(remote) = &entry.remote else {
-                continue;
-            };
-            if seen.contains(&entry.path.as_str()) {
-                continue;
-            }
-            seen.push(&entry.path);
-            let _ = writeln!(
-                out,
-                "{}|modules/{}|{}|{}|{}|{}|{}",
-                entry.path,
-                entry.dir(),
-                remote.git_ref,
-                remote.sha256,
-                remote.url_resolved(),
-                remote.path.clone().unwrap_or_default(),
-                image.file,
-            );
-        }
-    }
-    out
-}
-
-/// The module that provides a contract file path.
-pub fn find_provider(
-    image: &Image,
-    modules: &[Module],
-    file_path: &str,
-    target: Option<&str>,
-) -> String {
-    for entry in image.entries.iter().filter(|e| in_target(e, target)) {
-        let Some(module) = modules
-            .iter()
-            .find(|m| m.path == entry.path && m.flavour == entry.flavour)
-        else {
-            continue;
-        };
-        if module.provides_files.iter().any(|d| d.name == file_path) {
-            return format!("{}\n", module.path);
-        }
-    }
-    String::new()
-}
-
-/// Unique secret IDs the enabled modules declare, one per line.
-pub fn secrets(image: &Image, modules: &[Module], target: Option<&str>) -> String {
-    let mut seen: Vec<&str> = Vec::new();
-    let mut out = String::new();
-    for entry in image.entries.iter().filter(|e| in_target(e, target)) {
-        let Some(module) = modules
-            .iter()
-            .find(|m| m.path == entry.path && m.flavour == entry.flavour)
-        else {
-            continue;
-        };
-        for decl in &module.secrets {
-            if seen.contains(&decl.name.as_str()) {
-                continue;
-            }
-            seen.push(&decl.name);
-            let _ = writeln!(out, "{}", decl.name);
-        }
-    }
-    out
-}
-
-/// Contract file paths the finished image still carries, one per line: what
-/// the base image guarantees, then what the enabled modules declare.
-pub fn contract_files(image: &Image, modules: &[Module], target: Option<&str>) -> String {
-    let mut seen: Vec<&str> = Vec::new();
-    let mut out = String::new();
-    for decl in image.base.iter().flat_map(|b| b.provides_files.iter()) {
-        if seen.contains(&decl.name.as_str()) {
-            continue;
-        }
-        seen.push(&decl.name);
-        let _ = writeln!(out, "{}", decl.name);
-    }
-    for entry in image.entries.iter().filter(|e| in_target(e, target)) {
-        let Some(module) = modules
-            .iter()
-            .find(|m| m.path == entry.path && m.flavour == entry.flavour)
-        else {
-            continue;
-        };
-        for decl in &module.provides_files {
-            if module.provides_files_build_only.contains(&decl.name) {
-                continue;
-            }
-            if seen.contains(&decl.name.as_str()) {
-                continue;
-            }
-            seen.push(&decl.name);
-            let _ = writeln!(out, "{}", decl.name);
-        }
-    }
-    out
-}
-
-/// Every verify diagnostic the enabled modules accept, unique, one per line,
-/// pipe separated: <class>|<unit> Resolved per target for the same reason
-/// `contract-files` is: an exception belongs to the module that ships the
-/// unit, so an image without that module must not carry it.
-pub fn verify_exceptions(image: &Image, modules: &[Module], target: Option<&str>) -> String {
-    let mut seen: Vec<(&str, &str)> = Vec::new();
-    let mut out = String::new();
-    for entry in image.entries.iter().filter(|e| in_target(e, target)) {
-        let Some(module) = modules
-            .iter()
-            .find(|m| m.path == entry.path && m.flavour == entry.flavour)
-        else {
-            continue;
-        };
-        for exception in &module.verify_exceptions {
-            if seen.contains(&(exception.class.as_str(), exception.unit.as_str())) {
-                continue;
-            }
-            seen.push((exception.class.as_str(), exception.unit.as_str()));
-            let _ = writeln!(out, "{}|{}", exception.class, exception.unit);
-        }
-    }
-    out
-}
-
 fn standard(
     entry: &Entry,
     module: Option<&Module>,
-    collected: Option<&Vec<(String, String)>>,
+    collected: Option<&Vec<Collected>>,
     base_family: &str,
 ) -> String {
     let mut env = String::new();
@@ -482,7 +257,7 @@ fn standard(
     if let Some(collected) = collected.filter(|c| !c.is_empty()) {
         let pairs: Vec<String> = collected
             .iter()
-            .map(|(file, into)| format!("{file}={into}"))
+            .map(|c| format!("{}={}", c.file, c.staged))
             .collect();
         let _ = write!(env, "MODULE_COLLECT=\"{}\" ", pairs.join(" "));
     }

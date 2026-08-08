@@ -4,12 +4,12 @@ cd "$(dirname "$0")/.."
 
 target="${1:?usage: sbom-assets.sh <target>}"
 
-./scripts/manifest.sh assets "$target" | jq -Rs '
-    [ split("\n")[]
-      | select(length > 0)
-      | split("|")
-      | { module: .[0], name: .[1], version: .[3], sha256: .[4], url: .[6] }
-      | select(.url != "")
+./scripts/manifest.sh plan --json | jq --arg target "$target" '
+    [ .images[].targets[]
+      | select(.name == $target)
+      | .assets[]
+      | select(.url != null)
+      | { module, name, version, sha256: (.sha256 // ""), url }
       | . + { id: ("SPDXRef-Package-asset-"
                    + (.module | gsub("/"; "-")) + "-" + .name) }
     ] as $assets
@@ -27,7 +27,7 @@ target="${1:?usage: sbom-assets.sh <target>}"
               supplier: "NOASSERTION",
               comment: ("Pinned build input, declared by the " + .module + " module")
             }
-            + (if .version == "" then {} else { versionInfo: .version } end)
+            + (if .version == null then {} else { versionInfo: .version } end)
         ],
         relationships: [ $assets[]
           | {

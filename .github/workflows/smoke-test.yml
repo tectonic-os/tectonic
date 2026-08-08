@@ -25,7 +25,9 @@ jobs:
         uses: ublue-os/remove-unwanted-software@cc0becac701cf642c8f0a6613bbdaf5dc36b259e # v9
 
       - name: Resolve image name
-        run: echo "IMAGE_NAME=$(./scripts/targets.sh image "$(./scripts/targets.sh ungated)")" >> "${GITHUB_ENV}"
+        run: |
+          echo "IMAGE_NAME=$(./scripts/manifest.sh plan --json | jq -r .ungated_published)" \
+            >> "${GITHUB_ENV}"
 
       - name: Pull published image
         run: |

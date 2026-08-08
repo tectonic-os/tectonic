@@ -15,8 +15,8 @@ usage() {
 usage: scripts/render-iso-config.sh [options]
 
   --target <image/flavour>
-                    target the ISO installs (default: the default
-                    image's ungated build)
+                    target the ISO installs (default: the plan's
+                    ungated_target)
   --tag <tag>       tag it tracks (default: $DEFAULT_TAG, else latest)
 
 Environment:
@@ -50,10 +50,13 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-target="${target:-$(./scripts/targets.sh ungated)}"
-./scripts/targets.sh check "$target"
+plan="$(./scripts/manifest.sh plan --json)"
+target="${target:-$(jq -r '.ungated_target' <<< "$plan")}"
+published="$(jq -r --arg t "$target" \
+    '.images[].targets[] | select(.name == $t) | .published' <<< "$plan")"
+[ -n "$published" ] || die "'${target}' is not a build target"
 
-IMAGE_REF="$(./scripts/registry.sh ref "$(./scripts/targets.sh image "$target")"):${tag}"
+IMAGE_REF="$(./scripts/registry.sh namespace)/${published}:${tag}"
 export IMAGE_REF
 
 command -v envsubst > /dev/null 2>&1 \

@@ -6,6 +6,9 @@ use kdl::{KdlDocument, KdlNode, KdlValue};
 use miette::SourceSpan;
 use std::path::Path;
 
+/// The schema every file in the repository is written against.
+pub const SCHEMA_VERSION: u32 = 1;
+
 /// The build target that carries no flavour: the ungated set, published
 /// unsuffixed.
 pub const NO_FLAVOUR: &str = "none";
@@ -18,16 +21,13 @@ pub struct Target {
 }
 
 impl Target {
-    /// `<image>/<flavour>`.
-    pub fn parse(text: &str) -> Option<Self> {
-        let (image, flavour) = text.split_once('/')?;
-        if image.is_empty() || flavour.is_empty() || flavour.contains('/') {
-            return None;
+    /// What this target publishes as: the image name alone for the ungated
+    /// build, suffixed with the flavour otherwise.
+    pub fn published(&self) -> String {
+        match self.flavour.as_str() {
+            NO_FLAVOUR => self.image.clone(),
+            flavour => format!("{}-{flavour}", self.image),
         }
-        Some(Target {
-            image: image.to_string(),
-            flavour: flavour.to_string(),
-        })
     }
 }
 
@@ -136,6 +136,11 @@ pub struct List {
     /// request builds.
     pub default_image_id: Option<String>,
     pub pr_image_id: Option<String>,
+    /// What repo.kdl declares, which is `SCHEMA_VERSION` or the load failed.
+    pub schema_version: Option<u32>,
+    /// Whether the node was there at all, so a malformed one is reported once
+    /// rather than as both wrong and missing.
+    schema_version_seen: bool,
     /// repo.kdl and its source, for a diagnostic about either of the two
     /// above.
     pub repo_file: String,
@@ -193,6 +198,8 @@ impl List {
             workflows: Vec::new(),
             default_image_id: None,
             pr_image_id: None,
+            schema_version: None,
+            schema_version_seen: false,
             repo_file: root.join(REPO_FILE).display().to_string(),
             repo_text: String::new(),
             files: Vec::new(),
@@ -278,13 +285,14 @@ impl List {
                 (true, "pr-image") => {
                     self.pr_image_id = string_arg(node).map(str::to_string);
                 }
+                (true, "schema-version") => self.parse_schema_version(node, file, &text, issues),
                 (true, other) => issues.push(
                     Issue::new(format!("unknown node `{other}` in {REPO_FILE}"), file, &text)
                         .at(node.name().span(), "not part of the schema")
                         .help(
-                            "repo.kdl holds `default-image`, `pr-image` and a `workflows` \
-                             block: what is true of the repository rather than of any image \
-                             in it. An image goes in a file of its own",
+                            "repo.kdl holds `schema-version`, `default-image`, `pr-image` \
+                             and a `workflows` block: what is true of the repository rather \
+                             than of any image in it. An image goes in a file of its own",
                         ),
                 ),
                 (false, other) => issues.push(
@@ -312,6 +320,38 @@ impl List {
 
     /// What no single file can check: that two of them do not describe the
     /// same image, and that something says which one a bare build builds.
+    fn parse_schema_version(&mut self, node: &KdlNode, file: &str, text: &str, issues: &mut Issues) {
+        self.schema_version_seen = true;
+        let declared = node
+            .entries()
+            .iter()
+            .find(|e| e.name().is_none())
+            .and_then(|e| e.value().as_integer());
+        match declared {
+            Some(version) if version == i128::from(SCHEMA_VERSION) => {
+                self.schema_version = Some(SCHEMA_VERSION);
+            }
+            Some(version) => issues.push(
+                Issue::new(
+                    format!("this repository is written against schema version {version}"),
+                    file,
+                    text,
+                )
+                .at(node.name().span(), format!("this tool knows {SCHEMA_VERSION}"))
+                .help(if version > i128::from(SCHEMA_VERSION) {
+                    "the repository is ahead of the tool; take a newer release"
+                } else {
+                    "the tool is ahead of the repository; every diagnostic below it is suspect until the files are brought forward"
+                }),
+            ),
+            None => issues.push(
+                Issue::new("`schema-version` needs a number", file, text)
+                    .at(node.name().span(), "not a version")
+                    .help(format!("`schema-version {SCHEMA_VERSION}`")),
+            ),
+        }
+    }
+
     fn check_images(&self, issues: &mut Issues) {
         for (index, image) in self.images.iter().enumerate() {
             if image.id.is_empty() {
@@ -351,6 +391,20 @@ impl List {
                     }
                 }
             }
+        }
+
+        if !self.schema_version_seen {
+            issues.push(
+                Issue::new(
+                    format!("{REPO_FILE} declares no `schema-version`"),
+                    &self.repo_file,
+                    &self.repo_text,
+                )
+                .help(format!(
+                    "`schema-version {SCHEMA_VERSION}`, so a tool from a different release \
+                     says so plainly instead of reporting every node it does not recognise"
+                )),
+            );
         }
 
         if self.images.len() > 1 {
@@ -880,12 +934,7 @@ impl Image {
 
         let defaults: Vec<&Flavour> = self.flavours.iter().filter(|f| f.default).collect();
         match defaults.len() {
-            1 => {}
-            0 => issues.push(
-                Issue::new("no flavour is marked `default=#true`", file, text)
-                    .at(self.flavours[0].span, "one of these must be the default")
-                    .help("`just build` with no flavour has to build something; marking it beats inferring it from position"),
-            ),
+            0 | 1 => {}
             _ => {
                 let mut issue = Issue::new("more than one flavour is marked `default=#true`", file, text);
                 for f in &defaults {
@@ -1059,6 +1108,21 @@ impl List {
             image: image.id.clone(),
             flavour: image.default_flavour().unwrap_or(NO_FLAVOUR).to_string(),
         })
+    }
+
+    /// The default image's ungated build, which is what the installer ISO and
+    /// the disk builds lay down: an installer has no hardware to gate on, so
+    /// it wants the set that gates on none.
+    pub fn ungated_target(&self) -> Option<Target> {
+        self.default_image().map(|image| Target {
+            image: image.id.clone(),
+            flavour: NO_FLAVOUR.to_string(),
+        })
+    }
+
+    /// The image name the registry layer cache is kept under.
+    pub fn cache_image(&self) -> Option<String> {
+        self.default_image().map(|image| format!("{}-cache", image.id))
     }
 
     /// The one target a pull request builds, for half the runner time.
