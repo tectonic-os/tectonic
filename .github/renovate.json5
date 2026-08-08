@@ -50,7 +50,7 @@
   // directly below it. What Renovate needs is declared as data rather than
   // written in a comment, so the manifest parser validates it: an
   // unsupported datasource, a missing depName or anything wedged between
-  // the two lines fails `just lint` instead of quietly leaving the pin
+  // the two lines fails `scripts/lint.sh` instead of quietly leaving the pin
   // unmanaged, which is how these went unmatched through two path moves.
   "customManagers": [
     {
