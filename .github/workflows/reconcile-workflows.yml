@@ -19,7 +19,9 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Resolve the declared state
-        run: ./scripts/manifest.sh workflows | tee declared.txt
+        run: |
+          ./scripts/manifest.sh plan --json \
+            | jq -r '.workflows[] | "\(.file)|\(.enabled)"' | tee declared.txt
 
       - name: Reconcile
         env:

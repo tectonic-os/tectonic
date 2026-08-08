@@ -31,7 +31,7 @@ jobs:
         run: |
           set -euo pipefail
           changed=""
-          while IFS='|' read -r image base recorded; do
+          while IFS='|' read -r image base recorded file; do
             [ -n "${image}" ] || continue
             if cosign download signature "${base}" > /dev/null 2>&1; then
               actual="true"
@@ -41,11 +41,11 @@ jobs:
             echo "${image}: ${base} is $([ "${actual}" = true ] && echo signed || echo unsigned), recorded as ${recorded}"
             [ "${actual}" != "${recorded}" ] || continue
 
-            file="$(./scripts/manifest.sh image-file "${image}")"
             sed -i "s/signed #${recorded}/signed #${actual}/" "${file}"
             echo "  corrected ${file}: signed #${recorded} -> #${actual}"
             changed="${changed}${changed:+, }\`${image}\` (\`${base}\`): \`#${recorded}\` to \`#${actual}\`"
-          done < <(./scripts/manifest.sh base-signatures)
+          done < <(./scripts/manifest.sh plan --json \
+            | jq -r '.images[] | "\(.id)|\(.base.image)|\(.base.signed)|\(.file)"')
 
           if [ -z "${changed}" ]; then
             echo "every base matches its declaration"

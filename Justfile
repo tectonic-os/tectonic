@@ -1,4 +1,4 @@
-export image_name := env("IMAGE_NAME", `./scripts/targets.sh image "$(./scripts/targets.sh ungated)"`) # published name of the default image, ungated
+export image_name := env("IMAGE_NAME", `./scripts/manifest.sh plan --json | jq -r .ungated_published`) # published name of the default image, ungated
 export default_tag := env("DEFAULT_TAG", "latest")
 export bib_image := env("BIB_IMAGE", "quay.io/centos-bootc/bootc-image-builder:latest")
 
@@ -59,11 +59,11 @@ sudoif command *args:
     sudoif {{ command }} {{ args }}
 
 # Build the image with BuildKit, e.g. `just build tectonic latest tectonic/desktop stock`
-build $target_image=image_name $tag=default_tag $target=`./scripts/targets.sh default` $kernel="": (_build "buildkit" target_image tag target kernel)
+build $target_image=image_name $tag=default_tag $target=`./scripts/manifest.sh plan --json | jq -r .default_target` $kernel="": (_build "buildkit" target_image tag target kernel)
 
 # Build the image with buildah instead of BuildKit
 [group('Utility')]
-build-buildah $target_image=image_name $tag=default_tag $target=`./scripts/targets.sh default` $kernel="": (_build "buildah" target_image tag target kernel)
+build-buildah $target_image=image_name $tag=default_tag $target=`./scripts/manifest.sh plan --json | jq -r .default_target` $kernel="": (_build "buildah" target_image tag target kernel)
 
 [private]
 _build backend $target_image $tag $target $kernel:
@@ -84,10 +84,11 @@ buildkit-reset:
 # Generate a one-time Secure Boot (MOK) module-signing key pair. Keep the
 # private key out of the repo; commit the public cert.
 [group('Secure Boot')]
-generate-mok-key dir=(env("HOME") + "/.local/share/" + `./scripts/manifest.sh default-image`):
+generate-mok-key dir=(env("HOME") + "/.local/share/" + `./scripts/manifest.sh plan --json | jq -r .default_image`):
     #!/usr/bin/env bash
     set -euo pipefail
 
+    plan="$(./scripts/manifest.sh plan --json)"
     mkdir -p "{{ dir }}"
     KEY="{{ dir }}/MOK.priv"
     CERT="{{ dir }}/sb_cert.der"
@@ -101,7 +102,7 @@ generate-mok-key dir=(env("HOME") + "/.local/share/" + `./scripts/manifest.sh de
     openssl req -x509 -newkey rsa:2048 \
         -keyout "$KEY" -nodes -days 36500 \
         -outform DER -out "$CERT" \
-        -subj "/CN=$(./scripts/manifest.sh image-name) Secure Boot Module Signing/"
+        -subj "/CN=$(jq -r .default_image_name <<< "$plan") Secure Boot Module Signing/"
     chmod 600 "$KEY"
 
     echo
@@ -110,7 +111,9 @@ generate-mok-key dir=(env("HOME") + "/.local/share/" + `./scripts/manifest.sh de
     echo "Public cert: $CERT"
     echo
     echo "Next steps:"
-    cert_path="$(./scripts/manifest.sh find-provider "/usr/share/secureboot/sb_cert.der")"
+    cert_path="$(jq -r --arg t "$(jq -r .default_target <<< "$plan")" '
+        .images[].targets[] | select(.name == $t)
+        | .provides_files["/usr/share/secureboot/sb_cert.der"] // ""' <<< "$plan")"
     if [ -n "${cert_path}" ]; then
         echo "  1. cp $CERT modules/${cert_path}/files/usr/share/secureboot/sb_cert.der"
     else
@@ -221,7 +224,7 @@ rebuild-raw $target_image=("localhost/" + image_name) $tag=default_tag: && (_reb
 
 # Rebuild an ISO installer image
 [group('Build Virtual Machine Image')]
-rebuild-iso $target_image=("localhost/" + image_name) $tag=default_tag $target=`./scripts/targets.sh ungated`: (build target_image tag target)
+rebuild-iso $target_image=("localhost/" + image_name) $tag=default_tag $target=`./scripts/manifest.sh plan --json | jq -r .ungated_target`: (build target_image tag target)
     just build-iso "${target_image}" "${tag}" "${target}"
 
 # Run a virtual machine with the specified image type
