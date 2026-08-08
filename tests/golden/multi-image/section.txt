@@ -6,6 +6,7 @@ FROM quay.io/fedora/fedora-bootc:44
 # ---- core/shared ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/shared,target=/ctx/modules/core/shared \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
@@ -18,6 +19,7 @@ ARG FLAVOUR
 # ---- core/dev-tools ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/dev-tools,target=/ctx/modules/core/dev-tools \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \

@@ -6,6 +6,7 @@ FROM quay.io/fedora/fedora-bootc:44
 # ---- core/nameless ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/nameless,target=/ctx/modules/core/nameless \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
