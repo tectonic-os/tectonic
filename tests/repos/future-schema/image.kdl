@@ -1,0 +1,12 @@
+image {
+    name "Minimal"
+
+    base "quay.io/fedora/fedora-bootc:44" {
+        family "fedora"
+        provides "rechunking"
+    }
+
+    modules {
+        module "core/hello"
+    }
+}

@@ -185,12 +185,67 @@ fn string_args(node: &KdlNode) -> Vec<&str> {
         .collect()
 }
 
+/// The reader for a schema version. One version, one reader, today: a version
+/// this release cannot read is refused rather than parsed against the wrong
+/// grammar, and a new version adds an arm here rather than forking the reader.
+fn reader(version: i128) -> Option<fn(&Path) -> (List, Issues)> {
+    match version {
+        v if v == i128::from(SCHEMA_VERSION) => Some(List::read),
+        _ => None,
+    }
+}
+
+/// The version repo.kdl declares, read before anything else because it decides
+/// which reader sees the rest. A repo.kdl that is missing, unparseable or
+/// declares nothing usable falls through to the current reader, which is what
+/// reports it.
+fn declared_version(root: &Path) -> Option<(i128, Span, Source)> {
+    let path = root.join(REPO_FILE);
+    let text = std::fs::read_to_string(&path).ok()?;
+    let doc: KdlDocument = text.parse().ok()?;
+    let node = doc
+        .nodes()
+        .iter()
+        .find(|n| n.name().value() == "schema-version")?;
+    let version = node
+        .entries()
+        .iter()
+        .find(|e| e.name().is_none())?
+        .value()
+        .as_integer()?;
+    let src = Source::new(path.display().to_string(), text);
+    Some((version, node.name().span().into(), src))
+}
+
 impl List {
-    /// Every `*.kdl` at the repository root: one image apiece, plus repo.kdl,
-    /// which is repo context and declares no image.
+    /// The declared schema version, then the reader it selects.
     pub fn load(root: &Path) -> (Self, Issues) {
+        let Some((version, span, src)) = declared_version(root) else {
+            return List::read(root);
+        };
+        if let Some(read) = reader(version) {
+            return read(root);
+        }
+
         let mut issues = Issues::default();
-        let mut list = List {
+        issues.push(
+            Issue::new(
+                format!("this repository is written against schema version {version}"),
+                &src,
+            )
+            .at(span, format!("this tool knows {SCHEMA_VERSION}"))
+            .help(if version > i128::from(SCHEMA_VERSION) {
+                "the repository is ahead of the tool; take a newer release"
+            } else {
+                "the tool is ahead of the repository; nothing else is read, because every \
+                 diagnostic under a grammar this release does not have would be noise"
+            }),
+        );
+        (List::empty(root), issues)
+    }
+
+    fn empty(root: &Path) -> Self {
+        List {
             images: Vec::new(),
             workflows: Vec::new(),
             default_image_id: None,
@@ -199,7 +254,14 @@ impl List {
             schema_version_seen: false,
             repo_src: Source::new(root.join(REPO_FILE).display().to_string(), ""),
             files: Vec::new(),
-        };
+        }
+    }
+
+    /// Every `*.kdl` at the repository root: one image apiece, plus repo.kdl,
+    /// which is repo context and declares no image.
+    fn read(root: &Path) -> (Self, Issues) {
+        let mut issues = Issues::default();
+        let mut list = List::empty(root);
 
         let mut names: Vec<String> = Vec::new();
         match std::fs::read_dir(root) {
@@ -315,8 +377,8 @@ impl List {
         }
     }
 
-    /// What no single file can check: that two of them do not describe the
-    /// same image, and that something says which one a bare build builds.
+    /// A version this reader does not know never reaches it: `load` picks the
+    /// reader from the same node first.
     fn parse_schema_version(&mut self, node: &KdlNode, src: &Source, issues: &mut Issues) {
         self.schema_version_seen = true;
         let declared = node
@@ -325,21 +387,7 @@ impl List {
             .find(|e| e.name().is_none())
             .and_then(|e| e.value().as_integer());
         match declared {
-            Some(version) if version == i128::from(SCHEMA_VERSION) => {
-                self.schema_version = Some(SCHEMA_VERSION);
-            }
-            Some(version) => issues.push(
-                Issue::new(
-                    format!("this repository is written against schema version {version}"),
-                    src,
-                )
-                .at(node.name().span(), format!("this tool knows {SCHEMA_VERSION}"))
-                .help(if version > i128::from(SCHEMA_VERSION) {
-                    "the repository is ahead of the tool; take a newer release"
-                } else {
-                    "the tool is ahead of the repository; every diagnostic below it is suspect until the files are brought forward"
-                }),
-            ),
+            Some(_) => self.schema_version = Some(SCHEMA_VERSION),
             None => issues.push(
                 Issue::new("`schema-version` needs a number", src)
                     .at(node.name().span(), "not a version")

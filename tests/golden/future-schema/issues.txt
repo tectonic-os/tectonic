@@ -1,0 +1,8 @@
+  x this repository is written against schema version 2
+   ,-[./repo.kdl:1:1]
+ 1 | schema-version 2
+   : ^^^^^^^|^^^^^^
+   :        `-- this tool knows 1
+   `----
+  help: the repository is ahead of the tool; take a newer release
+
