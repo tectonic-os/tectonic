@@ -934,12 +934,7 @@ impl Image {
 
         let defaults: Vec<&Flavour> = self.flavours.iter().filter(|f| f.default).collect();
         match defaults.len() {
-            1 => {}
-            0 => issues.push(
-                Issue::new("no flavour is marked `default=#true`", file, text)
-                    .at(self.flavours[0].span, "one of these must be the default")
-                    .help("`just build` with no flavour has to build something; marking it beats inferring it from position"),
-            ),
+            0 | 1 => {}
             _ => {
                 let mut issue = Issue::new("more than one flavour is marked `default=#true`", file, text);
                 for f in &defaults {
