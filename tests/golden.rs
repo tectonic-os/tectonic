@@ -16,9 +16,8 @@ fn compare(name: &str, file: &str, actual: &str) {
         std::fs::write(&path, actual).unwrap();
         return;
     }
-    let expected = std::fs::read_to_string(&path).unwrap_or_else(|err| {
-        panic!("{}: {err}\nrun UPDATE_GOLDEN=1 cargo test", path.display())
-    });
+    let expected = std::fs::read_to_string(&path)
+        .unwrap_or_else(|err| panic!("{}: {err}\nrun UPDATE_GOLDEN=1 cargo test", path.display()));
     assert!(
         expected == actual,
         "{} changed. Rerun with UPDATE_GOLDEN=1 and read the diff",
@@ -36,7 +35,11 @@ fn capture(name: &str, root: &Path) {
     for (command, file) in [("plan", "plan.json"), ("section", "section.txt")] {
         compare(name, file, &tect::run(command, None, here).stdout);
     }
-    compare(name, "issues.txt", &tect::run("check", None, here).issues.plain());
+    compare(
+        name,
+        "issues.txt",
+        &tect::run("check", None, here).issues.plain(),
+    );
 }
 
 /// A repository `tect init` wrote, captured like any other fixture: what it

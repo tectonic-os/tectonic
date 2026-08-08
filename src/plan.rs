@@ -154,11 +154,17 @@ fn target(list: &List, image: &Image, resolved: &Resolved, target: &Target) -> J
         ("published", Json::string(target.published())),
         (
             "default",
-            Json::Bool(list.default_target().is_some_and(|d| d.to_string() == target.to_string())),
+            Json::Bool(
+                list.default_target()
+                    .is_some_and(|d| d.to_string() == target.to_string()),
+            ),
         ),
         (
             "pr",
-            Json::Bool(list.pr_target().is_some_and(|p| p.to_string() == target.to_string())),
+            Json::Bool(
+                list.pr_target()
+                    .is_some_and(|p| p.to_string() == target.to_string()),
+            ),
         ),
         (
             "siblings",
@@ -179,26 +185,34 @@ fn target(list: &List, image: &Image, resolved: &Resolved, target: &Target) -> J
             "modules",
             Json::array(entries.iter().map(|entry| self::module(entry))),
         ),
-        ("secrets", unique(&modules, |m| {
-            m.secrets.iter().map(|d| d.name.clone()).collect()
-        })),
+        (
+            "secrets",
+            unique(&modules, |m| {
+                m.secrets.iter().map(|d| d.name.clone()).collect()
+            }),
+        ),
         ("contract_files", contract_files(image, &modules)),
         (
             "verify_exceptions",
-            Json::array(unique_pairs(&modules, |m| {
-                m.verify_exceptions
-                    .iter()
-                    .map(|e| (e.class.clone(), e.unit.clone()))
-                    .collect()
-            })
-            .into_iter()
-            .map(|(class, unit)| {
-                Json::object([("class", Json::string(class)), ("unit", Json::string(unit))])
-            })),
+            Json::array(
+                unique_pairs(&modules, |m| {
+                    m.verify_exceptions
+                        .iter()
+                        .map(|e| (e.class.clone(), e.unit.clone()))
+                        .collect()
+                })
+                .into_iter()
+                .map(|(class, unit)| {
+                    Json::object([("class", Json::string(class)), ("unit", Json::string(unit))])
+                }),
+            ),
         ),
         ("assets", assets(&modules)),
         ("provides_files", provides_files(&modules)),
-        ("overlay_files", overlay_files(image, &resolved.shipped, flavour)),
+        (
+            "overlay_files",
+            overlay_files(image, &resolved.shipped, flavour),
+        ),
         (
             "collected_files",
             Json::map(entries.iter().filter_map(|entry| {

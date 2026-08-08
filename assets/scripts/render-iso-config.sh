@@ -11,7 +11,7 @@ die() {
 }
 
 usage() {
-    cat >&2 <<'EOF'
+    cat >&2 << 'EOF'
 usage: scripts/render-iso-config.sh [options]
 
   --target <image/flavour>

@@ -8,7 +8,7 @@ die() {
 }
 
 usage() {
-    cat >&2 <<'EOF'
+    cat >&2 << 'EOF'
 usage: scripts/vm.sh <command> <qcow2|raw|iso> [options]
 
   build     convert the container image into a disk image under output/

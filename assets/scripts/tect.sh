@@ -20,13 +20,13 @@ if [ ! -x "$bin" ]; then
     tmp="$(mktemp -d -p build download.XXXXXXXX)"
     trap 'rm -rf "$tmp"' EXIT
 
-    curl -fsSL --retry 3 -o "${tmp}/${asset}" "$url" ||
-        die "cannot fetch ${url}"
-    curl -fsSL --retry 3 -o "${tmp}/sha256" "${url}.sha256" ||
-        die "cannot fetch ${url}.sha256"
-    (cd "$tmp" && printf '%s  %s\n' "$(cat sha256)" "$asset" |
-        sha256sum --check --status) ||
-        die "${asset} does not match its published checksum"
+    curl -fsSL --retry 3 -o "${tmp}/${asset}" "$url" \
+        || die "cannot fetch ${url}"
+    curl -fsSL --retry 3 -o "${tmp}/sha256" "${url}.sha256" \
+        || die "cannot fetch ${url}.sha256"
+    (cd "$tmp" && printf '%s  %s\n' "$(cat sha256)" "$asset" \
+        | sha256sum --check --status) \
+        || die "${asset} does not match its published checksum"
 
     tar -xzf "${tmp}/${asset}" -C "$tmp" tect
     mv "${tmp}/tect" "$bin"

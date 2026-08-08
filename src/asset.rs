@@ -280,7 +280,10 @@ pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Asset>
     if asset.sha256.is_none() && asset.from != ShaFrom::Asset {
         issues.push(
             Issue::new(
-                format!("`{}` says where its hash comes from but pins no hash", asset.name),
+                format!(
+                    "`{}` says where its hash comes from but pins no hash",
+                    asset.name
+                ),
                 src,
             )
             .at(span, "nothing to refresh"),
@@ -332,7 +335,9 @@ pub fn check_renovate(node: &KdlNode, src: &Source, issues: &mut Issues) {
             other => issues.push(
                 Issue::new(format!("unknown renovate property `{other}`"), src)
                     .at(entry.span(), "not part of the schema")
-                    .help("datasource, depName and extractVersion, spelled as Renovate spells them"),
+                    .help(
+                        "datasource, depName and extractVersion, spelled as Renovate spells them",
+                    ),
             ),
         }
     }

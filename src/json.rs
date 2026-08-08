@@ -72,7 +72,11 @@ impl Json {
                 for (index, item) in items.iter().enumerate() {
                     out.push_str(&pad);
                     item.write(out, depth + 1);
-                    out.push_str(if index + 1 == items.len() { "\n" } else { ",\n" });
+                    out.push_str(if index + 1 == items.len() {
+                        "\n"
+                    } else {
+                        ",\n"
+                    });
                 }
                 out.push_str(&close);
                 out.push(']');
@@ -85,7 +89,11 @@ impl Json {
                     escape(name, out);
                     out.push_str(": ");
                     value.write(out, depth + 1);
-                    out.push_str(if index + 1 == fields.len() { "\n" } else { ",\n" });
+                    out.push_str(if index + 1 == fields.len() {
+                        "\n"
+                    } else {
+                        ",\n"
+                    });
                 }
                 out.push_str(&close);
                 out.push('}');

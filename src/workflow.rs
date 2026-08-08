@@ -18,13 +18,16 @@ pub fn resolve(list: &List, root: &Path, issues: &mut Issues) -> Vec<(String, bo
         }
         let known: Vec<&str> = files.iter().map(|(_, stem)| stem.as_str()).collect();
         issues.push(
-            Issue::new(format!("`{}` is not a workflow", toggle.name), &list.repo_src)
-                .at(toggle.span, format!("no such file under {WORKFLOW_DIR}/"))
-                .help(if known.is_empty() {
-                    format!("{WORKFLOW_DIR}/ holds no workflows")
-                } else {
-                    format!("workflows: {}", known.join(", "))
-                }),
+            Issue::new(
+                format!("`{}` is not a workflow", toggle.name),
+                &list.repo_src,
+            )
+            .at(toggle.span, format!("no such file under {WORKFLOW_DIR}/"))
+            .help(if known.is_empty() {
+                format!("{WORKFLOW_DIR}/ holds no workflows")
+            } else {
+                format!("workflows: {}", known.join(", "))
+            }),
         );
     }
 

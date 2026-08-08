@@ -267,7 +267,9 @@ fn check_path(remote: &Remote, src: &Source, issues: &mut Issues) {
         issues.push(
             Issue::new(format!("invalid subtree path `{path}`"), src)
                 .at(remote.span, reason)
-                .help("`path \"modules/module-name\"`, the module's directory inside the repository"),
+                .help(
+                    "`path \"modules/module-name\"`, the module's directory inside the repository",
+                ),
         );
     }
 }

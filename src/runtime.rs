@@ -110,10 +110,10 @@ fn assign(text: &str, set: &[(&str, String)]) -> String {
         }
     }
     for (name, value) in set {
-        if !text.lines().any(|line| {
-            line.split_once('=')
-                .is_some_and(|(key, _)| key == *name)
-        }) {
+        if !text
+            .lines()
+            .any(|line| line.split_once('=').is_some_and(|(key, _)| key == *name))
+        {
             let _ = writeln!(out, "{name}=\"{value}\"");
         }
     }
@@ -183,7 +183,9 @@ fn verified(url: &str, sha256: &str, dest: &Path) -> Result<(), String> {
     let got = sha256_file(dest)?;
     if got != sha256.to_lowercase() {
         let _ = fs::remove_file(dest);
-        return Err(format!("{url}\n  expected sha256 {sha256}\n  got      sha256 {got}"));
+        return Err(format!(
+            "{url}\n  expected sha256 {sha256}\n  got      sha256 {got}"
+        ));
     }
     Ok(())
 }
@@ -425,7 +427,11 @@ pub fn validate_image() -> Result<(), String> {
                 if kind != "L+" && kind != "L" {
                     continue;
                 }
-                let target = fields.skip(4).collect::<Vec<_>>().join(" ").replace("\\x20", " ");
+                let target = fields
+                    .skip(4)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+                    .replace("\\x20", " ");
                 if Path::new(&target).exists() {
                     println!("    {path} -> {target} ok");
                 } else {
@@ -453,7 +459,10 @@ pub fn validate_image() -> Result<(), String> {
     }
 
     let mut exceptions: Vec<(String, String)> = Vec::new();
-    for token in env("VERIFY_EXCEPTIONS").unwrap_or_default().split_whitespace() {
+    for token in env("VERIFY_EXCEPTIONS")
+        .unwrap_or_default()
+        .split_whitespace()
+    {
         let (class, unit) = token.split_once('|').unwrap_or((token, ""));
         if classify_known(class) {
             exceptions.push((class.to_string(), unit.to_string()));
@@ -581,10 +590,7 @@ pub fn validate_image() -> Result<(), String> {
         println!("All validation checks passed.");
         Ok(())
     } else {
-        Err(format!(
-            "{} validation check(s) failed.",
-            report.failures
-        ))
+        Err(format!("{} validation check(s) failed.", report.failures))
     }
 }
 
@@ -636,7 +642,9 @@ fn enablement_links(root: &Path, unit: &str) -> Vec<String> {
             continue;
         };
         for entry in entries.flatten() {
-            let Ok(kind) = entry.file_type() else { continue };
+            let Ok(kind) = entry.file_type() else {
+                continue;
+            };
             let path = entry.path();
             if kind.is_dir() {
                 if depth < 2 {

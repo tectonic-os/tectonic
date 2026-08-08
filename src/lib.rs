@@ -79,8 +79,11 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
     if let Some(unknown) = image_arg.filter(|id| !list.images.iter().any(|i| i.id == *id)) {
         let known: Vec<&str> = list.images.iter().map(|i| i.id.as_str()).collect();
         issues.push(
-            Issue::new(format!("`{unknown}` is not a declared image"), &list.repo_src)
-                .help(format!("images: {}", known.join(", "))),
+            Issue::new(
+                format!("`{unknown}` is not a declared image"),
+                &list.repo_src,
+            )
+            .help(format!("images: {}", known.join(", "))),
         );
     }
 
@@ -94,9 +97,7 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
     let stdout = match command {
         "plan" => plan::build(&list, &resolved, &workflows).render(),
         "section" => match one {
-            Some(i) => {
-                render::section(&list.images[i], &resolved[i].collected, &disk.phases, root)
-            }
+            Some(i) => render::section(&list.images[i], &resolved[i].collected, &disk.phases, root),
             None => String::new(),
         },
         _ => String::new(),

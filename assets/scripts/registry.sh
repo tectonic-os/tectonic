@@ -8,7 +8,7 @@ die() {
 }
 
 usage() {
-    cat >&2 <<'EOF'
+    cat >&2 << 'EOF'
 usage: scripts/registry.sh namespace
 
   namespace       registry and owner, e.g. ghcr.io/someone. Joining it to

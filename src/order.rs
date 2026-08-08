@@ -9,7 +9,9 @@ use std::collections::{BTreeMap, BinaryHeap};
 pub fn sort(image: &Image, issues: &mut Issues) -> Vec<usize> {
     let mut offered: BTreeMap<&str, usize> = BTreeMap::new();
     for (index, entry) in image.entries.iter().enumerate() {
-        let Some(module) = &entry.module else { continue };
+        let Some(module) = &entry.module else {
+            continue;
+        };
         for decl in module.provides.iter().chain(module.provides_files.iter()) {
             offered.entry(decl.name.as_str()).or_insert(index);
         }
@@ -18,7 +20,9 @@ pub fn sort(image: &Image, issues: &mut Issues) -> Vec<usize> {
     let n = image.entries.len();
     let mut waits_on: Vec<Vec<usize>> = vec![Vec::new(); n];
     for (index, entry) in image.entries.iter().enumerate() {
-        let Some(module) = &entry.module else { continue };
+        let Some(module) = &entry.module else {
+            continue;
+        };
         let hard = module.requires.iter().chain(module.requires_files.iter());
         for decl in hard {
             if let Some(&provider) = offered.get(decl.name.as_str()) {

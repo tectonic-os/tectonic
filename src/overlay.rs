@@ -13,7 +13,9 @@ pub type Index = BTreeMap<String, Vec<usize>>;
 pub fn index(image: &Image, disk: &Disk) -> Index {
     let mut shipped: Index = BTreeMap::new();
     for (index, entry) in image.entries.iter().enumerate() {
-        let Some(module) = &entry.module else { continue };
+        let Some(module) = &entry.module else {
+            continue;
+        };
         for path in disk.overlays.get(&module.dir).into_iter().flatten() {
             shipped.entry(path.clone()).or_default().push(index);
         }
@@ -58,7 +60,9 @@ pub fn check(image: &Image, shipped: &Index, issues: &mut Issues) {
     }
 
     for (index, entry) in entries.iter().enumerate() {
-        let Some(module) = &entry.module else { continue };
+        let Some(module) = &entry.module else {
+            continue;
+        };
         for decl in &module.overrides {
             if used[index].contains(decl.name.as_str()) {
                 continue;

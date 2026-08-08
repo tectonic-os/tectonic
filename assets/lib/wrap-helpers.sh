@@ -8,7 +8,7 @@ wrap_no_hardened_malloc() {
     fi
     [ -f "${bin}.bin" ] && return 0
     mv "$bin" "${bin}.bin"
-    cat > "$bin" <<EOF
+    cat > "$bin" << EOF
 #!/bin/bash
 exec env -u LD_PRELOAD "${bin}.bin" "\$@"
 EOF

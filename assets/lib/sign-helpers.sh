@@ -45,7 +45,7 @@ sign_modules_under() {
     while IFS= read -r ko; do
         sign_kernel_module "$ko" "$sign_file"
         echo "  Signed: $(basename "$ko")"
-    done < <(find "$dir" \( -name '*.ko' -o -name '*.ko.xz' -o -name '*.ko.zst' \) 2>/dev/null)
+    done < <(find "$dir" \( -name '*.ko' -o -name '*.ko.xz' -o -name '*.ko.zst' \) 2> /dev/null)
 }
 
 sign_vmlinuz() {

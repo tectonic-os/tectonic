@@ -60,10 +60,7 @@ pub fn section(
         );
     }
 
-    let _ = write!(
-        out,
-        "## Build phases and modules\n\n"
-    );
+    let _ = write!(out, "## Build phases and modules\n\n");
 
     for (_, file) in phases.iter().filter(|(number, _)| *number < MODULE_SLOT) {
         let _ = write!(out, "{}\n\n", phase(file, false, ""));
@@ -72,7 +69,9 @@ pub fn section(
     for entry in &image.entries {
         // A module that could not be read is already an issue, and there is
         // nothing to generate a layer from.
-        let Some(module) = &entry.module else { continue };
+        let Some(module) = &entry.module else {
+            continue;
+        };
 
         if entry.flavour.is_some() && !flavour_arg_emitted {
             let _ = write!(out, "{FLAVOUR_ARG}\n\n");
@@ -131,10 +130,7 @@ pub fn section(
     let _ = write!(out, "{IMAGE_VERSION_ARG}\n\n");
 
     let identity = identity(image);
-    let _ = write!(
-        out,
-        "# ---- image identity ----\n",
-    );
+    let _ = write!(out, "# ---- image identity ----\n",);
     for (name, value) in &identity {
         let _ = write!(out, "ARG {name}=\"{value}\"\n");
     }

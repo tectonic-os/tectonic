@@ -18,7 +18,7 @@ done
 rm -rf /opt
 mv /opt.bak /opt
 
-cat <<'EOF' > /tmp/composefs_execmem.te
+cat << 'EOF' > /tmp/composefs_execmem.te
 module composefs_execmem 0.1;
 
 require {
@@ -70,7 +70,8 @@ run_module_finalize() {
         [ "$entry" = "$name" ] || gate="${entry#*:}"
         [ -z "$gate" ] || [ "$gate" = "${FLAVOUR:-}" ] || continue
         dir="/ctx/modules/${name}"
-        MODDIR="$dir"; export MODDIR
+        MODDIR="$dir"
+        export MODDIR
         # shellcheck source=/dev/null
         source "$dir/finalize.sh"
     done
