@@ -13,7 +13,10 @@ die() {
     exit 1
 }
 
-remotes="$(./scripts/manifest.sh remotes)"
+remotes="$(./scripts/manifest.sh plan --json | jq -r '
+    .remotes[]
+    | [.name, .dir, .ref, .sha256, .url, (.path // ""), .file]
+    | join("|")')"
 pins=()
 [ -z "$remotes" ] || mapfile -t pins <<< "$remotes"
 

@@ -26,7 +26,7 @@ trap 'rm -f "$section_file"' EXIT
 
 mkdir -p "$outdir"
 
-mapfile -t images < <(./scripts/manifest.sh images)
+mapfile -t images < <(./scripts/manifest.sh plan --json | jq -r '.images[].id')
 if [ "${#images[@]}" -eq 0 ]; then
     echo "gen-containerfile: no images declared, so there is nothing to generate" >&2
     exit 1

@@ -38,8 +38,8 @@ fi
 echo "lint: verify classes agree ($(echo "$shell_classes" | tr '\n' ' ' | sed 's/ *$//'))"
 
 ./scripts/gen-containerfile.sh > /dev/null
-mapfile -t generated < <(./scripts/manifest.sh images \
-    | sed 's#^#containerfiles/#; s#$#.generated#')
+mapfile -t generated < <(./scripts/manifest.sh plan --json \
+    | jq -r '.images[] | "containerfiles/\(.id).generated"')
 if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
     echo "lint: the Containerfiles generate (no checkout, so no drift check)"
 else

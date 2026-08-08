@@ -2,7 +2,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-default_image="$(./scripts/manifest.sh default-image)"
+plan="$(./scripts/manifest.sh plan --json)"
+default_image="$(jq -r '.default_image' <<< "$plan")"
 
 # renovate: datasource=docker depName=docker.io/moby/buildkit
 buildkit_image="docker.io/moby/buildkit:v0.31.2"
@@ -24,14 +25,14 @@ usage: scripts/build.sh [options]
   --target <image/flavour>
                       what to build, e.g. tectonic/desktop; the flavour half
                       is `none` for the ungated set, which publishes
-                      unsuffixed (default: scripts/targets.sh default)
+                      unsuffixed (default: the plan's default_target)
   --kernel <name>     KERNEL build arg (default: unset, the Containerfile
                       decides, which is how the kernel-freshness fallback
                       switches the whole pipeline to the stock kernel)
   --tag <ref>         tag the result; repeatable
   --secret <id>=<path>
                       mount <path> as the build secret <id>, one of the
-                      IDs `scripts/manifest.sh secrets` lists; repeatable
+                      IDs the plan lists for the target; repeatable
   --backend <name>    buildkit, buildx or buildah (default: $BUILD_BACKEND,
                       else buildkit)
   --oci-output <path> write an OCI archive here instead of loading the image
@@ -135,16 +136,19 @@ if [ "$reset" = 1 ]; then
 fi
 
 # ---- resolved build inputs -----------------------------------------------
-target="${target:-$(./scripts/targets.sh default)}"
-./scripts/targets.sh check "$target"
+target="${target:-$(jq -r '.default_target' <<<"$plan")}"
+resolved="$(jq -c --arg t "$target" \
+	'.images[].targets[] | select(.name == $t)' <<<"$plan")"
+[ -n "$resolved" ] ||
+	die "'${target}' is not a build target (have: $(
+		jq -r '[.images[].targets[].name] | join(" ")' <<<"$plan"
+	))"
 
-image="${target%%/*}"
-flavour="${target#*/}"
+image="$(jq -r '.image' <<<"$resolved")"
+published="$(jq -r '.published' <<<"$resolved")"
+flavour_arg="$(jq -r '.flavour // ""' <<<"$resolved")"
 
 containerfile="containerfiles/${image}.generated"
-
-flavour_arg="$flavour"
-[ "$flavour" != none ] || flavour_arg=""
 
 image_version="${IMAGE_VERSION:-$(date -u +%Y%m%d)}"
 
@@ -152,7 +156,7 @@ while IFS= read -r line; do
 	if [ -n "$line" ]; then tags+=("$line"); fi
 done <<<"${TAGS:-}"
 [ "${#tags[@]}" -gt 0 ] ||
-	tags=("${IMAGE_NAME:-$(./scripts/targets.sh image "$target")}:${DEFAULT_TAG:-latest}")
+	tags=("${IMAGE_NAME:-$published}:${DEFAULT_TAG:-latest}")
 
 while IFS= read -r line; do
 	if [ -n "$line" ]; then labels+=("$line"); fi
@@ -179,15 +183,15 @@ done
 cache_import_refs=()
 cache_export_ref=""
 if [ "$cache_from" = 1 ] || [ "$cache_to" = 1 ]; then
-	if repo="$(./scripts/registry.sh ref "$(./scripts/targets.sh cache-image)")"; then
-		tag="$(./scripts/targets.sh image "$target")"
+	if namespace="$(./scripts/registry.sh namespace)"; then
+		repo="${namespace}/$(jq -r '.cache_image' <<<"$plan")"
 		if [ "$cache_from" = 1 ]; then
-			cache_import_refs+=("${repo}:${tag}")
+			cache_import_refs+=("${repo}:${published}")
 			while IFS= read -r sibling; do
-				cache_import_refs+=("${repo}:$(./scripts/targets.sh image "$sibling")")
-			done < <(./scripts/targets.sh siblings "$target")
+				cache_import_refs+=("${repo}:${sibling}")
+			done < <(jq -r '.siblings[].published' <<<"$resolved")
 		fi
-		[ "$cache_to" = 0 ] || cache_export_ref="${repo}:${tag},mode=max"
+		[ "$cache_to" = 0 ] || cache_export_ref="${repo}:${published},mode=max"
 	else
 		[ "$cache_to" = 0 ] || die "--cache-to needs a registry namespace"
 		echo "build: skipping the registry layer cache" >&2
@@ -201,8 +205,9 @@ build_args=(
 	"FLAVOUR=${flavour_arg}"
 	"IMAGE_VERSION=${image_version}"
 	"IMAGE_REGISTRY=$(./scripts/registry.sh namespace 2>/dev/null || true)"
-	"CONTRACT_FILES=$(./scripts/manifest.sh contract-files "$target" | tr '\n' ' ')"
-	"VERIFY_EXCEPTIONS=$(./scripts/manifest.sh verify-exceptions "$target" | tr '\n' ' ')"
+	"CONTRACT_FILES=$(jq -r '.contract_files | join(" ")' <<<"$resolved")"
+	"VERIFY_EXCEPTIONS=$(jq -r \
+		'[.verify_exceptions[] | "\(.class)|\(.unit)"] | join(" ")' <<<"$resolved")"
 )
 [ -z "$kernel" ] || build_args+=("KERNEL=${kernel}")
 
