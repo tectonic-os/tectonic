@@ -1,4 +1,11 @@
   x ./image.kdl is not valid KDL
+   ,-[./image.kdl:1:7]
+ 1 | ,-> image {
+   : |         |
+   : |         `-- No closing '}' for child block
+ 2 | |->     name "Broken Syntax"
+   : `---- Closing '}' was not found after nodes
+   `----
 
   x unknown node `colour` in repo.kdl
    ,-[./repo.kdl:2:1]
