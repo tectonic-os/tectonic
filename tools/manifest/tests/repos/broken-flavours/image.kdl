@@ -1,0 +1,22 @@
+image {
+    name "Broken Flavours"
+
+    base "quay.io/fedora/fedora-bootc:44" {
+        family "fedora"
+        provides "rechunking"
+    }
+
+    flavours {
+        dev
+        none
+        dev
+    }
+
+    modules {
+        module "core/hello"
+
+        flavour "server" {
+            module "core/hello"
+        }
+    }
+}

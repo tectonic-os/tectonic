@@ -1,0 +1,6 @@
+description "Requires a capability nothing in this image provides"
+
+supports "fedora"
+
+requires "package-manager"
+requires-file "/usr/bin/nothing"

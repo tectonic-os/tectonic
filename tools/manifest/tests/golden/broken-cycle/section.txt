@@ -1,0 +1,38 @@
+### Base Image
+FROM quay.io/fedora/fedora-bootc:44
+
+## Build phases and modules
+
+# ---- core/a ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/a,target=/ctx/modules/core/a \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/lib/run-module.sh /ctx/modules/core/a
+
+# ---- core/b ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/b,target=/ctx/modules/core/b \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/lib/run-module.sh /ctx/modules/core/b
+
+# ---- flavour gate ----
+ARG FLAVOUR
+
+# ---- finalize hook order ----
+ARG FINALIZE_ORDER=""
+
+# ---- collected file destinations ----
+ARG COLLECT_TARGETS=""
+
+# ---- image version ----
+ARG IMAGE_VERSION=dev
+
+# ---- image identity ----
+ARG IMAGE_ID="broken-cycle"
+ARG IMAGE_NAME="Broken Cycle"
+ARG IMAGE_REGISTRY=""
+

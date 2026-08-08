@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "default_image": "broken-collect",
+  "default_image_name": "Broken Collect",
+  "pr_image": "broken-collect",
+  "default_target": "broken-collect/none",
+  "default_published": "broken-collect",
+  "pr_target": "broken-collect/none",
+  "pr_published": "broken-collect",
+  "ungated_target": "broken-collect/none",
+  "ungated_published": "broken-collect",
+  "cache_image": "broken-collect-cache",
+  "workflows": [],
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "broken-collect",
+      "name": "Broken Collect",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "logo": "",
+      "watermark": "",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "provides_files": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "broken-collect/none",
+          "image": "broken-collect",
+          "flavour": null,
+          "published": "broken-collect",
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "core/menu",
+              "dir": "core/menu",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Collects a file, but declares no destination for it",
+              "options": {}
+            },
+            {
+              "path": "core/absent",
+              "dir": "core/absent",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Contributes a file it does not ship, twice, out of range",
+              "options": {}
+            },
+            {
+              "path": "core/unclaimed",
+              "dir": "core/unclaimed",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Ships a collected filename nothing in this image collects",
+              "options": {}
+            }
+          ],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

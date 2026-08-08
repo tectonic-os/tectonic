@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "default_image": "Not An Id",
+  "default_image_name": "",
+  "pr_image": "Not An Id",
+  "default_target": "Not An Id/none",
+  "default_published": "Not An Id",
+  "pr_target": "Not An Id/none",
+  "pr_published": "Not An Id",
+  "ungated_target": "Not An Id/none",
+  "ungated_published": "Not An Id",
+  "cache_image": "Not An Id-cache",
+  "workflows": [],
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "Not An Id",
+      "name": "",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "logo": "assets/logo.svg",
+      "watermark": "",
+      "base": null,
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "Not An Id/none",
+          "image": "Not An Id",
+          "flavour": null,
+          "published": "Not An Id",
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "modules": [],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

@@ -20,6 +20,13 @@ echo "lint: shellcheck passed on ${#scripts[@]} scripts"
 
 ./scripts/manifest.sh check
 
+if command -v cargo > /dev/null 2>&1; then
+    cargo test --quiet --manifest-path tools/manifest/Cargo.toml
+    echo "lint: the goldens match"
+else
+    echo "lint: cargo not found, the goldens were not run" >&2
+fi
+
 shell_classes="$(sed -n 's/^\t\[\([a-z-]*\)\]=.*/\1/p' lib/validate-image.sh | sort)"
 parser_classes="$(sed -n 's/^const VERIFY_CLASSES[^=]*= \[\(.*\)\];$/\1/p' \
     tools/manifest/src/module.rs | tr -d '" ' | tr ',' '\n' | sort)"

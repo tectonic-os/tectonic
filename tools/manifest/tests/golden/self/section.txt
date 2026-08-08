@@ -1,0 +1,354 @@
+### Base Image
+FROM quay.io/fedora/fedora-bootc:44
+
+## Build phases and modules
+
+# ---- phase 00-setup.sh ----
+RUN --mount=type=bind,from=ctx,source=/00-setup.sh,target=/ctx/00-setup.sh \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    /ctx/00-setup.sh
+
+# ---- core/bootloader ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/bootloader,target=/ctx/modules/core/bootloader \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    MODULE_COLLECT="justfile.inc=/usr/share/goojust/justfile.apps.d/0500-core-bootloader.part" bash /ctx/lib/run-module.sh /ctx/modules/core/bootloader
+
+# ---- core/signature-policy ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/signature-policy,target=/ctx/modules/core/signature-policy \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/lib/run-module.sh /ctx/modules/core/signature-policy
+
+# ---- core/auto-updates ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/auto-updates,target=/ctx/modules/core/auto-updates \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    MODULE_COLLECT="justfile.inc=/usr/share/goojust/justfile.apps.d/0500-core-auto-updates.part" bash /ctx/lib/run-module.sh /ctx/modules/core/auto-updates
+
+# ---- core/system-just-scripts ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/system-just-scripts,target=/ctx/modules/core/system-just-scripts \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    MODULE_COLLECT="justfile.inc=/usr/share/goojust/justfile.apps.d/0500-core-system-just-scripts.part" bash /ctx/lib/run-module.sh /ctx/modules/core/system-just-scripts
+
+# ---- core/power-just-scripts ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/power-just-scripts,target=/ctx/modules/core/power-just-scripts \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    MODULE_COLLECT="justfile.inc=/usr/share/goojust/justfile.apps.d/0900-core-power-just-scripts.part" bash /ctx/lib/run-module.sh /ctx/modules/core/power-just-scripts
+
+# ---- core/flatpak ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/flatpak,target=/ctx/modules/core/flatpak \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    dnf5 install -y flatpak && \
+    bash /ctx/lib/run-module.sh /ctx/modules/core/flatpak
+
+# ---- core/brew ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/brew,target=/ctx/modules/core/brew \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/lib/run-module.sh /ctx/modules/core/brew
+
+# ---- core/cli-tools ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/cli-tools,target=/ctx/modules/core/cli-tools \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    dnf5 install -y 7zip-standalone bash-completion bc bsdunzip btop htop iw mtr pv rsync tmux tree vim-enhanced whois wl-clipboard zip && \
+    bash /ctx/lib/run-module.sh /ctx/modules/core/cli-tools
+
+# ---- kernel/cachyos-kernel ----
+# verbatim from modules/kernel/cachyos-kernel/Containerfile.inc:
+ARG KERNEL=cachyos
+
+RUN --mount=type=bind,from=ctx,source=/modules/kernel/cachyos-kernel,target=/ctx/modules/kernel/cachyos-kernel \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    --mount=type=secret,id=mok_privkey,target=/run/secrets/mok_privkey,required=false \
+    KERNEL=${KERNEL} bash /ctx/lib/run-module.sh /ctx/modules/kernel/cachyos-kernel
+
+# ---- hardening/coredumps ----
+RUN --mount=type=bind,from=ctx,source=/modules/hardening/coredumps,target=/ctx/modules/hardening/coredumps \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/lib/run-module.sh /ctx/modules/hardening/coredumps
+
+# ---- hardening/login-policy ----
+RUN --mount=type=bind,from=ctx,source=/modules/hardening/login-policy,target=/ctx/modules/hardening/login-policy \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/lib/run-module.sh /ctx/modules/hardening/login-policy
+
+# ---- hardening/hardened-malloc ----
+RUN --mount=type=bind,from=ctx,source=/modules/hardening/hardened-malloc,target=/ctx/modules/hardening/hardened-malloc \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    MODULE_COLLECT="justfile.inc=/usr/share/goojust/justfile.apps.d/0500-hardening-hardened-malloc.part" bash /ctx/lib/run-module.sh /ctx/modules/hardening/hardened-malloc
+
+# ---- hardening/sudo-hardening ----
+RUN --mount=type=bind,from=ctx,source=/modules/hardening/sudo-hardening,target=/ctx/modules/hardening/sudo-hardening \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/lib/run-module.sh /ctx/modules/hardening/sudo-hardening
+
+# ---- backup/backup-tools ----
+RUN --mount=type=bind,from=ctx,source=/modules/backup/backup-tools,target=/ctx/modules/backup/backup-tools \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    dnf5 install -y borgbackup rclone restic && \
+    bash /ctx/lib/run-module.sh /ctx/modules/backup/backup-tools
+
+# ---- hardware/intel-wifi ----
+RUN --mount=type=bind,from=ctx,source=/modules/hardware/intel-wifi,target=/ctx/modules/hardware/intel-wifi \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    dnf5 install -y iwlwifi-mvm-firmware iwlwifi-mld-firmware && \
+    bash /ctx/lib/run-module.sh /ctx/modules/hardware/intel-wifi
+
+# ---- hardware/gaming ----
+RUN --mount=type=bind,from=ctx,source=/modules/hardware/gaming,target=/ctx/modules/hardware/gaming \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    --mount=type=secret,id=mok_privkey,target=/run/secrets/mok_privkey,required=false \
+    dnf5 install -y gamemode && \
+    ASSET_XONE_VERSION="3484f603484782dd7551c64e5a33fc602b127051" \
+    KERNEL=${KERNEL} bash /ctx/lib/run-module.sh /ctx/modules/hardware/gaming
+
+# ---- hardware/hardware-tools ----
+RUN --mount=type=bind,from=ctx,source=/modules/hardware/hardware-tools,target=/ctx/modules/hardware/hardware-tools \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    dnf5 install -y alsa-ucm alsa-utils dmidecode intel-lpmd lm_sensors lshw pciutils powerstat && \
+    bash /ctx/lib/run-module.sh /ctx/modules/hardware/hardware-tools
+
+# ---- hardware/logitech ----
+RUN --mount=type=bind,from=ctx,source=/modules/hardware/logitech,target=/ctx/modules/hardware/logitech \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    dnf5 install -y solaar-udev && \
+    bash /ctx/lib/run-module.sh /ctx/modules/hardware/logitech
+
+# ---- hardware/yubikey ----
+RUN --mount=type=bind,from=ctx,source=/modules/hardware/yubikey,target=/ctx/modules/hardware/yubikey \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    dnf5 install -y opensc pam-u2f pam_yubico pamu2fcfg pcsc-lite pcsc-lite-ccid yubikey-manager && \
+    bash /ctx/lib/run-module.sh /ctx/modules/hardware/yubikey
+
+# ---- de/kde-desktop ----
+RUN --mount=type=bind,from=ctx,source=/modules/de/kde-desktop,target=/ctx/modules/de/kde-desktop \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    MODULE_COLLECT="dracut.modules=/usr/lib/kernel-build/dracut.modules.d/0500-de-kde-desktop.part" bash /ctx/lib/run-module.sh /ctx/modules/de/kde-desktop
+
+# ---- de/bazaar ----
+RUN --mount=type=bind,from=ctx,source=/modules/de/bazaar,target=/ctx/modules/de/bazaar \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    MODULE_COLLECT="flatpaks.list=/usr/share/flatpak-defaults/apps.list.d/0500-de-bazaar.part" bash /ctx/lib/run-module.sh /ctx/modules/de/bazaar
+
+# ---- media-codecs ----
+RUN --mount=type=bind,from=ctx,source=/modules/media-codecs,target=/ctx/modules/media-codecs \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/lib/run-module.sh /ctx/modules/media-codecs
+
+# ---- networking ----
+RUN --mount=type=bind,from=ctx,source=/modules/networking,target=/ctx/modules/networking \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    dnf5 install -y avahi-gobject avahi-tools cifs-utils nmap-ncat tcpdump traceroute wireguard-tools && \
+    MODULE_COLLECT="justfile.inc=/usr/share/goojust/justfile.apps.d/0500-networking.part" bash /ctx/lib/run-module.sh /ctx/modules/networking
+
+# ---- virtualization/libvirt ----
+RUN --mount=type=bind,from=ctx,source=/modules/virtualization/libvirt,target=/ctx/modules/virtualization/libvirt \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    dnf5 install -y edk2-ovmf libvirt libvirt-nss qemu qemu-img qemu-system-x86-core qemu-user-binfmt qemu-user-static-aarch64 virt-manager virt-v2v virt-viewer && \
+    bash /ctx/lib/run-module.sh /ctx/modules/virtualization/libvirt
+
+# ---- virtualization/incus ----
+RUN --mount=type=bind,from=ctx,source=/modules/virtualization/incus,target=/ctx/modules/virtualization/incus \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    dnf5 install -y incus incus-agent lxc systemd-container && \
+    bash /ctx/lib/run-module.sh /ctx/modules/virtualization/incus
+
+# ---- virtualization/podman ----
+RUN --mount=type=bind,from=ctx,source=/modules/virtualization/podman,target=/ctx/modules/virtualization/podman \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    dnf5 install -y podman-compose podman-machine podman-tui slirp4netns && \
+    bash /ctx/lib/run-module.sh /ctx/modules/virtualization/podman
+
+# ---- vpn/netbird ----
+RUN --mount=type=bind,from=ctx,source=/modules/vpn/netbird,target=/ctx/modules/vpn/netbird \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/lib/run-module.sh /ctx/modules/vpn/netbird
+
+# ---- vpn/tailscale ----
+RUN --mount=type=bind,from=ctx,source=/modules/vpn/tailscale,target=/ctx/modules/vpn/tailscale \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/lib/run-module.sh /ctx/modules/vpn/tailscale
+
+# ---- apps/trivalent ----
+RUN --mount=type=bind,from=ctx,source=/modules/apps/trivalent,target=/ctx/modules/apps/trivalent \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/lib/run-module.sh /ctx/modules/apps/trivalent
+
+# ---- apps/vscodium ----
+RUN --mount=type=bind,from=ctx,source=/modules/apps/vscodium,target=/ctx/modules/apps/vscodium \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/lib/run-module.sh /ctx/modules/apps/vscodium
+
+# ---- apps/bitwarden ----
+RUN --mount=type=bind,from=ctx,source=/modules/apps/bitwarden,target=/ctx/modules/apps/bitwarden \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    MODULE_COLLECT="flatpaks.list=/usr/share/flatpak-defaults/apps.list.d/0500-apps-bitwarden.part" bash /ctx/lib/run-module.sh /ctx/modules/apps/bitwarden
+
+# ---- core/goojust ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/goojust,target=/ctx/modules/core/goojust \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    dnf5 install -y just fastfetch && \
+    ASSET_GOOJUST_VERSION="0.1.5" \
+    ASSET_GOOJUST_URL="https://github.com/tectonic-os/goojust/releases/download/v0.1.5/goojust-v0.1.5-x86_64-linux-gnu.tar.gz" \
+    ASSET_GOOJUST_SHA256="b5555c822de33e74793d43d99df27adaebc9f4be08dc956e8d7cbfb2a5121375" \
+    bash /ctx/lib/run-module.sh /ctx/modules/core/goojust
+
+# ---- de/plasma-bootc-updates ----
+RUN --mount=type=bind,from=ctx,source=/modules/de/plasma-bootc-updates,target=/ctx/modules/de/plasma-bootc-updates \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    ASSET_TECTONIC_BOOTC_UPDATES_VERSION="0.1.1" \
+    ASSET_TECTONIC_BOOTC_UPDATES_URL="https://github.com/tectonic-os/plasma-bootc-updates/releases/download/v0.1.1/tectonic-bootc-updates-0.1.1-1.fc44.x86_64.rpm" \
+    ASSET_TECTONIC_BOOTC_UPDATES_SHA256="2272f4682aff39bd0bff7b2b13db71854da971eda99b6e84653ba1da32d94b7a" \
+    bash /ctx/lib/run-module.sh /ctx/modules/de/plasma-bootc-updates
+
+# ---- flavour gate ----
+ARG FLAVOUR
+
+# ---- [dev] ----
+# ---- dev-tools ----
+RUN --mount=type=bind,from=ctx,source=/modules/dev-tools,target=/ctx/modules/dev-tools \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    dnf5 install -y direnv git git-credential-libsecret git-delta git-lfs && \
+    FLAVOUR_GATE=dev bash /ctx/lib/run-module.sh /ctx/modules/dev-tools
+
+# ---- finalize hook order ----
+ARG FINALIZE_ORDER="core/signature-policy core/auto-updates kernel/cachyos-kernel"
+
+# ---- collected file destinations ----
+ARG COLLECT_TARGETS="/usr/lib/kernel-build/dracut.modules /usr/share/flatpak-defaults/apps.list /usr/share/goojust/justfile.apps"
+
+# ---- image version ----
+ARG IMAGE_VERSION=dev
+
+# ---- image identity ----
+ARG IMAGE_ID="tectonic"
+ARG IMAGE_NAME="Tectonic"
+ARG IMAGE_URL="https://github.com/tectonic-os/tectonic"
+ARG IMAGE_ISSUES_URL="https://github.com/tectonic-os/tectonic/issues"
+ARG IMAGE_REGISTRY=""
+
+# ---- phase 50-flavour.sh ----
+RUN --mount=type=bind,from=ctx,source=/50-flavour.sh,target=/ctx/50-flavour.sh \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/modules,target=/ctx/modules \
+    --mount=type=bind,from=ctx,source=/brand,target=/ctx/brand \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    FLAVOUR=${FLAVOUR} IMAGE_VERSION=${IMAGE_VERSION} FINALIZE_ORDER="${FINALIZE_ORDER}" \
+    COLLECT_TARGETS="${COLLECT_TARGETS}" \
+    IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_URL="${IMAGE_URL}" IMAGE_ISSUES_URL="${IMAGE_ISSUES_URL}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" /ctx/50-flavour.sh
+
+# ---- phase 99-finalize.sh ----
+RUN --mount=type=bind,from=ctx,source=/99-finalize.sh,target=/ctx/99-finalize.sh \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/modules,target=/ctx/modules \
+    --mount=type=bind,from=ctx,source=/brand,target=/ctx/brand \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    FLAVOUR=${FLAVOUR} IMAGE_VERSION=${IMAGE_VERSION} FINALIZE_ORDER="${FINALIZE_ORDER}" \
+    COLLECT_TARGETS="${COLLECT_TARGETS}" \
+    IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_URL="${IMAGE_URL}" IMAGE_ISSUES_URL="${IMAGE_ISSUES_URL}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" /ctx/99-finalize.sh
+

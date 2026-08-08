@@ -1,0 +1,5 @@
+description "Network recipes, contributed to the menu before the defaults"
+
+supports "fedora"
+
+contributes "justfile.inc" priority=100

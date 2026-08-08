@@ -1,0 +1,8 @@
+description "A DKMS module built and signed against the kernel above"
+
+supports "fedora"
+
+requires "kernel-devel"
+requires-file "/usr/libexec/kernel-devel-helpers.sh"
+
+secret "mok_privkey"

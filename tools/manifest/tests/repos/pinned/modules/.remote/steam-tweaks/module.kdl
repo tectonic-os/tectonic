@@ -1,0 +1,3 @@
+description "A module fetched from outside this repository"
+
+supports "fedora"

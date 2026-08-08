@@ -1,0 +1,38 @@
+### Base Image
+FROM quay.io/fedora/fedora-bootc:44
+
+## Build phases and modules
+
+# ---- core/hello ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/hello,target=/ctx/modules/core/hello \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/lib/run-module.sh /ctx/modules/core/hello
+
+# ---- steam-tweaks ----
+RUN --mount=type=bind,from=ctx,source=/modules/.remote/steam-tweaks,target=/ctx/modules/.remote/steam-tweaks \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/lib/run-module.sh /ctx/modules/.remote/steam-tweaks
+
+# ---- flavour gate ----
+ARG FLAVOUR
+
+# ---- finalize hook order ----
+ARG FINALIZE_ORDER=""
+
+# ---- collected file destinations ----
+ARG COLLECT_TARGETS=""
+
+# ---- image version ----
+ARG IMAGE_VERSION=dev
+
+# ---- image identity ----
+ARG IMAGE_ID="pinned"
+ARG IMAGE_NAME="Pinned"
+ARG IMAGE_REGISTRY=""
+

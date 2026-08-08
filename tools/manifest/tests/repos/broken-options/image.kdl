@@ -1,0 +1,17 @@
+image {
+    name "Broken Options"
+
+    base "quay.io/fedora/fedora-bootc:44" {
+        family "fedora"
+        provides "rechunking"
+    }
+
+    modules {
+        module "core/configurable" variant="nonexistent" {
+            fonts "Fira Code"
+            starship "yes"
+            colour "blue"
+            starship #true
+        }
+    }
+}

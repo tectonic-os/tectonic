@@ -1,0 +1,5 @@
+description "Overrides a path no earlier module ships"
+
+supports "fedora"
+
+overrides "/usr/lib/nothing.conf"

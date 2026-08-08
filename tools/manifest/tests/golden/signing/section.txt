@@ -1,0 +1,40 @@
+### Base Image
+FROM quay.io/fedora/fedora-bootc:44
+
+## Build phases and modules
+
+# ---- kernel/signed-kernel ----
+RUN --mount=type=bind,from=ctx,source=/modules/kernel/signed-kernel,target=/ctx/modules/kernel/signed-kernel \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    --mount=type=secret,id=mok_privkey,target=/run/secrets/mok_privkey,required=false \
+    KERNEL=${KERNEL} bash /ctx/lib/run-module.sh /ctx/modules/kernel/signed-kernel
+
+# ---- drivers/kvmfr ----
+RUN --mount=type=bind,from=ctx,source=/modules/drivers/kvmfr,target=/ctx/modules/drivers/kvmfr \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    --mount=type=secret,id=mok_privkey,target=/run/secrets/mok_privkey,required=false \
+    bash /ctx/lib/run-module.sh /ctx/modules/drivers/kvmfr
+
+# ---- flavour gate ----
+ARG FLAVOUR
+
+# ---- finalize hook order ----
+ARG FINALIZE_ORDER=""
+
+# ---- collected file destinations ----
+ARG COLLECT_TARGETS=""
+
+# ---- image version ----
+ARG IMAGE_VERSION=dev
+
+# ---- image identity ----
+ARG IMAGE_ID="signing"
+ARG IMAGE_NAME="Signing"
+ARG IMAGE_REGISTRY=""
+

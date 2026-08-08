@@ -1,0 +1,30 @@
+### Base Image
+FROM quay.io/fedora/fedora-bootc:44
+
+## Build phases and modules
+
+# ---- core/nameless ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/nameless,target=/ctx/modules/core/nameless \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/lib/run-module.sh /ctx/modules/core/nameless
+
+# ---- flavour gate ----
+ARG FLAVOUR
+
+# ---- finalize hook order ----
+ARG FINALIZE_ORDER=""
+
+# ---- collected file destinations ----
+ARG COLLECT_TARGETS=""
+
+# ---- image version ----
+ARG IMAGE_VERSION=dev
+
+# ---- image identity ----
+ARG IMAGE_ID="broken-module"
+ARG IMAGE_NAME="Broken Module"
+ARG IMAGE_REGISTRY=""
+

@@ -1,0 +1,46 @@
+### Base Image
+FROM quay.io/fedora/fedora-bootc:44
+
+## Build phases and modules
+
+# ---- core/first ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/first,target=/ctx/modules/core/first \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/lib/run-module.sh /ctx/modules/core/first
+
+# ---- core/second ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/second,target=/ctx/modules/core/second \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/lib/run-module.sh /ctx/modules/core/second
+
+# ---- core/third ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/third,target=/ctx/modules/core/third \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/lib/run-module.sh /ctx/modules/core/third
+
+# ---- flavour gate ----
+ARG FLAVOUR
+
+# ---- finalize hook order ----
+ARG FINALIZE_ORDER=""
+
+# ---- collected file destinations ----
+ARG COLLECT_TARGETS=""
+
+# ---- image version ----
+ARG IMAGE_VERSION=dev
+
+# ---- image identity ----
+ARG IMAGE_ID="broken-overlay"
+ARG IMAGE_NAME="Broken Overlay"
+ARG IMAGE_REGISTRY=""
+

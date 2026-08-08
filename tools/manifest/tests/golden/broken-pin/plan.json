@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "default_image": "broken-pin",
+  "default_image_name": "Broken Pin",
+  "pr_image": "broken-pin",
+  "default_target": "broken-pin/none",
+  "default_published": "broken-pin",
+  "pr_target": "broken-pin/none",
+  "pr_published": "broken-pin",
+  "ungated_target": "broken-pin/none",
+  "ungated_published": "broken-pin",
+  "cache_image": "broken-pin-cache",
+  "workflows": [],
+  "remotes": [
+    {
+      "name": "loose",
+      "dir": "modules/.remote/loose",
+      "ref": "",
+      "sha256": "",
+      "url": "http://example.com/modules.zip",
+      "path": "/etc/passwd",
+      "file": "./image.kdl"
+    }
+  ],
+  "assets": [],
+  "images": [
+    {
+      "id": "broken-pin",
+      "name": "Broken Pin",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "logo": "",
+      "watermark": "",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "provides_files": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "broken-pin/none",
+          "image": "broken-pin",
+          "flavour": null,
+          "published": "broken-pin",
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "loose",
+              "dir": ".remote/loose",
+              "flavour": null,
+              "variant": null,
+              "remote": "",
+              "description": "",
+              "options": {}
+            }
+          ],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

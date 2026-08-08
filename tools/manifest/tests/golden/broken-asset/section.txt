@@ -1,0 +1,35 @@
+### Base Image
+FROM quay.io/fedora/fedora-bootc:44
+
+## Build phases and modules
+
+# ---- core/pins ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/pins,target=/ctx/modules/core/pins \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    ASSET_TRACKED_AND_MANUAL_VERSION="1.0.0" \
+    ASSET_TRACKED_AND_MANUAL_URL="https://example.com/download/v1.0.0/tool.tar.gz" \
+    ASSET_TRACKED_AND_MANUAL_SHA256="NOTHEX" \
+    ASSET_NO_TRACKING_VERSION="1.0.0" \
+    ASSET_NO_TRACKING_URL="https://example.com/download/v{tag}/tool.tar.gz; rm -rf /" \
+    bash /ctx/lib/run-module.sh /ctx/modules/core/pins
+
+# ---- flavour gate ----
+ARG FLAVOUR
+
+# ---- finalize hook order ----
+ARG FINALIZE_ORDER=""
+
+# ---- collected file destinations ----
+ARG COLLECT_TARGETS=""
+
+# ---- image version ----
+ARG IMAGE_VERSION=dev
+
+# ---- image identity ----
+ARG IMAGE_ID="broken-asset"
+ARG IMAGE_NAME="Broken Asset"
+ARG IMAGE_REGISTRY=""
+

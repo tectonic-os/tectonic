@@ -1,0 +1,3 @@
+description "A module in a repository whose flavours are wrong"
+
+supports "fedora"

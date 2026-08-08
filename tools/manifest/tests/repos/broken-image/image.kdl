@@ -1,0 +1,4 @@
+image "argument" {
+    id "Not An Id"
+    logo "assets/logo.svg"
+}

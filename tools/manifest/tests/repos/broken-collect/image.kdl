@@ -1,0 +1,14 @@
+image {
+    name "Broken Collect"
+
+    base "quay.io/fedora/fedora-bootc:44" {
+        family "fedora"
+        provides "rechunking"
+    }
+
+    modules {
+        module "core/menu"
+        module "core/absent"
+        module "core/unclaimed"
+    }
+}

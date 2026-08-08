@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "default_image": "signing",
+  "default_image_name": "Signing",
+  "pr_image": "signing",
+  "default_target": "signing/none",
+  "default_published": "signing",
+  "pr_target": "signing/none",
+  "pr_published": "signing",
+  "ungated_target": "signing/none",
+  "ungated_published": "signing",
+  "cache_image": "signing-cache",
+  "workflows": [],
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "signing",
+      "name": "Signing",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "logo": "",
+      "watermark": "",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking",
+          "initramfs-generation"
+        ],
+        "provides_files": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "signing/none",
+          "image": "signing",
+          "flavour": null,
+          "published": "signing",
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "kernel/signed-kernel",
+              "dir": "kernel/signed-kernel",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "A kernel that signs its own modules against a Secure Boot key",
+              "options": {}
+            },
+            {
+              "path": "drivers/kvmfr",
+              "dir": "drivers/kvmfr",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "A DKMS module built and signed against the kernel above",
+              "options": {}
+            }
+          ],
+          "secrets": [
+            "mok_privkey"
+          ],
+          "contract_files": [
+            "/usr/share/secureboot/sb_cert.der"
+          ],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {
+            "/usr/share/secureboot/sb_cert.der": "kernel/signed-kernel",
+            "/usr/libexec/kernel-devel-helpers.sh": "kernel/signed-kernel"
+          },
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

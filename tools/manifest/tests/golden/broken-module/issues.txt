@@ -1,0 +1,55 @@
+  x `core/nameless` is listed twice
+    ,-[./image.kdl:10:9]
+  9 |     modules {
+ 10 |         module "core/nameless"
+    :         ^^^|^^
+    :            `-- first here
+ 11 |         module "core/missing"
+ 12 |         module "core/nameless"
+    :         ^^^|^^
+    :            `-- and again here
+ 13 |     }
+    `----
+  help: a module builds once per flavour it is listed under
+
+  x unknown node `drives`
+   ,-[./modules/core/nameless/module.kdl:3:1]
+ 2 | 
+ 3 | drives "a truck"
+   : ^^^|^^
+   :    `-- not part of the schema
+   `----
+  help: SCHEMA.md documents every node a manifest may hold
+
+  x `core/nameless` declares no description
+  help: one line, present tense, no trailing period; it names the module in
+        the resolved build summary
+
+  x `core/nameless` declares no `supports`
+  help: a module has to say which base families it can build on, so a
+        portability gap surfaces at lint rather than mid-build
+
+  x `core/missing` has no module.kdl
+    ,-[./image.kdl:11:9]
+ 10 |         module "core/nameless"
+ 11 |         module "core/missing"
+    :         ^^^|^^
+    :            `-- every module needs a manifest
+ 12 |         module "core/nameless"
+    `----
+  help: create ./modules/core/missing/module.kdl; modules/_template/module-
+        name/module.kdl is a copy-me reference
+
+  x `core/nameless` does not support the `fedora` base family
+  help: add `supports "fedora"` to the manifest
+
+  x `core/missing` does not resolve to a module directory
+    ,-[./image.kdl:11:9]
+ 10 |         module "core/nameless"
+ 11 |         module "core/missing"
+    :         ^^^|^^
+    :            `-- no such module
+ 12 |         module "core/nameless"
+    `----
+  help: expected ./modules/core/missing
+

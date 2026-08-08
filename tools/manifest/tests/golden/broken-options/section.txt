@@ -1,0 +1,30 @@
+### Base Image
+FROM quay.io/fedora/fedora-bootc:44
+
+## Build phases and modules
+
+# ---- core/configurable ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/configurable,target=/ctx/modules/core/configurable \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    OPT_FONTS="JetBrainsMono" OPT_STARSHIP="1" bash /ctx/lib/run-module.sh /ctx/modules/core/configurable
+
+# ---- flavour gate ----
+ARG FLAVOUR
+
+# ---- finalize hook order ----
+ARG FINALIZE_ORDER=""
+
+# ---- collected file destinations ----
+ARG COLLECT_TARGETS=""
+
+# ---- image version ----
+ARG IMAGE_VERSION=dev
+
+# ---- image identity ----
+ARG IMAGE_ID="broken-options"
+ARG IMAGE_NAME="Broken Options"
+ARG IMAGE_REGISTRY=""
+

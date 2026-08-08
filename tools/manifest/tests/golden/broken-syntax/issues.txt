@@ -1,0 +1,29 @@
+  x ./image.kdl is not valid KDL
+
+  x unknown node `colour` in repo.kdl
+   ,-[./repo.kdl:2:1]
+ 1 | schema-version 1
+ 2 | colour "blue"
+   : ^^^|^^
+   :    `-- not part of the schema
+   `----
+  help: repo.kdl holds `schema-version`, `default-image`, `pr-image` and a
+        `workflows` block: what is true of the repository rather than of any
+        image in it. An image goes in a file of its own
+
+  x unknown top-level node `palette`
+   ,-[./second.kdl:1:1]
+ 1 | palette {
+   : ^^^|^^^
+   :    `-- not part of the schema
+ 2 |     accent "red"
+   `----
+  help: every root .kdl but repo.kdl is one `image` node; `base`, `flavours`
+        and `modules` are declared inside it, because they are what the image
+        is rather than what the repository is
+
+  x ./second.kdl declares no image
+  help: every root .kdl but repo.kdl holds one `image` node: `image { name
+        "Name" }`, what the image calls itself in os-release and what it
+        publishes as
+

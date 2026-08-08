@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "default_image": "broken-graph",
+  "default_image_name": "Broken Graph",
+  "pr_image": "broken-graph",
+  "default_target": "broken-graph/none",
+  "default_published": "broken-graph",
+  "pr_target": "broken-graph/none",
+  "pr_published": "broken-graph",
+  "ungated_target": "broken-graph/none",
+  "ungated_published": "broken-graph",
+  "cache_image": "broken-graph-cache",
+  "workflows": [],
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "broken-graph",
+      "name": "Broken Graph",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "logo": "",
+      "watermark": "",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "provides_files": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "broken-graph/none",
+          "image": "broken-graph",
+          "flavour": null,
+          "published": "broken-graph",
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "core/one",
+              "dir": "core/one",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Requires a capability nothing in this image provides",
+              "options": {}
+            },
+            {
+              "path": "core/two",
+              "dir": "core/two",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Provides what the base already provides",
+              "options": {}
+            },
+            {
+              "path": "core/three",
+              "dir": "core/three",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Provides the same capability as another enabled module",
+              "options": {}
+            }
+          ],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

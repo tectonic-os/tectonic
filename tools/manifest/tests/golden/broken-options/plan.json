@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "default_image": "broken-options",
+  "default_image_name": "Broken Options",
+  "pr_image": "broken-options",
+  "default_target": "broken-options/none",
+  "default_published": "broken-options",
+  "pr_target": "broken-options/none",
+  "pr_published": "broken-options",
+  "ungated_target": "broken-options/none",
+  "ungated_published": "broken-options",
+  "cache_image": "broken-options-cache",
+  "workflows": [],
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "broken-options",
+      "name": "Broken Options",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "logo": "",
+      "watermark": "",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "provides_files": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "broken-options/none",
+          "image": "broken-options",
+          "flavour": null,
+          "published": "broken-options",
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "core/configurable",
+              "dir": "core/configurable",
+              "flavour": null,
+              "variant": "nonexistent",
+              "remote": null,
+              "description": "Declares two options, and a variant that sets an undeclared one",
+              "options": {
+                "OPT_FONTS": "JetBrainsMono",
+                "OPT_STARSHIP": "1"
+              }
+            }
+          ],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

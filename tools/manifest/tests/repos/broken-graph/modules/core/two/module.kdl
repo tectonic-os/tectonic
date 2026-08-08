@@ -1,0 +1,6 @@
+description "Provides what the base already provides"
+
+supports "fedora"
+
+provides "rechunking"
+provides "shell-tools"

@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "default_image": "broken-overlay",
+  "default_image_name": "Broken Overlay",
+  "pr_image": "broken-overlay",
+  "default_target": "broken-overlay/none",
+  "default_published": "broken-overlay",
+  "pr_target": "broken-overlay/none",
+  "pr_published": "broken-overlay",
+  "ungated_target": "broken-overlay/none",
+  "ungated_published": "broken-overlay",
+  "cache_image": "broken-overlay-cache",
+  "workflows": [],
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "broken-overlay",
+      "name": "Broken Overlay",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "logo": "",
+      "watermark": "",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "provides_files": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "broken-overlay/none",
+          "image": "broken-overlay",
+          "flavour": null,
+          "published": "broken-overlay",
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "core/first",
+              "dir": "core/first",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Ships a file a later module ships too",
+              "options": {}
+            },
+            {
+              "path": "core/second",
+              "dir": "core/second",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Ships the same path without saying so",
+              "options": {}
+            },
+            {
+              "path": "core/third",
+              "dir": "core/third",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Overrides a path no earlier module ships",
+              "options": {}
+            }
+          ],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {
+            "/usr/lib/clash.conf": "core/second"
+          },
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

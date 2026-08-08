@@ -1,0 +1,12 @@
+description "A kernel that signs its own modules against a Secure Boot key"
+
+supports "fedora"
+
+provides "kernel-devel"
+provides-file "/usr/share/secureboot/sb_cert.der"
+provides-file "/usr/libexec/kernel-devel-helpers.sh" build-only=#true
+
+requires "initramfs-generation"
+
+arg "KERNEL"
+secret "mok_privkey"

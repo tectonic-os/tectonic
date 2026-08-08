@@ -1,0 +1,31 @@
+### Base Image
+FROM quay.io/fedora/fedora-bootc:44
+
+## Build phases and modules
+
+# ---- core/hello ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/hello,target=/ctx/modules/core/hello \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    dnf5 install -y fastfetch && \
+    bash /ctx/lib/run-module.sh /ctx/modules/core/hello
+
+# ---- flavour gate ----
+ARG FLAVOUR
+
+# ---- finalize hook order ----
+ARG FINALIZE_ORDER=""
+
+# ---- collected file destinations ----
+ARG COLLECT_TARGETS=""
+
+# ---- image version ----
+ARG IMAGE_VERSION=dev
+
+# ---- image identity ----
+ARG IMAGE_ID="minimal"
+ARG IMAGE_NAME="Minimal"
+ARG IMAGE_REGISTRY=""
+

@@ -1,0 +1,14 @@
+image {
+    name "Collecting"
+
+    base "quay.io/fedora/fedora-bootc:44" {
+        family "fedora"
+        provides "rechunking"
+    }
+
+    modules {
+        module "core/menu"
+        module "core/power"
+        module "core/network"
+    }
+}

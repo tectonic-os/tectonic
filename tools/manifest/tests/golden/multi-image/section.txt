@@ -1,0 +1,39 @@
+### Base Image
+FROM quay.io/fedora/fedora-bootc:44
+
+## Build phases and modules
+
+# ---- core/shared ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/shared,target=/ctx/modules/core/shared \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/lib/run-module.sh /ctx/modules/core/shared
+
+# ---- flavour gate ----
+ARG FLAVOUR
+
+# ---- [dev] ----
+# ---- core/dev-tools ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/dev-tools,target=/ctx/modules/core/dev-tools \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    FLAVOUR_GATE=dev bash /ctx/lib/run-module.sh /ctx/modules/core/dev-tools
+
+# ---- finalize hook order ----
+ARG FINALIZE_ORDER=""
+
+# ---- collected file destinations ----
+ARG COLLECT_TARGETS=""
+
+# ---- image version ----
+ARG IMAGE_VERSION=dev
+
+# ---- image identity ----
+ARG IMAGE_ID="workstation"
+ARG IMAGE_NAME="Workstation"
+ARG IMAGE_REGISTRY=""
+

@@ -1,0 +1,5 @@
+description "Compilers and language servers, behind the dev flavour"
+
+supports "fedora"
+
+requires "shell-tools"

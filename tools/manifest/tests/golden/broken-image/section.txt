@@ -1,0 +1,19 @@
+## Build phases and modules
+
+# ---- flavour gate ----
+ARG FLAVOUR
+
+# ---- finalize hook order ----
+ARG FINALIZE_ORDER=""
+
+# ---- collected file destinations ----
+ARG COLLECT_TARGETS=""
+
+# ---- image version ----
+ARG IMAGE_VERSION=dev
+
+# ---- image identity ----
+ARG IMAGE_ID="Not An Id"
+ARG IMAGE_LOGO="assets/logo.svg"
+ARG IMAGE_REGISTRY=""
+

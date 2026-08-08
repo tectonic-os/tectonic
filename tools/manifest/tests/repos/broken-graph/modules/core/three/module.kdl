@@ -1,0 +1,5 @@
+description "Provides the same capability as another enabled module"
+
+supports "debian"
+
+provides "shell-tools"

@@ -1,0 +1,69 @@
+  x `image` takes no argument
+   ,-[./image.kdl:1:1]
+ 1 | image "argument" {
+   : ^^|^^
+   :   `-- the name belongs in the block
+ 2 |     id "Not An Id"
+   `----
+  help: `image { id "argument" }` is the machine name, and `name` is the human
+        one it derives from when absent
+
+  x `image` declares no `name`
+   ,-[./image.kdl:1:1]
+ 1 | image "argument" {
+   : ^^|^^
+   :   `-- no name
+ 2 |     id "Not An Id"
+   `----
+  help: `name "Tectonic"` is os-release NAME, which the boot menu and the
+        desktop read
+
+  x invalid image name `Not An Id`
+   ,-[./image.kdl:1:1]
+ 1 | image "argument" {
+   : ^^|^^
+   :   `-- must be lowercase letters, digits and dashes, starting with a letter
+ 2 |     id "Not An Id"
+   `----
+  help: it becomes an image tag, a cache tag and the default hostname, all of
+        which restrict it
+
+  x `logo` is not under brand/
+   ,-[./image.kdl:1:1]
+ 1 | image "argument" {
+   : ^^|^^
+   :   `-- brand assets live in brand/
+ 2 |     id "Not An Id"
+   `----
+  help: the build context carries brand/ for them; a path anywhere else is not
+        in it
+
+  x `image` declares no `base`
+   ,-[./image.kdl:1:1]
+ 1 | image "argument" {
+   : ^^|^^
+   :   `-- nothing to build on
+ 2 |     id "Not An Id"
+   `----
+  help: `base "quay.io/fedora/fedora-bootc:44" { family "fedora" }`, naming
+        the image every layer builds on
+
+  x `image` has no `modules` block
+   ,-[./image.kdl:1:1]
+ 1 | image "argument" {
+   : ^^|^^
+   :   `-- nothing in it
+ 2 |     id "Not An Id"
+   `----
+  help: an image with no modules is almost certainly a mistake; the block is
+        required even when empty
+
+  x `assets/logo.svg` does not exist
+   ,-[./image.kdl:1:1]
+ 1 | image "argument" {
+   : ^^|^^
+   :   `-- declared brand asset
+ 2 |     id "Not An Id"
+   `----
+  help: the path is relative to the repository root
+

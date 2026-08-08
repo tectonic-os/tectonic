@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "default_image": "broken-asset",
+  "default_image_name": "Broken Asset",
+  "pr_image": "broken-asset",
+  "default_target": "broken-asset/none",
+  "default_published": "broken-asset",
+  "pr_target": "broken-asset/none",
+  "pr_published": "broken-asset",
+  "ungated_target": "broken-asset/none",
+  "ungated_published": "broken-asset",
+  "cache_image": "broken-asset-cache",
+  "workflows": [],
+  "remotes": [],
+  "assets": [
+    {
+      "module": "core/pins",
+      "name": "tracked-and-manual",
+      "manifest": "modules/core/pins/module.kdl",
+      "version": "1.0.0",
+      "sha256": "NOTHEX",
+      "from": "sidecar",
+      "url": "https://example.com/download/v1.0.0/tool.tar.gz"
+    },
+    {
+      "module": "core/pins",
+      "name": "no-tracking",
+      "manifest": "modules/core/pins/module.kdl",
+      "version": "1.0.0",
+      "sha256": null,
+      "from": "asset",
+      "url": "https://example.com/download/v{tag}/tool.tar.gz; rm -rf /"
+    }
+  ],
+  "images": [
+    {
+      "id": "broken-asset",
+      "name": "Broken Asset",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "logo": "",
+      "watermark": "",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "provides_files": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "broken-asset/none",
+          "image": "broken-asset",
+          "flavour": null,
+          "published": "broken-asset",
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "core/pins",
+              "dir": "core/pins",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Asset pins that say nothing usable about what they fetch",
+              "options": {}
+            }
+          ],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [
+            {
+              "module": "core/pins",
+              "name": "tracked-and-manual",
+              "manifest": "modules/core/pins/module.kdl",
+              "version": "1.0.0",
+              "sha256": "NOTHEX",
+              "from": "sidecar",
+              "url": "https://example.com/download/v1.0.0/tool.tar.gz"
+            },
+            {
+              "module": "core/pins",
+              "name": "no-tracking",
+              "manifest": "modules/core/pins/module.kdl",
+              "version": "1.0.0",
+              "sha256": null,
+              "from": "asset",
+              "url": "https://example.com/download/v{tag}/tool.tar.gz; rm -rf /"
+            }
+          ],
+          "provides_files": {},
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

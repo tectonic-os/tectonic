@@ -1,0 +1,56 @@
+  x unknown base family `debian`
+   ,-[./modules/core/three/module.kdl:3:1]
+ 2 | 
+ 3 | supports "debian"
+   : ^^^^|^^^
+   :     `-- not a family this repository builds on
+ 4 | 
+   `----
+  help: known families: fedora
+
+  x `core/two` provides `rechunking`, which the base image already provides
+   ,-[./modules/core/two/module.kdl:5:1]
+ 4 | 
+ 5 | provides "rechunking"
+   : ^^^^|^^^
+   :     `-- already provided by the base
+ 6 | provides "shell-tools"
+   `----
+  help: the `base` node in ./image.kdl declares it. Drop it from the module,
+        or drop it from the base if the base no longer carries it
+
+  x `core/three` does not support the `fedora` base family
+  help: it declares support for: debian
+
+  x `shell-tools` is provided by more than one enabled module
+   ,-[./modules/core/two/module.kdl:6:1]
+ 5 | provides "rechunking"
+ 6 | provides "shell-tools"
+   : ^^^^|^^^
+   :     `-- also provided elsewhere
+   `----
+  help: provided by: core/two, core/three. Enable one provider, so that what
+        satisfies a requirement is never ambiguous
+
+  x `core/one` requires `package-manager`, which nothing enabled provides
+   ,-[./modules/core/one/module.kdl:5:1]
+ 4 | 
+ 5 | requires "package-manager"
+   : ^^^^|^^^
+   :     `-- unsatisfied
+ 6 | requires-file "/usr/bin/nothing"
+   `----
+  help: no module in the repository declares `provides "package-manager"`, and
+        neither does the `base` node in ./image.kdl
+
+  x `core/one` requires-file `/usr/bin/nothing`, which nothing enabled
+  | provides
+   ,-[./modules/core/one/module.kdl:6:1]
+ 5 | requires "package-manager"
+ 6 | requires-file "/usr/bin/nothing"
+   : ^^^^^^|^^^^^^
+   :       `-- unsatisfied
+   `----
+  help: no module in the repository declares `provides "/usr/bin/nothing"`,
+        and neither does the `base` node in ./image.kdl
+

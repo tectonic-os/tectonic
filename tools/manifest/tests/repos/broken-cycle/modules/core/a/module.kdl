@@ -1,0 +1,6 @@
+description "Requires what requires it back"
+
+supports "fedora"
+
+provides "a"
+requires "b"

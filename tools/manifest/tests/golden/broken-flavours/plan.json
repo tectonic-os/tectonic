@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "default_image": "broken-flavours",
+  "default_image_name": "Broken Flavours",
+  "pr_image": "broken-flavours",
+  "default_target": "broken-flavours/none",
+  "default_published": "broken-flavours",
+  "pr_target": "broken-flavours/none",
+  "pr_published": "broken-flavours",
+  "ungated_target": "broken-flavours/none",
+  "ungated_published": "broken-flavours",
+  "cache_image": "broken-flavours-cache",
+  "workflows": [],
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "broken-flavours",
+      "name": "Broken Flavours",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "logo": "",
+      "watermark": "",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "provides_files": []
+      },
+      "flavours": [
+        {
+          "name": "dev",
+          "default": false,
+          "pr_build": false
+        },
+        {
+          "name": "none",
+          "default": false,
+          "pr_build": false
+        }
+      ],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "broken-flavours/none",
+          "image": "broken-flavours",
+          "flavour": null,
+          "published": "broken-flavours",
+          "default": true,
+          "pr": true,
+          "siblings": [
+            {
+              "name": "broken-flavours/dev",
+              "published": "broken-flavours-dev"
+            }
+          ],
+          "modules": [
+            {
+              "path": "core/hello",
+              "dir": "core/hello",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "A module in a repository whose flavours are wrong",
+              "options": {}
+            }
+          ],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        },
+        {
+          "name": "broken-flavours/dev",
+          "image": "broken-flavours",
+          "flavour": "dev",
+          "published": "broken-flavours-dev",
+          "default": false,
+          "pr": false,
+          "siblings": [
+            {
+              "name": "broken-flavours/none",
+              "published": "broken-flavours"
+            },
+            {
+              "name": "broken-flavours/none",
+              "published": "broken-flavours"
+            }
+          ],
+          "modules": [
+            {
+              "path": "core/hello",
+              "dir": "core/hello",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "A module in a repository whose flavours are wrong",
+              "options": {}
+            }
+          ],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        },
+        {
+          "name": "broken-flavours/none",
+          "image": "broken-flavours",
+          "flavour": null,
+          "published": "broken-flavours",
+          "default": true,
+          "pr": true,
+          "siblings": [
+            {
+              "name": "broken-flavours/dev",
+              "published": "broken-flavours-dev"
+            }
+          ],
+          "modules": [
+            {
+              "path": "core/hello",
+              "dir": "core/hello",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "A module in a repository whose flavours are wrong",
+              "options": {}
+            }
+          ],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

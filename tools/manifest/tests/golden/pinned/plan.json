@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "default_image": "pinned",
+  "default_image_name": "Pinned",
+  "pr_image": "pinned",
+  "default_target": "pinned/none",
+  "default_published": "pinned",
+  "pr_target": "pinned/none",
+  "pr_published": "pinned",
+  "ungated_target": "pinned/none",
+  "ungated_published": "pinned",
+  "cache_image": "pinned-cache",
+  "workflows": [],
+  "remotes": [
+    {
+      "name": "steam-tweaks",
+      "dir": "modules/.remote/steam-tweaks",
+      "ref": "steam-tweaks/v1.2.0",
+      "sha256": "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3",
+      "url": "https://github.com/owner/bootc-modules/archive/refs/tags/steam-tweaks/v1.2.0.tar.gz",
+      "path": "modules/steam-tweaks",
+      "file": "./image.kdl"
+    }
+  ],
+  "assets": [],
+  "images": [
+    {
+      "id": "pinned",
+      "name": "Pinned",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "logo": "",
+      "watermark": "",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "provides_files": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "pinned/none",
+          "image": "pinned",
+          "flavour": null,
+          "published": "pinned",
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "core/hello",
+              "dir": "core/hello",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "An in-tree module beside the pinned one",
+              "options": {}
+            },
+            {
+              "path": "steam-tweaks",
+              "dir": ".remote/steam-tweaks",
+              "flavour": null,
+              "variant": null,
+              "remote": "steam-tweaks/v1.2.0",
+              "description": "A module fetched from outside this repository",
+              "options": {}
+            }
+          ],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

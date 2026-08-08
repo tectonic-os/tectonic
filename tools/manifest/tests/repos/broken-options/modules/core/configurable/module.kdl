@@ -1,0 +1,18 @@
+description "Declares two options, and a variant that sets an undeclared one"
+
+supports "fedora"
+
+option "fonts" type="list" {
+    description "Nerd Font families to install"
+    default "JetBrainsMono"
+}
+
+option "starship" type="bool" {
+    description "Install the starship prompt"
+    default #true
+}
+
+variant "lean" {
+    description "Skip the prompt"
+    set "prompt" #false
+}

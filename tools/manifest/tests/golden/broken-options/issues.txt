@@ -1,0 +1,45 @@
+  x `core/configurable` has no variant `nonexistent`
+  help: declared variants: lean
+
+  x list value "Fira Code" on option `fonts` contains whitespace
+    ,-[./image.kdl:11:13]
+ 10 |         module "core/configurable" variant="nonexistent" {
+ 11 |             fonts "Fira Code"
+    :             ^^|^^
+    :               `-- not usable as this option's value
+ 12 |             starship "yes"
+    `----
+  help: list values join on spaces to reach the build, so one containing a
+        space would arrive as two
+
+  x option `starship` is a bool, so it takes one #true or #false
+    ,-[./image.kdl:12:13]
+ 11 |             fonts "Fira Code"
+ 12 |             starship "yes"
+    :             ^^^^|^^^
+    :                 `-- not usable as this option's value
+ 13 |             colour "blue"
+    `----
+  help: bools reach the build as 1 or 0
+
+  x `core/configurable` has no option `colour`
+    ,-[./image.kdl:13:13]
+ 12 |             starship "yes"
+ 13 |             colour "blue"
+    :             ^^^|^^
+    :                `-- not declared by this module
+ 14 |             starship #true
+    `----
+  help: declared options: fonts, starship
+
+  x `starship` is set twice on `core/configurable`
+    ,-[./image.kdl:14:13]
+ 13 |             colour "blue"
+ 14 |             starship #true
+    :             ^^^^|^^^
+    :                 `-- set again here
+ 15 |         }
+    `----
+  help: resolution is a single pass, so a second value is an error rather than
+        a merge
+

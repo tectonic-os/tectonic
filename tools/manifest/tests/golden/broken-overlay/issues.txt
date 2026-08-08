@@ -1,0 +1,18 @@
+  x `core/second` overwrites `/usr/lib/clash.conf`, which `core/first` also
+  | ships
+  help: overlays are copied in build order, so this one wins and the other
+        file never reaches the image. Rename one of the two, or declare
+        `overrides "/usr/lib/clash.conf"` here if replacing it is the point
+
+  x `core/third` overrides `/usr/lib/nothing.conf`, which no earlier module
+  | ships
+   ,-[./modules/core/third/module.kdl:5:1]
+ 4 | 
+ 5 | overrides "/usr/lib/nothing.conf"
+   : ^^^^|^^^^
+   :     `-- nothing to replace
+   `----
+  help: an override is checked, so it cannot outlive the collision it was
+        added for; drop it, or check the path against what the other module
+        actually ships
+

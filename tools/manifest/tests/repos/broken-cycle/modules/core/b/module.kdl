@@ -1,0 +1,6 @@
+description "The other half of the cycle"
+
+supports "fedora"
+
+provides "b"
+requires "a"

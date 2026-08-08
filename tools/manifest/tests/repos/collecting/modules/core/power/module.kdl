@@ -1,0 +1,5 @@
+description "Power recipes, contributed to the menu after the defaults"
+
+supports "fedora"
+
+contributes "justfile.inc" priority=900

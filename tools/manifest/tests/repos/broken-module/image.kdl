@@ -1,0 +1,14 @@
+image {
+    name "Broken Module"
+
+    base "quay.io/fedora/fedora-bootc:44" {
+        family "fedora"
+        provides "rechunking"
+    }
+
+    modules {
+        module "core/nameless"
+        module "core/missing"
+        module "core/nameless"
+    }
+}

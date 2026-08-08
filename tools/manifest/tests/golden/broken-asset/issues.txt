@@ -1,0 +1,64 @@
+  x `tracked-and-manual` puts something between `renovate` and `version`
+   ,-[./modules/core/pins/module.kdl:8:5]
+ 7 |     manual "someone watches the release feed"
+ 8 |     version "1.0.0"
+   :     ^^^|^^^
+   :        `-- has to be the line directly below `renovate`
+ 9 |     url "https://example.com/download/v{version}/tool.tar.gz"
+   `----
+  help: Renovate matches the two together, so anything between them stops the
+        pin being tracked, silently
+
+  x `tracked-and-manual` is declared both tracked and manual
+   ,-[./modules/core/pins/module.kdl:7:5]
+ 6 |     renovate datasource="github-releases" depName="owner/repo"
+ 7 |     manual "someone watches the release feed"
+   :     ^^^|^^
+   :        `-- pick one
+ 8 |     version "1.0.0"
+   `----
+  help: `renovate` says Renovate bumps this pin, `manual` says nothing does
+        and why
+
+  x `tracked-and-manual` has a malformed sha256
+   ,-[./modules/core/pins/module.kdl:5:1]
+ 4 | 
+ 5 | asset "tracked-and-manual" {
+   : ^^|^^
+   :   `-- not 64 hex digits
+ 6 |     renovate datasource="github-releases" depName="owner/repo"
+   `----
+  help: sha256sum output, lowercase
+
+  x `no-tracking` says nothing about how its pin is kept current
+    ,-[./modules/core/pins/module.kdl:13:1]
+ 12 | 
+ 13 | asset "no-tracking" {
+    : ^^|^^
+    :   `-- needs `renovate` or `manual`
+ 14 |     version "1.0.0"
+    `----
+  help: `renovate datasource="github-releases" depName="owner/repo"`, or
+        `manual "why nothing tracks it"`
+
+  x `no-tracking` declares a url with no sha256
+    ,-[./modules/core/pins/module.kdl:13:1]
+ 12 | 
+ 13 | asset "no-tracking" {
+    : ^^|^^
+    :   `-- an unverified fetch
+ 14 |     version "1.0.0"
+    `----
+  help: every downloaded asset is verified against its pin; a module that
+        clones a git ref instead declares neither
+
+  x `no-tracking` has an unknown placeholder {tag}
+    ,-[./modules/core/pins/module.kdl:13:1]
+ 12 | 
+ 13 | asset "no-tracking" {
+    : ^^|^^
+    :   `-- not substituted
+ 14 |     version "1.0.0"
+    `----
+  help: a URL template expands `{version}` and nothing else
+

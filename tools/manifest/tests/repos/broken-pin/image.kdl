@@ -1,0 +1,16 @@
+image {
+    name "Broken Pin"
+
+    base "quay.io/fedora/fedora-bootc:44" {
+        family "fedora"
+        provides "rechunking"
+    }
+
+    modules {
+        module "loose" {
+            source "http://example.com/modules.zip" {
+                path "/etc/passwd"
+            }
+        }
+    }
+}

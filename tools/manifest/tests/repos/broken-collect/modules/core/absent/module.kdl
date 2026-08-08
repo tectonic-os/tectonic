@@ -1,0 +1,6 @@
+description "Contributes a file it does not ship, twice, out of range"
+
+supports "fedora"
+
+contributes "justfile.inc" priority=90000
+contributes "justfile.inc" priority=100

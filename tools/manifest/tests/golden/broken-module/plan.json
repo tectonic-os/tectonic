@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "default_image": "broken-module",
+  "default_image_name": "Broken Module",
+  "pr_image": "broken-module",
+  "default_target": "broken-module/none",
+  "default_published": "broken-module",
+  "pr_target": "broken-module/none",
+  "pr_published": "broken-module",
+  "ungated_target": "broken-module/none",
+  "ungated_published": "broken-module",
+  "cache_image": "broken-module-cache",
+  "workflows": [],
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "broken-module",
+      "name": "Broken Module",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "logo": "",
+      "watermark": "",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "provides_files": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "broken-module/none",
+          "image": "broken-module",
+          "flavour": null,
+          "published": "broken-module",
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "core/nameless",
+              "dir": "core/nameless",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "",
+              "options": {}
+            },
+            {
+              "path": "core/missing",
+              "dir": "core/missing",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "",
+              "options": {}
+            }
+          ],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

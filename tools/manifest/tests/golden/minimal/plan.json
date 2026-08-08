@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "default_image": "minimal",
+  "default_image_name": "Minimal",
+  "pr_image": "minimal",
+  "default_target": "minimal/none",
+  "default_published": "minimal",
+  "pr_target": "minimal/none",
+  "pr_published": "minimal",
+  "ungated_target": "minimal/none",
+  "ungated_published": "minimal",
+  "cache_image": "minimal-cache",
+  "workflows": [],
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "minimal",
+      "name": "Minimal",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "logo": "",
+      "watermark": "",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "provides_files": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "minimal/none",
+          "image": "minimal",
+          "flavour": null,
+          "published": "minimal",
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "core/hello",
+              "dir": "core/hello",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "The smallest module a repository can hold",
+              "options": {}
+            }
+          ],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

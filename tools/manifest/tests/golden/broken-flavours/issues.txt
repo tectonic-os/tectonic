@@ -1,0 +1,34 @@
+  x `none` is reserved
+    ,-[./image.kdl:11:9]
+ 10 |         dev
+ 11 |         none
+    :         ^^|^
+    :           `-- not usable as a flavour name
+ 12 |         dev
+    `----
+  help: `none` names the ungated build, which is published unsuffixed and
+        needs no declaration
+
+  x flavour `dev` is declared twice
+    ,-[./image.kdl:10:9]
+  9 |     flavours {
+ 10 |         dev
+    :         ^|^
+    :          `-- first here
+ 11 |         none
+ 12 |         dev
+    :         ^|^
+    :          `-- and again here
+ 13 |     }
+    `----
+
+  x `server` is not a declared flavour
+    ,-[./image.kdl:18:9]
+ 17 | 
+ 18 |         flavour "server" {
+    :         ^^^|^^^
+    :            `-- no such flavour
+ 19 |             module "core/hello"
+    `----
+  help: declared flavours: dev, none
+

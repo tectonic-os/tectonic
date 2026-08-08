@@ -1,0 +1,14 @@
+  x the module graph has a cycle
+    ,-[./image.kdl:10:9]
+  9 |     modules {
+ 10 |         module "core/a"
+    :         ^^^|^^
+    :            `-- waits on `core/b`
+ 11 |         module "core/b"
+    :         ^^^|^^
+    :            `-- waits on `core/a`
+ 12 |     }
+    `----
+  help: a requirement implies ordering, so a cycle has no build order at all;
+        drop one of the edges, or split the module that closes it
+

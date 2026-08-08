@@ -1,0 +1,85 @@
+  x the pin says nothing about how it is kept current
+    ,-[./image.kdl:11:13]
+ 10 |         module "loose" {
+ 11 |             source "http://example.com/modules.zip" {
+    :             ^^^|^^
+    :                `-- needs `renovate` or `manual`
+ 12 |                 path "/etc/passwd"
+    `----
+  help: `renovate datasource="github-tags" depName="owner/repo"`, or `manual
+        "why nothing tracks it"`
+
+  x the pin declares no `ref`
+    ,-[./image.kdl:11:13]
+ 10 |         module "loose" {
+ 11 |             source "http://example.com/modules.zip" {
+    :             ^^^|^^
+    :                `-- nothing pinned
+ 12 |                 path "/etc/passwd"
+    `----
+  help: an exact tag or commit; a moving ref would make the build depend on
+        when it ran
+
+  x the pin declares no `sha256`
+    ,-[./image.kdl:11:13]
+ 10 |         module "loose" {
+ 11 |             source "http://example.com/modules.zip" {
+    :             ^^^|^^
+    :                `-- nothing to verify the archive against
+ 12 |                 path "/etc/passwd"
+    `----
+  help: a remote module is arbitrary shell running as root in the build, so
+        the content hash is required, not optional
+
+  x the source URL is not https
+    ,-[./image.kdl:11:13]
+ 10 |         module "loose" {
+ 11 |             source "http://example.com/modules.zip" {
+    :             ^^^|^^
+    :                `-- unencrypted or unsupported scheme
+ 12 |                 path "/etc/passwd"
+    `----
+  help: https://, or file:// for a local archive
+
+  x the source is not a tar archive
+    ,-[./image.kdl:11:13]
+ 10 |         module "loose" {
+ 11 |             source "http://example.com/modules.zip" {
+    :             ^^^|^^
+    :                `-- cannot be extracted
+ 12 |                 path "/etc/passwd"
+    `----
+  help: one of .tar.gz, .tgz, .tar.xz, .tar.zst, .tar.bz2; the fetch strips
+        the archive's leading directory, which is a tar option
+
+  x invalid subtree path `/etc/passwd`
+    ,-[./image.kdl:11:13]
+ 10 |         module "loose" {
+ 11 |             source "http://example.com/modules.zip" {
+    :             ^^^|^^
+    :                `-- relative to the archive root, so it cannot start with /
+ 12 |                 path "/etc/passwd"
+    `----
+  help: `path "modules/module-name"`, the module's directory inside the
+        repository
+
+  x `loose` has no module.kdl
+    ,-[./image.kdl:10:9]
+  9 |     modules {
+ 10 |         module "loose" {
+    :         ^^^|^^
+    :            `-- every module needs a manifest
+ 11 |             source "http://example.com/modules.zip" {
+    `----
+  help: run ./scripts/fetch-modules.sh to fetch what the image pins
+
+  x `loose` does not resolve to a module directory
+    ,-[./image.kdl:10:9]
+  9 |     modules {
+ 10 |         module "loose" {
+    :         ^^^|^^
+    :            `-- no such module
+ 11 |             source "http://example.com/modules.zip" {
+    `----
+  help: expected ./modules/.remote/loose
+

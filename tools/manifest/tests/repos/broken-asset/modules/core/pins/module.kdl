@@ -1,0 +1,16 @@
+description "Asset pins that say nothing usable about what they fetch"
+
+supports "fedora"
+
+asset "tracked-and-manual" {
+    renovate datasource="github-releases" depName="owner/repo"
+    manual "someone watches the release feed"
+    version "1.0.0"
+    url "https://example.com/download/v{version}/tool.tar.gz"
+    sha256 "NOTHEX" from="sidecar"
+}
+
+asset "no-tracking" {
+    version "1.0.0"
+    url "https://example.com/download/v{tag}/tool.tar.gz; rm -rf /"
+}
