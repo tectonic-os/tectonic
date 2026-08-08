@@ -12,6 +12,9 @@ const FLAVOUR_ARG: &str = "\
 # ---- flavour gate ----
 ARG FLAVOUR";
 
+/// The binary, so anything running in the image can call the tool.
+const TECT_MOUNT: &str = "--mount=type=bind,from=tect,source=/tect,target=/ctx/tect \\\n    ";
+
 /// CI passes the build date, so this changes every day.
 const IMAGE_VERSION_ARG: &str = "\
 # ---- image version ----
@@ -159,6 +162,7 @@ fn phase(file: &str, below_modules: bool, identity_env: &str) -> String {
         out.push_str("--mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \\\n    ");
         out.push_str("--mount=type=bind,from=ctx,source=/modules,target=/ctx/modules \\\n    ");
     }
+    out.push_str(TECT_MOUNT);
     out.push_str(
         "--mount=type=cache,target=/var/cache \\\n    \
          --mount=type=cache,target=/var/log \\\n    \
@@ -224,6 +228,7 @@ fn standard(
         out,
         "RUN --mount=type=bind,from=ctx,source=/modules/{path},target=/ctx/modules/{path} \\\n    \
          --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \\\n    \
+         {TECT_MOUNT}\
          --mount=type=cache,target=/var/cache \\\n    \
          --mount=type=cache,target=/var/log \\\n    \
          --mount=type=tmpfs,target=/tmp \\\n    \

@@ -421,7 +421,6 @@ fragment position="after" standard-layer=#false
 - an `allow-verify` naming a class outside the known set, listing them
 - an `allow-verify` with no class, or no `unit=`
 - the same class allowed twice on the same unit in one module
-- the class list in `lib/validate-image.sh` disagreeing with the one in
 
 - shipping a collected filename while the module that collects it is not
 - two enabled modules collecting the same filename

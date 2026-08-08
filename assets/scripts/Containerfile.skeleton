@@ -4,12 +4,15 @@ COPY build-phases/ /
 COPY lib/ /lib/
 COPY modules/ /modules/
 
+FROM scratch AS tect
+COPY build/tect /tect
+
 # ---- BEGIN GENERATED (build phases and modules; see scripts/gen-containerfile.sh) ----
 # ---- END GENERATED ----
 
 ARG CONTRACT_FILES=""
 ARG VERIFY_EXCEPTIONS=""
 RUN bootc container lint
-RUN --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     CONTRACT_FILES="${CONTRACT_FILES}" \
-    VERIFY_EXCEPTIONS="${VERIFY_EXCEPTIONS}" bash /ctx/lib/validate-image.sh
+    VERIFY_EXCEPTIONS="${VERIFY_EXCEPTIONS}" /ctx/tect validate-image

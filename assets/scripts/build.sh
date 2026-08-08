@@ -178,6 +178,9 @@ fi
 # ---- the Containerfile the build actually uses ---------------------------
 ./scripts/gen-containerfile.sh
 
+# The `tect` stage copies this, and every layer mounts it from there.
+install -D -m755 "$(./scripts/tect.sh --path)" build/tect
+
 build_args=(
 	"FLAVOUR=${flavour_arg}"
 	"IMAGE_VERSION=${image_version}"

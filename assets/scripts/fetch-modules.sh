@@ -2,9 +2,6 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# shellcheck source=lib/fetch-helpers.sh
-source lib/fetch-helpers.sh
-
 remote_root="modules/.remote"
 stamp_root="build/remote-modules"
 
@@ -51,7 +48,7 @@ for pin in "${pins[@]}"; do
 
     mkdir -p build
     tmp="$(mktemp -d build/fetch-module.XXXXXX)"
-    fetch_extract "$url" "$sha256" "$tmp" --strip-components=1
+    ./scripts/tect.sh fetch tree "$url" "$sha256" "$tmp" --strip-components=1
 
     src="$tmp"
     [ -z "$path" ] || src="${tmp}/${path}"

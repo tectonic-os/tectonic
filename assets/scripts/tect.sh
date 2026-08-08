@@ -34,4 +34,11 @@ if [ ! -x "$bin" ]; then
     trap - EXIT
 fi
 
+# The build mounts the binary into its layers, so a caller has to be able to
+# ask where it is rather than only run it.
+if [ "${1:-}" = "--path" ]; then
+    echo "$bin"
+    exit 0
+fi
+
 exec "$bin" "$@"
