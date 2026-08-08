@@ -1,6 +1,7 @@
 //! The image files: one `.kdl` at the repository root per image.
 
 use crate::diag::{Issue, Issues};
+use crate::module::Module;
 use crate::remote::{self, Remote, REMOTE_DIR};
 use kdl::{KdlDocument, KdlNode, KdlValue};
 use miette::SourceSpan;
@@ -107,6 +108,9 @@ pub struct Entry {
     /// The pin, for a module that lives outside this repository.
     pub remote: Option<Remote>,
     pub span: SourceSpan,
+    /// The manifest this entry names, loaded during resolution. None when it
+    /// could not be read, which is already an issue.
+    pub module: Option<Module>,
 }
 
 impl Entry {
@@ -572,6 +576,11 @@ impl List {
 }
 
 impl Image {
+    /// The manifests this image's entries resolved to, in build order.
+    pub fn modules(&self) -> impl Iterator<Item = &Module> {
+        self.entries.iter().filter_map(|e| e.module.as_ref())
+    }
+
     fn parse_base(&mut self, node: &KdlNode, issues: &mut Issues) {
         let (file, text) = (self.file.clone(), self.text.clone());
 
@@ -904,6 +913,7 @@ impl Image {
             options,
             remote: pin,
             span: node.name().span(),
+            module: None,
         })
     }
 

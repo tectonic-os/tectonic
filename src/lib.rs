@@ -46,24 +46,21 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
 
     let mut resolved: Vec<Resolved> = Vec::new();
     for image in &mut list.images {
-        let mut modules: Vec<module::Module> = image
-            .entries
-            .iter()
-            .filter_map(|entry| module::Module::load(entry, image, root, &mut issues))
-            .collect();
+        // Taken out so a diagnostic can still read the image it was declared in.
+        let mut entries = std::mem::take(&mut image.entries);
+        for entry in &mut entries {
+            entry.module = module::Module::load(entry, image, root, &mut issues);
+        }
+        image.entries = entries;
 
-        let order = order::sort(image, &modules, &mut issues);
-        order::apply(image, &mut modules, &order);
-        module::check_graph(&modules, image, root, &mut issues);
-        let shipped = overlay::index(&modules, root);
-        overlay::check(&modules, &shipped, &mut issues);
-        let collected = module::resolve_collects(&modules, root, &mut issues);
+        let order = order::sort(image, &mut issues);
+        order::apply(image, &order);
+        module::check_graph(image, root, &mut issues);
+        let shipped = overlay::index(image, root);
+        overlay::check(image, &shipped, &mut issues);
+        let collected = module::resolve_collects(image, root, &mut issues);
 
-        resolved.push(Resolved {
-            modules,
-            shipped,
-            collected,
-        });
+        resolved.push(Resolved { shipped, collected });
     }
 
     if let Some(unknown) = image_arg.filter(|id| !list.images.iter().any(|i| i.id == *id)) {
@@ -84,24 +81,12 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
     let stdout = match command {
         "plan" => plan::build(&list, &resolved, &workflows).render(),
         "section" => match one {
-            Some(i) => render::section(
-                &list.images[i],
-                &resolved[i].modules,
-                &resolved[i].collected,
-                root,
-                &mut issues,
-            ),
+            Some(i) => render::section(&list.images[i], &resolved[i].collected, root, &mut issues),
             None => String::new(),
         },
         _ => {
             for (i, image) in list.images.iter().enumerate() {
-                let _ = render::section(
-                    image,
-                    &resolved[i].modules,
-                    &resolved[i].collected,
-                    root,
-                    &mut issues,
-                );
+                let _ = render::section(image, &resolved[i].collected, root, &mut issues);
             }
             String::new()
         }
@@ -112,7 +97,7 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
         issues,
         context,
         images: list.images.len(),
-        modules: resolved.iter().map(|r| r.modules.len()).sum(),
+        modules: list.images.iter().map(|i| i.modules().count()).sum(),
         flavours: list.images.iter().map(|i| i.flavours.len()).sum(),
     }
 }

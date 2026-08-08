@@ -41,7 +41,6 @@ const MODULE_SLOT: u32 = 50;
 
 pub fn section(
     image: &Image,
-    modules: &[Module],
     collection: &Collection,
     root: &Path,
     issues: &mut Issues,
@@ -91,9 +90,7 @@ pub fn section(
             flavour_arg_emitted = true;
         }
 
-        let module = modules
-            .iter()
-            .find(|m| m.path == entry.path && m.flavour == entry.flavour);
+        let module = entry.module.as_ref();
 
         let inc = dir.join("Containerfile.inc");
         let mut blocks: Vec<String> = Vec::new();
