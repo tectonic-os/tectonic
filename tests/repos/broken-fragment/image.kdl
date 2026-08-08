@@ -1,0 +1,21 @@
+image {
+    name "Broken Fragment"
+
+    base "quay.io/fedora/fedora-bootc:44" {
+        family "fedora"
+        provides "rechunking"
+    }
+
+    flavours {
+        dev
+    }
+
+    modules {
+        module "core/early"
+
+        flavour "dev" {
+            module "core/silent"
+            module "core/mismatched"
+        }
+    }
+}

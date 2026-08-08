@@ -1,0 +1,35 @@
+  x `unnumbered.sh` has no phase number
+  help: name it <number>-unnumbered.sh: below 50 to run before the module
+        layers, 50 or above to run after
+
+  x `core/early` expands FLAVOUR above the flavour gate
+    ,-[./image.kdl:14:9]
+ 13 |     modules {
+ 14 |         module "core/early"
+    :         ^^^|^^
+    :            `-- listed above the first flavour-gated module
+ 15 | 
+    `----
+  help: ARG FLAVOUR is declared directly above the first gated entry, so a
+        fragment before it would expand to an empty string
+
+  x `core/silent` is listed under `dev` but its fragment sets no FLAVOUR_GATE
+    ,-[./image.kdl:17:13]
+ 16 |         flavour "dev" {
+ 17 |             module "core/silent"
+    :             ^^^|^^
+    :                `-- the flavour gate would be silently ignored
+ 18 |             module "core/mismatched"
+    `----
+  help: a fragment is emitted unconditionally, so anything it runs has to
+        carry the gate itself
+
+  x `core/mismatched` is listed under `dev` but its fragment gates on `server`
+    ,-[./image.kdl:18:13]
+ 17 |             module "core/silent"
+ 18 |             module "core/mismatched"
+    :             ^^^|^^
+    :                `-- listed here
+ 19 |         }
+    `----
+

@@ -43,13 +43,3 @@
   x `core/nameless` does not support the `fedora` base family
   help: add `supports "fedora"` to the manifest
 
-  x `core/missing` does not resolve to a module directory
-    ,-[./image.kdl:11:9]
- 10 |         module "core/nameless"
- 11 |         module "core/missing"
-    :         ^^^|^^
-    :            `-- no such module
- 12 |         module "core/nameless"
-    `----
-  help: expected ./modules/core/missing
-

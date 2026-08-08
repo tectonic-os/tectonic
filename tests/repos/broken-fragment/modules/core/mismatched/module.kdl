@@ -1,0 +1,3 @@
+description "Gates its fragment on a flavour it is not listed under"
+
+supports "fedora"

@@ -1,9 +1,13 @@
 //! One walk of the repository's trees, for everything that asks what is on
 //! disk rather than what an image enables.
 
+use crate::diag::{Issue, Issues};
 use kdl::KdlDocument;
 use std::collections::BTreeMap;
 use std::path::Path;
+
+/// Where the module layers sit among the build phases.
+pub const MODULE_SLOT: u32 = 50;
 
 #[derive(Default)]
 pub struct Disk {
@@ -15,11 +19,16 @@ pub struct Disk {
     pub collectors: BTreeMap<String, String>,
     /// Module directory to every path its files/ overlay puts in the image.
     pub overlays: BTreeMap<String, Vec<String>>,
+    /// build-phases/*.sh, as number and filename, in build order.
+    pub phases: Vec<(u32, String)>,
 }
 
 impl Disk {
-    pub fn scan(root: &Path) -> Self {
-        let mut out = Disk::default();
+    pub fn scan(root: &Path, issues: &mut Issues) -> Self {
+        let mut out = Disk {
+            phases: phases(root, issues),
+            ..Disk::default()
+        };
 
         let modules = root.join("modules");
         let mut dirs = vec![modules.clone()];
@@ -84,6 +93,39 @@ impl Disk {
         }
         out
     }
+}
+
+/// Every build-phases/*.sh, as its number and filename, in build order.
+fn phases(root: &Path, issues: &mut Issues) -> Vec<(u32, String)> {
+    let dir = root.join("build-phases");
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return Vec::new();
+    };
+
+    let mut out: Vec<(u32, String)> = Vec::new();
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !name.ends_with(".sh") || !entry.path().is_file() {
+            continue;
+        }
+        let number = name
+            .split_once('-')
+            .and_then(|(prefix, _)| prefix.parse::<u32>().ok());
+        match number {
+            Some(number) => out.push((number, name)),
+            None => {
+                let file = dir.join(&name).display().to_string();
+                issues.push(
+                    Issue::new(format!("`{name}` has no phase number"), &file, "")
+                        .help(format!(
+                            "name it <number>-{name}: below {MODULE_SLOT} to run before the module layers, {MODULE_SLOT} or above to run after"
+                        )),
+                );
+            }
+        }
+    }
+    out.sort();
+    out
 }
 
 /// Every file in an overlay, as the absolute path it becomes in the image.

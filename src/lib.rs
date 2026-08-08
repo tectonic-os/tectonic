@@ -44,7 +44,7 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
     };
 
     let workflows = workflow::resolve(&list, root, &mut issues);
-    let disk = disk::Disk::scan(root);
+    let disk = disk::Disk::scan(root, &mut issues);
 
     let mut resolved: Vec<Resolved> = Vec::new();
     for image in &mut list.images {
@@ -58,6 +58,7 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
         let order = order::sort(image, &mut issues);
         order::apply(image, &order);
         module::check_graph(image, root, &disk, &mut issues);
+        module::check_fragments(image, &mut issues);
         let shipped = overlay::index(image, &disk);
         overlay::check(image, &shipped, &mut issues);
         let collected = module::resolve_collects(image, root, &disk, &mut issues);
@@ -83,15 +84,12 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
     let stdout = match command {
         "plan" => plan::build(&list, &resolved, &workflows).render(),
         "section" => match one {
-            Some(i) => render::section(&list.images[i], &resolved[i].collected, root, &mut issues),
+            Some(i) => {
+                render::section(&list.images[i], &resolved[i].collected, &disk.phases, root)
+            }
             None => String::new(),
         },
-        _ => {
-            for (i, image) in list.images.iter().enumerate() {
-                let _ = render::section(image, &resolved[i].collected, root, &mut issues);
-            }
-            String::new()
-        }
+        _ => String::new(),
     };
 
     Run {

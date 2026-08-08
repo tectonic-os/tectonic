@@ -389,7 +389,6 @@ fragment position="after" standard-layer=#false
 ## Validation
 
 - any file unparseable, or carrying a node or property this schema
-- an image file entry that does not resolve to a module directory
 - a module directory without a `module.kdl`, or one missing
 - a repository declaring no image, or a root `.kdl` that declares none
 - a `repo.kdl` with no `schema-version`, or one this tool does not know

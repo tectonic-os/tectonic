@@ -73,13 +73,3 @@
     `----
   help: run ./scripts/fetch-modules.sh to fetch what the image pins
 
-  x `loose` does not resolve to a module directory
-    ,-[./image.kdl:10:9]
-  9 |     modules {
- 10 |         module "loose" {
-    :         ^^^|^^
-    :            `-- no such module
- 11 |             source "http://example.com/modules.zip" {
-    `----
-  help: expected ./modules/.remote/loose
-
