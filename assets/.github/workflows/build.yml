@@ -451,7 +451,7 @@ jobs:
           IMAGE_DIGEST="${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}"
           module="$(jq -r '.provides_files["/etc/pki/containers/cosign.pub"] // ""' "$TARGET_PLAN")"
           key="modules/${module}/files/etc/pki/containers/cosign.pub"
-          [ -f "$key" ] || { echo "no module provides the cosign key" >&2; exit 1; }
+          [ -s "$key" ] || { echo "no module provides a cosign key" >&2; exit 1; }
           cosign verify --key "$key" --insecure-ignore-tlog=true \
             "${IMAGE_DIGEST}" > /dev/null
           cosign verify-attestation --key "$key" --type spdxjson \
