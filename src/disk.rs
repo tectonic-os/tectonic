@@ -1,7 +1,7 @@
 //! One walk of the repository's trees, for everything that asks what is on
 //! disk rather than what an image enables.
 
-use crate::diag::{Issue, Issues};
+use crate::diag::{Issue, Issues, Source};
 use kdl::KdlDocument;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -116,7 +116,7 @@ fn phases(root: &Path, issues: &mut Issues) -> Vec<(u32, String)> {
             None => {
                 let file = dir.join(&name).display().to_string();
                 issues.push(
-                    Issue::new(format!("`{name}` has no phase number"), &file, "")
+                    Issue::new(format!("`{name}` has no phase number"), &Source::new(&file, ""))
                         .help(format!(
                             "name it <number>-{name}: below {MODULE_SLOT} to run before the module layers, {MODULE_SLOT} or above to run after"
                         )),

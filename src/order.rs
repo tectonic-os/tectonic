@@ -98,7 +98,7 @@ fn report_cycle(image: &Image, waits_on: &[Vec<usize>], remaining: &[usize], iss
         None => image.entries[index].path.clone(),
     };
 
-    let mut issue = Issue::new("the module graph has a cycle", &image.file, &image.text).help(
+    let mut issue = Issue::new("the module graph has a cycle", &image.src).help(
         "a requirement implies ordering, so a cycle has no build order at all; \
          drop one of the edges, or split the module that closes it",
     );

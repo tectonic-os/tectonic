@@ -1,10 +1,48 @@
 //! Typed options: declared by the module, set by the image author, resolved
 //! here and passed to the layer as env.
 
-use crate::diag::{Issue, Issues};
+use crate::diag::{Issue, Issues, Source, Span};
 use crate::list::{Entry, Image};
 use kdl::{KdlNode, KdlValue};
-use miette::SourceSpan;
+
+/// A declared value, owned by the model: `parse` is the only thing that sees
+/// KDL's own value type.
+#[derive(Clone)]
+pub enum Value {
+    String(String),
+    Bool(bool),
+    Integer(i128),
+    Float(f64),
+    Null,
+}
+
+impl Value {
+    pub fn as_string(&self) -> Option<&str> {
+        match self {
+            Self::String(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    pub fn as_bool(&self) -> Option<bool> {
+        match self {
+            Self::Bool(b) => Some(*b),
+            _ => None,
+        }
+    }
+}
+
+impl From<&KdlValue> for Value {
+    fn from(value: &KdlValue) -> Self {
+        match value {
+            KdlValue::String(s) => Self::String(s.clone()),
+            KdlValue::Bool(b) => Self::Bool(*b),
+            KdlValue::Integer(i) => Self::Integer(*i),
+            KdlValue::Float(f) => Self::Float(*f),
+            KdlValue::Null => Self::Null,
+        }
+    }
+}
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum OptType {
@@ -27,21 +65,22 @@ impl OptType {
 pub struct Opt {
     pub name: String,
     pub ty: OptType,
-    pub default: Vec<KdlValue>,
-    pub span: SourceSpan,
+    pub default: Vec<Value>,
+    pub span: Span,
 }
 
 pub struct Variant {
     pub name: String,
-    pub sets: Vec<(String, Vec<KdlValue>, SourceSpan)>,
-    pub span: SourceSpan,
+    pub sets: Vec<(String, Vec<Value>, Span)>,
+    pub span: Span,
 }
 
-fn args(node: &KdlNode) -> Vec<KdlValue> {
+/// Every unnamed entry of a node, as model values.
+pub fn args(node: &KdlNode) -> Vec<Value> {
     node.entries()
         .iter()
         .filter(|e| e.name().is_none())
-        .map(|e| e.value().clone())
+        .map(|e| Value::from(e.value()))
         .collect()
 }
 
@@ -53,7 +92,7 @@ fn prop<'a>(node: &'a KdlNode, key: &str) -> Option<&'a KdlValue> {
 }
 
 /// `option "fonts" type="list" { description "..."; default "A" "B" }`
-pub fn parse_option(node: &KdlNode, file: &str, text: &str, issues: &mut Issues) -> Option<Opt> {
+pub fn parse_option(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Opt> {
     let name = match args(node)
         .first()
         .and_then(|v| v.as_string().map(str::to_string))
@@ -61,7 +100,7 @@ pub fn parse_option(node: &KdlNode, file: &str, text: &str, issues: &mut Issues)
         Some(n) => n,
         None => {
             issues.push(
-                Issue::new("`option` needs a name", file, text)
+                Issue::new("`option` needs a name", src)
                     .at(node.name().span(), "no name given")
                     .help("`option \"fonts\" type=\"list\" { ... }`"),
             );
@@ -75,7 +114,7 @@ pub fn parse_option(node: &KdlNode, file: &str, text: &str, issues: &mut Issues)
         || name.is_empty()
     {
         issues.push(
-            Issue::new(format!("invalid option name `{name}`"), file, text)
+            Issue::new(format!("invalid option name `{name}`"), src)
                 .at(node.name().span(), "lowercase, digits and dashes only")
                 .help("the name becomes an env var, uppercased with dashes as underscores and prefixed OPT_"),
         );
@@ -83,7 +122,7 @@ pub fn parse_option(node: &KdlNode, file: &str, text: &str, issues: &mut Issues)
 
     if name == "source" {
         issues.push(
-            Issue::new("`source` is not usable as an option name", file, text)
+            Issue::new("`source` is not usable as an option name", src)
                 .at(node.name().span(), "reserved")
                 .help("a `source` child of a list entry is the out-of-tree module pin, so this option could never be set"),
         );
@@ -94,7 +133,7 @@ pub fn parse_option(node: &KdlNode, file: &str, text: &str, issues: &mut Issues)
             Some(ty) => ty,
             None => {
                 issues.push(
-                    Issue::new(format!("unknown option type `{t}`"), file, text)
+                    Issue::new(format!("unknown option type `{t}`"), src)
                         .at(node.name().span(), "not a type")
                         .help("string, bool or list"),
                 );
@@ -103,7 +142,7 @@ pub fn parse_option(node: &KdlNode, file: &str, text: &str, issues: &mut Issues)
         },
         None => {
             issues.push(
-                Issue::new(format!("option `{name}` declares no type"), file, text)
+                Issue::new(format!("option `{name}` declares no type"), src)
                     .at(node.name().span(), "type= is required")
                     .help("string, bool or list; an untyped option cannot be checked"),
             );
@@ -117,7 +156,7 @@ pub fn parse_option(node: &KdlNode, file: &str, text: &str, issues: &mut Issues)
             "description" => {}
             "default" => default = Some(args(child)),
             other => issues.push(
-                Issue::new(format!("unknown node `{other}` in an option"), file, text)
+                Issue::new(format!("unknown node `{other}` in an option"), src)
                     .at(child.name().span(), "not part of the schema")
                     .help("an option holds `description` and `default`"),
             ),
@@ -126,37 +165,31 @@ pub fn parse_option(node: &KdlNode, file: &str, text: &str, issues: &mut Issues)
 
     let Some(default) = default else {
         issues.push(
-            Issue::new(format!("option `{name}` declares no default"), file, text)
+            Issue::new(format!("option `{name}` declares no default"), src)
                 .at(node.name().span(), "every option needs one")
                 .help("an option with no default is a required argument in disguise; express that as a `requires` instead"),
         );
         return None;
     };
 
-    check_values(&name, ty, &default, file, text, node.name().span(), issues);
+    check_values(&name, ty, &default, src, node.name().span().into(), issues);
 
     Some(Opt {
         name,
         ty,
         default,
-        span: node.name().span(),
+        span: node.name().span().into(),
     })
 }
 
 /// `variant "wine-only" { description "..."; set "dotnet" #false }`
-pub fn parse_variant(
-    node: &KdlNode,
-    file: &str,
-    text: &str,
-    issues: &mut Issues,
-) -> Option<Variant> {
+pub fn parse_variant(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Variant> {
     let Some(name) = args(node)
         .first()
         .and_then(|v| v.as_string().map(str::to_string))
     else {
         issues.push(
-            Issue::new("`variant` needs a name", file, text)
-                .at(node.name().span(), "no name given"),
+            Issue::new("`variant` needs a name", src).at(node.name().span(), "no name given"),
         );
         return None;
     };
@@ -169,15 +202,19 @@ pub fn parse_variant(
                 let values = args(child);
                 let Some(opt) = values.first().and_then(|v| v.as_string()) else {
                     issues.push(
-                        Issue::new("`set` needs an option name", file, text)
+                        Issue::new("`set` needs an option name", src)
                             .at(child.name().span(), "no option named"),
                     );
                     continue;
                 };
-                sets.push((opt.to_string(), values[1..].to_vec(), child.name().span()));
+                sets.push((
+                    opt.to_string(),
+                    values[1..].to_vec(),
+                    child.name().span().into(),
+                ));
             }
             other => issues.push(
-                Issue::new(format!("unknown node `{other}` in a variant"), file, text)
+                Issue::new(format!("unknown node `{other}` in a variant"), src)
                     .at(child.name().span(), "not part of the schema")
                     .help("a variant holds `description` and `set`"),
             ),
@@ -187,7 +224,7 @@ pub fn parse_variant(
     Some(Variant {
         name,
         sets,
-        span: node.name().span(),
+        span: node.name().span().into(),
     })
 }
 
@@ -197,16 +234,15 @@ pub fn parse_variant(
 fn check_values(
     name: &str,
     ty: OptType,
-    values: &[KdlValue],
-    file: &str,
-    text: &str,
-    span: SourceSpan,
+    values: &[Value],
+    src: &Source,
+    span: Span,
     issues: &mut Issues,
 ) -> bool {
     let mut ok = true;
     let mut bad = |msg: String, help: &str| {
         issues.push(
-            Issue::new(msg, file, text)
+            Issue::new(msg, src)
                 .at(span, "not usable as this option's value")
                 .help(help.to_string()),
         );
@@ -266,7 +302,7 @@ fn check_values(
     ok
 }
 
-fn env_value(ty: OptType, values: &[KdlValue]) -> String {
+fn env_value(ty: OptType, values: &[Value]) -> String {
     match ty {
         OptType::Bool => match values.first().and_then(|v| v.as_bool()) {
             Some(true) => "1".into(),
@@ -295,8 +331,7 @@ pub fn env_name(option: &str) -> String {
 pub fn resolve(
     options: &[Opt],
     variants: &[Variant],
-    file: &str,
-    text: &str,
+    src: &Source,
     entry: &Entry,
     image: &Image,
     issues: &mut Issues,
@@ -304,9 +339,9 @@ pub fn resolve(
     let selected = entry.variant.as_ref();
     let set = &entry.options;
     let module_path = entry.path.as_str();
-    let (list_file, list_text) = (image.file.as_str(), image.text.as_str());
+    let list_src = &image.src;
 
-    let mut resolved: Vec<(String, Vec<KdlValue>)> = options
+    let mut resolved: Vec<(String, Vec<Value>)> = options
         .iter()
         .map(|o| (o.name.clone(), o.default.clone()))
         .collect();
@@ -321,15 +356,14 @@ pub fn resolve(
                         issues.push(
                             Issue::new(
                                 format!("variant `{want}` sets `{name}`, which this module does not declare"),
-                                file,
-                                text,
+                                src,
                             )
                             .at(*span, "no such option")
                             .help("a variant may only set options declared in the same manifest"),
                         );
                         continue;
                     };
-                    if check_values(name, opt.ty, values, file, text, *span, issues) {
+                    if check_values(name, opt.ty, values, src, *span, issues) {
                         if let Some(slot) = resolved.iter_mut().find(|(n, _)| n == name) {
                             slot.1 = values.clone();
                         }
@@ -339,16 +373,13 @@ pub fn resolve(
             None => {
                 let known: Vec<&str> = variants.iter().map(|v| v.name.as_str()).collect();
                 issues.push(
-                    Issue::new(
-                        format!("`{module_path}` has no variant `{want}`"),
-                        list_file,
-                        list_text,
-                    )
-                    .help(if known.is_empty() {
-                        "this module declares no variants".to_string()
-                    } else {
-                        format!("declared variants: {}", known.join(", "))
-                    }),
+                    Issue::new(format!("`{module_path}` has no variant `{want}`"), list_src).help(
+                        if known.is_empty() {
+                            "this module declares no variants".to_string()
+                        } else {
+                            format!("declared variants: {}", known.join(", "))
+                        },
+                    ),
                 );
             }
         }
@@ -359,17 +390,13 @@ pub fn resolve(
         let Some(opt) = find(name) else {
             let known: Vec<&str> = options.iter().map(|o| o.name.as_str()).collect();
             issues.push(
-                Issue::new(
-                    format!("`{module_path}` has no option `{name}`"),
-                    list_file,
-                    list_text,
-                )
-                .at(*span, "not declared by this module")
-                .help(if known.is_empty() {
-                    "this module declares no options".to_string()
-                } else {
-                    format!("declared options: {}", known.join(", "))
-                }),
+                Issue::new(format!("`{module_path}` has no option `{name}`"), list_src)
+                    .at(*span, "not declared by this module")
+                    .help(if known.is_empty() {
+                        "this module declares no options".to_string()
+                    } else {
+                        format!("declared options: {}", known.join(", "))
+                    }),
             );
             continue;
         };
@@ -377,8 +404,7 @@ pub fn resolve(
             issues.push(
                 Issue::new(
                     format!("`{name}` is set twice on `{module_path}`"),
-                    list_file,
-                    list_text,
+                    list_src,
                 )
                 .at(*span, "set again here")
                 .help("resolution is a single pass, so a second value is an error rather than a merge"),
@@ -387,7 +413,7 @@ pub fn resolve(
         }
         seen.push(name.as_str());
 
-        if check_values(name, opt.ty, values, list_file, list_text, *span, issues) {
+        if check_values(name, opt.ty, values, list_src, *span, issues) {
             if let Some(slot) = resolved.iter_mut().find(|(n, _)| n == name) {
                 slot.1 = values.clone();
             }

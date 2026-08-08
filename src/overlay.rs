@@ -47,8 +47,7 @@ pub fn check(image: &Image, shipped: &Index, issues: &mut Issues) {
                         "`{}` overwrites `{path}`, which `{}` also ships",
                         entries[later].path, entries[earlier].path
                     ),
-                    &module.file,
-                    &module.text,
+                    &module.src,
                 )
                 .help(format!(
                     "overlays are copied in build order, so this one wins and the other file never reaches the image. \
@@ -70,8 +69,7 @@ pub fn check(image: &Image, shipped: &Index, issues: &mut Issues) {
                         "`{}` overrides `{}`, which no earlier module ships",
                         entry.path, decl.name
                     ),
-                    &module.file,
-                    &module.text,
+                    &module.src,
                 )
                 .at(decl.span, "nothing to replace")
                 .help("an override is checked, so it cannot outlive the collision it was added for; drop it, or check the path against what the other module actually ships"),

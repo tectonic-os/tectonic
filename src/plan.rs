@@ -83,7 +83,7 @@ fn image(list: &List, image: &Image, resolved: &Resolved) -> Json {
         ("id", Json::string(&image.id)),
         ("name", Json::string(&image.name)),
         ("pretty_name", Json::string(&image.pretty_name)),
-        ("file", Json::string(&image.file)),
+        ("file", Json::string(image.src.name())),
         ("url", Json::string(&image.url)),
         ("issues_url", Json::string(&image.issues_url)),
         (
@@ -355,7 +355,7 @@ fn remotes(list: &List) -> Json {
                 ("sha256", Json::string(&remote.sha256)),
                 ("url", Json::string(remote.url_resolved())),
                 ("path", Json::optional(remote.path.clone())),
-                ("file", Json::string(&image.file)),
+                ("file", Json::string(image.src.name())),
             ]));
         }
     }
