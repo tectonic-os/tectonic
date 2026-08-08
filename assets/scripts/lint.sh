@@ -18,10 +18,10 @@ mapfile -t scripts < <(
 shellcheck -s bash "${scripts[@]}"
 echo "lint: shellcheck passed on ${#scripts[@]} scripts"
 
-tect check
+./scripts/tect.sh check
 
 ./scripts/gen-containerfile.sh > /dev/null
-mapfile -t generated < <(tect plan --json \
+mapfile -t generated < <(./scripts/tect.sh plan --json \
     | jq -r '.images[] | "containerfiles/\(.id).generated"')
 if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
     echo "lint: the Containerfiles generate (no checkout, so no drift check)"

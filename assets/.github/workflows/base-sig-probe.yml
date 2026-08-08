@@ -44,7 +44,7 @@ jobs:
             sed -i "s/signed #${recorded}/signed #${actual}/" "${file}"
             echo "  corrected ${file}: signed #${recorded} -> #${actual}"
             changed="${changed}${changed:+, }\`${image}\` (\`${base}\`): \`#${recorded}\` to \`#${actual}\`"
-          done < <(tect plan --json \
+          done < <(./scripts/tect.sh plan --json \
             | jq -r '.images[] | "\(.id)|\(.base.image)|\(.base.signed)|\(.file)"')
 
           if [ -z "${changed}" ]; then

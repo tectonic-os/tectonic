@@ -20,7 +20,7 @@ jobs:
 
       - name: Resolve the declared state
         run: |
-          tect plan --json \
+          ./scripts/tect.sh plan --json \
             | jq -r '.workflows[] | "\(.file)|\(.enabled)"' | tee declared.txt
 
       - name: Reconcile

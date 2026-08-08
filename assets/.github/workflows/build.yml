@@ -84,7 +84,7 @@ jobs:
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             selection='[.pr_target]'
           fi
-          targets="$(tect plan --json | jq -c "$selection")"
+          targets="$(./scripts/tect.sh plan --json | jq -c "$selection")"
           echo "targets=${targets}" >> "$GITHUB_OUTPUT"
 
   build_push:
@@ -114,7 +114,7 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
-          tect plan --json > "${RUNNER_TEMP}/plan.json"
+          ./scripts/tect.sh plan --json > "${RUNNER_TEMP}/plan.json"
           jq -e --arg t "$TARGET" '.images[] | select([.targets[].name] | index($t))' \
             "${RUNNER_TEMP}/plan.json" > "${RUNNER_TEMP}/image.json"
           jq -e --arg t "$TARGET" '.targets[] | select(.name == $t)' \

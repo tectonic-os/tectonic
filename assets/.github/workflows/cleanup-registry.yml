@@ -50,7 +50,7 @@ jobs:
             fi
           }
 
-          tect plan --json > plan.json
+          ./scripts/tect.sh plan --json > plan.json
           mapfile -t packages < <(jq -r '.images[].targets[].published' plan.json)
           for pkg in "${packages[@]}"; do
             echo "== ${pkg}"

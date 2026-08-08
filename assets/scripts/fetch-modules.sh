@@ -13,7 +13,7 @@ die() {
     exit 1
 }
 
-remotes="$(tect plan --json | jq -r '
+remotes="$(./scripts/tect.sh plan --json | jq -r '
     .remotes[]
     | [.name, .dir, .ref, .sha256, .url, (.path // ""), .file]
     | join("|")')"

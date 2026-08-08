@@ -55,6 +55,18 @@
   "customManagers": [
     {
       "customType": "regex",
+      // The release every script fetches and verifies before it runs. The
+      // asset name and the tag carry the version, so the tag is what is
+      // tracked and the leading v comes back off.
+      "description": "The pinned build tool release",
+      "managerFilePatterns": ["/^scripts/tect\\.sh$/"],
+      "extractVersionTemplate": "^v(?<version>.+)$",
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s*\\nversion=\"(?<currentValue>[^\"]+)\"",
+      ],
+    },
+    {
+      "customType": "regex",
       // The base image moved out of the Containerfile skeleton and into
       // the `base` node each image declares, which its generated FROM is
       // emitted from. The dockerfile manager configured above still

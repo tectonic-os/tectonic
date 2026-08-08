@@ -43,7 +43,7 @@ jobs:
           USER_UID=$(id -u)
           USER_GID=$(id -g)
           DISK_TYPE=$(echo "${{ matrix.disk-type }}" | tr ' ' '-')
-          IMAGE_NAME="$(tect plan --json | jq -r .ungated_published)"
+          IMAGE_NAME="$(./scripts/tect.sh plan --json | jq -r .ungated_published)"
           IMAGE_REF="$(./scripts/registry.sh namespace)/${IMAGE_NAME}:${DEFAULT_TAG}"
           {
             echo "IMAGE_REF=${IMAGE_REF}"

@@ -4,7 +4,7 @@ cd "$(dirname "$0")/.."
 
 target="${1:?usage: summary.sh <target>}"
 
-tect plan --json | jq -r --arg target "$target" '
+./scripts/tect.sh plan --json | jq -r --arg target "$target" '
     def cell: gsub("\\|"; "\\\\|");
 
     .images[].targets[] | select(.name == $target)

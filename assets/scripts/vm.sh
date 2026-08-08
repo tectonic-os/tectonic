@@ -83,7 +83,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-image="${image:-localhost/$(tect plan --json | jq -r .ungated_published)}"
+image="${image:-localhost/$(./scripts/tect.sh plan --json | jq -r .ungated_published)}"
 ref="${image}:${tag}"
 
 image_file="output/${type}/disk.${type}"

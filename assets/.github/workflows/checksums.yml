@@ -62,7 +62,7 @@ jobs:
               sed -i "s/sha256 \"${pinned}\"/sha256 \"${actual}\"/" "${file}"
               fixed+=("${name} ${ref}")
               echo "${name} ${ref}: hash updated."
-            done < <(tect plan --json | jq -r '.remotes[]
+            done < <(./scripts/tect.sh plan --json | jq -r '.remotes[]
               | [.name, .dir, .ref, .sha256, .url, (.path // ""), .file] | join("|")')
           fi
 
@@ -95,7 +95,7 @@ jobs:
             sed -i "s/sha256 \"${pinned}\"/sha256 \"${actual}\"/" "$file"
             fixed+=("${name} ${version}")
             echo "${module} ${name} ${version}: hash updated."
-          done < <(tect plan --json | jq -r '.assets[]
+          done < <(./scripts/tect.sh plan --json | jq -r '.assets[]
             | [.module, .name, .manifest, (.version // ""), (.sha256 // ""), .from,
                (.url // "")] | join("|")')
 

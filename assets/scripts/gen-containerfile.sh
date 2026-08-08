@@ -26,7 +26,7 @@ trap 'rm -f "$section_file"' EXIT
 
 mkdir -p "$outdir"
 
-mapfile -t images < <(tect plan --json | jq -r '.images[].id')
+mapfile -t images < <(./scripts/tect.sh plan --json | jq -r '.images[].id')
 if [ "${#images[@]}" -eq 0 ]; then
     echo "gen-containerfile: no images declared, so there is nothing to generate" >&2
     exit 1
@@ -34,7 +34,7 @@ fi
 
 for image in "${images[@]}"; do
     out="${outdir}/${image}.generated"
-    tect section "$image" > "$section_file"
+    ./scripts/tect.sh section "$image" > "$section_file"
 
     {
         [ -z "$directive" ] || echo "$directive"

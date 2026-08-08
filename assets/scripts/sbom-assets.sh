@@ -4,7 +4,7 @@ cd "$(dirname "$0")/.."
 
 target="${1:?usage: sbom-assets.sh <target>}"
 
-tect plan --json | jq --arg target "$target" '
+./scripts/tect.sh plan --json | jq --arg target "$target" '
     [ .images[].targets[]
       | select(.name == $target)
       | .assets[]

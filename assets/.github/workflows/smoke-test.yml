@@ -26,7 +26,7 @@ jobs:
 
       - name: Resolve image name
         run: |
-          echo "IMAGE_NAME=$(tect plan --json | jq -r .ungated_published)" \
+          echo "IMAGE_NAME=$(./scripts/tect.sh plan --json | jq -r .ungated_published)" \
             >> "${GITHUB_ENV}"
 
       - name: Pull published image

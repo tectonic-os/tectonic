@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-plan="$(tect plan --json)"
+plan="$(./scripts/tect.sh plan --json)"
 
 die() {
 	echo "build: $*" >&2
