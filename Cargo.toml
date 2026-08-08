@@ -16,3 +16,10 @@ lto = false
 codegen-units = 16
 panic = "abort"
 strip = true
+
+# What a release is built with; `release` stays tuned for rebuild speed
+[profile.dist]
+inherits = "release"
+opt-level = "s"
+lto = true
+codegen-units = 1

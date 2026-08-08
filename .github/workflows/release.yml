@@ -16,17 +16,22 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - name: Build
-        run: cargo build --release --locked
+        run: |
+          set -euo pipefail
+          rustup target add x86_64-unknown-linux-musl
+          cargo build --profile dist --locked --target x86_64-unknown-linux-musl
 
       - name: Package with checksum
         id: pkg
         run: |
           set -euo pipefail
+          bin=target/x86_64-unknown-linux-musl/dist/tect
+          # It mounts into build layers, so it has to carry no interpreter
+          file "$bin" | grep -q static
           version="${GITHUB_REF_NAME#v}"
-          asset="tect-v${version}-x86_64-linux-gnu.tar.gz"
+          asset="tect-v${version}-x86_64-linux-musl.tar.gz"
           # The binary plus the scaffolding `tect init` writes
-          tar -czf "$asset" --transform 's|^target/release/||' \
-            target/release/tect assets
+          tar -czf "$asset" --transform "s|^${bin%/tect}/||" "$bin" assets
           sha256sum "$asset" | cut -d' ' -f1 > "${asset}.sha256"
           echo "asset=${asset}" >> "$GITHUB_OUTPUT"
 
