@@ -87,8 +87,6 @@ fn image(list: &List, image: &Image, resolved: &Resolved) -> Json {
         ("file", Json::string(&image.file)),
         ("url", Json::string(&image.url)),
         ("issues_url", Json::string(&image.issues_url)),
-        ("logo", Json::string(&image.logo)),
-        ("watermark", Json::string(&image.watermark)),
         (
             "base",
             match &image.base {

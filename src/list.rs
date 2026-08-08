@@ -51,10 +51,6 @@ pub struct Image {
     pub pretty_name: String,
     pub url: String,
     pub issues_url: String,
-    /// Repository-relative paths, under brand/, which is the only directory of
-    /// theirs the build context carries.
-    pub logo: String,
-    pub watermark: String,
     /// None only when the `base` node is missing or malformed, which is
     /// already an issue: nothing downstream invents a default for it.
     pub base: Option<Base>,
@@ -476,8 +472,6 @@ impl List {
             pretty_name: String::new(),
             url: String::new(),
             issues_url: String::new(),
-            logo: String::new(),
-            watermark: String::new(),
             base: None,
             flavours: Vec::new(),
             entries: Vec::new(),
@@ -502,8 +496,6 @@ impl List {
                 "pretty-name" => image.pretty_name = value("pretty-name", issues),
                 "url" => image.url = value("url", issues),
                 "issues-url" => image.issues_url = value("issues-url", issues),
-                "logo" => image.logo = value("logo", issues),
-                "watermark" => image.watermark = value("watermark", issues),
                 "base" => image.parse_base(child, issues),
                 "flavours" => image.parse_flavours(child, issues),
                 "modules" => {}
@@ -511,9 +503,9 @@ impl List {
                     Issue::new(format!("unknown image property `{other}`"), &file, &text)
                         .at(child.name().span(), "not part of the schema")
                         .help(
-                            "an image accepts `id`, `name`, `pretty-name`, `url`, \
-                             `issues-url`, `logo` and `watermark`, and the `base`, \
-                             `flavours` and `modules` blocks",
+                            "an image accepts `id`, `name`, `pretty-name`, `url` \
+                             and `issues-url`, and the `base`, `flavours` and \
+                             `modules` blocks",
                         ),
                 ),
             }
@@ -552,16 +544,6 @@ impl List {
                     .at(image.span, "must be lowercase letters, digits and dashes, starting with a letter")
                     .help("it becomes an image tag, a cache tag and the default hostname, all of which restrict it"),
             );
-        }
-
-        for (field, path) in [("logo", &image.logo), ("watermark", &image.watermark)] {
-            if !path.is_empty() && !path.starts_with("brand/") {
-                issues.push(
-                    Issue::new(format!("`{field}` is not under brand/"), &file, &text)
-                        .at(image.span, "brand assets live in brand/")
-                        .help("the build context carries brand/ for them; a path anywhere else is not in it"),
-                );
-            }
         }
 
         if image.base.is_none() && !children.iter().any(|c| c.name().value() == "base") {

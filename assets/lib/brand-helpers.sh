@@ -32,19 +32,3 @@ brand_os_release() {
     fi
     ln -sf ../usr/lib/os-release /etc/os-release
 }
-
-install_brand_assets() {
-    local logo="${IMAGE_LOGO:-}" watermark="${IMAGE_WATERMARK:-}" file
-
-    if [ -n "$logo" ]; then
-        file="$(basename "$logo")"
-        install -Dm644 "/ctx/${logo}" \
-            "/usr/share/icons/hicolor/scalable/places/${file}"
-        sed -i "s|^LOGO=.*|LOGO=${file%.*}|" /usr/lib/os-release
-    fi
-
-    if [ -n "$watermark" ]; then
-        install -Dm644 "/ctx/${watermark}" \
-            "/usr/share/plymouth/themes/spinner/watermark.png"
-    fi
-}

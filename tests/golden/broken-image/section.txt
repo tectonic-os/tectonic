@@ -14,6 +14,5 @@ ARG IMAGE_VERSION=dev
 
 # ---- image identity ----
 ARG IMAGE_ID="Not An Id"
-ARG IMAGE_LOGO="assets/logo.svg"
 ARG IMAGE_REGISTRY=""
 

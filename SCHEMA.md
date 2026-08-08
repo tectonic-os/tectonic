@@ -83,8 +83,6 @@ tectonic-server/none
 | `pretty-name` | os-release `PRETTY_NAME`. Defaults to `<name> <version>`. |
 | `url` | os-release `HOME_URL` and `DOCUMENTATION_URL`. |
 | `issues-url` | os-release `SUPPORT_URL` and `BUG_REPORT_URL`. |
-| `logo` | scalable icon, installed into the hicolor theme. Its filename without the extension becomes os-release `LOGO`, so the two cannot name different icons. |
-| `watermark` | plymouth boot splash watermark. |
 
 ### `base`
 

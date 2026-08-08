@@ -27,8 +27,6 @@ fn identity(image: &Image) -> Vec<(&'static str, String)> {
         ("IMAGE_PRETTY_NAME", &image.pretty_name),
         ("IMAGE_URL", &image.url),
         ("IMAGE_ISSUES_URL", &image.issues_url),
-        ("IMAGE_LOGO", &image.logo),
-        ("IMAGE_WATERMARK", &image.watermark),
     ] {
         if !value.is_empty() {
             vars.push((name, value.clone()));
@@ -149,16 +147,6 @@ pub fn section(
 
     let _ = write!(out, "{IMAGE_VERSION_ARG}\n\n");
 
-    for path in [&image.logo, &image.watermark] {
-        if !path.is_empty() && !root.join(path).is_file() {
-            issues.push(
-                Issue::new(format!("`{path}` does not exist"), &image.file, &image.text)
-                    .at(image.span, "declared brand asset")
-                    .help("the path is relative to the repository root"),
-            );
-        }
-    }
-
     let identity = identity(image);
     let _ = write!(
         out,
@@ -223,7 +211,6 @@ fn phase(file: &str, below_modules: bool, identity_env: &str) -> String {
     if below_modules {
         out.push_str("--mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \\\n    ");
         out.push_str("--mount=type=bind,from=ctx,source=/modules,target=/ctx/modules \\\n    ");
-        out.push_str("--mount=type=bind,from=ctx,source=/brand,target=/ctx/brand \\\n    ");
     }
     out.push_str(
         "--mount=type=cache,target=/var/cache \\\n    \
