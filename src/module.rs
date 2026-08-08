@@ -5,6 +5,7 @@ use crate::diag::{Issue, Issues, Source, Span};
 use crate::disk::Disk;
 use crate::list::{Entry, Image};
 use crate::options::{self, Opt, Variant};
+use crate::runtime::{class_names, VERIFY_CLASSES};
 use kdl::{KdlDocument, KdlNode};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -104,9 +105,6 @@ pub struct Module {
 
 /// The only base family today.
 const FAMILIES: [&str; 1] = ["fedora"];
-
-/// The diagnostic classes `allow-verify` may name.
-const VERIFY_CLASSES: [&str; 2] = ["mount-not-found", "man-page-missing"];
 
 const TOKEN_HELP: &str = "package names and repo IDs are emitted straight into the RUN line, so they are limited to letters, digits and . _ + : -; anything else belongs in module.sh, where it can be quoted deliberately";
 
@@ -390,7 +388,7 @@ impl Module {
 
                     match (class, unit) {
                         (Some(class), Some(unit)) => {
-                            if !VERIFY_CLASSES.contains(&class.as_str()) {
+                            if !VERIFY_CLASSES.iter().any(|(name, _)| *name == class) {
                                 issues.push(
                                     Issue::new(
                                         format!("`{class}` is not a verify diagnostic class"),
@@ -398,8 +396,8 @@ impl Module {
                                     )
                                     .at(span, "not one of the known classes")
                                     .help(format!(
-                                        "known classes: {}. They are named rather than written as regexes, and lib/validate-image.sh holds the pattern each one stands for",
-                                        VERIFY_CLASSES.join(", ")
+                                        "known classes: {}. They are named rather than written as patterns, and `tect validate-image` holds what each one stands for",
+                                        class_names()
                                     )),
                                 );
                             } else if let Some(dup) = module

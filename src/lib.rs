@@ -13,6 +13,7 @@ pub mod overlay;
 pub mod plan;
 pub mod remote;
 pub mod render;
+pub mod runtime;
 pub mod workflow;
 
 use diag::Issue;
