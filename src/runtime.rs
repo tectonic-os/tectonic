@@ -85,10 +85,22 @@ pub fn os_release() -> Result<(), String> {
     }
 
     let text = fs::read_to_string(OS_RELEASE).map_err(|err| format!("{OS_RELEASE}: {err}"))?;
+    fs::write(OS_RELEASE, assign(&text, &set)).map_err(|err| format!("{OS_RELEASE}: {err}"))?;
+
+    let link = Path::new("/etc/os-release");
+    let _ = fs::remove_file(link);
+    std::os::unix::fs::symlink("../usr/lib/os-release", link)
+        .map_err(|err| format!("{}: {err}", link.display()))
+}
+
+/// Each key replaced where it already is, appended where it is not.
+fn assign(text: &str, set: &[(&str, String)]) -> String {
     let mut out = String::new();
     for line in text.lines() {
-        let key = line.split_once('=').map(|(k, _)| k).unwrap_or("");
-        match set.iter().find(|(name, _)| *name == key) {
+        match line
+            .split_once('=')
+            .and_then(|(key, _)| set.iter().find(|(name, _)| *name == key))
+        {
             Some((name, value)) => {
                 let _ = writeln!(out, "{name}=\"{value}\"");
             }
@@ -97,17 +109,15 @@ pub fn os_release() -> Result<(), String> {
             }
         }
     }
-    for (name, value) in &set {
-        if !text.lines().any(|l| l.starts_with(&format!("{name}="))) {
+    for (name, value) in set {
+        if !text.lines().any(|line| {
+            line.split_once('=')
+                .is_some_and(|(key, _)| key == *name)
+        }) {
             let _ = writeln!(out, "{name}=\"{value}\"");
         }
     }
-    fs::write(OS_RELEASE, out).map_err(|err| format!("{OS_RELEASE}: {err}"))?;
-
-    let link = Path::new("/etc/os-release");
-    let _ = fs::remove_file(link);
-    std::os::unix::fs::symlink("../usr/lib/os-release", link)
-        .map_err(|err| format!("{}: {err}", link.display()))
+    out
 }
 
 // ---- fetch ---------------------------------------------------------------
@@ -686,6 +696,22 @@ mod tests {
         assert_eq!(
             hash.hex(),
             "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"
+        );
+    }
+
+    #[test]
+    fn os_release_keys_are_replaced_in_place_or_appended() {
+        let set = [
+            ("NAME", "Example".to_string()),
+            ("IMAGE_VERSION", "20260809".to_string()),
+        ];
+        assert_eq!(
+            assign("NAME=Fedora\nVERSION_ID=44\nID=fedora\n", &set),
+            "NAME=\"Example\"\nVERSION_ID=44\nID=fedora\nIMAGE_VERSION=\"20260809\"\n"
+        );
+        assert_eq!(
+            assign("IMAGE_VERSION=\"old\"\nNAME=Fedora\n", &set),
+            "IMAGE_VERSION=\"20260809\"\nNAME=\"Example\"\n"
         );
     }
 
