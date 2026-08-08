@@ -48,6 +48,19 @@ apply_module_presets() {
 apply_module_presets system /usr/lib/systemd/system-preset
 apply_module_presets user /usr/lib/systemd/user-preset
 
+assemble_collected() {
+    local dest parts destinations=()
+    read -ra destinations <<< "${COLLECT_TARGETS:-}"
+    for dest in "${destinations[@]}"; do
+        [ -d "${dest}.d" ] || continue
+        parts=("${dest}.d"/*.part)
+        [ -e "${parts[0]}" ] || continue
+        cat "${parts[@]}" > "$dest"
+        rm -rf "${dest}.d"
+    done
+}
+assemble_collected
+
 run_module_finalize() {
     local entry name gate dir entries=()
     read -ra entries <<< "${FINALIZE_ORDER:-}"
