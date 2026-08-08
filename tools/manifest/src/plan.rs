@@ -1,7 +1,7 @@
 //! One resolved plan, as JSON: every fact anything downstream derives.
 
 use crate::json::Json;
-use crate::list::{Entry, Image, List, Target, NO_FLAVOUR};
+use crate::list::{Entry, Image, List, Target, NO_FLAVOUR, SCHEMA_VERSION};
 use crate::module::{Collection, Module};
 use crate::overlay;
 
@@ -13,13 +13,12 @@ pub struct Resolved {
     pub collected: Collection,
 }
 
-/// The schema the images and manifests in this repository are written against,
-/// which `repo.kdl` declares and this tool checks.
-pub const SCHEMA_VERSION: u32 = 1;
-
 pub fn build(list: &List, resolved: &[Resolved], workflows: &[(String, bool)]) -> Json {
     Json::object([
-        ("schema_version", Json::Number(SCHEMA_VERSION)),
+        (
+            "schema_version",
+            Json::Number(list.schema_version.unwrap_or(SCHEMA_VERSION)),
+        ),
         (
             "default_image",
             Json::optional(list.default_image().map(|i| i.id.clone())),

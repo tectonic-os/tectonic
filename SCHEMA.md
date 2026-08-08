@@ -1,7 +1,7 @@
 | File | Declares |
 | --- | --- |
 | [`<name>.kdl`](image.kdl) at the root | One image: its name, its base, its flavours, and the modules in it |
-| [`repo.kdl`](repo.kdl) | The repository: which image a bare build builds, and which CI workflows run |
+| [`repo.kdl`](repo.kdl) | The repository: the schema it is written against, which image a bare build builds, and which CI workflows run |
 | `modules/<path>/module.kdl` | One module: what it needs, what it offers, and what an image author may configure |
 
 ## The image files
@@ -157,6 +157,8 @@ flavour "<name>" {
 ## repo.kdl
 
 ```kdl
+schema-version 1
+
 default-image "tectonic"
 pr-image "tectonic"
 
@@ -164,6 +166,8 @@ workflows {
     smoke-test enabled=#false
 }
 ```
+
+### `schema-version`
 
 ### `default-image` and `pr-image`
 
@@ -390,6 +394,7 @@ fragment position="after" standard-layer=#false
 - an image file entry that does not resolve to a module directory
 - a module directory without a `module.kdl`, or one missing
 - a repository declaring no image, or a root `.kdl` that declares none
+- a `repo.kdl` with no `schema-version`, or one this tool does not know
 - an `image` node with an argument, no `name` child, an `id` outside
 - two images declaring the same `id`, or two builds that would publish
 - `default-image` missing with more than one image declared, or either it
