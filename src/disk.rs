@@ -24,6 +24,11 @@ pub struct Disk {
 }
 
 impl Disk {
+    /// Every module directory on disk, whether or not an image lists it.
+    pub fn modules(&self) -> impl Iterator<Item = &String> {
+        self.overlays.keys()
+    }
+
     pub fn scan(root: &Path, issues: &mut Issues) -> Self {
         let mut out = Disk {
             phases: phases(root, issues),

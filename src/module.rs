@@ -3,11 +3,12 @@
 use crate::asset::{self, Asset};
 use crate::diag::{Issue, Issues, Source, Span};
 use crate::disk::Disk;
-use crate::list::{Entry, Image};
+use crate::list::{Entry, Image, List};
 use crate::options::{self, Opt, Variant};
+use crate::remote::REMOTE_DIR;
 use crate::runtime::{class_names, VERIFY_CLASSES};
 use kdl::{KdlDocument, KdlNode};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 /// A batch of packages keyed to a base family, with an optional repo to enable
@@ -186,11 +187,15 @@ impl Module {
             );
         }
 
-        let dir = root.join("modules").join(entry.dir());
-        let path = dir.join("module.kdl");
-        let file = path.display().to_string();
+        let dir_rel = entry.dir();
+        let file = root
+            .join("modules")
+            .join(&dir_rel)
+            .join("module.kdl")
+            .display()
+            .to_string();
 
-        let Ok(text) = std::fs::read_to_string(&path) else {
+        let Ok(text) = std::fs::read_to_string(&file) else {
             issues.push(
                 Issue::new(
                     format!("`{}` has no module.kdl", entry.path),
@@ -208,6 +213,26 @@ impl Module {
             return None;
         };
 
+        let mut module = Self::parse(&entry.path, &dir_rel, root, text, issues)?;
+        module.flavour = entry.flavour.clone();
+        let src = &module.src.clone();
+        module.resolved =
+            options::resolve(&module.options, &module.variants, src, entry, image, issues);
+        Some(module)
+    }
+
+    /// Everything a manifest says on its own, so a module no image lists is
+    /// still held to the schema.
+    fn parse(
+        path: &str,
+        dir_rel: &str,
+        root: &Path,
+        text: String,
+        issues: &mut Issues,
+    ) -> Option<Self> {
+        let dir = root.join("modules").join(dir_rel);
+        let file = dir.join("module.kdl").display().to_string();
+
         let src = &Source::new(&file, text.clone());
         let doc: KdlDocument = match text.parse() {
             Ok(doc) => doc,
@@ -218,8 +243,8 @@ impl Module {
         };
 
         let mut module = Module {
-            path: entry.path.clone(),
-            dir: entry.dir(),
+            path: path.to_string(),
+            dir: dir_rel.to_string(),
             description: String::new(),
             supports: Vec::new(),
             provides: Vec::new(),
@@ -230,7 +255,7 @@ impl Module {
             requires_files: Vec::new(),
             overrides: Vec::new(),
             verify_exceptions: Vec::new(),
-            flavour: entry.flavour.clone(),
+            flavour: None,
             collects: Vec::new(),
             contributes: Vec::new(),
             secrets: Vec::new(),
@@ -485,7 +510,7 @@ impl Module {
                             if !dir.join(&contributed).is_file() {
                                 issues.push(
                                     Issue::new(
-                                        format!("`{}` orders a {contributed} it does not ship", entry.path),
+                                        format!("`{}` orders a {contributed} it does not ship", path),
                                         src,
                                     )
                                     .at(node.name().span(), "nothing to order")
@@ -535,7 +560,7 @@ impl Module {
                     if module.fragment.is_none() {
                         issues.push(
                             Issue::new(
-                                format!("`{}` declares `fragment` but ships no Containerfile.inc", entry.path),
+                                format!("`{}` declares `fragment` but ships no Containerfile.inc", path),
                                 src,
                             )
                             .at(node.name().span(), "nothing to place")
@@ -598,7 +623,7 @@ impl Module {
 
         if module.description.is_empty() {
             issues.push(
-                Issue::new(format!("`{}` declares no description", entry.path), src)
+                Issue::new(format!("`{}` declares no description", path), src)
                     .help("one line, present tense, no trailing period; it names the module in the resolved build summary"),
             );
         }
@@ -625,7 +650,7 @@ impl Module {
                     Issue::new(
                         format!(
                             "`{}` declares `{kind} \"{name}\"` with no standard layer to carry it",
-                            entry.path
+                            path
                         ),
                         src,
                     )
@@ -637,7 +662,7 @@ impl Module {
 
         if module.supports.is_empty() {
             issues.push(
-                Issue::new(format!("`{}` declares no `supports`", entry.path), src)
+                Issue::new(format!("`{}` declares no `supports`", path), src)
                     .help("a module has to say which base families it can build on, so a portability gap surfaces at lint rather than mid-build"),
             );
         }
@@ -646,7 +671,7 @@ impl Module {
             for group in &module.packages {
                 issues.push(
                     Issue::new(
-                        format!("`{}` declares both a `repo` file and `packages`", entry.path),
+                        format!("`{}` declares both a `repo` file and `packages`", path),
                         src,
                     )
                     .at(group.span, "installed before the repo file is sourced")
@@ -654,9 +679,6 @@ impl Module {
                 );
             }
         }
-
-        module.resolved =
-            options::resolve(&module.options, &module.variants, src, entry, image, issues);
 
         Some(module)
     }
@@ -803,6 +825,26 @@ impl Module {
                 enablerepo,
                 span: child.name().span().into(),
             });
+        }
+    }
+}
+
+/// Every module on disk that no image lists, held to the schema on its own.
+pub fn check_unlisted(list: &List, root: &Path, disk: &Disk, issues: &mut Issues) {
+    let listed: BTreeSet<String> = list
+        .images
+        .iter()
+        .flat_map(|image| image.entries.iter())
+        .map(Entry::dir)
+        .collect();
+
+    for dir in disk.modules() {
+        if listed.contains(dir) || dir.starts_with(REMOTE_DIR) {
+            continue;
+        }
+        let file = root.join("modules").join(dir).join("module.kdl");
+        if let Ok(text) = std::fs::read_to_string(&file) {
+            Module::parse(dir, dir, root, text, issues);
         }
     }
 }

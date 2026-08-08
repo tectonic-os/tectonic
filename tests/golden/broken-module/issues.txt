@@ -12,6 +12,15 @@
     `----
   help: a module builds once per flavour it is listed under
 
+  x unknown node `flies`
+   ,-[./modules/core/unlisted/module.kdl:4:1]
+ 3 | 
+ 4 | flies "a kite"
+   : ^^|^^
+   :   `-- not part of the schema
+   `----
+  help: SCHEMA.md documents every node a manifest may hold
+
   x unknown node `drives`
    ,-[./modules/core/nameless/module.kdl:3:1]
  2 | 

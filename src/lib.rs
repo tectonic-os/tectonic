@@ -54,6 +54,7 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
 
     let workflows = workflow::resolve(&list, root, &mut issues);
     let disk = disk::Disk::scan(root, &mut issues);
+    module::check_unlisted(&list, root, &disk, &mut issues);
 
     let mut resolved: Vec<Resolved> = Vec::new();
     for image in &mut list.images {
