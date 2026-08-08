@@ -131,9 +131,9 @@ pub fn section(
     let _ = write!(out, "{IMAGE_VERSION_ARG}\n\n");
 
     let identity = identity(image);
-    let _ = write!(out, "# ---- image identity ----\n",);
+    let _ = writeln!(out, "# ---- image identity ----");
     for (name, value) in &identity {
-        let _ = write!(out, "ARG {name}=\"{value}\"\n");
+        let _ = writeln!(out, "ARG {name}=\"{value}\"");
     }
     out.push('\n');
 

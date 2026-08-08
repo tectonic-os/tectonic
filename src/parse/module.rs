@@ -233,7 +233,7 @@ impl Module {
                             Some(value) => value,
                             None => {
                                 issues.push(
-                                    Issue::new(format!("`build-only` takes #true or #false"), src)
+                                    Issue::new("`build-only` takes #true or #false", src)
                                         .at(entry.span(), "not a boolean"),
                                 );
                                 false

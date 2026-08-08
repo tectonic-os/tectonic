@@ -6,10 +6,13 @@ use crate::parse::{string_arg, syntax_issue};
 use kdl::{KdlDocument, KdlNode};
 use std::path::Path;
 
+/// Everything one schema version's grammar produces.
+type Reader = fn(&Path) -> (List, Issues);
+
 /// The reader for a schema version. One version, one reader, today: a version
 /// this release cannot read is refused rather than parsed against the wrong
 /// grammar, and a new version adds an arm here rather than forking the reader.
-fn reader(version: i128) -> Option<fn(&Path) -> (List, Issues)> {
+fn reader(version: i128) -> Option<Reader> {
     match version {
         v if v == i128::from(SCHEMA_VERSION) => Some(List::read),
         _ => None,

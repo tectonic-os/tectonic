@@ -48,11 +48,13 @@ pub fn resolve_collects(
         }
     }
 
-    let mut out = Collection::default();
-    out.destinations = by_file
-        .values()
-        .flat_map(|collector| collector.collects.iter().map(|c| c.into.clone()))
-        .collect();
+    let mut out = Collection {
+        destinations: by_file
+            .values()
+            .flat_map(|collector| collector.collects.iter().map(|c| c.into.clone()))
+            .collect(),
+        ..Collection::default()
+    };
     out.destinations.sort();
     out.destinations.dedup();
 
