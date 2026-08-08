@@ -5,12 +5,6 @@
   ],
 
   "rebaseWhen": "never",
-
-  // One grouped PR per day, created early UTC so the PR build and automerge
-  // finish before the 12:30 UTC scheduled image build, which then picks up
-  // the merged bumps together with any upstream drift. Merges by
-  // renovate[bot] are excluded from the push build in build.yml for the
-  // same reason.
   "timezone": "Etc/UTC",
   "schedule": ["before 6am"],
 
@@ -19,96 +13,6 @@
       "matchPackageNames": ["*"],
       "groupName": "scheduled updates",
       "automerge": true,
-    },
-    {
-      "enabled": false,
-      "matchUpdateTypes": ["digest", "pinDigest", "pin"],
-      "matchDepTypes": ["container"],
-      "matchFileNames": [".github/workflows/**.yaml", ".github/workflows/**.yml"],
-    },
-    {
-      // quay.io/fedora prunes old untagged manifests within days, so a
-      // pinned digest 404s before the next Renovate bump lands and breaks
-      // the scheduled builds. Track the tag instead.
-      "matchPackageNames": ["quay.io/fedora/fedora-bootc"],
-      "pinDigests": false,
-    },
-  ],
-
-  // The generated Containerfiles, one per image, carry the same base
-  // image reference as the declaration the custom manager below matches.
-  // They used to be one file at the repository root, which the dockerfile
-  // manager matched by default; `containerfiles/<image>.generated` is not
-  // a name it recognises, so it is named here. Without this the
-  // declaration bumps and the generated FROM does not, and every base
-  // image PR fails the drift check in scripts/lint.sh.
-  "dockerfile": {
-    "managerFilePatterns": ["/^containerfiles/[^/]+\\.generated$/"],
-  },
-
-  // The `renovate` node inside an `asset` block, and the `version` line
-  // directly below it. What Renovate needs is declared as data rather than
-  // written in a comment, so the manifest parser validates it: an
-  // unsupported datasource, a missing depName or anything wedged between
-  // the two lines fails `scripts/lint.sh` instead of quietly leaving the pin
-  // unmanaged, which is how these went unmatched through two path moves.
-  "customManagers": [
-    {
-      "customType": "regex",
-      // The base image moved out of the Containerfile skeleton and into
-      // the `base` node each image declares, which its generated FROM is
-      // emitted from. The dockerfile manager configured above still
-      // matches that FROM, and both carry the same depName and version, so
-      // a bump updates the declaration and the generated file together in
-      // one PR and the drift check stays happy.
-      //
-      // Every root .kdl but repo.kdl is an image, and each declares its own
-      // base, so the pattern is the layout rather than one file name.
-      // repo.kdl matches too and has nothing in it to match, which costs a
-      // scan and keeps the pattern honest about what the layout is.
-      "description": "Base image reference in an image file",
-      "managerFilePatterns": ["/^[^/]+\\.kdl$/"],
-      "datasourceTemplate": "docker",
-      "matchStrings": [
-        "base \"(?<depName>[^\":]+):(?<currentValue>[^\"]+)\"",
-      ],
-    },
-    {
-      "customType": "regex",
-      // Path segments must start with a lowercase letter, which excludes
-      // modules/_template — its examples name a placeholder upstream that
-      // would fail every lookup. RE2 has no negative lookahead, so the
-      // exclusion is expressed in the character class.
-      "description": "Version-tagged asset pins in module.kdl",
-      "managerFilePatterns": ["/^modules/([a-z][^/]*/)?[a-z][^/]*/module\\.kdl$/"],
-      "matchStrings": [
-        "renovate datasource=\"(?<datasource>github-releases|github-tags)\" depName=\"(?<depName>[^\"]+)\"(?: extractVersion=\"(?<extractVersion>[^\"]+)\")?\\s*\\n\\s*version \"(?<currentValue>[^\"]+)\"",
-      ],
-    },
-    {
-      "customType": "regex",
-      "description": "Commit-pinned asset pins in module.kdl",
-      "managerFilePatterns": ["/^modules/([a-z][^/]*/)?[a-z][^/]*/module\\.kdl$/"],
-      "matchStrings": [
-        "renovate datasource=\"(?<datasource>git-refs)\" depName=\"(?<depName>[^\"]+)\"\\s*\\n\\s*version \"(?<currentDigest>[^\"]+)\"",
-      ],
-      // Both commit-pinned deps (xone, Ant) track their default branch,
-      // which is `master` for both — Renovate's regex manager requires a
-      // currentValue (or this template) even for a digest-only pin.
-      "currentValueTemplate": "master",
-    },
-    {
-      "customType": "regex",
-      // Out-of-tree modules: the `renovate` node inside a `source` block
-      // and the `ref` line directly below it, the same shape and the same
-      // adjacency rule as an asset pin. Tags only, since a module is
-      // published as a per-module tag; the parser rejects git-refs here
-      // rather than leaving a branch-tracked pin unmatched.
-      "description": "Out-of-tree module pins in an image file",
-      "managerFilePatterns": ["/^[^/]+\\.kdl$/"],
-      "matchStrings": [
-        "renovate datasource=\"(?<datasource>github-releases|github-tags)\" depName=\"(?<depName>[^\"]+)\"(?: extractVersion=\"(?<extractVersion>[^\"]+)\")?\\s*\\n\\s*ref \"(?<currentValue>[^\"]+)\"",
-      ],
     },
   ],
 }
