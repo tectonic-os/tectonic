@@ -60,7 +60,7 @@ image {
 ```
 
 ```console
-$ manifest targets
+$ manifest plan --json | jq -r '.images[].targets[].name'
 tectonic/none
 tectonic/dev
 tectonic-server/none
@@ -226,8 +226,10 @@ arg "KERNEL"
 | --- | --- |
 | `overrides "<abs-path>"` | this module's overlay knowingly replaces a path an earlier module ships |
 
-```
-$ manifest owns /usr/lib/modprobe.d/vfio.conf dev
+```console
+$ manifest plan --json | jq -r '
+    .images[].targets[] | select(.name == "tectonic/dev")
+    | .overlay_files["/usr/lib/modprobe.d/vfio.conf"]'
 virtualization/vfio-passthrough
 ```
 

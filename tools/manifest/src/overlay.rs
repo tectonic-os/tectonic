@@ -21,29 +21,6 @@ pub fn index(modules: &[Module], root: &Path) -> Index {
     shipped
 }
 
-/// The module whose overlay actually puts a file at `path` in a target's
-/// image.
-pub fn owns(modules: &[Module], shipped: &Index, path: &str, target: Option<&str>) -> String {
-    let Some(owners) = shipped.get(path) else {
-        return String::new();
-    };
-    owners
-        .iter()
-        .rev()
-        .find(|&&owner| in_target(&modules[owner], target))
-        .map(|&owner| format!("{}\n", modules[owner].path))
-        .unwrap_or_default()
-}
-
-/// Whether a module lands in a target's image.
-fn in_target(module: &Module, target: Option<&str>) -> bool {
-    match (&module.flavour, target) {
-        (None, _) => true,
-        (Some(_), None) => true,
-        (Some(gate), Some(target)) => gate == target,
-    }
-}
-
 pub fn check(modules: &[Module], shipped: &Index, issues: &mut Issues) {
     let mut used: Vec<BTreeSet<&str>> = vec![BTreeSet::new(); modules.len()];
 

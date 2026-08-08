@@ -2,7 +2,6 @@
 
 use crate::diag::{Issue, Issues};
 use crate::list::List;
-use std::fmt::Write as _;
 use std::path::Path;
 
 /// GitHub's path, not this repository's choice, which is why it is written
@@ -44,18 +43,6 @@ pub fn resolve(list: &List, root: &Path, issues: &mut Issues) -> Vec<(String, bo
             (file, enabled)
         })
         .collect()
-}
-
-/// One line per workflow file, pipe separated: <file>|<enabled> The file name
-/// rather than the stem, because that is what the API takes as its
-/// `workflow_id`, and `true`/`false` rather than the API's own
-/// `active`/`disabled_manually` because this says what should be, not what is.
-pub fn render(workflows: &[(String, bool)]) -> String {
-    let mut out = String::new();
-    for (file, enabled) in workflows {
-        let _ = writeln!(out, "{file}|{enabled}");
-    }
-    out
 }
 
 /// Every workflow file, as its name and its stem, sorted by name so two runs

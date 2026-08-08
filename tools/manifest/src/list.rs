@@ -18,16 +18,13 @@ pub struct Target {
 }
 
 impl Target {
-    /// `<image>/<flavour>`.
-    pub fn parse(text: &str) -> Option<Self> {
-        let (image, flavour) = text.split_once('/')?;
-        if image.is_empty() || flavour.is_empty() || flavour.contains('/') {
-            return None;
+    /// What this target publishes as: the image name alone for the ungated
+    /// build, suffixed with the flavour otherwise.
+    pub fn published(&self) -> String {
+        match self.flavour.as_str() {
+            NO_FLAVOUR => self.image.clone(),
+            flavour => format!("{}-{flavour}", self.image),
         }
-        Some(Target {
-            image: image.to_string(),
-            flavour: flavour.to_string(),
-        })
     }
 }
 
@@ -1059,6 +1056,21 @@ impl List {
             image: image.id.clone(),
             flavour: image.default_flavour().unwrap_or(NO_FLAVOUR).to_string(),
         })
+    }
+
+    /// The default image's ungated build, which is what the installer ISO and
+    /// the disk builds lay down: an installer has no hardware to gate on, so
+    /// it wants the set that gates on none.
+    pub fn ungated_target(&self) -> Option<Target> {
+        self.default_image().map(|image| Target {
+            image: image.id.clone(),
+            flavour: NO_FLAVOUR.to_string(),
+        })
+    }
+
+    /// The image name the registry layer cache is kept under.
+    pub fn cache_image(&self) -> Option<String> {
+        self.default_image().map(|image| format!("{}-cache", image.id))
     }
 
     /// The one target a pull request builds, for half the runner time.
