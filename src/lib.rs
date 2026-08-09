@@ -6,6 +6,7 @@ pub mod import;
 pub mod init;
 pub mod model;
 pub mod parse;
+pub mod prompt;
 pub mod resolve;
 pub mod runtime;
 
