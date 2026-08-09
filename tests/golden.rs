@@ -42,11 +42,11 @@ fn capture(name: &str, root: &Path) {
     );
 
     // `generate` writes nothing here: what it produced is on the run.
-    let mut scripts = String::new();
+    let mut generated = String::new();
     for (path, body) in &tect::run("generate", None, here).files {
-        scripts.push_str(&format!("==== {}\n{body}", path.display()));
+        generated.push_str(&format!("==== {}\n{body}", path.display()));
     }
-    compare(name, "modules.txt", &scripts);
+    compare(name, "generated.txt", &generated);
 }
 
 /// A repository `tect init` wrote, captured like any other fixture: what it

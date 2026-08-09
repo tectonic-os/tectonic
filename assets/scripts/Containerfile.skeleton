@@ -8,7 +8,7 @@ COPY generated/ /generated/
 FROM scratch AS tect
 COPY out/tect /tect
 
-# ---- BEGIN GENERATED (build phases and modules; see scripts/gen-containerfile.sh) ----
+# ---- BEGIN GENERATED (build phases and modules) ----
 # ---- END GENERATED ----
 
 ARG CONTRACT_FILES=""

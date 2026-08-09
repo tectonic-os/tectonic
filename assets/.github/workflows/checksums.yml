@@ -99,7 +99,7 @@ jobs:
             | [.module, .name, .manifest, (.version // ""), (.sha256 // ""), .from,
                (.url // "")] | join("|")')
 
-          ./scripts/gen-containerfile.sh
+          ./scripts/tect.sh generate
 
           if git diff --quiet; then
             echo "Nothing to fix up."

@@ -1,4 +1,5 @@
-//! The generated Containerfile section.
+//! The generated Containerfile: the skeleton the repository keeps, with the
+//! build phases and module layers spliced between its markers.
 
 use crate::emit::module_build;
 use crate::model::image::{Entry, Image};
@@ -6,7 +7,48 @@ use crate::model::module::Module;
 use crate::parse::disk::MODULE_SLOT;
 use crate::resolve::collect::Collection;
 use std::fmt::Write as _;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+/// The hand-written half, which a repository owns and this splices into.
+pub const SKELETON: &str = "scripts/Containerfile.skeleton";
+pub const BEGIN: &str = "# ---- BEGIN GENERATED (build phases and modules) ----";
+pub const END: &str = "# ---- END GENERATED ----";
+
+/// Where the assembled Containerfile for one image is written.
+pub fn path(image: &Image) -> PathBuf {
+    PathBuf::from("generated").join(&image.id)
+}
+
+/// The skeleton with `section` between its markers, the syntax directive kept
+/// first and the header under it.
+pub fn file(skeleton: &str, image: &Image, section: &str) -> String {
+    let mut out = String::new();
+    let mut lines = skeleton.lines().peekable();
+    if lines.peek().is_some_and(|l| l.starts_with("# syntax=")) {
+        let _ = writeln!(out, "{}", lines.next().unwrap_or_default());
+    }
+    let _ = write!(
+        out,
+        "# GENERATED FILE, do not edit. Produced by `tect generate` from\n\
+         # {SKELETON} and the {} image definition.\n\n",
+        image.id
+    );
+
+    let mut generated = false;
+    for line in lines {
+        if line == END {
+            generated = false;
+        }
+        if !generated {
+            let _ = writeln!(out, "{line}");
+        }
+        if line == BEGIN {
+            let _ = write!(out, "\n{section}");
+            generated = true;
+        }
+    }
+    out
+}
 
 /// Declared immediately above the first layer that can read it, never at the
 /// top.

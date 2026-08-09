@@ -10,6 +10,7 @@ pub mod runtime;
 
 use diag::Issue;
 use diag::Issues;
+use diag::Source;
 use model::image::{List, REPO_FILE};
 use model::module::Module;
 use resolve::Resolved;
@@ -35,6 +36,27 @@ pub struct Run {
     pub images: usize,
     pub modules: usize,
     pub flavours: usize,
+}
+
+/// The Containerfile skeleton, when the repository has one to splice into. A
+/// repository with no `scripts/` generates its module scripts and no
+/// Containerfile.
+fn skeleton(root: &Path, issues: &mut Issues) -> Option<String> {
+    use emit::containerfile::{BEGIN, END, SKELETON};
+
+    let text = std::fs::read_to_string(root.join(SKELETON)).ok()?;
+    let src = Source::new(SKELETON, text.clone());
+    let mut found = true;
+    for marker in [BEGIN, END] {
+        if !text.lines().any(|line| line == marker) {
+            issues.push(
+                Issue::new(format!("`{SKELETON}` has no `{marker}` line"), &src)
+                    .help("the generated phases and module layers go between the two markers"),
+            );
+            found = false;
+        }
+    }
+    found.then_some(text)
 }
 
 /// Loads the repository, resolves every image, then runs one command over the
@@ -90,9 +112,19 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
             .and_then(|d| list.images.iter().position(|i| i.id == d.id)),
     };
 
+    let skeleton = skeleton(root, &mut issues);
+
     let mut files: Vec<(PathBuf, String)> = Vec::new();
     if command == "generate" {
         for (image, resolved) in list.images.iter().zip(&resolved) {
+            if let Some(skeleton) = &skeleton {
+                let section =
+                    emit::containerfile::section(image, &resolved.collected, &disk.phases, root);
+                files.push((
+                    emit::containerfile::path(image),
+                    emit::containerfile::file(skeleton, image, &section),
+                ));
+            }
             files.extend(emit::module_build::scripts(
                 image,
                 &resolved.collected,
