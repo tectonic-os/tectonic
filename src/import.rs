@@ -3,6 +3,8 @@
 //! image is made of are different questions.
 
 use crate::model::remote::{At, Collection};
+use crate::prompt::Prompt;
+use crate::ui::Choice;
 use std::path::{Path, PathBuf};
 
 /// Where a fetched collection is unpacked. Under `out/`, which is ignored: the
@@ -79,6 +81,72 @@ pub fn find(root: &Path, sources: &[Collection], name: &str) -> Result<Vec<Found
         ));
     }
     Ok(found)
+}
+
+/// One module a collection has, and what its manifest says about it.
+pub struct Listed {
+    pub owner: String,
+    pub name: String,
+    /// `<owner>/<name>`, which names it whatever else has the same name.
+    pub qualified: String,
+    pub description: String,
+    pub requires: Vec<String>,
+}
+
+impl Listed {
+    /// What a picker shows beside the name.
+    pub fn about(&self) -> String {
+        match self.requires.is_empty() {
+            true => self.description.clone(),
+            false => format!(
+                "{} (requires {})",
+                self.description,
+                self.requires.join(", ")
+            ),
+        }
+    }
+}
+
+/// Every module every declared collection holds, by name and then by collection.
+pub fn catalog(root: &Path, sources: &[Collection]) -> Result<Vec<Listed>, String> {
+    let mut listed: Vec<Listed> = Vec::new();
+    for collection in sources {
+        let tree = tree(root, collection)?.join(collection.subtree().unwrap_or(""));
+        let dirs = std::fs::read_dir(&tree)
+            .map_err(|err| format!("`{}`: {}: {err}", collection.name, tree.display()))?;
+        for dir in dirs.flatten().map(|entry| entry.path()) {
+            if !dir.join("module.kdl").is_file() {
+                continue;
+            }
+            let name = dir.file_name().unwrap_or_default().to_string_lossy();
+            let (description, requires) = crate::parse::module::summary(&dir.join("module.kdl"));
+            listed.push(Listed {
+                qualified: format!("{}/{name}", collection.name),
+                name: name.into_owned(),
+                owner: collection.name.clone(),
+                description,
+                requires,
+            });
+        }
+    }
+    listed.sort_by(|a, b| (&a.name, &a.owner).cmp(&(&b.name, &b.owner)));
+    Ok(listed)
+}
+
+/// Which module, out of everything the collections hold.
+pub fn choose(root: &Path, sources: &[Collection], prompt: &Prompt) -> Result<String, String> {
+    let listed = catalog(root, sources)?;
+    if listed.is_empty() {
+        return Err(format!("no module in {}", names(sources)));
+    }
+    let options: Vec<Choice> = listed
+        .iter()
+        .map(|module| Choice::new(&module.qualified, module.about()))
+        .collect();
+    match prompt.choose("which module", &options)? {
+        Some(chosen) => Ok(listed[chosen].qualified.clone()),
+        None => Err("no module chosen; `tect import module <name>` names one".to_string()),
+    }
 }
 
 /// The collection's tree on this machine: the directory it already is, or the

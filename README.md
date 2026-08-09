@@ -38,9 +38,10 @@ This is the whole surface today. The rest of it is not built yet.
     tect create module [name]
                           write a module, with the packages it installs, and
                           offer to list it in an image
-    tect import module <name>
+    tect import module [name]
                           copy a module out of a collection repo.kdl names,
-                          into modules/<owner>/<name>
+                          into modules/<owner>/<name>, choosing from what the
+                          collections hold when no name is given
     tect check            validate every manifest, and say where and why
     tect generate         write the Containerfile per image, the per-module
                           build scripts and the graph, under generated/

@@ -163,7 +163,10 @@ pub fn add_to_image(
     let options: Vec<Choice> = list
         .images
         .iter()
-        .map(|image| Choice::new(&image.id, &image.name))
+        .map(|image| match image.name == image.id {
+            true => Choice::new(&image.id, ""),
+            false => Choice::new(&image.id, &image.name),
+        })
         .collect();
     if ids.is_empty() {
         println!("no image lists it yet; `tect create image <name>` writes one");

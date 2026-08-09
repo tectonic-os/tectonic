@@ -709,6 +709,26 @@ impl Module {
     }
 }
 
+/// What a manifest says about itself where a picker has to show it: the
+/// description and what it requires, and nothing where it does not parse.
+pub fn summary(file: &Path) -> (String, Vec<String>) {
+    let Some(doc) = std::fs::read_to_string(file)
+        .ok()
+        .and_then(|text| text.parse::<KdlDocument>().ok())
+    else {
+        return (String::new(), Vec::new());
+    };
+    let strings = |name: &str| -> Vec<String> {
+        doc.nodes()
+            .iter()
+            .filter(|node| node.name().value() == name)
+            .flat_map(KdlNode::entries)
+            .filter_map(|entry| entry.value().as_string().map(str::to_string))
+            .collect()
+    };
+    (strings("description").join(" "), strings("requires"))
+}
+
 /// Every module on disk that no image lists, held to the schema on its own.
 pub fn check_unlisted(list: &List, root: &Path, disk: &Disk, issues: &mut Issues) {
     let listed: BTreeSet<String> = list

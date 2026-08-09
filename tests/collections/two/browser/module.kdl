@@ -5,3 +5,5 @@ supports "fedora"
 packages {
     fedora "chromium"
 }
+
+requires "flatpak"

@@ -74,12 +74,15 @@ there is only one, and none is an answer: having a module in the repository
 and listing it in an image are different decisions, which is what makes a
 repository with several images work.
 
-### `import module <name>`
+### `import module [name]`
 
 Copies one module out of a source collection into `modules/<owner>/<name>`,
 where `<owner>` names the collection `repo.kdl` declares it in. A bare name is
 searched for in every collection; `<owner>/<name>` picks between two that both
 have it, and so does the prompt when there is a terminal.
+
+With no name it lists every module the collections hold, each with its
+description and what it requires, and asks which one.
 
 Then it offers to list the module in an image, the same offer `create module`
 ends with; `--image`.

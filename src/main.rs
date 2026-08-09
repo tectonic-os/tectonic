@@ -17,9 +17,10 @@ const IN_REPO: &str = "\
   create module [name]
                       write a module, with the packages it installs, and offer
                       to list it in an image
-  import module <name>
+  import module [name]
                       copy a module in from a collection repo.kdl declares,
-                      and offer to list it in an image
+                      choosing from what they hold, and offer to list it in an
+                      image
   check               read every manifest and say what is wrong with it
   generate            write the build files, and list what was written
   section [image]     print the Containerfile section an image generates
@@ -125,10 +126,10 @@ fn repo_root(given: Option<PathBuf>) -> Result<PathBuf, String> {
         .ok_or_else(|| format!("no repo.kdl in {} or any parent directory", here.display()))
 }
 
-/// Copies one module in, asking which collection only when a name is in more
-/// than one and there is someone to ask, then offers it to an image.
+/// Copies one module in, asking which one when no name was given and which
+/// collection when a name is in more than one, then offers it to an image.
 fn import(
-    name: &str,
+    name: Option<String>,
     root: &Path,
     image_arg: Option<String>,
     prompt: &Prompt,
@@ -138,8 +139,12 @@ fn import(
         return Ok(ExitCode::from(REPO_ERROR));
     }
 
-    let found = tect::import::find(root, &sources, name)?;
-    let module = tect::import::split(name).1;
+    let name = match name {
+        Some(name) => name,
+        None => tect::import::choose(root, &sources, prompt)?,
+    };
+    let found = tect::import::find(root, &sources, &name)?;
+    let module = tect::import::split(&name).1;
     let one = match found.as_slice() {
         [one] => one,
         many => {
@@ -278,8 +283,9 @@ fn run() -> Result<ExitCode, String> {
             tect::create::module(&root, name, pkgs, with, image_arg, &prompt)?;
             return Ok(ExitCode::SUCCESS);
         }
-        ["import", "module", name] => {
+        ["import", "module", rest @ ..] => {
             only(&given, &["root", "image"], "import module")?;
+            let name = one_name(rest, "import module")?;
             return import(name, &repo_root(root_arg)?, image_arg, &prompt);
         }
         ["create", ..] => {
