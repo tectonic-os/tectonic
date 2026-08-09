@@ -29,6 +29,11 @@ if grep -rnE 'kdl::|Kdl[A-Z]' src --exclude-dir=parse; then
     exit 1
 fi
 
+if grep -rn 'ratatui' src --exclude-dir=ui; then
+    echo "lint: ratatui outside src/ui/, which is the only place it may appear" >&2
+    exit 1
+fi
+
 shellcheck -s bash "${scripts[@]}"
 "${shfmt[@]}" -d "${scripts[@]}" || unformatted
 cargo fmt --check || unformatted

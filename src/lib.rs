@@ -10,6 +10,7 @@ pub mod parse;
 pub mod prompt;
 pub mod resolve;
 pub mod runtime;
+pub mod ui;
 
 use diag::Issue;
 use diag::Issues;
