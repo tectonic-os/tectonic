@@ -186,19 +186,6 @@ impl List {
             list.parse_file(&src, &text, name == REPO_FILE, &mut issues);
         }
 
-        if !names.iter().any(|n| n != REPO_FILE) {
-            issues.push(
-                Issue::new(
-                    format!("{} declares no image", root.display()),
-                    &list.repo_src,
-                )
-                .help(
-                    "an image is a `.kdl` file at the repository root holding one `image` \
-                     node; image.kdl is the name a repository with one image tends to use",
-                ),
-            );
-        }
-
         list.check_images(&mut issues);
         (list, issues)
     }

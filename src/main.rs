@@ -320,16 +320,22 @@ fn main() -> ExitCode {
     }
     print!("{}", run.stdout);
     if command == "check" {
-        eprintln!(
-            "tect: {} images, {} modules, {} flavours{}",
-            run.images,
-            run.modules,
-            run.flavours,
-            match run.suppressed {
-                0 => String::new(),
-                n => format!(", {n} the base already provides"),
-            }
-        );
+        match run.images {
+            0 => eprintln!("tect: no image yet; `tect create image <name>` writes one"),
+            _ => eprintln!(
+                "tect: {} images, {} modules, {} flavours{}",
+                run.images,
+                run.modules,
+                run.flavours,
+                match run.suppressed {
+                    0 => String::new(),
+                    n => format!(", {n} the base already provides"),
+                }
+            ),
+        }
+    }
+    if command == "generate" && run.files.is_empty() {
+        eprintln!("tect: nothing to generate; `tect create image <name>` writes an image");
     }
     if command == "verify" {
         let count = run.files.len();
