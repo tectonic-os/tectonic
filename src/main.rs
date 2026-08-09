@@ -125,8 +125,13 @@ fn repo_root(given: Option<PathBuf>) -> Result<PathBuf, String> {
 }
 
 /// Copies one module in, asking which collection only when a name is in more
-/// than one and there is someone to ask. Nothing here touches an image file.
-fn import(name: &str, root: &Path, prompt: &Prompt) -> Result<ExitCode, String> {
+/// than one and there is someone to ask, then offers it to an image.
+fn import(
+    name: &str,
+    root: &Path,
+    image_arg: Option<String>,
+    prompt: &Prompt,
+) -> Result<ExitCode, String> {
     let (sources, issues, context) = tect::sources(root);
     if issues.report(&context) {
         return Ok(ExitCode::from(REPO_ERROR));
@@ -152,13 +157,8 @@ fn import(name: &str, root: &Path, prompt: &Prompt) -> Result<ExitCode, String> 
     };
 
     let dest = tect::import::vendor(root, one, module)?;
-    println!(
-        "imported {}\n\n\
-         next, to build it, list it in an image:\n\
-         \x20 module \"{}/{module}\"\n",
-        dest.display(),
-        one.owner
-    );
+    println!("imported {}", dest.display());
+    tect::create::add_to_image(root, &format!("{}/{module}", one.owner), image_arg, prompt)?;
     Ok(ExitCode::SUCCESS)
 }
 
@@ -277,8 +277,8 @@ fn run() -> Result<ExitCode, String> {
             return Ok(ExitCode::SUCCESS);
         }
         ["import", "module", name] => {
-            only(&given, &["root"], "import module")?;
-            return import(name, &repo_root(root_arg)?, &prompt);
+            only(&given, &["root", "image"], "import module")?;
+            return import(name, &repo_root(root_arg)?, image_arg, &prompt);
         }
         ["create", ..] => {
             return Err("`create` takes `repo <name>`, `image <name>` or `module <name>`".into())
