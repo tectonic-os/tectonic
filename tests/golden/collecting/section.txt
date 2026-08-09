@@ -6,29 +6,32 @@ FROM quay.io/fedora/fedora-bootc:44
 # ---- core/menu ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/menu,target=/ctx/modules/core/menu \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/generated/collecting.d/core/menu.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/lib/run-module.sh /ctx/modules/core/menu
+    bash /ctx/module.sh
 
 # ---- core/power ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/power,target=/ctx/modules/core/power \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/generated/collecting.d/core/power.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    MODULE_COLLECT="justfile.inc=/usr/share/menu/justfile.apps.d/0900-core-power.part" bash /ctx/lib/run-module.sh /ctx/modules/core/power
+    bash /ctx/module.sh
 
 # ---- core/network ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/network,target=/ctx/modules/core/network \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/generated/collecting.d/core/network.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    MODULE_COLLECT="justfile.inc=/usr/share/menu/justfile.apps.d/0100-core-network.part" bash /ctx/lib/run-module.sh /ctx/modules/core/network
+    bash /ctx/module.sh
 
 # ---- flavour gate ----
 ARG FLAVOUR

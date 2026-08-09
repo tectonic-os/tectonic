@@ -6,29 +6,32 @@ FROM quay.io/fedora/fedora-bootc:44
 # ---- core/menu ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/menu,target=/ctx/modules/core/menu \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/generated/broken-collect.d/core/menu.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/lib/run-module.sh /ctx/modules/core/menu
+    bash /ctx/module.sh
 
 # ---- core/absent ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/absent,target=/ctx/modules/core/absent \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/generated/broken-collect.d/core/absent.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/lib/run-module.sh /ctx/modules/core/absent
+    bash /ctx/module.sh
 
 # ---- core/unclaimed ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/unclaimed,target=/ctx/modules/core/unclaimed \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/generated/broken-collect.d/core/unclaimed.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/lib/run-module.sh /ctx/modules/core/unclaimed
+    bash /ctx/module.sh
 
 # ---- flavour gate ----
 ARG FLAVOUR

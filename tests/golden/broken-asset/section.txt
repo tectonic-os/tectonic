@@ -6,16 +6,12 @@ FROM quay.io/fedora/fedora-bootc:44
 # ---- core/pins ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/pins,target=/ctx/modules/core/pins \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/generated/broken-asset.d/core/pins.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    ASSET_TRACKED_AND_MANUAL_VERSION="1.0.0" \
-    ASSET_TRACKED_AND_MANUAL_URL="https://example.com/download/v1.0.0/tool.tar.gz" \
-    ASSET_TRACKED_AND_MANUAL_SHA256="NOTHEX" \
-    ASSET_NO_TRACKING_VERSION="1.0.0" \
-    ASSET_NO_TRACKING_URL="https://example.com/download/v{tag}/tool.tar.gz; rm -rf /" \
-    bash /ctx/lib/run-module.sh /ctx/modules/core/pins
+    bash /ctx/module.sh
 
 # ---- flavour gate ----
 ARG FLAVOUR

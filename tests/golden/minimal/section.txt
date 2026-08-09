@@ -6,12 +6,12 @@ FROM quay.io/fedora/fedora-bootc:44
 # ---- core/hello ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/hello,target=/ctx/modules/core/hello \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/generated/minimal.d/core/hello.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    dnf5 install -y fastfetch && \
-    bash /ctx/lib/run-module.sh /ctx/modules/core/hello
+    bash /ctx/module.sh
 
 # ---- flavour gate ----
 ARG FLAVOUR

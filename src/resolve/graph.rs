@@ -126,7 +126,7 @@ pub fn check_graph(image: &Image, root: &Path, disk: &Disk, issues: &mut Issues)
                 &module.src,
             )
             .help(format!(
-                "add `requires \"{MAC_POLICY}\"`; lib/run-module.sh compiles selinux/*.te against the base image's policy store"
+                "add `requires \"{MAC_POLICY}\"`; the generated build script compiles selinux/*.te against the base image's policy store"
             )),
         );
     }

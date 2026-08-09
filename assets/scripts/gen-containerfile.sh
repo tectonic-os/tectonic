@@ -15,6 +15,7 @@ if ! grep -qxF "$begin" "$skeleton" || ! grep -qxF "$end" "$skeleton"; then
 fi
 
 ./scripts/fetch-modules.sh
+./scripts/tect.sh generate > /dev/null
 
 directive=""
 case "$(head -1 "$skeleton")" in
@@ -58,6 +59,6 @@ for image in "${images[@]}"; do
         ' "$skeleton"
     } > "$out"
 
-    echo "gen-containerfile: wrote ${out} ($(grep -c 'run-module.sh /ctx' "$out") module layers,\
+    echo "gen-containerfile: wrote ${out} ($(grep -c 'bash /ctx/module.sh' "$out") module layers,\
  $(grep -c '^# ---- phase ' "$out") build phases)"
 done

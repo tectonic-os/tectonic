@@ -6,29 +6,32 @@ FROM quay.io/fedora/fedora-bootc:44
 # ---- core/one ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/one,target=/ctx/modules/core/one \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/generated/broken-graph.d/core/one.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/lib/run-module.sh /ctx/modules/core/one
+    bash /ctx/module.sh
 
 # ---- core/two ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/two,target=/ctx/modules/core/two \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/generated/broken-graph.d/core/two.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/lib/run-module.sh /ctx/modules/core/two
+    bash /ctx/module.sh
 
 # ---- core/three ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/three,target=/ctx/modules/core/three \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/generated/broken-graph.d/core/three.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/lib/run-module.sh /ctx/modules/core/three
+    bash /ctx/module.sh
 
 # ---- flavour gate ----
 ARG FLAVOUR

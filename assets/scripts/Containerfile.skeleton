@@ -3,6 +3,7 @@ FROM scratch AS ctx
 COPY build-phases/ /
 COPY lib/ /lib/
 COPY modules/ /modules/
+COPY generated/ /generated/
 
 FROM scratch AS tect
 COPY out/tect /tect

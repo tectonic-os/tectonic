@@ -1,9 +1,10 @@
 //! The generated Containerfile section.
 
+use crate::emit::module_build;
 use crate::model::image::{Entry, Image};
 use crate::model::module::Module;
 use crate::parse::disk::MODULE_SLOT;
-use crate::resolve::collect::{Collected, Collection};
+use crate::resolve::collect::Collection;
 use std::fmt::Write as _;
 use std::path::Path;
 
@@ -50,8 +51,6 @@ pub fn section(
     let mut flavour_arg_emitted = false;
     let mut finalize: Vec<String> = Vec::new();
 
-    let base_family = image.base.as_ref().map_or("", |b| b.family.as_str());
-
     if let Some(base) = &image.base {
         let _ = write!(
             out,
@@ -84,12 +83,7 @@ pub fn section(
             blocks.push(fragment(entry, body));
         }
         if module.standard_layer {
-            blocks.push(standard(
-                entry,
-                module,
-                collection.by_module.get(&entry.path),
-                base_family,
-            ));
+            blocks.push(standard(entry, module, &module_build::path(image, entry)));
         }
         if let Some(body) = module.fragment.as_ref().filter(|_| module.fragment_after) {
             blocks.push(fragment(entry, body));
@@ -176,33 +170,10 @@ fn phase(file: &str, below_modules: bool, identity_env: &str) -> String {
     out
 }
 
-fn standard(
-    entry: &Entry,
-    module: &Module,
-    collected: Option<&Vec<Collected>>,
-    base_family: &str,
-) -> String {
+/// The layer is the mounts and the build inputs only a Containerfile can
+/// name; everything the host resolved is in the script it runs.
+fn standard(entry: &Entry, module: &Module, script: &Path) -> String {
     let mut env = String::new();
-    if let Some(flavour) = &entry.flavour {
-        let _ = write!(env, "FLAVOUR_GATE={flavour} ");
-    }
-    for (name, value) in &module.resolved {
-        let _ = write!(env, "{name}=\"{value}\" ");
-    }
-    if let Some(collected) = collected.filter(|c| !c.is_empty()) {
-        let pairs: Vec<String> = collected
-            .iter()
-            .map(|c| format!("{}={}", c.file, c.staged))
-            .collect();
-        let _ = write!(env, "MODULE_COLLECT=\"{}\" ", pairs.join(" "));
-    }
-
-    let mut assets = String::new();
-    for asset in &module.assets {
-        for (name, value) in asset.env() {
-            let _ = write!(assets, "{name}=\"{value}\" \\\n    ");
-        }
-    }
 
     let mut secrets = String::new();
     for decl in &module.secrets {
@@ -217,40 +188,20 @@ fn standard(
         env.insert_str(0, &format!("{name}=${{{name}}} "));
     }
 
-    let packages_cmd = packages_install(module, base_family);
-
     let path = entry.dir();
+    let script = script.display();
     let mut out = String::new();
     let _ = write!(
         out,
         "RUN --mount=type=bind,from=ctx,source=/modules/{path},target=/ctx/modules/{path} \\\n    \
          --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \\\n    \
+         --mount=type=bind,from=ctx,source=/{script},target=/ctx/module.sh \\\n    \
          {TECT_MOUNT}\
          --mount=type=cache,target=/var/cache \\\n    \
          --mount=type=cache,target=/var/log \\\n    \
          --mount=type=tmpfs,target=/tmp \\\n    \
-         {secrets}{packages_cmd}{assets}{env}bash /ctx/lib/run-module.sh /ctx/modules/{path}"
+         {secrets}{env}bash /ctx/module.sh"
     );
-    out
-}
-
-/// The install commands for declared packages, if any.
-fn packages_install(module: &Module, base_family: &str) -> String {
-    let mut out = String::new();
-    for group in module.packages.iter().filter(|g| g.family == base_family) {
-        let pkgs = group.packages.join(" ");
-        match &group.enablerepo {
-            Some(repo) => {
-                let _ = write!(
-                    out,
-                    "dnf5 install -y --enablerepo='{repo}' {pkgs} && \\\n    "
-                );
-            }
-            None => {
-                let _ = write!(out, "dnf5 install -y {pkgs} && \\\n    ");
-            }
-        }
-    }
     out
 }
 

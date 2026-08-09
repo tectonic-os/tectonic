@@ -595,7 +595,7 @@ impl Module {
                         src,
                     )
                     .at(group.span, "installed before the repo file is sourced")
-                    .help("run-module.sh sources `repo` after the generated install, so call `dnf5 install -y` in module.sh instead"),
+                    .help("the generated build script sources `repo` after installing these, so call `dnf5 install -y` in module.sh instead"),
                 );
             }
         }
