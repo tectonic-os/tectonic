@@ -35,6 +35,7 @@ This is the whole surface today. The rest of it is not built yet.
     tect check            validate every manifest, and say where and why
     tect plan [--json]    every fact the repository derives, as one document
     tect section [image]  the generated Containerfile module section
+    tect generate         write the per-module build scripts under generated/
 
 Inside a build layer, where the binary is mounted and there is no repository
 to read:

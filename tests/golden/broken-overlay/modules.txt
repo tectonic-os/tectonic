@@ -1,0 +1,33 @@
+==== generated/broken-overlay.d/core/first.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/first
+export MODDIR
+
+cp -rT /ctx/modules/core/first/files /
+==== generated/broken-overlay.d/core/second.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/second
+export MODDIR
+
+cp -rT /ctx/modules/core/second/files /
+==== generated/broken-overlay.d/core/third.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/third
+export MODDIR
+
+if [ -f /etc/yum.repos.d/example.repo ]; then
+    echo "repo example is already configured"
+else
+    source /ctx/modules/core/third/repo
+fi
+
+source /ctx/modules/core/third/module.sh

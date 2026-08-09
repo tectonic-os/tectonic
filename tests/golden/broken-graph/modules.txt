@@ -1,0 +1,21 @@
+==== generated/broken-graph.d/core/one.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/one
+export MODDIR
+==== generated/broken-graph.d/core/two.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/two
+export MODDIR
+==== generated/broken-graph.d/core/three.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/three
+export MODDIR

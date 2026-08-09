@@ -349,7 +349,8 @@ One base family, and the packages to install on it.
 An option is one value an image may set on the module that declared it. Every
 declared option reaches that module's layer as `OPT_<NAME>`, uppercased with
 dashes as underscores, always, defaults included, so `module.sh` reads a
-variable rather than testing whether one is set.
+variable rather than testing whether one is set. A `list` arrives as a bash
+array, a `string` or a `bool` as a scalar.
 
 ```kdl
 option "fonts" type="list" {

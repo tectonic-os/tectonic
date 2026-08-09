@@ -1,0 +1,10 @@
+==== generated/broken-options.d/core/configurable.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/configurable
+export MODDIR
+
+OPT_FONTS=(JetBrainsMono)
+export OPT_STARSHIP="1"

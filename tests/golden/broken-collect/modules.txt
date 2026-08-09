@@ -1,0 +1,21 @@
+==== generated/broken-collect.d/core/menu.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/menu
+export MODDIR
+==== generated/broken-collect.d/core/absent.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/absent
+export MODDIR
+==== generated/broken-collect.d/core/unclaimed.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/unclaimed
+export MODDIR

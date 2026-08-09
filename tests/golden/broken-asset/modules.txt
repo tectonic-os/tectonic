@@ -1,0 +1,13 @@
+==== generated/broken-asset.d/core/pins.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/pins
+export MODDIR
+
+export ASSET_TRACKED_AND_MANUAL_VERSION="1.0.0"
+export ASSET_TRACKED_AND_MANUAL_URL="https://example.com/download/v1.0.0/tool.tar.gz"
+export ASSET_TRACKED_AND_MANUAL_SHA256="NOTHEX"
+export ASSET_NO_TRACKING_VERSION="1.0.0"
+export ASSET_NO_TRACKING_URL="https://example.com/download/v{tag}/tool.tar.gz; rm -rf /"

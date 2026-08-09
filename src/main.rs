@@ -17,6 +17,8 @@ usage: tect [--root <dir>] <command>
                     than deriving anything from a name
   section [image]   the generated Containerfile module section for an
                     image; the default image when none is given
+  generate          write the per-module build scripts the module layers
+                    run, under generated/, and list what was written
   check             validate every manifest, printing what is wrong
 
 Inside a build layer, where the binary is mounted and there is no
@@ -134,6 +136,26 @@ fn init(args: &[&str], root_arg: Option<PathBuf>, owner: Option<String>) -> Resu
     Ok(())
 }
 
+/// Writes what `generate` produced, after clearing the directories it owns so
+/// a module that is gone leaves with its script.
+fn write_generated(root: &Path, files: &[(PathBuf, String)]) -> Result<(), String> {
+    if let Ok(entries) = std::fs::read_dir(root.join("generated")) {
+        for entry in entries.flatten() {
+            if entry.path().extension().is_some_and(|e| e == "d") {
+                std::fs::remove_dir_all(entry.path())
+                    .map_err(|err| format!("{}: {err}", entry.path().display()))?;
+            }
+        }
+    }
+    for (path, text) in files {
+        let path = root.join(path);
+        let dir = path.parent().unwrap_or(&path);
+        std::fs::create_dir_all(dir).map_err(|err| format!("{}: {err}", dir.display()))?;
+        std::fs::write(&path, text).map_err(|err| format!("{}: {err}", path.display()))?;
+    }
+    Ok(())
+}
+
 fn main() -> ExitCode {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let root_arg = match take_flag(&mut args, "root") {
@@ -187,10 +209,10 @@ fn main() -> ExitCode {
 
     let image_arg = match (command, rest.as_slice()) {
         ("plan", []) | ("plan", ["--json"]) => None,
-        ("check", []) => None,
+        ("check", []) | ("generate", []) => None,
         ("section", []) => None,
         ("section", [image]) => Some(*image),
-        ("plan" | "check" | "section", _) => {
+        ("plan" | "check" | "section" | "generate", _) => {
             return usage_error(format!("`{command}` does not take {}", rest.join(" ")))
         }
         (other, _) => return usage_error(format!("unknown command `{other}`")),
@@ -216,6 +238,12 @@ fn main() -> ExitCode {
 
     if run.issues.report(&run.context) {
         return ExitCode::from(REPO_ERROR);
+    }
+    if command == "generate" {
+        if let Err(message) = write_generated(&root, &run.files) {
+            eprintln!("tect: {message}");
+            return ExitCode::from(USAGE_ERROR);
+        }
     }
     print!("{}", run.stdout);
     if command == "check" {

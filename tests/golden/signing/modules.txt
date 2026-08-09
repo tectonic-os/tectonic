@@ -1,0 +1,14 @@
+==== generated/signing.d/kernel/signed-kernel.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/kernel/signed-kernel
+export MODDIR
+==== generated/signing.d/drivers/kvmfr.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/drivers/kvmfr
+export MODDIR

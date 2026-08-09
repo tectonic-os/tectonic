@@ -1,0 +1,31 @@
+==== generated/broken-fragment.d/core/early.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/early
+export MODDIR
+==== generated/broken-fragment.d/core/silent@dev.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/silent
+export MODDIR
+
+if [ "${FLAVOUR:-}" != "dev" ]; then
+    echo "skipping core/silent: not built for '${FLAVOUR:-the ungated build}'"
+    exit 0
+fi
+==== generated/broken-fragment.d/core/mismatched@dev.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/mismatched
+export MODDIR
+
+if [ "${FLAVOUR:-}" != "dev" ]; then
+    echo "skipping core/mismatched: not built for '${FLAVOUR:-the ungated build}'"
+    exit 0
+fi
