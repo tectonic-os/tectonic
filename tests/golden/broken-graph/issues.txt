@@ -1,3 +1,14 @@
+  x invalid capability name `boot policy`
+   ,-[./image.kdl:6:9]
+ 5 |         family "fedora"
+ 6 |         provides "rechunking" "boot policy"
+   :         ^^^^|^^^
+   :             `-- lowercase, digits and dashes, starting with a letter
+ 7 |     }
+   `----
+  help: the name is written into the generated graph as a mermaid label and a
+        markdown table cell, neither of which quotes anything
+
   x unknown base family `debian`
    ,-[./modules/core/three/module.kdl:3:1]
  2 | 

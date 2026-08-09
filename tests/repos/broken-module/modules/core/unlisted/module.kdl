@@ -2,3 +2,4 @@ description "Sits on disk without being listed"
 supports "fedora"
 
 flies "a kite"
+provides "Shell|Tools"

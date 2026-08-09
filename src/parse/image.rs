@@ -1,10 +1,10 @@
 //! The `image` node: what an image calls itself, builds on, and is made of.
 
 use crate::diag::{Issue, Issues, Source, Span};
-use crate::model::image::{is_flavour_name, Base, Decl, Entry, Flavour, Image, List, NO_FLAVOUR};
+use crate::model::image::{is_name, Base, Decl, Entry, Flavour, Image, List, NO_FLAVOUR};
 use crate::model::remote::{Remote, REMOTE_DIR};
 use crate::parse::schema::{Arg, Kind, Node, Prop, Say};
-use crate::parse::{bool_arg, child, flag, kids, options, prop, remote};
+use crate::parse::{bool_arg, check_capability, child, flag, kids, options, prop, remote};
 use crate::parse::{string_arg, string_args, text};
 use kdl::KdlNode;
 
@@ -189,6 +189,9 @@ impl Image {
             span: node.name().span().into(),
         };
 
+        for decl in &base.provides {
+            check_capability(&decl.name, decl.span, src, issues);
+        }
         for decl in &base.provides_files {
             if !decl.name.starts_with('/') {
                 issues.push(
@@ -208,7 +211,7 @@ impl Image {
         let src = &self.src.clone();
         if self.id.is_empty() {
             self.id = self.name.to_lowercase().replace(' ', "-");
-            if !self.name.is_empty() && !is_flavour_name(&self.id) {
+            if !self.name.is_empty() && !is_name(&self.id) {
                 issues.push(
                     Issue::new(
                         format!("`{}` does not derive a usable image name", self.name),
@@ -219,7 +222,7 @@ impl Image {
                 );
                 self.id = String::new();
             }
-        } else if !is_flavour_name(&self.id) {
+        } else if !is_name(&self.id) {
             issues.push(
                 Issue::new(format!("invalid image name `{}`", self.id), src)
                     .at(self.span, "must be lowercase letters, digits and dashes, starting with a letter")
@@ -238,7 +241,7 @@ impl Image {
                 span: node.name().span().into(),
             };
 
-            if !is_flavour_name(&flavour.name) {
+            if !is_name(&flavour.name) {
                 issues.push(
                     Issue::new(format!("invalid flavour name `{}`", flavour.name), src)
                         .at(flavour.span, "must be lowercase letters, digits and dashes, starting with a letter")
@@ -349,7 +352,7 @@ impl Image {
             ));
         }
 
-        if pin.is_some() && !is_flavour_name(&path) {
+        if pin.is_some() && !is_name(&path) {
             issues.push(
                 Issue::new(format!("invalid module name `{path}`"), src)
                     .at(node.name().span(), "must be lowercase letters, digits and dashes, starting with a letter")

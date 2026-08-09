@@ -18,8 +18,19 @@
  4 | flies "a kite"
    : ^^|^^
    :   `-- not part of the schema
+ 5 | provides "Shell|Tools"
    `----
   help: docs/schema.md documents every node a manifest may hold
+
+  x invalid capability name `Shell|Tools`
+   ,-[./modules/core/unlisted/module.kdl:5:1]
+ 4 | flies "a kite"
+ 5 | provides "Shell|Tools"
+   : ^^^^|^^^
+   :     `-- lowercase, digits and dashes, starting with a letter
+   `----
+  help: the name is written into the generated graph as a mermaid label and a
+        markdown table cell, neither of which quotes anything
 
   x unknown node `drives`
    ,-[./modules/core/nameless/module.kdl:3:1]

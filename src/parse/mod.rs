@@ -9,8 +9,26 @@ pub mod remote;
 pub mod repo;
 pub mod schema;
 
-use crate::diag::{Issue, Source, Span};
+use crate::diag::{Issue, Issues, Source, Span};
+use crate::model::image::is_name;
 use kdl::KdlNode;
+
+/// A capability name reaches the generated graph verbatim, as a mermaid edge
+/// label and a markdown table cell, so it is held to the charset every other
+/// derived name is.
+pub(crate) fn check_capability(name: &str, span: Span, src: &Source, issues: &mut Issues) {
+    if is_name(name) {
+        return;
+    }
+    issues.push(
+        Issue::new(format!("invalid capability name `{name}`"), src)
+            .at(span, "lowercase, digits and dashes, starting with a letter")
+            .help(
+                "the name is written into the generated graph as a mermaid label and a markdown \
+                 table cell, neither of which quotes anything",
+            ),
+    );
+}
 
 /// A syntax error as one issue, carrying what the parser found so it is
 /// reported through the collector rather than beside it.

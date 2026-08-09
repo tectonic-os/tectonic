@@ -41,6 +41,7 @@ graph LR
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
 | `/usr/bin/nothing` | file |  | `core/one` |  |
+| `boot policy` | capability | `base` |  |  |
 | `package-manager` | capability |  | `core/one` |  |
 | `rechunking` | capability | `base` |  |  |
 | `shell-tools` | capability | `core/two` |  |  |
@@ -56,6 +57,14 @@ graph LR
       "required_by": [
         "core/one"
       ],
+      "after": []
+    },
+    {
+      "name": "boot policy",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
       "after": []
     },
     {

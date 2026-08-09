@@ -6,7 +6,7 @@ use crate::model::module::{Collect, Contribution, Decl, Module, PackageGroup, Ve
 use crate::model::remote::REMOTE_DIR;
 use crate::parse::disk::Disk;
 use crate::parse::schema::{check_doc, Arg, Kind, Node, Prop, Say};
-use crate::parse::{asset, boolean, flag, options, prop, prop_span};
+use crate::parse::{asset, boolean, check_capability, flag, options, prop, prop_span};
 use crate::parse::{string_arg, string_args, syntax_issue};
 use crate::resolve::options as resolve_options;
 use crate::runtime::{class_names, VERIFY_CLASSES};
@@ -313,6 +313,9 @@ impl Module {
                             span: node.name().span().into(),
                         })
                         .collect::<Vec<_>>();
+                    for decl in &decls {
+                        check_capability(&decl.name, decl.span, src, issues);
+                    }
                     match kind {
                         "provides" => module.provides.extend(decls),
                         "requires" => module.requires.extend(decls),

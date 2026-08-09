@@ -26,7 +26,8 @@
         "family": "fedora",
         "signed": false,
         "provides": [
-          "rechunking"
+          "rechunking",
+          "boot policy"
         ],
         "provides_files": []
       },

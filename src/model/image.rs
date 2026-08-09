@@ -15,8 +15,9 @@ pub const NO_FLAVOUR: &str = "none";
 /// Repo context, not an image: the file every image file is not.
 pub const REPO_FILE: &str = "repo.kdl";
 
-/// Lowercase letters, digits and dashes, starting with a letter.
-pub fn is_flavour_name(name: &str) -> bool {
+/// Lowercase letters, digits and dashes, starting with a letter: image ids,
+/// flavour names and capabilities.
+pub fn is_name(name: &str) -> bool {
     let mut chars = name.chars();
     match chars.next() {
         Some(c) if c.is_ascii_lowercase() => {}
