@@ -4,7 +4,7 @@ Three kinds of file, all KDL, all read by `tect`.
 
 | File | Declares |
 | --- | --- |
-| `repo.kdl` | the repository: the schema it is written against, which image a bare build builds, which shipped workflows run |
+| `repo.kdl` | the repository: the schema it is written against, the tool release it pins, which image a bare build builds, which shipped workflows run |
 | `<name>.kdl` at the root | one image: what it calls itself, what it builds on, and the modules in it |
 | `modules/<path>/module.kdl` | one module: what it needs, what it offers, and what an image author may set |
 
@@ -20,6 +20,9 @@ it.
 ```kdl
 schema-version 1
 
+// renovate: datasource=github-releases depName=tectonic-os/tectonic
+tect-version "0.0.0"
+
 default-image "workstation"
 pr-image "workstation"
 
@@ -30,7 +33,14 @@ workflows {
 
 `schema-version` picks the reader, so a repository written against an earlier
 release keeps building: a tool that does not know the version says so plainly
-instead of reporting every node it cannot place.
+instead of reporting every node it cannot place. A repository behind this
+release is moved forward by `tect update-repo`; one ahead of it is read by the
+release it pins.
+
+`tect-version` is that release. `scripts/tect.sh` fetches it, so the build
+runs the tool the repository was written for whatever is installed on the
+machine, and every command refuses to run in a repository pinned to a release
+it is not. A repository that pins nothing is held to nothing.
 
 A workflow is named by its file stem under `.github/workflows/`, and one
 nobody names runs. The block is how a repository turns something off.
@@ -68,6 +78,7 @@ repository problem.
 | Node | Takes | Meaning |
 | --- | --- | --- |
 | `schema-version` | a number, at most one | The schema release this repository is written against, which picks the reader. |
+| `tect-version` | a string, at most one | The tect release this repository is built with, which every command holds itself to. |
 | `default-image` | a string, at most one | The image a build that names no target builds. |
 | `pr-image` | a string, at most one | The image a pull request builds. |
 

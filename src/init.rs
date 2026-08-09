@@ -1,6 +1,6 @@
 //! The tree a new repository starts as.
 
-use crate::model::image::{is_name, REPO_FILE, SCHEMA_VERSION};
+use crate::model::image::{is_name, REPO_FILE, SCHEMA_VERSION, TECT_VERSION};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -59,7 +59,11 @@ pub fn write(root: &Path, name: &str, assets: &Path) -> Result<(), String> {
     copy_tree(assets, root)?;
     put(
         &root.join(REPO_FILE),
-        &format!("schema-version {SCHEMA_VERSION}\n"),
+        &format!(
+            "schema-version {SCHEMA_VERSION}\n\n\
+             // renovate: datasource=github-releases depName=tectonic-os/tectonic\n\
+             tect-version \"{TECT_VERSION}\"\n"
+        ),
     )?;
     put(&root.join("README.md"), &format!("# {name}\n"))?;
     // A module directory that survives a commit: the build context mounts it.

@@ -11,7 +11,8 @@ does, once, and the shell that runs inside a layer is handed the result.
 
 ## What a repository looks like
 
-    repo.kdl              the repository: schema version, default image, workflows
+    repo.kdl              the repository: schema version, tool pin, default
+                          image, workflows
     workstation.kdl       one image, and every root .kdl but repo.kdl is one
     modules/<path>/       one module apiece, each with a module.kdl
 

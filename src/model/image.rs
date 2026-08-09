@@ -8,6 +8,9 @@ use crate::model::remote::{Collection, Remote, REMOTE_DIR};
 /// The schema every file in the repository is written against.
 pub const SCHEMA_VERSION: u32 = 1;
 
+/// This release, which is what a repository pins in `tect-version`.
+pub const TECT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 /// The build target that carries no flavour: the ungated set, published
 /// unsuffixed.
 pub const NO_FLAVOUR: &str = "none";
