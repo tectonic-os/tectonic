@@ -20,10 +20,6 @@ impl Prompt {
         Self { ask: false }
     }
 
-    pub fn asks(&self) -> bool {
-        self.ask
-    }
-
     fn read(&self, question: &str) -> Result<String, String> {
         print!("{question}: ");
         std::io::stdout().flush().map_err(|err| err.to_string())?;
