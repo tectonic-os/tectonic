@@ -34,6 +34,11 @@ if grep -rn 'ratatui' src --exclude-dir=ui; then
     exit 1
 fi
 
+if grep -rn 'crate::ui' src/resolve src/emit; then
+    echo "lint: the resolver or an emitter reading src/ui/, and that dependency runs one way" >&2
+    exit 1
+fi
+
 shellcheck -s bash "${scripts[@]}"
 "${shfmt[@]}" -d "${scripts[@]}" || unformatted
 cargo fmt --check || unformatted
