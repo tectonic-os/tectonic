@@ -22,7 +22,7 @@ pub const OPTION: Node = Node::new("option",
         "an option carries `type`, and everything else as child nodes"))
     .children(&[
         Node::new("description", "What setting the option does, for the generated reference.")
-            .once(""),
+            .arg(Arg::Str, Say::NONE).once(""),
         Node::new("default", "What the module builds with when no image sets it.")
             .arg(Arg::Strs, Say::NONE)
             .once(""),
@@ -37,7 +37,8 @@ pub const VARIANT: Node = Node::new("variant",
     .props(&[], Say::new("unknown variant property `{}`", "not part of the schema",
         "a variant carries its name, and everything else as child nodes"))
     .children(&[
-        Node::new("description", "What the variant is for.").once(""),
+        Node::new("description", "What the variant is for.")
+            .arg(Arg::Str, Say::NONE).once(""),
         Node::new("set", "One option this variant sets, and what it sets it to.")
             .arg(Arg::Str, Say::new("`set` needs an option name", "no option named", "")),
     ], Say::new("unknown node `{}` in a variant", "not part of the schema",

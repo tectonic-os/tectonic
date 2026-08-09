@@ -51,6 +51,23 @@ fn init_repo() -> PathBuf {
     root
 }
 
+/// The reference in docs/schema.md, re-rendered from the tables. The renderer
+/// is what checks that every marker names a schema and every schema is marked.
+#[test]
+fn schema_doc() {
+    let path = crate_dir().join("docs/schema.md");
+    let doc = std::fs::read_to_string(&path).expect("docs/schema.md exists");
+    let rendered = tect::emit::schema_md::render(&doc).unwrap_or_else(|err| panic!("{err}"));
+    if std::env::var_os("UPDATE_GOLDEN").is_some() {
+        std::fs::write(&path, rendered).unwrap();
+        return;
+    }
+    assert!(
+        doc == rendered,
+        "docs/schema.md is stale. Rerun with UPDATE_GOLDEN=1 and read the diff"
+    );
+}
+
 /// One process, one working directory: every capture runs in turn.
 #[test]
 fn golden() {
