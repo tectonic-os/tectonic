@@ -114,7 +114,7 @@ holding a mermaid diagram, unless `json` is asked for.
 
 ## For scripts
 
-Neither is in the help a person reads, and both are the contract the build
+None of these is in the help a person reads. They are the contract the build
 runs against rather than something to read.
 
 ### `plan [--json]`
@@ -130,6 +130,12 @@ Re-emits every artifact and byte-compares it against what is committed under
 `generated/`, naming what differs, what is missing, and anything under
 `generated/` that nothing emits. It is the drift gate, and it runs before
 every build.
+
+### `summary [target]`
+
+What one target is made of, as a markdown table: every module it builds, with
+its description and the options it resolved. The default target when none is
+named. This is what a build writes into its job summary.
 
 ## Inside a build layer
 

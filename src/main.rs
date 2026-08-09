@@ -330,7 +330,13 @@ fn run() -> Result<ExitCode, String> {
         ("check", []) | ("generate", []) | ("verify", []) => None,
         ("section", []) | ("graph" | "graph-json", []) => None,
         ("section", [image]) => Some(*image),
-        ("plan" | "check" | "section" | "graph" | "graph-json" | "generate" | "verify", _) => {
+        ("summary" | "sbom", []) => None,
+        ("summary" | "sbom", [target]) => Some(*target),
+        (
+            "plan" | "check" | "section" | "graph" | "graph-json" | "generate" | "verify"
+            | "summary" | "sbom",
+            _,
+        ) => {
             return Err(format!("`{}` does not take {}", words[0], rest.join(" ")));
         }
         (other, _) => return Err(format!("unknown command `{other}`")),

@@ -1,10 +1,31 @@
 //! One resolved plan, as JSON: every fact anything downstream derives.
 
 use crate::emit::json::Json;
+use crate::model::asset::Asset;
 use crate::model::image::{Entry, Image, List, Target, NO_FLAVOUR, SCHEMA_VERSION};
 use crate::model::module::Module;
 use crate::resolve::overlay;
 use crate::resolve::Resolved;
+
+/// The image one target names, the flavour it gates on, and the entries that
+/// land in its build. None when nothing publishes under that name.
+pub(crate) fn of_target<'a>(
+    list: &'a List,
+    name: &str,
+) -> Option<(&'a Image, Option<String>, Vec<&'a Entry>)> {
+    let target = list.targets().into_iter().find(|t| t.to_string() == name)?;
+    let image = list.images.iter().find(|i| i.id == target.image)?;
+    let entries = image
+        .entries
+        .iter()
+        .filter(|entry| in_target(entry, Some(&target.flavour)))
+        .collect();
+    let flavour = match target.flavour.as_str() {
+        NO_FLAVOUR => None,
+        flavour => Some(flavour.to_string()),
+    };
+    Some((image, flavour, entries))
+}
 
 pub fn build(list: &List, resolved: &[Resolved], workflows: &[(String, bool)]) -> Json {
     Json::object([
@@ -320,30 +341,36 @@ fn overlay_files(image: &Image, shipped: &overlay::Index, flavour: Option<&str>)
 
 /// Every pinned asset the given modules declare, deduplicated by module and
 /// name.
-fn assets(modules: &[&Module]) -> Json {
+pub(crate) fn pinned<'a>(modules: &[&'a Module]) -> Vec<(&'a Module, &'a Asset)> {
     let mut seen: Vec<(&str, &str)> = Vec::new();
-    let mut out: Vec<Json> = Vec::new();
+    let mut out = Vec::new();
     for module in modules {
         for asset in &module.assets {
             if seen.contains(&(module.path.as_str(), asset.name.as_str())) {
                 continue;
             }
             seen.push((module.path.as_str(), asset.name.as_str()));
-            out.push(Json::object([
-                ("module", Json::string(&module.path)),
-                ("name", Json::string(&asset.name)),
-                (
-                    "manifest",
-                    Json::string(format!("modules/{}/module.kdl", module.dir)),
-                ),
-                ("version", Json::optional(asset.version.clone())),
-                ("sha256", Json::optional(asset.sha256.clone())),
-                ("from", Json::string(asset.from.as_str())),
-                ("url", Json::optional(asset.url_resolved())),
-            ]));
+            out.push((*module, asset));
         }
     }
-    Json::Array(out)
+    out
+}
+
+fn assets(modules: &[&Module]) -> Json {
+    Json::array(pinned(modules).into_iter().map(|(module, asset)| {
+        Json::object([
+            ("module", Json::string(&module.path)),
+            ("name", Json::string(&asset.name)),
+            (
+                "manifest",
+                Json::string(format!("modules/{}/module.kdl", module.dir)),
+            ),
+            ("version", Json::optional(asset.version.clone())),
+            ("sha256", Json::optional(asset.sha256.clone())),
+            ("from", Json::string(asset.from.as_str())),
+            ("url", Json::optional(asset.url_resolved())),
+        ])
+    }))
 }
 
 /// Every asset in the repository, whatever image or flavour it is behind.
@@ -381,7 +408,7 @@ fn remotes(list: &List) -> Json {
 }
 
 /// Whether an entry lands in a target's image.
-fn in_target(entry: &Entry, target: Option<&str>) -> bool {
+pub(crate) fn in_target(entry: &Entry, target: Option<&str>) -> bool {
     match (&entry.flavour, target) {
         (None, _) => true,
         (Some(_), None) => true,

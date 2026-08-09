@@ -32,7 +32,11 @@ fn compare(name: &str, file: &str, actual: &str) {
 fn capture(name: &str, root: &Path) {
     std::env::set_current_dir(root).expect("fixture root exists");
     let here = Path::new(".");
-    for (command, file) in [("plan", "plan.json"), ("section", "section.txt")] {
+    for (command, file) in [
+        ("plan", "plan.json"),
+        ("section", "section.txt"),
+        ("summary", "summary.md"),
+    ] {
         compare(name, file, &tect::run(command, None, here).stdout);
     }
     compare(

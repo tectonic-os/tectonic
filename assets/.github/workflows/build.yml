@@ -416,7 +416,7 @@ jobs:
           {
             echo "## ${IMAGE_NAME}"
             echo
-            ./scripts/summary.sh "$TARGET"
+            ./scripts/tect.sh summary "$TARGET"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the generated Containerfile
