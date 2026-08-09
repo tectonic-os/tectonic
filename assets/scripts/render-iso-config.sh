@@ -20,12 +20,12 @@ usage: scripts/render-iso-config.sh [options]
   --tag <tag>       tag it tracks (default: $DEFAULT_TAG, else latest)
 
 Environment:
-  IMAGE_REGISTRY    registry namespace, as scripts/registry.sh reads it
+  IMAGE_REGISTRY    overrides the registry namespace the reference is under
 EOF
 }
 
 target=""
-tag="${DEFAULT_TAG:-latest}"
+tag=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -50,13 +50,10 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-plan="$(./scripts/tect.sh plan --json)"
-target="${target:-$(jq -r '.ungated_target' <<< "$plan")}"
-published="$(jq -r --arg t "$target" \
-    '.images[].targets[] | select(.name == $t) | .published' <<< "$plan")"
-[ -n "$published" ] || die "'${target}' is not a build target"
-
-IMAGE_REF="$(./scripts/registry.sh namespace)/${published}:${tag}"
+ref=()
+[ -z "$target" ] || ref+=(--target "$target")
+[ -z "$tag" ] || ref+=(--tag "$tag")
+IMAGE_REF="$(./scripts/tect.sh registry ref "${ref[@]}")" || die "no image reference to install"
 export IMAGE_REF
 
 command -v envsubst > /dev/null 2>&1 \

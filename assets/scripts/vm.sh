@@ -83,8 +83,11 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-image="${image:-localhost/$(./scripts/tect.sh plan --json | jq -r .ungated_published)}"
-ref="${image}:${tag}"
+if [ -n "$image" ]; then
+    ref="${image}:${tag}"
+else
+    ref="$(IMAGE_REGISTRY=localhost ./scripts/tect.sh registry ref --tag "$tag")"
+fi
 
 image_file="out/${type}/disk.${type}"
 [ "$type" != iso ] || image_file="out/bootiso/install.iso"

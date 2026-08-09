@@ -211,6 +211,8 @@ fn run() -> Result<ExitCode, String> {
     let image_arg = take_flag(&mut args, "image")?;
     let base = take_flag(&mut args, "base")?;
     let format = take_flag(&mut args, "format")?;
+    let target = take_flag(&mut args, "target")?;
+    let tags = take_flags(&mut args, "tag")?;
     let pkgs = take_flags(&mut args, "pkg")?;
     let with = take_flags(&mut args, "with")?
         .iter()
@@ -227,6 +229,8 @@ fn run() -> Result<ExitCode, String> {
         ("image", image_arg.is_some()),
         ("base", base.is_some()),
         ("format", format.is_some()),
+        ("target", target.is_some()),
+        ("tag", !tags.is_empty()),
         ("pkg", !pkgs.is_empty()),
         ("with", !with.is_empty()),
     ] {
@@ -300,6 +304,25 @@ fn run() -> Result<ExitCode, String> {
             let name = one_name(rest, "import module")?;
             return import(name, &repo_root(root_arg)?, image_arg, &prompt);
         }
+        ["registry", "namespace"] => {
+            only(&given, &["root"], "registry namespace")?;
+            println!("{}", tect::registry::namespace(&repo_root(root_arg)?)?);
+            return Ok(ExitCode::SUCCESS);
+        }
+        ["registry", "ref"] => {
+            only(&given, &["root", "target", "tag"], "registry ref")?;
+            let root = repo_root(root_arg)?;
+            let (list, issues, context) = tect::declarations(&root);
+            if issues.report(&context) {
+                return Ok(ExitCode::from(REPO_ERROR));
+            }
+            println!(
+                "{}",
+                tect::registry::reference(&list, &root, target.as_deref(), tags.last())?
+            );
+            return Ok(ExitCode::SUCCESS);
+        }
+        ["registry", ..] => return Err("`registry` takes `namespace` or `ref`".into()),
         ["create", ..] => {
             return Err("`create` takes `repo <name>`, `image <name>` or `module <name>`".into())
         }

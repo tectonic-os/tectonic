@@ -8,6 +8,7 @@ pub mod init;
 pub mod model;
 pub mod parse;
 pub mod prompt;
+pub mod registry;
 pub mod resolve;
 pub mod runtime;
 pub mod ui;
@@ -29,11 +30,19 @@ pub fn find_root(from: &Path) -> Option<PathBuf> {
         .map(Path::to_path_buf)
 }
 
+/// What the repository declares, without loading a module manifest: enough for
+/// anything that only needs a name, and readable before a pinned module has
+/// been fetched.
+pub fn declarations(root: &Path) -> (List, Issues, String) {
+    let (list, issues) = List::load(root);
+    let context = context(&list, root);
+    (list, issues, context)
+}
+
 /// The collections repo.kdl names, and anything wrong with the repository an
 /// import has to see before it writes into it.
 pub fn sources(root: &Path) -> (Vec<Collection>, Issues, String) {
-    let (list, issues) = List::load(root);
-    let context = context(&list, root);
+    let (list, issues, context) = declarations(root);
     (list.sources, issues, context)
 }
 

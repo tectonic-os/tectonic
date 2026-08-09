@@ -143,6 +143,15 @@ The pinned payloads one target carries, as SPDX packages and the relationships
 that describe them. A scan of the built image cannot see where a downloaded
 asset came from, so this is merged into the SBOM the scan produces.
 
+### `registry namespace` and `registry ref [--target T] [--tag X]`
+
+Where an image publishes. The namespace is `$IMAGE_REGISTRY`, which CI sets
+from the workflow context, else `ghcr.io/<owner>` read off the github origin
+remote. `ref` joins it to the name the target publishes under, at `--tag`, else
+`$DEFAULT_TAG`, else latest; the ungated target when none is named.
+
+Reading the remote is a read. The tool still writes nothing to git.
+
 ## Inside a build layer
 
 These read the image around them rather than a repository, run where the
