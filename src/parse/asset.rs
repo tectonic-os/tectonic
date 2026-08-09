@@ -8,6 +8,45 @@ use kdl::KdlNode;
 
 const NEEDS_VALUE: Say = Say::new("`{}` needs a value", "nothing given", "");
 
+/// The datasources the Renovate custom managers in .github/renovate.json5
+/// match.
+const DATASOURCES: [&str; 3] = ["github-releases", "github-tags", "git-refs"];
+
+/// The annotation Renovate matches, declared as data rather than as a comment
+/// so this can check it. A module pin's `source` carries the same node.
+#[rustfmt::skip]
+pub const RENOVATE: Node = Node::new("renovate",
+    "The custom manager Renovate matches to keep the pin current.")
+    .arg(Arg::None, Say::new("`renovate` takes no arguments", "unexpected value",
+        "`renovate datasource=\"github-releases\" depName=\"owner/repo\"`"))
+    .once("")
+    .props(&[
+        Prop { name: "datasource", kind: Kind::One(&DATASOURCES),
+            desc: "Which Renovate datasource the pin is tracked through.",
+            say: Say::new("unsupported datasource `{}`", "no custom manager matches it",
+                "the managers in .github/renovate.json5 cover github-releases, github-tags, \
+                 git-refs; a fourth would leave this pin unmanaged without saying so"),
+            missing: Say::new("`{}` declares no datasource", "datasource= is required",
+                "one of: github-releases, github-tags, git-refs") },
+        Prop { name: "depName", kind: Kind::Str,
+            desc: "What that datasource calls the thing being tracked.",
+            say: Say::new("`{}` must be a string", "not a string", ""),
+            missing: Say::new("`{}` declares no depName", "depName= is required",
+                "`owner/repo` for the github datasources, the clone URL for git-refs") },
+        Prop { name: "extractVersion", kind: Kind::Str,
+            desc: "The pattern Renovate pulls the version out of the tag with.",
+            say: Say::NONE, missing: Say::NONE },
+    ], Say::new("unknown renovate property `{}`", "not part of the schema",
+        "datasource, depName and extractVersion, spelled as Renovate spells them"));
+
+/// The other half of the same choice, carried by both grammars.
+#[rustfmt::skip]
+pub const MANUAL: Node = Node::new("manual", "Why nothing tracks this pin.")
+    .arg(Arg::Str, Say::new("`{}` needs a reason", "no reason given",
+        "say why nothing tracks this pin, or the next reader takes the absence for an \
+         oversight"))
+    .once("");
+
 #[rustfmt::skip]
 pub const ASSET: Node = Node::new("asset",
     "A pinned upstream payload the module fetches, reaching the build as ASSET_*.")
@@ -18,13 +57,8 @@ pub const ASSET: Node = Node::new("asset",
     .props(&[], Say::new("unknown asset property `{}`", "not part of the schema",
         "an asset carries its fields as child nodes, not properties"))
     .children(&[
-        Node::new("renovate", "The custom manager Renovate matches to keep the pin current.")
-            .once(""),
-        Node::new("manual", "Why nothing tracks this pin.")
-            .arg(Arg::Str, Say::new("`manual` needs a reason", "no reason given",
-                "say why nothing tracks this pin, or the next reader takes the absence for an \
-                 oversight"))
-            .once(""),
+        RENOVATE,
+        MANUAL,
         Node::new("version", "The pinned version, which the URL expands and Renovate rewrites.")
             .arg(Arg::Str, NEEDS_VALUE).once(""),
         Node::new("url", "Where the payload is fetched from.")
@@ -42,10 +76,6 @@ pub const ASSET: Node = Node::new("asset",
                 "`sha256` accepts `from`")),
     ], Say::new("unknown node `{}` in an asset", "not part of the schema",
         "an asset holds `renovate` or `manual`, `version`, `url` and `sha256`"));
-
-/// The datasources the Renovate custom managers in .github/renovate.json5
-/// match.
-const DATASOURCES: [&str; 3] = ["github-releases", "github-tags", "git-refs"];
 
 /// `asset "starship" { renovate ...; version "1.26.0"; url "..."; sha256 "..."
 /// }`
@@ -87,10 +117,7 @@ pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Asset>
             .map(str::to_string);
 
         match kind {
-            "renovate" => {
-                renovate = Some(child_span);
-                check_renovate(child, src, issues);
-            }
+            "renovate" => renovate = Some(child_span),
             "manual" => manual = Some(child_span),
             "version" => {
                 version_span = Some(child_span);
@@ -217,64 +244,6 @@ pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Asset>
     }
 
     Some(asset)
-}
-
-/// `renovate datasource="github-releases" depName="owner/repo"` Declared as
-/// data rather than as a comment, so this can check it.
-pub fn check_renovate(node: &KdlNode, src: &Source, issues: &mut Issues) {
-    let span: Span = node.name().span().into();
-    let mut datasource = None;
-    let mut dep_name = None;
-
-    for entry in node.entries() {
-        let Some(key) = entry.name().map(|n| n.value()) else {
-            issues.push(
-                Issue::new("`renovate` takes no arguments", src)
-                    .at(entry.span(), "unexpected value")
-                    .help("`renovate datasource=\"github-releases\" depName=\"owner/repo\"`"),
-            );
-            continue;
-        };
-        let value = entry.value().as_string().map(str::to_string);
-        match key {
-            "datasource" => datasource = value,
-            "depName" => dep_name = value,
-            "extractVersion" => {}
-            other => issues.push(
-                Issue::new(format!("unknown renovate property `{other}`"), src)
-                    .at(entry.span(), "not part of the schema")
-                    .help(
-                        "datasource, depName and extractVersion, spelled as Renovate spells them",
-                    ),
-            ),
-        }
-    }
-
-    let Some(datasource) = datasource else {
-        issues.push(
-            Issue::new("`renovate` declares no datasource", src)
-                .at(span, "datasource= is required")
-                .help(format!("one of: {}", DATASOURCES.join(", "))),
-        );
-        return;
-    };
-    if !DATASOURCES.contains(&datasource.as_str()) {
-        issues.push(
-            Issue::new(format!("unsupported datasource `{datasource}`"), src)
-                .at(span, "no custom manager matches it")
-                .help(format!(
-                    "the managers in .github/renovate.json5 cover {}; a fourth would leave this pin unmanaged without saying so",
-                    DATASOURCES.join(", ")
-                )),
-        );
-    }
-    if dep_name.is_none() {
-        issues.push(
-            Issue::new("`renovate` declares no depName", src)
-                .at(span, "depName= is required")
-                .help("`owner/repo` for the github datasources, the clone URL for git-refs"),
-        );
-    }
 }
 
 /// A URL template expands `{version}` and nothing else.

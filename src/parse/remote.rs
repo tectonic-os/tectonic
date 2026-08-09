@@ -2,12 +2,35 @@
 
 use crate::diag::{Issue, Issues, Source, Span};
 use crate::model::remote::Remote;
-use crate::parse::asset::check_renovate;
-use crate::parse::string_arg;
+use crate::parse::asset::{MANUAL, RENOVATE};
+use crate::parse::schema::{Arg, Node, Say};
+use crate::parse::{kids, string_arg};
 use kdl::KdlNode;
 
 /// The archives the fetch can extract.
 const ARCHIVES: [&str; 5] = [".tar.gz", ".tgz", ".tar.xz", ".tar.zst", ".tar.bz2"];
+
+const NEEDS_VALUE: Say = Say::new("`{}` needs a value", "nothing given", "");
+
+/// The pin on a list entry, which is the same shape as an `asset`.
+#[rustfmt::skip]
+pub const SOURCE: Node = Node::new("source",
+    "Where a module that lives outside this repository is fetched from, and what pins it.")
+    .arg(Arg::Str, Say::new("`{}` needs a URL", "no URL given",
+        "`source \"https://host/owner/repo/archive/{ref}.tar.gz\" { ... }`"))
+    .props(&[], Say::new("unknown source property `{}`", "not part of the schema",
+        "a source carries its fields as child nodes, not properties"))
+    .children(&[
+        RENOVATE,
+        MANUAL,
+        Node::new("ref", "The tag or commit the archive is fetched at.")
+            .arg(Arg::Str, NEEDS_VALUE).once(""),
+        Node::new("sha256", "What the fetched archive is verified against.")
+            .arg(Arg::Str, NEEDS_VALUE).once(""),
+        Node::new("path", "The module's directory inside the archive.")
+            .arg(Arg::Str, NEEDS_VALUE).once(""),
+    ], Say::new("unknown node `{}` in a source", "not part of the schema",
+        "a source holds `renovate` or `manual`, `ref`, `sha256` and `path`"));
 
 fn datasource(node: &KdlNode) -> Option<&str> {
     node.entries()
@@ -17,33 +40,12 @@ fn datasource(node: &KdlNode) -> Option<&str> {
 }
 
 /// `source "https://host/owner/repo/archive/{ref}.tar.gz" { renovate ...; ref
-/// "..."; sha256 "..."; path "modules/name" }` The same shape as an `asset`
-/// block: exactly one of `renovate` and `manual`, and the tracked line
-/// directly below `renovate`, since one regex matches the two together.
+/// "..."; sha256 "..."; path "modules/name" }` Exactly one of `renovate` and
+/// `manual`, and the tracked line directly below `renovate`, since one regex
+/// matches the two together.
 pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Remote> {
     let span: Span = node.name().span().into();
-    let Some(url) = string_arg(node).map(str::to_string) else {
-        issues.push(
-            Issue::new("`source` needs a URL", src)
-                .at(span, "no URL given")
-                .help("`source \"https://host/owner/repo/archive/{ref}.tar.gz\" { ... }`"),
-        );
-        return None;
-    };
-
-    for entry in node.entries().iter().filter(|e| e.name().is_some()) {
-        issues.push(
-            Issue::new(
-                format!(
-                    "unknown source property `{}`",
-                    entry.name().map(|n| n.value()).unwrap_or_default()
-                ),
-                src,
-            )
-            .at(entry.span(), "not part of the schema")
-            .help("a source carries its fields as child nodes, not properties"),
-        );
-    }
+    let url = string_arg(node)?.to_string();
 
     let mut remote = Remote {
         url,
@@ -58,24 +60,16 @@ pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Remote
     let mut ref_span: Option<Span> = None;
     let mut previous: Option<&str> = None;
 
-    for child in node.children().map(|c| c.nodes()).unwrap_or_default() {
+    for child in kids(node) {
         let kind = child.name().value();
         let child_span: Span = child.name().span().into();
-        let string = |issues: &mut Issues| match string_arg(child) {
-            Some(v) if !v.is_empty() => Some(v.to_string()),
-            _ => {
-                issues.push(
-                    Issue::new(format!("`{kind}` needs a value"), src)
-                        .at(child_span, "nothing given"),
-                );
-                None
-            }
-        };
+        let value = string_arg(child)
+            .filter(|v| !v.is_empty())
+            .map(str::to_string);
 
         match kind {
             "renovate" => {
                 renovate = Some(child_span);
-                check_renovate(child, src, issues);
                 if datasource(child) == Some("git-refs") {
                     issues.push(
                         Issue::new("`git-refs` does not track a module pin", src)
@@ -84,19 +78,10 @@ pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Remote
                     );
                 }
             }
-            "manual" => {
-                manual = Some(child_span);
-                if string_arg(child).unwrap_or_default().is_empty() {
-                    issues.push(
-                        Issue::new("`manual` needs a reason", src)
-                            .at(child_span, "no reason given")
-                            .help("say why nothing tracks this pin, or the next reader takes the absence for an oversight"),
-                    );
-                }
-            }
+            "manual" => manual = Some(child_span),
             "ref" => {
                 ref_span = Some(child_span);
-                remote.git_ref = string(issues).unwrap_or_default();
+                remote.git_ref = value.unwrap_or_default();
                 if renovate.is_some() && previous != Some("renovate") {
                     issues.push(
                         Issue::new("something sits between `renovate` and `ref`", src)
@@ -105,13 +90,9 @@ pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Remote
                     );
                 }
             }
-            "sha256" => remote.sha256 = string(issues).unwrap_or_default(),
-            "path" => remote.path = string(issues),
-            other => issues.push(
-                Issue::new(format!("unknown node `{other}` in a source"), src)
-                    .at(child_span, "not part of the schema")
-                    .help("a source holds `renovate` or `manual`, `ref`, `sha256` and `path`"),
-            ),
+            "sha256" => remote.sha256 = value.unwrap_or_default(),
+            "path" => remote.path = value,
+            _ => {}
         }
         previous = Some(kind);
     }
@@ -242,6 +223,71 @@ fn check_path(remote: &Remote, src: &Source, issues: &mut Issues) {
                 .help(
                     "`path \"modules/module-name\"`, the module's directory inside the repository",
                 ),
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parse::schema::check;
+    use kdl::KdlDocument;
+
+    fn messages(text: &str) -> Vec<String> {
+        let doc: KdlDocument = text.parse().expect("valid KDL");
+        let src = Source::new("image.kdl", text);
+        let mut issues = Issues::default();
+        check(&doc.nodes()[0], &SOURCE, &src, &mut issues);
+        issues
+            .plain()
+            .lines()
+            .filter_map(|line| line.strip_prefix("  x "))
+            .map(str::to_string)
+            .collect()
+    }
+
+    /// Every shape the golden corpus has no broken fixture for.
+    #[test]
+    fn the_table_catches_what_the_corpus_does_not() {
+        let found = messages(
+            r#"
+source pin="tag" {
+    renovate "now" datasource="crates" flavour="x"
+    manual
+    ref
+    sha256 "abc"
+    sha256 "def"
+    subtree "modules/x"
+}
+"#,
+        );
+        assert_eq!(
+            found,
+            [
+                "`source` needs a URL",
+                "unknown source property `pin`",
+                "`renovate` takes no arguments",
+                "unsupported datasource `crates`",
+                "unknown renovate property `flavour`",
+                "`renovate` declares no depName",
+                "`manual` needs a reason",
+                "`ref` needs a value",
+                "`sha256` is declared twice",
+                "unknown node `subtree` in a source",
+            ]
+        );
+    }
+
+    /// The annotation both this and an `asset` point at.
+    #[test]
+    fn a_renovate_annotation_says_what_tracks_the_pin() {
+        let found = messages("source \"https://host/a.tar.gz\" { renovate }");
+        assert_eq!(
+            found,
+            [
+                "`renovate` declares no datasource",
+                "`renovate` declares no depName",
+            ]
         );
     }
 }

@@ -23,8 +23,7 @@ const ENTRY: Node = Node::new("module", "One module the image is made of, named 
     ], Say::new("unknown module property `{}`", "not part of the schema",
         "a list entry accepts `variant`; options are set as child nodes"))
     .children(&[
-        Node::new("source",
-            "Where a module that lives outside this repository is fetched from, and what pins it."),
+        remote::SOURCE,
         Node::new("",
             "An option the module declares, set for this image by the node's name."),
     ], Say::NONE);
