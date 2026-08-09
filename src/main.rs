@@ -4,51 +4,35 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use tect::prompt::Prompt;
 
-const USAGE: &str = "\
-usage: tect [--root <dir>] <command>
+const HEAD: &str = "usage: tect [--root <dir>] <command>\n";
 
-  init [name]       write a new repository: the manifests, the module
-                    directory and the scaffolding, into `--root`, else a
-                    directory named for the image, else here. `--owner`
-                    names who it belongs to on github
-  plan [--json]     every fact this repository derives, as one JSON
-                    document: the images, each image's targets, and what
-                    each target is made of. Read a field out of it rather
-                    than deriving anything from a name
-  section [image]   the generated Containerfile module section for an
-                    image; the default image when none is given
+const CREATE_REPO: &str = "\
+\x20 create repo [name]  start a repository for your own images, here or in
+                      `--root`. `--owner` is your account or org on github
+";
+
+const IN_REPO: &str = "\
+\x20 create image [name] add an image: what it is called, and what it builds on
+  create module [name]
+                      write a module, with the packages it installs, and offer
+                      to list it in an image
+  import module <name>
+                      copy a module in from a collection repo.kdl declares,
+                      and offer to list it in an image
+  check               read every manifest and say what is wrong with it
+  generate            write the build files, and list what was written
+  section [image]     print the Containerfile section an image generates
   graph [--format md|json]
-                    the default image's capability graph: what provides
-                    what, what requires it, what only orders against it,
-                    and what the base already carries. Markdown, holding a
-                    mermaid diagram, unless `json` is asked for
-  module import <name>
-                    copy one module out of a source collection into
-                    modules/<owner>/<name>, where <owner> names the
-                    collection repo.kdl declares it in. `<owner>/<name>`
-                    picks between two collections that both have it.
-                    Listing it in an image is a separate operation
-  generate          write the Containerfile per image, the per-module build
-                    scripts and both renderings of the graph, under
-                    generated/, and list what was written
-  verify            re-emit all of that and compare it against what is
-                    committed under generated/, naming what differs
-  check             validate every manifest, printing what is wrong
+                      print what provides what, what requires it, and what the
+                      base already carries
+";
 
-Inside a build layer, where the binary is mounted and there is no
-repository to read:
+const RULE: &str = "\
+Every command takes a flag for everything it needs. What no flag gave is asked
+for, and `--no-tui` asks nothing, failing and naming the flag instead.
 
-  os-release        write the image identity the ARGs carry into
-                    /usr/lib/os-release
-  fetch <what> <url> <sha256> [target] [extra...]
-                    download, verify against the hash, and place it: `file`
-                    keeps it, `tree` unpacks it, `bin` installs one
-                    executable, `rpm` installs the package
-  validate-image    every check a built image has to pass
-
-The repository is the nearest directory at or above the working directory
-holding a repo.kdl, or `--root`. Data goes to stdout and diagnostics to
-stderr; exit 1 is the invocation, exit 2 the repository.
+Data goes to stdout and diagnostics to stderr; exit 1 is the invocation, exit
+2 the repository.
 ";
 
 /// The invocation is wrong: an unknown command, a bad argument, no repository.
@@ -56,22 +40,35 @@ const USAGE_ERROR: u8 = 1;
 /// The repository is wrong, and every problem was printed to stderr.
 const REPO_ERROR: u8 = 2;
 
-fn usage_error(message: String) -> ExitCode {
-    eprintln!("tect: {message}");
-    eprint!("{USAGE}");
-    ExitCode::from(USAGE_ERROR)
+/// Only what can run here: outside a repository that is `create repo`, and the
+/// rest is listed as needing one.
+fn usage(in_repo: bool) -> String {
+    match in_repo {
+        true => format!("{HEAD}\n{CREATE_REPO}{IN_REPO}\n{RULE}"),
+        false => format!(
+            "{HEAD}\n{CREATE_REPO}\nthese need a repository, and there is none here or above:\n\n\
+             {IN_REPO}\n{RULE}"
+        ),
+    }
 }
 
-/// Removes `--<flag> <value>` or `--<flag>=<value>` from the arguments.
-fn take_flag(args: &mut Vec<String>, flag: &str) -> Result<Option<String>, String> {
-    let mut value = None;
+fn in_repo() -> bool {
+    std::env::current_dir()
+        .ok()
+        .and_then(|here| tect::find_root(&here))
+        .is_some()
+}
+
+/// Removes every `--<flag> <value>` and `--<flag>=<value>` from the arguments.
+fn take_flags(args: &mut Vec<String>, flag: &str) -> Result<Vec<String>, String> {
+    let mut values = Vec::new();
     let mut i = 0;
     while i < args.len() {
         let taken = if let Some(v) = args[i].strip_prefix(&format!("--{flag}=")) {
-            value = Some(v.to_string());
+            values.push(v.to_string());
             1
         } else if args[i] == format!("--{flag}") {
-            value = Some(
+            values.push(
                 args.get(i + 1)
                     .ok_or(format!("`--{flag}` takes a value"))?
                     .clone(),
@@ -83,7 +80,11 @@ fn take_flag(args: &mut Vec<String>, flag: &str) -> Result<Option<String>, Strin
         };
         args.drain(i..i + taken);
     }
-    Ok(value)
+    Ok(values)
+}
+
+fn take_flag(args: &mut Vec<String>, flag: &str) -> Result<Option<String>, String> {
+    Ok(take_flags(args, flag)?.pop())
 }
 
 /// Removes `--<flag>`.
@@ -93,53 +94,34 @@ fn take_switch(args: &mut Vec<String>, flag: &str) -> bool {
     args.len() != before
 }
 
-const OWNERSHIP: &str = "your account or org on github (not tectonic-os)";
+/// A flag the command does not read is a failure rather than a silent no-op.
+fn only(given: &[&str], takes: &[&str], command: &str) -> Result<(), String> {
+    match given.iter().find(|flag| !takes.contains(flag)) {
+        Some(flag) => Err(format!("`{command}` does not take `--{flag}`")),
+        None => Ok(()),
+    }
+}
 
-/// Writes the tree, then prints what the tool deliberately does not do: the
-/// repository, the remote and the first commit are the user's.
-fn init(
-    args: &[&str],
-    root_arg: Option<PathBuf>,
-    owner: Option<String>,
-    prompt: &Prompt,
-) -> Result<(), String> {
-    let name = match args {
-        [] => None,
-        [name] => Some((*name).to_string()),
-        _ => return Err(format!("`init` takes one name, not {}", args.join(" "))),
-    };
+/// The optional name a `create` takes, and nothing else.
+fn one_name(rest: &[&str], command: &str) -> Result<Option<String>, String> {
+    match rest {
+        [] => Ok(None),
+        [name] => Ok(Some((*name).to_string())),
+        _ => Err(format!(
+            "`{command}` takes one name, not {}",
+            rest.join(" ")
+        )),
+    }
+}
 
-    let root = match (&root_arg, &name) {
-        (Some(root), _) => root.clone(),
-        (None, Some(name)) => PathBuf::from(tect::init::id(name)?),
-        (None, None) => PathBuf::from("."),
-    };
-
-    let name = match name {
-        Some(name) => name,
-        None => std::fs::canonicalize(&root)
-            .ok()
-            .as_deref()
-            .and_then(Path::file_name)
-            .map(|n| n.to_string_lossy().into_owned())
-            .ok_or_else(|| format!("cannot name an image after {}", root.display()))?,
-    };
-
-    let owner = prompt.text(owner, &format!("owner, {OWNERSHIP}"), "`--owner`", None)?;
-
-    let assets = tect::init::assets()?;
-    tect::init::write(&root, &name, &owner, &assets)?;
-
-    let id = tect::init::id(&name)?;
-    println!(
-        "wrote {} into {}\n\n\
-         next, in that directory:\n\
-         \x20 git init && git add -A && git commit\n\
-         \x20 gh repo create {owner}/{id} --source=. --push\n",
-        name,
-        root.display()
-    );
-    Ok(())
+/// `--root`, else the nearest directory at or above here holding a repo.kdl.
+fn repo_root(given: Option<PathBuf>) -> Result<PathBuf, String> {
+    if let Some(root) = given {
+        return Ok(root);
+    }
+    let here = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    tect::find_root(&here)
+        .ok_or_else(|| format!("no repo.kdl in {} or any parent directory", here.display()))
 }
 
 /// Copies one module in, asking which collection only when a name is in more
@@ -155,13 +137,10 @@ fn import(name: &str, root: &Path, prompt: &Prompt) -> Result<ExitCode, String> 
     let one = match found.as_slice() {
         [one] => one,
         many => {
-            let owners: Vec<&str> = many.iter().map(|f| f.owner.as_str()).collect();
+            let owners: Vec<String> = many.iter().map(|f| f.owner.clone()).collect();
             let listed = owners.join(", ");
             let chosen = prompt
-                .choose(
-                    &format!("`{module}` is in {listed}; which one"),
-                    &owners.iter().map(|o| (*o).to_string()).collect::<Vec<_>>(),
-                )?
+                .choose(&format!("`{module}` is in {listed}; which one"), &owners)?
                 .ok_or_else(|| {
                     format!(
                         "`{module}` is in {listed}; name which one, as `{}/{module}`",
@@ -201,122 +180,133 @@ fn write_generated(root: &Path, files: &[(PathBuf, String)]) -> Result<(), Strin
 }
 
 fn main() -> ExitCode {
+    match run() {
+        Ok(code) => code,
+        Err(message) => {
+            eprintln!("tect: {message}");
+            eprint!("{}", usage(in_repo()));
+            ExitCode::from(USAGE_ERROR)
+        }
+    }
+}
+
+fn run() -> Result<ExitCode, String> {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let prompt = Prompt::new(take_switch(&mut args, "no-tui"));
-    let root_arg = match take_flag(&mut args, "root") {
-        Ok(root) => root.map(PathBuf::from),
-        Err(message) => return usage_error(message),
-    };
-    let owner_arg = match take_flag(&mut args, "owner") {
-        Ok(owner) => owner,
-        Err(message) => return usage_error(message),
-    };
-    let format_arg = match take_flag(&mut args, "format") {
-        Ok(format) => format,
-        Err(message) => return usage_error(message),
-    };
+    let root_arg = take_flag(&mut args, "root")?.map(PathBuf::from);
+    let owner = take_flag(&mut args, "owner")?;
+    let image_arg = take_flag(&mut args, "image")?;
+    let base = take_flag(&mut args, "base")?;
+    let format = take_flag(&mut args, "format")?;
 
-    let command = match args.first().map(String::as_str) {
-        Some("-h") | Some("--help") => {
-            print!("{USAGE}");
-            return ExitCode::SUCCESS;
+    let mut given: Vec<&str> = Vec::new();
+    for (flag, present) in [
+        ("root", root_arg.is_some()),
+        ("owner", owner.is_some()),
+        ("image", image_arg.is_some()),
+        ("base", base.is_some()),
+        ("format", format.is_some()),
+    ] {
+        if present {
+            given.push(flag);
         }
-        Some(c) => c,
-        None => {
-            eprint!("{USAGE}");
-            return ExitCode::from(USAGE_ERROR);
-        }
-    };
-
-    let command = match (command, format_arg.as_deref()) {
-        ("graph", None | Some("md")) => "graph",
-        ("graph", Some("json")) => "graph-json",
-        ("graph", Some(other)) => {
-            return usage_error(format!("`--format` is md or json, not `{other}`"))
-        }
-        (command, Some(_)) => return usage_error(format!("`{command}` does not take `--format`")),
-        (command, None) => command,
-    };
-
-    let rest: Vec<&str> = args[1..].iter().map(String::as_str).collect();
-    if command == "init" {
-        return match init(&rest, root_arg, owner_arg, &prompt) {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(message) => usage_error(message),
-        };
     }
-    if owner_arg.is_some() {
-        return usage_error(format!("`{command}` does not take `--owner`"));
+
+    let words: Vec<&str> = args.iter().map(String::as_str).collect();
+    match words.first() {
+        None => {
+            eprint!("{}", usage(in_repo()));
+            return Ok(ExitCode::from(USAGE_ERROR));
+        }
+        Some(&"-h") | Some(&"--help") => {
+            print!("{}", usage(in_repo()));
+            return Ok(ExitCode::SUCCESS);
+        }
+        Some(_) => {}
+    }
+
+    if let ["create", "repo", rest @ ..] = words.as_slice() {
+        only(&given, &["root", "owner", "image", "base"], "create repo")?;
+        let name = one_name(rest, "create repo")?;
+        tect::create::repo(name, owner, image_arg, base, root_arg, &prompt)?;
+        return Ok(ExitCode::SUCCESS);
     }
 
     // The build-layer commands read the image around them, not a repository.
-    let in_layer = match command {
-        "os-release" => Some(tect::runtime::os_release()),
-        "validate-image" => Some(tect::runtime::validate_image()),
-        "fetch" => Some(tect::runtime::fetch(&rest)),
+    let in_layer = match words.as_slice() {
+        ["os-release"] => Some(tect::runtime::os_release()),
+        ["validate-image"] => Some(tect::runtime::validate_image()),
+        ["fetch", rest @ ..] => Some(tect::runtime::fetch(rest)),
         _ => None,
     };
     if let Some(result) = in_layer {
-        return match result {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(message) => {
-                eprintln!("tect: {message}");
-                ExitCode::from(USAGE_ERROR)
-            }
-        };
+        result?;
+        return Ok(ExitCode::SUCCESS);
     }
 
-    let image_arg = match (command, rest.as_slice()) {
+    match words.as_slice() {
+        ["create", "image", rest @ ..] => {
+            only(&given, &["root", "owner", "base"], "create image")?;
+            let name = one_name(rest, "create image")?;
+            let root = repo_root(root_arg)?;
+            tect::create::image(
+                &root,
+                name,
+                base,
+                owner.as_deref(),
+                "a name argument",
+                &prompt,
+            )?;
+            return Ok(ExitCode::SUCCESS);
+        }
+        ["import", "module", name] => {
+            only(&given, &["root"], "import module")?;
+            return import(name, &repo_root(root_arg)?, &prompt);
+        }
+        ["create", ..] => {
+            return Err("`create` takes `repo <name>`, `image <name>` or `module <name>`".into())
+        }
+        ["import", ..] => return Err("`import` takes `module <name>`".into()),
+        _ => {}
+    }
+
+    only(
+        &given,
+        match words[0] {
+            "graph" => &["root", "format"],
+            _ => &["root"],
+        },
+        words[0],
+    )?;
+    let command = match (words[0], format.as_deref()) {
+        ("graph", None | Some("md")) => "graph",
+        ("graph", Some("json")) => "graph-json",
+        ("graph", Some(other)) => {
+            return Err(format!("`--format` is md or json, not `{other}`"));
+        }
+        (command, _) => command,
+    };
+
+    let rest = &words[1..];
+    let image_arg = match (command, rest) {
         ("plan", []) | ("plan", ["--json"]) => None,
         ("check", []) | ("generate", []) | ("verify", []) => None,
         ("section", []) | ("graph" | "graph-json", []) => None,
         ("section", [image]) => Some(*image),
-        ("module", ["import", _]) => None,
-        ("module", _) => {
-            return usage_error(format!(
-                "`module` takes `import <name>`, not {}",
-                rest.join(" ")
-            ))
-        }
         ("plan" | "check" | "section" | "graph" | "graph-json" | "generate" | "verify", _) => {
-            return usage_error(format!("`{}` does not take {}", args[0], rest.join(" ")))
+            return Err(format!("`{}` does not take {}", words[0], rest.join(" ")));
         }
-        (other, _) => return usage_error(format!("unknown command `{other}`")),
+        (other, _) => return Err(format!("unknown command `{other}`")),
     };
 
-    let root = match root_arg {
-        Some(root) => root,
-        None => {
-            let here = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-            match tect::find_root(&here) {
-                Some(root) => root,
-                None => {
-                    return usage_error(format!(
-                        "no repo.kdl in {} or any parent directory",
-                        here.display()
-                    ))
-                }
-            }
-        }
-    };
-
-    if command == "module" {
-        return match import(rest[1], &root, &prompt) {
-            Ok(code) => code,
-            Err(message) => usage_error(message),
-        };
-    }
-
+    let root = repo_root(root_arg)?;
     let run = tect::run(command, image_arg, &root);
 
     if run.issues.report(&run.context) {
-        return ExitCode::from(REPO_ERROR);
+        return Ok(ExitCode::from(REPO_ERROR));
     }
     if command == "generate" {
-        if let Err(message) = write_generated(&root, &run.files) {
-            eprintln!("tect: {message}");
-            return ExitCode::from(USAGE_ERROR);
-        }
+        write_generated(&root, &run.files)?;
     }
     print!("{}", run.stdout);
     if command == "check" {
@@ -344,5 +334,5 @@ fn main() -> ExitCode {
             if count == 1 { "" } else { "s" }
         );
     }
-    ExitCode::SUCCESS
+    Ok(ExitCode::SUCCESS)
 }

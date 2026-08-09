@@ -48,7 +48,9 @@ impl Prompt {
         }
         let missing = || match default {
             Some(default) => Ok(default.to_string()),
-            None => Err(format!("no {flag} and no terminal to ask on: {question}")),
+            None => Err(format!(
+                "give {flag}, since nothing can be asked here: {question}"
+            )),
         };
         if !self.ask {
             return missing();

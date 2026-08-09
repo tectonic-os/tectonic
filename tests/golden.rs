@@ -49,12 +49,21 @@ fn capture(name: &str, root: &Path) {
     compare(name, "generated.txt", &generated);
 }
 
-/// A repository `tect init` wrote, captured like any other fixture: what it
-/// scaffolds has to resolve, generate and report nothing.
+/// A repository `create repo` wrote, from flags alone, captured like any other
+/// fixture: what it scaffolds has to resolve, generate and report nothing.
 fn init_repo(name: &str) -> PathBuf {
     let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(name);
     let _ = std::fs::remove_dir_all(&root);
-    tect::init::write(&root, "Example", "someone", &crate_dir().join("assets")).unwrap();
+    std::env::set_var("TECT_ASSETS", crate_dir().join("assets"));
+    tect::create::repo(
+        Some("Example".into()),
+        Some("someone".into()),
+        Some("Example".into()),
+        None,
+        Some(root.clone()),
+        &tect::prompt::Prompt::silent(),
+    )
+    .unwrap();
     root
 }
 
