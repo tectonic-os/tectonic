@@ -260,7 +260,11 @@ fn main() -> ExitCode {
         );
     }
     if command == "verify" {
-        eprintln!("tect: {} generated files match", run.files.len());
+        let count = run.files.len();
+        eprintln!(
+            "tect: {count} generated file{} match the manifests",
+            if count == 1 { "" } else { "s" }
+        );
     }
     ExitCode::SUCCESS
 }
