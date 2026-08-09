@@ -45,10 +45,10 @@
       "customType": "regex",
       // The tag carries the version, so the leading v comes back off.
       "description": "The pinned build tool release",
-      "managerFilePatterns": ["/^scripts/tect\\.sh$/"],
+      "managerFilePatterns": ["/^repo\\.kdl$/"],
       "extractVersionTemplate": "^v(?<version>.+)$",
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s*\\nversion=\"(?<currentValue>[^\"]+)\"",
+        "// renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s*\\ntect-version \"(?<currentValue>[^\"]+)\"",
       ],
     },
     {

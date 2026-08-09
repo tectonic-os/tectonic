@@ -2,13 +2,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# renovate: datasource=github-releases depName=tectonic-os/tectonic
-version="0.0.0"
-
 die() {
     echo "tect: $*" >&2
     exit 1
 }
+
+# One declared value out of the manifest, and nothing derived from it.
+version="$(sed -n 's/^tect-version "\(.*\)"$/\1/p' repo.kdl)"
+[ -n "$version" ] || die "repo.kdl declares no tect-version"
 
 bin="${TECT_BIN:-out/tect-${version}}"
 
