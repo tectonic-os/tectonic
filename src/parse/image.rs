@@ -10,271 +10,120 @@ use kdl::KdlNode;
 
 const NEEDS_VALUE: Say = Say::new("`{}` needs a value", "nothing given", "");
 
-const ID: Node = Node::new(
-    "id",
-    "The machine name: published image, build target, cache tag, os-release \
-     DEFAULT_HOSTNAME. Derived from `name` when it is not declared.",
-)
-.arg(Arg::Str, NEEDS_VALUE)
-.once("");
+/// A list entry, which is the same node ungated and inside a flavour block.
+#[rustfmt::skip]
+const ENTRY: Node = Node::new("module", "One module the image is made of, named by its path under `modules/`.")
+    .arg(Arg::Str, Say::new("`module` needs a path", "no path given",
+        "`module \"core/flatpak\"`, the path relative to modules/"))
+    .props(&[
+        Prop { name: "variant", kind: Kind::Str,
+            desc: "Which of the module's declared variants this image builds.",
+            say: Say::new("`variant` must be a string", "not a string", "") },
+    ], Say::new("unknown module property `{}`", "not part of the schema",
+        "a list entry accepts `variant`; options are set as child nodes"))
+    .children(&[
+        Node::new("source",
+            "Where a module that lives outside this repository is fetched from, and what pins it."),
+        Node::new("",
+            "An option the module declares, set for this image by the node's name."),
+    ], Say::NONE);
 
-const NAME: Node = Node::new(
-    "name",
-    "os-release NAME, which the boot menu and the desktop read.",
-)
-.arg(Arg::Str, NEEDS_VALUE)
-.once("")
-.missing(Say::new(
-    "`image` declares no `name`",
-    "no name",
-    "`name \"Tectonic\"` is os-release NAME, which the boot menu and the desktop read",
-));
-
-const PRETTY_NAME: Node = Node::new(
-    "pretty-name",
-    "os-release PRETTY_NAME, the full name a user is shown.",
-)
-.arg(Arg::Str, NEEDS_VALUE)
-.once("");
-
-const URL: Node = Node::new(
-    "url",
-    "The project's home page, in os-release and the image labels.",
-)
-.arg(Arg::Str, NEEDS_VALUE)
-.once("");
-
-const ISSUES_URL: Node = Node::new(
-    "issues-url",
-    "Where a user reports a problem with the image.",
-)
-.arg(Arg::Str, NEEDS_VALUE)
-.once("");
-
-const FAMILY: Node = Node::new(
-    "family",
-    "The base's family, matched against every module's `supports`.",
-)
-.arg(
-    Arg::Str,
-    Say::new(
-        "`family` needs a name",
-        "no family given",
-        "`family \"fedora\"`, matched against each module's `supports`",
-    ),
-)
-.once("")
-.missing(Say::new(
-    "`base` declares no `family`",
-    "no family",
-    "every module declares which families it `supports`, and the two are checked against each other",
-));
-
-const PROVIDES: Node = Node::new(
-    "provides",
-    "Capabilities the base satisfies that no module could implement portably.",
-)
-.arg(Arg::Strs, Say::NONE);
-
-const PROVIDES_FILE: Node = Node::new(
-    "provides-file",
-    "Absolute paths the base guarantees, which a module may require.",
-)
-.arg(Arg::Strs, Say::NONE);
-
-const SIGNED: Node = Node::new("signed", "Whether the base publishes a cosign signature.")
-    .arg(
-        Arg::Bool,
-        Say::new(
-            "`signed` needs #true or #false",
-            "not a boolean",
-            "`signed #false` records that this base publishes no cosign signature; base-sig-probe.yml keeps it current",
-        ),
-    )
-    .once("");
-
-const BASE: Node = Node::new(
-    "base",
-    "The image every layer builds on, and what building on it may assume.",
-)
-.arg(
-    Arg::Str,
-    Say::new(
-        "`base` needs an image reference",
-        "no image given",
-        "`base \"quay.io/fedora/fedora-bootc:44\"`, emitted verbatim as the generated FROM",
-    ),
-)
-.once("an image builds on one base; a second family is a second image")
-.missing(Say::new(
-    "`image` declares no `base`",
-    "nothing to build on",
-    "`base \"quay.io/fedora/fedora-bootc:44\" { family \"fedora\" }`, naming the image every layer builds on",
-))
-.children(
-    &[FAMILY, PROVIDES, PROVIDES_FILE, SIGNED],
-    Say::new(
-        "unknown base property `{}`",
-        "not part of the schema",
-        "a base accepts `family`, `provides`, `provides-file` and `signed`",
-    ),
-);
-
-const FLAVOUR: Node = Node::new(
-    "",
-    "One flavour, named by the node: a gated module set published as `<image>-<flavour>`.",
-)
-.arg(
-    Arg::None,
-    Say::new(
-        "a flavour takes no arguments",
-        "unexpected value",
-        "the flavour's name is the node name: `desktop default=#true`",
-    ),
-)
-.props(
-    &[
-        Prop {
-            name: "default",
-            desc: "Whether a build that names no flavour builds this one.",
-            kind: Kind::Bool,
-            say: Say::new("`{}` must be #true or #false", "not a boolean", ""),
-        },
-        Prop {
-            name: "pr-build",
-            desc: "Whether a pull request builds this flavour rather than the default.",
-            kind: Kind::Bool,
-            say: Say::new("`{}` must be #true or #false", "not a boolean", ""),
-        },
-    ],
-    Say::new(
-        "unknown flavour property `{}`",
-        "not part of the schema",
-        "a flavour accepts `default` and `pr-build`",
-    ),
-);
-
-const FLAVOURS: Node = Node::new(
-    "flavours",
-    "The flavours this image publishes beside its ungated build.",
-)
-.once("a second block would split one set of flavours in two")
-.empty(Say::new(
-    "`flavours` has no flavours in it",
-    "empty block",
-    "omit the block entirely to build one unnamed image",
-))
-.children(&[FLAVOUR], Say::NONE);
-
-const SOURCE: Node = Node::new(
-    "source",
-    "Where a module that lives outside this repository is fetched from, and what pins it.",
-);
-
-const OPTION: Node = Node::new(
-    "",
-    "An option the module declares, set for this image by the node's name.",
-);
-
-const ENTRY: Node = Node::new(
-    "module",
-    "One module the image is made of, named by its path under `modules/`.",
-)
-.arg(
-    Arg::Str,
-    Say::new(
-        "`module` needs a path",
-        "no path given",
-        "`module \"core/flatpak\"`, the path relative to modules/",
-    ),
-)
-.props(
-    &[Prop {
-        name: "variant",
-        desc: "Which of the module's declared variants this image builds.",
-        kind: Kind::Str,
-        say: Say::new("`variant` must be a string", "not a string", ""),
-    }],
-    Say::new(
-        "unknown module property `{}`",
-        "not part of the schema",
-        "a list entry accepts `variant`; options are set as child nodes",
-    ),
-)
-.children(&[SOURCE, OPTION], Say::NONE);
-
-const GATED: Node = Node::new(
-    "flavour",
-    "The modules one flavour adds, which build only for that flavour.",
-)
-.arg(
-    Arg::Str,
-    Say::new(
-        "`flavour` needs a flavour name",
-        "no name given",
-        "`flavour \"desktop\" { module \"...\" }`",
-    ),
-)
-.children(
-    &[ENTRY],
-    Say::new(
-        "`{}` is not allowed inside a flavour block",
-        "only `module` belongs here",
-        "flavour blocks do not nest; a module gated to two flavours is listed under each",
-    ),
-);
-
-const MODULES: Node = Node::new(
-    "modules",
-    "Every module the image is made of: ungated entries, and the flavours that gate the rest.",
-)
-.once("a second block would split one list in two")
-.missing(Say::new(
-    "`image` has no `modules` block",
-    "nothing in it",
-    "an image with no modules is almost certainly a mistake; the block is required even when empty",
-))
-.children(
-    &[ENTRY, GATED],
-    Say::new(
-        "unknown node `{}` in `modules`",
-        "not part of the schema",
-        "`modules` holds `module` entries and `flavour` blocks",
-    ),
-);
-
-/// One image file's grammar.
-pub const IMAGE: Node = Node::new(
-    "image",
-    "One image: what it calls itself, what it builds on, and everything it is made of.",
-)
-.arg(
-    Arg::None,
-    Say::new(
-        "`image` takes no argument",
-        "the name belongs in the block",
+/// The image file's grammar, and the whole of it.
+#[rustfmt::skip]
+pub const IMAGE: Node = Node::new("image",
+    "One image: what it calls itself, what it builds on, and everything it is made of.")
+    .arg(Arg::None, Say::new("`image` takes no argument", "the name belongs in the block",
         "`image { id \"{}\" }` is the machine name, and `name` is the human one it derives from \
-         when absent",
-    ),
-)
-.children(
-    &[
-        ID,
-        NAME,
-        PRETTY_NAME,
-        URL,
-        ISSUES_URL,
-        BASE,
-        FLAVOURS,
-        MODULES,
-    ],
-    Say::new(
-        "unknown image property `{}`",
-        "not part of the schema",
+         when absent"))
+    .children(&[
+        Node::new("id",
+            "The machine name: published image, build target, cache tag, os-release \
+             DEFAULT_HOSTNAME. Derived from `name` when it is not declared.")
+            .arg(Arg::Str, NEEDS_VALUE).once(""),
+        Node::new("name", "os-release NAME, which the boot menu and the desktop read.")
+            .arg(Arg::Str, NEEDS_VALUE).once("")
+            .missing(Say::new("`image` declares no `name`", "no name",
+                "`name \"Tectonic\"` is os-release NAME, which the boot menu and the desktop read")),
+        Node::new("pretty-name", "os-release PRETTY_NAME, the full name a user is shown.")
+            .arg(Arg::Str, NEEDS_VALUE).once(""),
+        Node::new("url", "The project's home page, in os-release and the image labels.")
+            .arg(Arg::Str, NEEDS_VALUE).once(""),
+        Node::new("issues-url", "Where a user reports a problem with the image.")
+            .arg(Arg::Str, NEEDS_VALUE).once(""),
+
+        Node::new("base", "The image every layer builds on, and what building on it may assume.")
+            .arg(Arg::Str, Say::new("`base` needs an image reference", "no image given",
+                "`base \"quay.io/fedora/fedora-bootc:44\"`, emitted verbatim as the generated FROM"))
+            .once("an image builds on one base; a second family is a second image")
+            .missing(Say::new("`image` declares no `base`", "nothing to build on",
+                "`base \"quay.io/fedora/fedora-bootc:44\" { family \"fedora\" }`, naming the image \
+                 every layer builds on"))
+            .children(&[
+                Node::new("family", "The base's family, matched against every module's `supports`.")
+                    .arg(Arg::Str, Say::new("`family` needs a name", "no family given",
+                        "`family \"fedora\"`, matched against each module's `supports`"))
+                    .once("")
+                    .missing(Say::new("`base` declares no `family`", "no family",
+                        "every module declares which families it `supports`, and the two are \
+                         checked against each other")),
+                Node::new("provides",
+                    "Capabilities the base satisfies that no module could implement portably.")
+                    .arg(Arg::Strs, Say::NONE),
+                Node::new("provides-file",
+                    "Absolute paths the base guarantees, which a module may require.")
+                    .arg(Arg::Strs, Say::NONE),
+                Node::new("signed", "Whether the base publishes a cosign signature.")
+                    .arg(Arg::Bool, Say::new("`signed` needs #true or #false", "not a boolean",
+                        "`signed #false` records that this base publishes no cosign signature; \
+                         base-sig-probe.yml keeps it current"))
+                    .once(""),
+            ], Say::new("unknown base property `{}`", "not part of the schema",
+                "a base accepts `family`, `provides`, `provides-file` and `signed`")),
+
+        Node::new("flavours", "The flavours this image publishes beside its ungated build.")
+            .once("a second block would split one set of flavours in two")
+            .empty(Say::new("`flavours` has no flavours in it", "empty block",
+                "omit the block entirely to build one unnamed image"))
+            .children(&[
+                Node::new("",
+                    "One flavour, named by the node: a gated module set published as \
+                     `<image>-<flavour>`.")
+                    .arg(Arg::None, Say::new("a flavour takes no arguments", "unexpected value",
+                        "the flavour's name is the node name: `desktop default=#true`"))
+                    .props(&[
+                        Prop { name: "default", kind: Kind::Bool,
+                            desc: "Whether a build that names no flavour builds this one.",
+                            say: Say::new("`{}` must be #true or #false", "not a boolean", "") },
+                        Prop { name: "pr-build", kind: Kind::Bool,
+                            desc: "Whether a pull request builds this flavour rather than the \
+                                   default.",
+                            say: Say::new("`{}` must be #true or #false", "not a boolean", "") },
+                    ], Say::new("unknown flavour property `{}`", "not part of the schema",
+                        "a flavour accepts `default` and `pr-build`")),
+            ], Say::NONE),
+
+        Node::new("modules",
+            "Every module the image is made of: ungated entries, and the flavours that gate \
+             the rest.")
+            .once("a second block would split one list in two")
+            .missing(Say::new("`image` has no `modules` block", "nothing in it",
+                "an image with no modules is almost certainly a mistake; the block is required \
+                 even when empty"))
+            .children(&[
+                ENTRY,
+                Node::new("flavour", "The modules one flavour adds, which build only for that flavour.")
+                    .arg(Arg::Str, Say::new("`flavour` needs a flavour name", "no name given",
+                        "`flavour \"desktop\" { module \"...\" }`"))
+                    .children(&[ENTRY],
+                        Say::new("`{}` is not allowed inside a flavour block",
+                            "only `module` belongs here",
+                            "flavour blocks do not nest; a module gated to two flavours is listed \
+                             under each")),
+            ], Say::new("unknown node `{}` in `modules`", "not part of the schema",
+                "`modules` holds `module` entries and `flavour` blocks")),
+    ], Say::new("unknown image property `{}`", "not part of the schema",
         "an image accepts `id`, `name`, `pretty-name`, `url` and `issues-url`, and the `base`, \
-         `flavours` and `modules` blocks",
-    ),
-);
+         `flavours` and `modules` blocks"));
 
 /// Every `name "a" "b"` under a node, as declarations pointing at the node.
 fn decls(node: &KdlNode, name: &str) -> Vec<Decl> {
