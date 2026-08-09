@@ -176,8 +176,9 @@ if [ "$cache_from" = 1 ] || [ "$cache_to" = 1 ]; then
 fi
 
 # ---- the Containerfile the build actually uses ---------------------------
+# Never regenerated here: a build proves the committed files are current.
 ./scripts/fetch-modules.sh
-./scripts/tect.sh generate
+./scripts/tect.sh verify
 
 # The `tect` stage copies this, and every layer mounts it from there.
 install -D -m755 "$(./scripts/tect.sh --path)" out/tect
