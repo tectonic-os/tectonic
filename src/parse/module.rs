@@ -717,3 +717,112 @@ pub fn check_unlisted(list: &List, root: &Path, disk: &Disk, issues: &mut Issues
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn messages(text: &str) -> Vec<String> {
+        let doc: KdlDocument = text.parse().expect("valid KDL");
+        let src = Source::new("module.kdl", text);
+        let mut issues = Issues::default();
+        check_doc(&doc, &MODULE, &src, &mut issues);
+        issues
+            .plain()
+            .lines()
+            .filter_map(|line| line.strip_prefix("  x "))
+            .map(str::to_string)
+            .collect()
+    }
+
+    /// Every shape the golden corpus has no broken fixture for.
+    #[test]
+    fn the_table_catches_what_the_corpus_does_not() {
+        let found = messages(
+            r#"
+description
+description "twice"
+provides
+requires-file "/usr/bin/one" build-only=#true
+provides-file "/usr/bin/two" build-only="yes" lifetime="long"
+secret
+allow-verify "man-page-missing" unit=1 scope="image"
+collects "justfile.inc" into="/etc/one" priority=90000 mode="append"
+contributes "justfile.inc" priority=100 mode="append"
+fragment "here" position="sideways" standard-layer="no" placement="last"
+fragment
+packages {
+    fedora "one" enablerepo="two" weak=#true
+}
+drives "a truck"
+"#,
+        );
+        assert_eq!(
+            found,
+            [
+                "`description` needs a string",
+                "`description` is declared twice",
+                "`provides` needs a capability name",
+                "`build-only` is not a `requires-file` property",
+                "`build-only` takes #true or #false",
+                "unknown `provides-file` property `lifetime`",
+                "`secret` needs a name",
+                "`unit` must be a string",
+                "unknown `allow-verify` property `scope`",
+                "`priority` is a number from 0 to 9999",
+                "unknown `collects` property `mode`",
+                "unknown `contributes` property `mode`",
+                "`fragment` takes no arguments",
+                "`position` must be \"before\" or \"after\"",
+                "`standard-layer` must be #true or #false",
+                "unknown fragment property `placement`",
+                "`fragment` is declared twice",
+                "unknown property `weak` in packages block",
+                "unknown node `drives`",
+            ]
+        );
+    }
+
+    /// The three nodes a module may repeat under one name, and what they hold.
+    #[test]
+    fn the_table_holds_the_option_variant_and_asset_grammars() {
+        let found = messages(
+            r#"
+option "fonts" type="list" scope="image" {
+    default "A"
+    default "B"
+    describe "the fonts"
+}
+option "fonts" type="list"
+variant "lean" scope="image" {
+    set
+}
+variant "lean"
+asset "starship" tracked=#true {
+    version
+    sha256 "abc" from="upstream" algorithm="sha512"
+    checksum "abc"
+}
+asset "starship"
+"#,
+        );
+        assert_eq!(
+            found,
+            [
+                "unknown option property `scope`",
+                "`default` is declared twice",
+                "unknown node `describe` in an option",
+                "option `fonts` is declared twice",
+                "unknown variant property `scope`",
+                "`set` needs an option name",
+                "variant `lean` is declared twice",
+                "unknown asset property `tracked`",
+                "`version` needs a value",
+                "`from` must be asset, sidecar or manual",
+                "unknown sha256 property `algorithm`",
+                "unknown node `checksum` in an asset",
+                "asset `starship` is declared twice",
+            ]
+        );
+    }
+}
