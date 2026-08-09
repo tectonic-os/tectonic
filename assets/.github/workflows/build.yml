@@ -407,7 +407,7 @@ jobs:
           if [ "$PUBLISH" = "true" ]; then
             args+=(--oci-output "${RUNNER_TEMP}/raw-oci.tar")
           fi
-          ./scripts/build.sh "${args[@]}"
+          ./scripts/tect.sh build "${args[@]}"
 
       - name: Summarize the resolved build
         env:

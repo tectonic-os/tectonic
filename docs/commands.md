@@ -100,6 +100,29 @@ build scripts, and both renderings of the capability graph. Lists what it
 wrote. The directory is cleared first, so an image or a module that is gone
 leaves with its files. `generated/` is tracked; `out/` is scratch and ignored.
 
+### `build [target]`
+
+Fetches the pinned modules, runs `verify` as the drift gate, then execs the
+container backend with the argv the plan derives: the Containerfile, the build
+args, the tags, the secrets and the layer cache references. The default target
+when none is named; a target is `<image>/<flavour>`, and the flavour half is
+`none` for the ungated set.
+
+    --kernel <name>       the KERNEL build arg, which the Containerfile decides
+                          when nothing sets it
+    --tag <ref>           tag the result; repeatable, and $TAGS adds to it
+    --secret <id>=<path>  mount <path> as the build secret <id>; repeatable
+    --backend <name>      buildx or buildah, else $BUILD_BACKEND, else buildah
+    --oci-output <path>   write an OCI archive instead of loading the image
+    --cache-to            export the layer cache to the registry cache repo
+    --no-cache-from       do not import it
+
+`$LABELS` adds OCI labels the way `$TAGS` adds tags, `$IMAGE_VERSION` is
+stamped into the image and defaults to today in UTC, and `$MOK_KEY_PATH` is
+shorthand for `--secret mok_privkey=<path>`.
+
+Nothing is regenerated here. A build proves the committed files are current.
+
 ### `section [image]`
 
 Prints the generated Containerfile module section for one image, the default

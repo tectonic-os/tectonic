@@ -216,7 +216,10 @@ fn target(list: &List, image: &Image, resolved: &Resolved, target: &Target) -> J
                 m.secrets.iter().map(|d| d.name.clone()).collect()
             }),
         ),
-        ("contract_files", contract_files(image, &modules)),
+        (
+            "contract_files",
+            Json::strings(contract_files(image, &modules)),
+        ),
         (
             "verify_exceptions",
             Json::array(
@@ -291,7 +294,7 @@ fn module(entry: &Entry) -> Json {
 
 /// Contract file paths the finished image still carries: what the base
 /// guarantees, then what the enabled modules declare.
-fn contract_files(image: &Image, modules: &[&Module]) -> Json {
+pub(crate) fn contract_files(image: &Image, modules: &[&Module]) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for decl in image.base.iter().flat_map(|b| b.provides_files.iter()) {
         if !out.contains(&decl.name) {
@@ -308,7 +311,7 @@ fn contract_files(image: &Image, modules: &[&Module]) -> Json {
             }
         }
     }
-    Json::strings(out)
+    out
 }
 
 /// Every contract path an enabled module declares, to the module that declares
@@ -428,7 +431,7 @@ fn unique(modules: &[&Module], of: impl Fn(&Module) -> Vec<String>) -> Json {
     Json::strings(out)
 }
 
-fn unique_pairs(
+pub(crate) fn unique_pairs(
     modules: &[&Module],
     of: impl Fn(&Module) -> Vec<(String, String)>,
 ) -> Vec<(String, String)> {

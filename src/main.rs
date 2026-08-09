@@ -23,6 +23,7 @@ const IN_REPO: &str = "\
                       image
   check               read every manifest and say what is wrong with it
   generate            write the build files, and list what was written
+  build [target]      verify the build files, then build the image
   section [image]     print the Containerfile section an image generates
   graph [--format md|json]
                       print what provides what, what requires it, and what the
@@ -206,6 +207,8 @@ fn main() -> ExitCode {
 fn run() -> Result<ExitCode, String> {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let prompt = Prompt::new(take_switch(&mut args, "no-tui"));
+    let cache_to = take_switch(&mut args, "cache-to");
+    let no_cache_from = take_switch(&mut args, "no-cache-from");
     let root_arg = take_flag(&mut args, "root")?.map(PathBuf::from);
     let owner = take_flag(&mut args, "owner")?;
     let image_arg = take_flag(&mut args, "image")?;
@@ -213,6 +216,10 @@ fn run() -> Result<ExitCode, String> {
     let format = take_flag(&mut args, "format")?;
     let target = take_flag(&mut args, "target")?;
     let tags = take_flags(&mut args, "tag")?;
+    let kernel = take_flag(&mut args, "kernel")?;
+    let backend = take_flag(&mut args, "backend")?;
+    let oci_output = take_flag(&mut args, "oci-output")?;
+    let secrets = take_flags(&mut args, "secret")?;
     let pkgs = take_flags(&mut args, "pkg")?;
     let with = take_flags(&mut args, "with")?
         .iter()
@@ -231,6 +238,10 @@ fn run() -> Result<ExitCode, String> {
         ("format", format.is_some()),
         ("target", target.is_some()),
         ("tag", !tags.is_empty()),
+        ("kernel", kernel.is_some()),
+        ("backend", backend.is_some()),
+        ("oci-output", oci_output.is_some()),
+        ("secret", !secrets.is_empty()),
         ("pkg", !pkgs.is_empty()),
         ("with", !with.is_empty()),
     ] {
@@ -316,6 +327,36 @@ fn run() -> Result<ExitCode, String> {
             only(&given, &["root", "image"], "import module")?;
             let name = one_name(rest, "import module")?;
             return import(name, &repo_root(root_arg)?, image_arg, &prompt);
+        }
+        ["build", rest @ ..] => {
+            only(
+                &given,
+                &[
+                    "root",
+                    "target",
+                    "tag",
+                    "kernel",
+                    "backend",
+                    "oci-output",
+                    "secret",
+                ],
+                "build",
+            )?;
+            let opts = tect::build::Options {
+                target: one_name(rest, "build")?.or(target),
+                kernel,
+                tags,
+                secrets,
+                backend,
+                oci_output,
+                no_cache_from,
+                cache_to,
+            };
+            let refused = tect::build::run(&repo_root(root_arg)?, &opts)?;
+            return Ok(match refused {
+                true => ExitCode::from(REPO_ERROR),
+                false => ExitCode::SUCCESS,
+            });
         }
         ["registry", "namespace"] => {
             only(&given, &["root"], "registry namespace")?;

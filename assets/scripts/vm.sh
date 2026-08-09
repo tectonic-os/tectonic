@@ -168,7 +168,7 @@ if [ "$command" = build ] || [ "$rebuild" = 1 ] || [ ! -f "$image_file" ]; then
     if [ "$rebuild" = 1 ]; then
         args=(--tag "$ref")
         [ -z "$target" ] || args+=(--target "$target")
-        ./scripts/build.sh "${args[@]}"
+        ./scripts/tect.sh build "${args[@]}"
     fi
     build_disk
 fi

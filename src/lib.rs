@@ -1,5 +1,6 @@
 //! The only reader of the image files and the per-module module.kdl files.
 
+pub mod build;
 pub mod create;
 pub mod diag;
 pub mod emit;
@@ -93,14 +94,18 @@ fn skeleton(root: &Path, issues: &mut Issues) -> Option<String> {
     found.then_some(text)
 }
 
-/// Loads the repository, resolves every image, then runs one command over the
-/// result. `arg` names the image `section` renders and the target `summary` and
-/// `sbom` answer about; the defaults otherwise.
-pub fn run(command: &str, arg: Option<&str>, root: &Path) -> Run {
-    let (target_arg, image_arg) = match command {
-        "summary" | "sbom" => (arg, None),
-        _ => (None, arg),
-    };
+/// Every manifest read and every image resolved, which is what any command
+/// beyond a name needs.
+pub(crate) struct Loaded {
+    list: List,
+    resolved: Vec<Resolved>,
+    disk: parse::disk::Disk,
+    workflows: Vec<(String, bool)>,
+    issues: Issues,
+    context: String,
+}
+
+pub(crate) fn load(root: &Path) -> Loaded {
     let (mut list, mut issues) = List::load(root);
     let context = context(&list, root);
 
@@ -128,6 +133,33 @@ pub fn run(command: &str, arg: Option<&str>, root: &Path) -> Run {
 
         resolved.push(Resolved { shipped, collected });
     }
+
+    Loaded {
+        list,
+        resolved,
+        disk,
+        workflows,
+        issues,
+        context,
+    }
+}
+
+/// Loads the repository, resolves every image, then runs one command over the
+/// result. `arg` names the image `section` renders and the target `summary` and
+/// `sbom` answer about; the defaults otherwise.
+pub fn run(command: &str, arg: Option<&str>, root: &Path) -> Run {
+    let (target_arg, image_arg) = match command {
+        "summary" | "sbom" => (arg, None),
+        _ => (None, arg),
+    };
+    let Loaded {
+        list,
+        resolved,
+        disk,
+        workflows,
+        mut issues,
+        context,
+    } = load(root);
 
     if let Some(unknown) = image_arg.filter(|id| !list.images.iter().any(|i| i.id == *id)) {
         let known: Vec<&str> = list.images.iter().map(|i| i.id.as_str()).collect();
