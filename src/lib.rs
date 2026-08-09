@@ -35,6 +35,8 @@ pub struct Run {
     pub context: String,
     pub images: usize,
     pub modules: usize,
+    /// Listed modules the base covers, which nothing builds.
+    pub suppressed: usize,
     pub flavours: usize,
 }
 
@@ -174,6 +176,7 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
         context,
         images: list.images.len(),
         modules: list.images.iter().map(|i| i.modules().count()).sum(),
+        suppressed: list.images.iter().map(|i| i.suppressed.len()).sum(),
         flavours: list.images.iter().map(|i| i.flavours.len()).sum(),
     }
 }
