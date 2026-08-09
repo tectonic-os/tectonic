@@ -1,0 +1,19 @@
+==== as generated
+==== edited by hand
+  x `generated/example` is not what this repository generates
+    ,-[generated/example:39:1]
+ 38 | # ---- image version ----
+ 39 | ARG IMAGE_VERSION=by-hand
+    : ^^^^^^^^^^^^|^^^^^^^^^^^^
+    :             `-- generated: ARG IMAGE_VERSION=dev
+ 40 | 
+    `----
+  help: run `tect generate` and commit what it writes
+
+==== gone, and one nobody claims
+  x `generated/example` is not there
+  help: run `tect generate` and commit what it writes
+
+  x nothing generates `generated/leftover`
+  help: delete it, or declare what it belongs to
+

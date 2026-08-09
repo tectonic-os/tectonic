@@ -17,8 +17,11 @@ usage: tect [--root <dir>] <command>
                     than deriving anything from a name
   section [image]   the generated Containerfile module section for an
                     image; the default image when none is given
-  generate          write the per-module build scripts the module layers
-                    run, under generated/, and list what was written
+  generate          write the Containerfile per image and the per-module
+                    build scripts, under generated/, and list what was
+                    written
+  verify            re-emit all of that and compare it against what is
+                    committed under generated/, naming what differs
   check             validate every manifest, printing what is wrong
 
 Inside a build layer, where the binary is mounted and there is no
@@ -213,10 +216,10 @@ fn main() -> ExitCode {
 
     let image_arg = match (command, rest.as_slice()) {
         ("plan", []) | ("plan", ["--json"]) => None,
-        ("check", []) | ("generate", []) => None,
+        ("check", []) | ("generate", []) | ("verify", []) => None,
         ("section", []) => None,
         ("section", [image]) => Some(*image),
-        ("plan" | "check" | "section" | "generate", _) => {
+        ("plan" | "check" | "section" | "generate" | "verify", _) => {
             return usage_error(format!("`{command}` does not take {}", rest.join(" ")))
         }
         (other, _) => return usage_error(format!("unknown command `{other}`")),
@@ -255,6 +258,9 @@ fn main() -> ExitCode {
             "tect: {} images, {} modules, {} flavours",
             run.images, run.modules, run.flavours
         );
+    }
+    if command == "verify" {
+        eprintln!("tect: {} generated files match", run.files.len());
     }
     ExitCode::SUCCESS
 }

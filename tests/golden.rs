@@ -58,6 +58,34 @@ fn init_repo() -> PathBuf {
     root
 }
 
+/// `verify` both ways: silent once the generated tree is what the tool emits,
+/// and naming what moved once it is not.
+fn verify(name: &str, root: &Path) {
+    std::env::set_current_dir(root).expect("fixture root exists");
+    let here = Path::new(".");
+    let run = tect::run("generate", None, here);
+    for (path, body) in &run.files {
+        std::fs::create_dir_all(path.parent().expect("a file under generated/")).unwrap();
+        std::fs::write(path, body).unwrap();
+    }
+    let issues = || tect::run("verify", None, here).issues.plain();
+
+    let mut out = format!("==== as generated\n{}", issues());
+
+    let containerfile = &run.files[0].0;
+    let edited = std::fs::read_to_string(containerfile)
+        .unwrap()
+        .replace("ARG IMAGE_VERSION=dev", "ARG IMAGE_VERSION=by-hand");
+    std::fs::write(containerfile, edited).unwrap();
+    out.push_str(&format!("==== edited by hand\n{}", issues()));
+
+    std::fs::remove_file(containerfile).unwrap();
+    std::fs::write("generated/leftover", "").unwrap();
+    out.push_str(&format!("==== gone, and one nobody claims\n{}", issues()));
+
+    compare(name, "verify.txt", &out);
+}
+
 /// The reference in docs/schema.md, re-rendered from the tables. The renderer
 /// is what checks that every marker names a schema and every schema is marked.
 #[test]
@@ -93,4 +121,5 @@ fn golden() {
         capture(&name, &dir.join(&name));
     }
     capture("init", &init);
+    verify("init", &init);
 }

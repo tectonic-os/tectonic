@@ -115,7 +115,7 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
     let skeleton = skeleton(root, &mut issues);
 
     let mut files: Vec<(PathBuf, String)> = Vec::new();
-    if command == "generate" {
+    if matches!(command, "generate" | "verify") {
         for (image, resolved) in list.images.iter().zip(&resolved) {
             if let Some(skeleton) = &skeleton {
                 let section =
@@ -131,6 +131,10 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
                 root,
             ));
         }
+    }
+
+    if command == "verify" {
+        verify(root, &files, &mut issues);
     }
 
     let stdout = match command {
@@ -160,4 +164,92 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
         modules: list.images.iter().map(|i| i.modules().count()).sum(),
         flavours: list.images.iter().map(|i| i.flavours.len()).sum(),
     }
+}
+
+/// What `generate` produced, against what is committed under `generated/`: an
+/// artifact that differs, one that is not there, and one nothing generates.
+fn verify(root: &Path, files: &[(PathBuf, String)], issues: &mut Issues) {
+    const HELP: &str = "run `tect generate` and commit what it writes";
+
+    for (path, generated) in files {
+        let name = path.display().to_string();
+        let Ok(found) = std::fs::read_to_string(root.join(path)) else {
+            issues.push(
+                Issue::new(format!("`{name}` is not there"), &Source::new(&name, "")).help(HELP),
+            );
+            continue;
+        };
+        if found == *generated {
+            continue;
+        }
+        let (span, line) = difference(&found, generated);
+        issues.push(
+            Issue::new(
+                format!("`{name}` is not what this repository generates"),
+                &Source::new(&name, found),
+            )
+            .at(span, line)
+            .help(HELP),
+        );
+    }
+
+    for path in tracked(&root.join("generated")) {
+        let Ok(path) = path.strip_prefix(root).map(Path::to_path_buf) else {
+            continue;
+        };
+        if files.iter().any(|(emitted, _)| *emitted == path) {
+            continue;
+        }
+        let name = path.display().to_string();
+        issues.push(
+            Issue::new(
+                format!("nothing generates `{name}`"),
+                &Source::new(&name, ""),
+            )
+            .help("delete it, or declare what it belongs to"),
+        );
+    }
+}
+
+/// The first line two texts differ on, as its span in `found` and what was
+/// generated in its place.
+fn difference(found: &str, generated: &str) -> (diag::Span, String) {
+    let mut offset = 0;
+    let mut theirs = found.lines();
+    let mut ours = generated.lines();
+    loop {
+        match (theirs.next(), ours.next()) {
+            (Some(a), Some(b)) if a == b => offset += a.len() + 1,
+            (a, b) => {
+                let span = diag::Span {
+                    offset,
+                    len: a.map_or(0, str::len),
+                };
+                let label = match b {
+                    Some(line) => format!("generated: {line}"),
+                    None => "generated: nothing, the file ends above".to_string(),
+                };
+                return (span, label);
+            }
+        }
+    }
+}
+
+/// Every file under `dir`, deepest last and sorted, so a run reports them in
+/// the same order twice.
+fn tracked(dir: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut paths: Vec<PathBuf> = entries.flatten().map(|e| e.path()).collect();
+    paths.sort();
+    let mut out = Vec::new();
+    for path in paths {
+        if path.is_dir() {
+            out.extend(tracked(&path));
+        } else {
+            out.push(path);
+        }
+    }
+    out
 }
