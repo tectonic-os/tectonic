@@ -46,13 +46,15 @@ This is the whole surface today. The rest of it is not built yet.
     tect check            validate every manifest, and say where and why
     tect generate         write the Containerfile per image, the per-module
                           build scripts and the graph, under generated/
+    tect build [target]   verify the build files, then build the image
     tect section [image]  the generated Containerfile module section
     tect graph [--format md|json]
                           the capability graph, as markdown holding a mermaid
                           diagram, or as JSON
 
-`tect plan --json` and `tect verify` are the build's, and `os-release`,
-`fetch` and `validate-image` run only inside a build layer. See
+`tect plan --json`, `verify`, `summary`, `sbom`, `fetch modules` and
+`registry` are the build's, and `os-release`, `fetch` and `validate-image` run
+only inside a build layer. See
 [the commands](docs/commands.md), which documents all of them, and how every
 command takes a flag for everything it needs.
 
