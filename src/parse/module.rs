@@ -212,7 +212,7 @@ impl Module {
                 )
                 .at(entry.span, "every module needs a manifest")
                 .help(match entry.remote {
-                    Some(_) => "run ./scripts/fetch-modules.sh to fetch what the image pins"
+                    Some(_) => "run ./scripts/tect.sh fetch modules to fetch what the image pins"
                         .to_string(),
                     None => format!(
                         "create {file}; modules/_template/module-name/module.kdl is a copy-me reference"

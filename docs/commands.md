@@ -143,6 +143,17 @@ The pinned payloads one target carries, as SPDX packages and the relationships
 that describe them. A scan of the built image cannot see where a downloaded
 asset came from, so this is merged into the SBOM the scan produces.
 
+### `fetch modules`
+
+Fetches every out-of-tree module the images pin, verifies it against the hash
+they pin it at, and puts it under `modules/.remote/` where the resolver looks
+for it. A tree already at its pin is left alone; one no image pins any more is
+removed. What each fetch hashed to is stamped under `out/`, so nothing under
+`modules/` is tool-written state.
+
+It reads the declarations rather than the resolved plan, so it runs before the
+modules it fetches can be read.
+
 ### `registry namespace` and `registry ref [--target T] [--tag X]`
 
 Where an image publishes. The namespace is `$IMAGE_REGISTRY`, which CI sets

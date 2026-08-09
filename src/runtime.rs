@@ -190,7 +190,7 @@ fn verified(url: &str, sha256: &str, dest: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn extract(url: &str, sha256: &str, dir: &Path, extra: &[&str]) -> Result<(), String> {
+pub(crate) fn extract(url: &str, sha256: &str, dir: &Path, extra: &[&str]) -> Result<(), String> {
     let archive = scratch(url);
     verified(url, sha256, &archive)?;
     fs::create_dir_all(dir).map_err(|err| format!("{}: {err}", dir.display()))?;

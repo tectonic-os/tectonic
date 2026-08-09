@@ -3,6 +3,7 @@
 pub mod create;
 pub mod diag;
 pub mod emit;
+pub mod fetch;
 pub mod import;
 pub mod init;
 pub mod model;
@@ -142,11 +143,8 @@ pub fn run(command: &str, arg: Option<&str>, root: &Path) -> Run {
     let targets: Vec<String> = list.targets().iter().map(Target::to_string).collect();
     if let Some(unknown) = target_arg.filter(|name| !targets.iter().any(|have| have == name)) {
         issues.push(
-            Issue::new(
-                format!("`{unknown}` is not a build target"),
-                &list.repo_src,
-            )
-            .help(format!("targets: {}", targets.join(", "))),
+            Issue::new(format!("`{unknown}` is not a build target"), &list.repo_src)
+                .help(format!("targets: {}", targets.join(", "))),
         );
     }
     let target = target_arg

@@ -88,7 +88,7 @@ jobs:
               | [.name, .dir, .ref, .sha256, .url, (.path // ""), .file] | join("|")')
           fi
 
-          ./scripts/fetch-modules.sh
+          ./scripts/tect.sh fetch modules
           while IFS='|' read -r module name file version pinned from url; do
             grep -qxF "$file" <<< "$changed" || continue
             [ -n "$pinned" ] || continue

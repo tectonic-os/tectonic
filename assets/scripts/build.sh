@@ -177,7 +177,7 @@ fi
 
 # ---- the Containerfile the build actually uses ---------------------------
 # Never regenerated here: a build proves the committed files are current.
-./scripts/fetch-modules.sh
+./scripts/tect.sh fetch modules
 ./scripts/tect.sh verify
 
 # The `tect` stage copies this, and every layer mounts it from there.

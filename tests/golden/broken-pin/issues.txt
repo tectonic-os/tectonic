@@ -71,5 +71,5 @@
     :            `-- every module needs a manifest
  11 |             source "http://example.com/modules.zip" {
     `----
-  help: run ./scripts/fetch-modules.sh to fetch what the image pins
+  help: run ./scripts/tect.sh fetch modules to fetch what the image pins
 

@@ -78,7 +78,7 @@ jobs:
                 echo "expected 'ARG KERNEL=${from}' in ${part_file}" >&2
                 exit 1
               fi
-              ./scripts/fetch-modules.sh
+              ./scripts/tect.sh fetch modules
               ./scripts/tect.sh generate
               git commit -am "$title"
               git push -f origin "$branch"

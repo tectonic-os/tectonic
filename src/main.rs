@@ -259,6 +259,19 @@ fn run() -> Result<ExitCode, String> {
         return Ok(ExitCode::SUCCESS);
     }
 
+    if let ["fetch", "modules"] = words.as_slice() {
+        only(&given, &["root"], "fetch modules")?;
+        let root = repo_root(root_arg)?;
+        let (list, issues, context) = tect::declarations(&root);
+        if issues.report(&context) {
+            return Ok(ExitCode::from(REPO_ERROR));
+        }
+        for line in tect::fetch::modules(&root, &list)? {
+            eprintln!("tect: {line}");
+        }
+        return Ok(ExitCode::SUCCESS);
+    }
+
     // The build-layer commands read the image around them, not a repository.
     let in_layer = match words.as_slice() {
         ["os-release"] => Some(tect::runtime::os_release()),
