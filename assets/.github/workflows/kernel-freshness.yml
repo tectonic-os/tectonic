@@ -3,8 +3,7 @@ name: Kernel freshness
 
 on:
   schedule:
-    - cron: '15 9 * * *'  # daily freshness check
-    - cron: '45 9 1 * *'  # monthly stock-kernel fallback validation build
+    - cron: '15 9 * * *'
   workflow_dispatch:
 
 env:
@@ -18,7 +17,6 @@ permissions:
 
 jobs:
   check:
-    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '15 9 * * *'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -132,10 +130,3 @@ jobs:
                 ;;
             esac
           done
-
-  stock-rot-check:
-    if: github.event.schedule == '45 9 1 * *'
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Dispatch stock-kernel validation build
-        run: gh workflow run build.yml --ref main -f kernel=stock -R "$GITHUB_REPOSITORY"
