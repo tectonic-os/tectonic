@@ -16,8 +16,8 @@ does, once, and the shell that runs inside a layer is handed the result.
     workstation.kdl       one image, and every root .kdl but repo.kdl is one
     modules/<path>/       one module apiece, each with a module.kdl
 
-`tect create repo` writes that tree, along with the build scripts, the build
-phases, the disk config and the workflows, which the tool ships and a
+`tect create repo` writes that tree, along with the build scripts, the shell
+helpers, the disk config and the workflows, which the tool ships and a
 repository does not carry.
 
 See [the schema](docs/schema.md), which documents

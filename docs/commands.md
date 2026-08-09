@@ -28,7 +28,7 @@ its absence under `--no-tui` means no.
 ### `create repo [name]`
 
 Writes a new repository: `repo.kdl`, the module directory, and the build
-scripts, build phases, disk config and workflows the tool ships and a
+scripts, shell helpers, disk config and workflows the tool ships and a
 repository does not carry. Into `--root`, else a directory named for the
 repository.
 
