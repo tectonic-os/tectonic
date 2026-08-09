@@ -7,11 +7,12 @@ use crate::parse::disk::Disk;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-/// One contribution, as the file in the contributor's directory and the path
-/// its layer stages that file at.
+/// One contribution, as the file in the contributor's directory, the path its
+/// layer stages that file at, and the destination it is assembled into.
 pub struct Collected {
     pub file: String,
     pub staged: String,
+    pub into: String,
 }
 
 /// Every contribution, and every destination assembled from them.
@@ -19,9 +20,12 @@ pub struct Collected {
 pub struct Collection {
     /// Contributor module path to what its layer stages.
     pub by_module: BTreeMap<String, Vec<Collected>>,
-    /// Every destination the finalize phase assembles, sorted so two runs on
-    /// the same tree emit the same ARG.
+    /// Every declared destination, sorted so two runs on the same tree emit
+    /// the same plan.
     pub destinations: Vec<String>,
+    /// Each destination and the staged parts it is assembled from, ordered by
+    /// the priority each contribution declared rather than by build order.
+    pub assembled: BTreeMap<String, Vec<String>>,
 }
 
 pub fn resolve_collects(
@@ -96,6 +100,7 @@ pub fn resolve_collects(
                         .push(Collected {
                             file: file.clone(),
                             staged: staged(&into, priority, &module.path),
+                            into,
                         });
                 }
                 None => issues.push(
@@ -113,6 +118,20 @@ pub fn resolve_collects(
             }
         }
     }
+
+    let mut assembled: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for collected in out.by_module.values().flatten() {
+        assembled
+            .entry(collected.into.clone())
+            .or_default()
+            .push(collected.staged.clone());
+    }
+    // The staged name carries the declared priority, so sorting it is the
+    // declared order and nothing downstream has to know the build order.
+    for parts in assembled.values_mut() {
+        parts.sort();
+    }
+    out.assembled = assembled;
     out
 }
 
