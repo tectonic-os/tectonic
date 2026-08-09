@@ -139,7 +139,7 @@ jobs:
           {
             echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}"
             echo "IMAGE_NAME=$(jq -r '.published' "$TARGET_PLAN")"
-            echo "CONTAINERFILE=containerfiles/$(jq -r '.image' "$TARGET_PLAN").generated"
+            echo "CONTAINERFILE=generated/$(jq -r '.image' "$TARGET_PLAN")"
             echo "RECHUNK=$(jq -r '.base.provides | index("rechunking") != null' "$IMAGE_PLAN")"
           } >> "${GITHUB_ENV}"
           if [ "${{ github.event_name }}" != "pull_request" ] \

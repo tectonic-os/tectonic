@@ -125,7 +125,7 @@ image="$(jq -r '.image' <<< "$resolved")"
 published="$(jq -r '.published' <<< "$resolved")"
 flavour_arg="$(jq -r '.flavour // ""' <<< "$resolved")"
 
-containerfile="containerfiles/${image}.generated"
+containerfile="generated/${image}"
 
 image_version="${IMAGE_VERSION:-$(date -u +%Y%m%d)}"
 
@@ -179,7 +179,7 @@ fi
 ./scripts/gen-containerfile.sh
 
 # The `tect` stage copies this, and every layer mounts it from there.
-install -D -m755 "$(./scripts/tect.sh --path)" build/tect
+install -D -m755 "$(./scripts/tect.sh --path)" out/tect
 
 build_args=(
     "FLAVOUR=${flavour_arg}"

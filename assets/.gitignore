@@ -1,7 +1,4 @@
 cosign.key
 MOK.priv
-_build_*
-output
-_build-*/**
-build/
+out/
 modules/.remote/

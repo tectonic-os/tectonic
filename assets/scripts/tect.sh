@@ -10,14 +10,14 @@ die() {
     exit 1
 }
 
-bin="${TECT_BIN:-build/tect-${version}}"
+bin="${TECT_BIN:-out/tect-${version}}"
 
 if [ ! -x "$bin" ]; then
     asset="tect-v${version}-x86_64-linux-musl.tar.gz"
     url="https://github.com/tectonic-os/tectonic/releases/download/v${version}/${asset}"
 
-    mkdir -p build
-    tmp="$(mktemp -d -p build download.XXXXXXXX)"
+    mkdir -p out
+    tmp="$(mktemp -d -p out download.XXXXXXXX)"
     trap 'rm -rf "$tmp"' EXIT
 
     curl -fsSL --retry 3 -o "${tmp}/${asset}" "$url" \

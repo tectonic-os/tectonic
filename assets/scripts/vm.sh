@@ -11,7 +11,7 @@ usage() {
     cat >&2 << 'EOF'
 usage: scripts/vm.sh <command> <qcow2|raw|iso> [options]
 
-  build     convert the container image into a disk image under output/
+  build     convert the container image into a disk image under out/
   run       boot that disk image under qemu, building it if it is missing
   spawn     boot it with systemd-vmspawn instead (qcow2 or raw)
 
@@ -86,8 +86,8 @@ done
 image="${image:-localhost/$(./scripts/tect.sh plan --json | jq -r .ungated_published)}"
 ref="${image}:${tag}"
 
-image_file="output/${type}/disk.${type}"
-[ "$type" != iso ] || image_file="output/bootiso/install.iso"
+image_file="out/${type}/disk.${type}"
+[ "$type" != iso ] || image_file="out/bootiso/install.iso"
 
 sudoif() {
     if [ "${UID}" -eq 0 ]; then
@@ -112,7 +112,8 @@ load_rootful() {
     mine="$(podman images --filter reference="$ref" --format '{{.ID}}')"
     theirs="$(sudoif podman images --filter reference="$ref" --format '{{.ID}}')"
     [ "$mine" != "$theirs" ] || return 0
-    tmp="$(mktemp -p "$PWD" -d _build_scp.XXXXXXXX)"
+    mkdir -p out
+    tmp="$(mktemp -p "${PWD}/out" -d scp.XXXXXXXX)"
     sudoif env "TMPDIR=${tmp}" podman image scp \
         "${UID}@localhost::${ref}" "root@localhost::${ref}"
     rm -rf "$tmp"
@@ -125,7 +126,8 @@ build_disk() {
         config="$(./scripts/render-iso-config.sh "${args[@]}")"
     fi
     load_rootful
-    tmp="$(mktemp -p "$PWD" -d _build_bib.XXXXXXXX)"
+    mkdir -p out
+    tmp="$(mktemp -p "${PWD}/out" -d bib.XXXXXXXX)"
     sudoif podman run \
         --rm -it --privileged --pull=newer --net=host \
         --security-opt label=type:unconfined_t \
@@ -134,10 +136,9 @@ build_disk() {
         -v /var/lib/containers/storage:/var/lib/containers/storage \
         "${BIB_IMAGE:-quay.io/centos-bootc/bootc-image-builder:latest}" \
         --type "$type" --use-librepo=True --rootfs=btrfs "$ref"
-    mkdir -p output
-    sudoif mv -f "$tmp"/* output/
+    sudoif mv -f "$tmp"/* out/
     sudoif rmdir "$tmp"
-    sudoif chown -R "$(id -u):$(id -g)" output/
+    sudoif chown -R "$(id -u):$(id -g)" out/
 }
 
 run_qemu() {

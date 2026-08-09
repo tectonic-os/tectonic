@@ -35,33 +35,16 @@ echo "lint: ${#scripts[@]} scripts pass shellcheck and shfmt"
 ./scripts/tect.sh check
 
 ./scripts/gen-containerfile.sh > /dev/null
-mapfile -t generated < <(./scripts/tect.sh plan --json \
-    | jq -r '.images[] | "containerfiles/\(.id).generated"')
+./scripts/render-iso-config.sh > /dev/null
+
 if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
-    echo "lint: the Containerfiles generate (no checkout, so no drift check)"
+    echo "lint: the build files generate (no checkout, so no drift check)"
 else
-    for file in "${generated[@]}"; do
-        if ! git ls-files --error-unmatch "$file" > /dev/null 2>&1; then
-            echo "lint: ${file} is untracked, so nothing reviews it" >&2
-            exit 1
-        elif ! git diff --quiet -- "$file"; then
-            echo "lint: ${file} is stale, stage the regenerated file" >&2
-            git --no-pager diff --stat -- "$file" >&2
-            exit 1
-        fi
-    done
-
-    while IFS= read -r file; do
-        [ -n "$file" ] || continue
-        for want in "${generated[@]}"; do
-            [ "$file" != "$want" ] || continue 2
-        done
-        echo "lint: ${file} belongs to no declared image, remove it" >&2
+    drift="$(git status --porcelain -- generated)"
+    if [ -n "$drift" ]; then
+        echo "lint: generated/ does not match what the tree generates, stage it" >&2
+        printf '%s\n' "$drift" >&2
         exit 1
-    done < <(git ls-files 'containerfiles/*.generated')
-
-    echo "lint: ${#generated[@]} Containerfile(s) generate and match the committed ones"
+    fi
+    echo "lint: generated/ matches the committed files"
 fi
-
-IMAGE_REGISTRY=lint.invalid ./scripts/render-iso-config.sh > /dev/null
-echo "lint: installer config renders"

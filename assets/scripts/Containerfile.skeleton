@@ -5,7 +5,7 @@ COPY lib/ /lib/
 COPY modules/ /modules/
 
 FROM scratch AS tect
-COPY build/tect /tect
+COPY out/tect /tect
 
 # ---- BEGIN GENERATED (build phases and modules; see scripts/gen-containerfile.sh) ----
 # ---- END GENERATED ----

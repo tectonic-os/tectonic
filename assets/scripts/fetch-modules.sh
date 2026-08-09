@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 remote_root="modules/.remote"
-stamp_root="build/remote-modules"
+stamp_root="out/remote-modules"
 
 die() {
     echo "fetch-modules: $*" >&2
@@ -46,8 +46,8 @@ for pin in "${pins[@]}"; do
         continue
     fi
 
-    mkdir -p build
-    tmp="$(mktemp -d build/fetch-module.XXXXXX)"
+    mkdir -p out
+    tmp="$(mktemp -d out/fetch-module.XXXXXX)"
     ./scripts/tect.sh fetch tree "$url" "$sha256" "$tmp" --strip-components=1
 
     src="$tmp"
