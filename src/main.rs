@@ -3,6 +3,7 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use tect::prompt::Prompt;
+use tect::ui::Choice;
 
 const HEAD: &str = "usage: tect [--root <dir>] <command>\n";
 
@@ -144,8 +145,9 @@ fn import(
         many => {
             let owners: Vec<String> = many.iter().map(|f| f.owner.clone()).collect();
             let listed = owners.join(", ");
+            let options: Vec<Choice> = owners.iter().map(|owner| Choice::new(owner, "")).collect();
             let chosen = prompt
-                .choose(&format!("`{module}` is in {listed}; which one"), &owners)?
+                .choose(&format!("`{module}` is in {listed}; which one"), &options)?
                 .ok_or_else(|| {
                     format!(
                         "`{module}` is in {listed}; name which one, as `{}/{module}`",

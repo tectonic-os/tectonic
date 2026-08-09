@@ -3,6 +3,7 @@
 //! writing an image of its own.
 
 use crate::prompt::Prompt;
+use crate::ui::Choice;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -159,6 +160,11 @@ pub fn add_to_image(
 ) -> Result<(), String> {
     let (list, _) = crate::model::image::List::load(root);
     let ids: Vec<String> = list.images.iter().map(|image| image.id.clone()).collect();
+    let options: Vec<Choice> = list
+        .images
+        .iter()
+        .map(|image| Choice::new(&image.id, &image.name))
+        .collect();
     if ids.is_empty() {
         println!("no image lists it yet; `tect create image <name>` writes one");
         return Ok(());
@@ -171,7 +177,7 @@ pub fn add_to_image(
                 ids.join(", ")
             )
         })?),
-        None => prompt.choose("list it in an image", &ids)?,
+        None => prompt.choose("list it in an image", &options)?,
     };
     let Some(chosen) = chosen else {
         println!("next, to build it, list it in an image:\n\x20 module \"{path}\"");
