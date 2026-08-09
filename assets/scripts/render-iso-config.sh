@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 template=disk_config/iso.template.toml
-out=generated/iso.toml
+out=out/iso.toml
 
 die() {
     echo "render-iso-config: $*" >&2
