@@ -3,7 +3,7 @@
 use crate::diag::{Issue, Issues, Source, Span};
 use crate::model::image::{is_flavour_name, Base, Decl, Entry, Flavour, Image, List, NO_FLAVOUR};
 use crate::model::remote::{Remote, REMOTE_DIR};
-use crate::parse::schema::{check, Arg, Kind, Node, Prop, Say};
+use crate::parse::schema::{Arg, Kind, Node, Prop, Say};
 use crate::parse::{bool_arg, child, flag, kids, options, prop, remote};
 use crate::parse::{string_arg, string_args, text};
 use kdl::KdlNode;
@@ -18,7 +18,8 @@ const ENTRY: Node = Node::new("module", "One module the image is made of, named 
     .props(&[
         Prop { name: "variant", kind: Kind::Str,
             desc: "Which of the module's declared variants this image builds.",
-            say: Say::new("`variant` must be a string", "not a string", "") },
+            say: Say::new("`variant` must be a string", "not a string", ""),
+            missing: Say::NONE },
     ], Say::new("unknown module property `{}`", "not part of the schema",
         "a list entry accepts `variant`; options are set as child nodes"))
     .children(&[
@@ -93,11 +94,13 @@ pub const IMAGE: Node = Node::new("image",
                     .props(&[
                         Prop { name: "default", kind: Kind::Bool,
                             desc: "Whether a build that names no flavour builds this one.",
-                            say: Say::new("`{}` must be #true or #false", "not a boolean", "") },
+                            say: Say::new("`{}` must be #true or #false", "not a boolean", ""),
+                            missing: Say::NONE },
                         Prop { name: "pr-build", kind: Kind::Bool,
                             desc: "Whether a pull request builds this flavour rather than the \
                                    default.",
-                            say: Say::new("`{}` must be #true or #false", "not a boolean", "") },
+                            say: Say::new("`{}` must be #true or #false", "not a boolean", ""),
+                            missing: Say::NONE },
                     ], Say::new("unknown flavour property `{}`", "not part of the schema",
                         "a flavour accepts `default` and `pr-build`")),
             ], Say::NONE),
@@ -142,8 +145,6 @@ fn decls(node: &KdlNode, name: &str) -> Vec<Decl> {
 
 impl List {
     pub(super) fn parse_image(&mut self, node: &KdlNode, src: &Source, issues: &mut Issues) {
-        check(node, &IMAGE, src, issues);
-
         let mut image = Image {
             src: src.clone(),
             id: text(node, "id"),
@@ -401,6 +402,7 @@ impl Image {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parse::schema::check;
     use kdl::KdlDocument;
 
     fn messages(text: &str) -> Vec<String> {

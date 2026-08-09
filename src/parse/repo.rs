@@ -2,9 +2,62 @@
 
 use crate::diag::{Issue, Issues, Source, Span};
 use crate::model::image::{List, WorkflowToggle, REPO_FILE, SCHEMA_VERSION};
-use crate::parse::{string_arg, syntax_issue};
+use crate::parse::image::IMAGE;
+use crate::parse::schema::{check_doc, Arg, Kind, Node, Prop, Say};
+use crate::parse::{boolean, int_arg, kids, string_arg, syntax_issue};
 use kdl::{KdlDocument, KdlNode};
 use std::path::Path;
+
+/// repo.kdl's grammar, and the whole of it.
+#[rustfmt::skip]
+pub const REPO: Node = Node::new("repo",
+    "What is true of the repository rather than of any image in it.")
+    .children(&[
+        Node::new("schema-version",
+            "The schema release this repository is written against, which picks the reader.")
+            .arg(Arg::Int, Say::new("`{}` needs a number", "not a version", "`schema-version 1`"))
+            .once(""),
+        Node::new("default-image", "The image a build that names no target builds.")
+            .arg(Arg::Str, Say::new("`{}` needs an image name", "no image given",
+                "`default-image \"workstation\"`, naming one of the images declared at the root"))
+            .once(""),
+        Node::new("pr-image", "The image a pull request builds.")
+            .arg(Arg::Str, Say::new("`{}` needs an image name", "no image given",
+                "`pr-image \"workstation\"`, since a pull request builds one target"))
+            .once(""),
+        Node::new("workflows",
+            "The shipped workflows this repository turns off, named by file stem.")
+            .once("a second block would split one set of toggles in two")
+            .empty(Say::new("`workflows` has no workflows in it", "empty block",
+                "omit the block entirely; every workflow in .github/workflows/ runs unless \
+                 something here says otherwise"))
+            .children(&[
+                Node::new("", "One workflow, named by the node, and whether it runs.")
+                    .arg(Arg::None, Say::new("a workflow takes no arguments", "unexpected value",
+                        "the file stem is the node name: `smoke-test enabled=#false`"))
+                    .props(&[
+                        Prop { name: "enabled", kind: Kind::Bool,
+                            desc: "Whether the workflow runs at all.",
+                            say: Say::new("`{}` must be #true or #false", "not a boolean", ""),
+                            missing: Say::new("`{}` says nothing about whether it runs",
+                                "no `enabled`",
+                                "`{} enabled=#false` turns it off; a workflow nobody wants to \
+                                 change belongs outside this block") },
+                    ], Say::new("unknown workflow property `{}`", "not part of the schema",
+                        "a workflow accepts `enabled`")),
+            ], Say::NONE),
+    ], Say::new("unknown node `{}` in repo.kdl", "not part of the schema",
+        "repo.kdl holds `schema-version`, `default-image`, `pr-image` and a `workflows` block: \
+         what is true of the repository rather than of any image in it. An image goes in a file \
+         of its own"));
+
+/// Every other root `.kdl`, which is one image and nothing else.
+#[rustfmt::skip]
+const IMAGE_FILE: Node = Node::new("image file", "One image, in a file of its own.")
+    .children(&[IMAGE], Say::new("unknown top-level node `{}`", "not part of the schema",
+        "every root .kdl but repo.kdl is one `image` node; `base`, `flavours` and `modules` are \
+         declared inside it, because they are what the image is rather than what the repository \
+         is"));
 
 /// Everything one schema version's grammar produces.
 type Reader = fn(&Path) -> (List, Issues);
@@ -31,12 +84,7 @@ fn declared_version(root: &Path) -> Option<(i128, Span, Source)> {
         .nodes()
         .iter()
         .find(|n| n.name().value() == "schema-version")?;
-    let version = node
-        .entries()
-        .iter()
-        .find(|e| e.name().is_none())?
-        .value()
-        .as_integer()?;
+    let version = int_arg(node)?;
     let src = Source::new(path.display().to_string(), text);
     Some((version, node.name().span().into(), src))
 }
@@ -157,6 +205,8 @@ impl List {
             }
         };
 
+        check_doc(&doc, if is_repo { &REPO } else { &IMAGE_FILE }, src, issues);
+
         for node in doc.nodes() {
             match (is_repo, node.name().value()) {
                 (false, "image") => self.parse_image(node, src, issues),
@@ -167,25 +217,11 @@ impl List {
                 (true, "pr-image") => {
                     self.pr_image_id = string_arg(node).map(str::to_string);
                 }
-                (true, "schema-version") => self.parse_schema_version(node, src, issues),
-                (true, other) => issues.push(
-                    Issue::new(format!("unknown node `{other}` in {REPO_FILE}"), src)
-                        .at(node.name().span(), "not part of the schema")
-                        .help(
-                            "repo.kdl holds `schema-version`, `default-image`, `pr-image` \
-                             and a `workflows` block: what is true of the repository rather \
-                             than of any image in it. An image goes in a file of its own",
-                        ),
-                ),
-                (false, other) => issues.push(
-                    Issue::new(format!("unknown top-level node `{other}`"), src)
-                        .at(node.name().span(), "not part of the schema")
-                        .help(format!(
-                            "every root .kdl but {REPO_FILE} is one `image` node; `base`, \
-                             `flavours` and `modules` are declared inside it, because they \
-                             are what the image is rather than what the repository is"
-                        )),
-                ),
+                (true, "schema-version") => {
+                    self.schema_version_seen = true;
+                    self.schema_version = int_arg(node).map(|_| SCHEMA_VERSION);
+                }
+                _ => {}
             }
         }
 
@@ -197,25 +233,6 @@ impl List {
                      and what it publishes as"
                 )),
             );
-        }
-    }
-
-    /// A version this reader does not know never reaches it: `load` picks the
-    /// reader from the same node first.
-    fn parse_schema_version(&mut self, node: &KdlNode, src: &Source, issues: &mut Issues) {
-        self.schema_version_seen = true;
-        let declared = node
-            .entries()
-            .iter()
-            .find(|e| e.name().is_none())
-            .and_then(|e| e.value().as_integer());
-        match declared {
-            Some(_) => self.schema_version = Some(SCHEMA_VERSION),
-            None => issues.push(
-                Issue::new("`schema-version` needs a number", src)
-                    .at(node.name().span(), "not a version")
-                    .help(format!("`schema-version {SCHEMA_VERSION}`")),
-            ),
         }
     }
 
@@ -323,16 +340,7 @@ impl List {
     /// `workflows { smoke-test enabled=#false }` Each child names a workflow
     /// by its file stem.
     fn parse_workflows(&mut self, block: &KdlNode, src: &Source, issues: &mut Issues) {
-        let Some(children) = block.children() else {
-            issues.push(
-                Issue::new("`workflows` has no workflows in it", src)
-                    .at(block.name().span(), "empty block")
-                    .help("omit the block entirely; every workflow in .github/workflows/ runs unless something here says otherwise"),
-            );
-            return;
-        };
-
-        for node in children.nodes() {
+        for node in kids(block) {
             let name = node.name().value().to_string();
             let span: Span = node.name().span().into();
 
@@ -346,57 +354,71 @@ impl List {
                 continue;
             }
 
-            let mut enabled: Option<bool> = None;
-            let mut stated = false;
-            for entry in node.entries() {
-                let Some(key) = entry.name().map(|n| n.value()) else {
-                    issues.push(
-                        Issue::new("a workflow takes no arguments", src)
-                            .at(entry.span(), "unexpected value")
-                            .help("the file stem is the node name: `smoke-test enabled=#false`"),
-                    );
-                    continue;
-                };
-                match key {
-                    "enabled" => {
-                        stated = true;
-                        match entry.value().as_bool() {
-                            Some(v) => enabled = Some(v),
-                            None => issues.push(
-                                Issue::new("`enabled` must be #true or #false", src)
-                                    .at(entry.span(), "not a boolean"),
-                            ),
-                        }
-                    }
-                    other => issues.push(
-                        Issue::new(format!("unknown workflow property `{other}`"), src)
-                            .at(entry.span(), "not part of the schema")
-                            .help("a workflow accepts `enabled`"),
-                    ),
-                }
+            if let Some(enabled) = boolean(node, "enabled") {
+                self.workflows.push(WorkflowToggle {
+                    name,
+                    enabled,
+                    span,
+                });
             }
-
-            let Some(enabled) = enabled else {
-                if !stated {
-                    issues.push(
-                        Issue::new(
-                            format!("`{name}` says nothing about whether it runs"),
-                            src,
-                        )
-                        .at(span, "no `enabled`")
-                        .help(format!(
-                            "`{name} enabled=#false` turns it off; a workflow nobody wants to change belongs outside this block"
-                        )),
-                    );
-                }
-                continue;
-            };
-
-            self.workflows.push(WorkflowToggle {
-                name,
-                enabled,
-                span,
-            });
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn messages(text: &str) -> Vec<String> {
+        let doc: KdlDocument = text.parse().expect("valid KDL");
+        let src = Source::new(REPO_FILE, text);
+        let mut issues = Issues::default();
+        check_doc(&doc, &REPO, &src, &mut issues);
+        issues
+            .plain()
+            .lines()
+            .filter_map(|line| line.strip_prefix("  x "))
+            .map(str::to_string)
+            .collect()
+    }
+
+    /// Every shape the golden corpus has no broken fixture for.
+    #[test]
+    fn the_table_catches_what_the_corpus_does_not() {
+        let found = messages(
+            r#"
+schema-version
+schema-version 1
+default-image
+pr-image
+workflows {
+    smoke-test "on" trigger="push"
+    build enabled="yes"
+    lint
+}
+colour "blue"
+"#,
+        );
+        assert_eq!(
+            found,
+            [
+                "`schema-version` needs a number",
+                "`schema-version` is declared twice",
+                "`default-image` needs an image name",
+                "`pr-image` needs an image name",
+                "a workflow takes no arguments",
+                "unknown workflow property `trigger`",
+                "`smoke-test` says nothing about whether it runs",
+                "`enabled` must be #true or #false",
+                "`lint` says nothing about whether it runs",
+                "unknown node `colour` in repo.kdl",
+            ]
+        );
+    }
+
+    #[test]
+    fn an_empty_workflows_block_is_a_block_with_nothing_in_it() {
+        let found = messages("schema-version 1\nworkflows { }\n");
+        assert_eq!(found, ["`workflows` has no workflows in it"]);
     }
 }

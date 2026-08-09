@@ -3,7 +3,7 @@
 //! document does not match. Meaning stays in `resolve`.
 
 use crate::diag::{Issue, Issues, Source, Span};
-use crate::parse::{bool_arg, kids, string_arg, string_args};
+use crate::parse::{bool_arg, int_arg, kids, string_arg, string_args};
 use kdl::{KdlDocument, KdlNode};
 
 /// One thing the shape has to say. `{}` stands for the name or value it is
@@ -43,6 +43,7 @@ pub enum Arg {
     None,
     Str,
     Bool,
+    Int,
     /// Every positional string, as the list it looks like.
     Strs,
 }
@@ -63,6 +64,8 @@ pub struct Prop {
     pub kind: Kind,
     /// When the value is not of `kind`.
     pub say: Say,
+    /// When the node carries no such entry at all.
+    pub missing: Say,
 }
 
 /// One node in the grammar. A node named `""` inside `children` matches any
@@ -174,6 +177,11 @@ pub fn check(node: &KdlNode, schema: &Node, src: &Source, issues: &mut Issues) {
                 schema.arg_say.raise(schema.name, here, src, issues);
             }
         }
+        Arg::Int => {
+            if int_arg(node).is_none() {
+                schema.arg_say.raise(schema.name, here, src, issues);
+            }
+        }
         Arg::Strs => {
             if string_args(node).is_empty() {
                 schema.arg_say.raise(schema.name, here, src, issues);
@@ -197,11 +205,28 @@ pub fn check(node: &KdlNode, schema: &Node, src: &Source, issues: &mut Issues) {
                     Kind::One(set) => entry.value().as_string().is_some_and(|v| set.contains(&v)),
                 };
                 if !ok {
-                    prop.say.raise(key, entry.span(), src, issues);
+                    // A closed set is about the value, which is the thing not in it.
+                    let about = match prop.kind {
+                        Kind::One(_) => entry.value().as_string().unwrap_or(key),
+                        _ => key,
+                    };
+                    prop.say.raise(about, entry.span(), src, issues);
                 }
             }
             None => schema.prop_say.raise(key, entry.span(), src, issues),
         }
+    }
+
+    for prop in schema.props {
+        if prop.missing.silent()
+            || node
+                .entries()
+                .iter()
+                .any(|e| e.name().map(|n| n.value()) == Some(prop.name))
+        {
+            continue;
+        }
+        prop.missing.raise(node.name().value(), here, src, issues);
     }
 
     walk(kids(node), schema, here, src, issues);

@@ -16,7 +16,8 @@ pub const OPTION: Node = Node::new("option",
     .props(&[
         Prop { name: "type", kind: Kind::Str,
             desc: "What the option holds: string, bool or list.",
-            say: Say::NONE },
+            say: Say::NONE,
+            missing: Say::NONE },
     ], Say::new("unknown option property `{}`", "not part of the schema",
         "an option carries `type`, and everything else as child nodes"))
     .children(&[
