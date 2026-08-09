@@ -1,5 +1,6 @@
 //! The only reader of the image files and the per-module module.kdl files.
 
+pub mod base;
 pub mod build;
 pub mod create;
 pub mod diag;
