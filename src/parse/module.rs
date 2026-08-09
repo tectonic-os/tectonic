@@ -5,7 +5,7 @@ use crate::model::image::{Entry, Image, List};
 use crate::model::module::{Collect, Contribution, Decl, Module, PackageGroup, VerifyException};
 use crate::model::remote::REMOTE_DIR;
 use crate::parse::disk::Disk;
-use crate::parse::{asset, options, string_args, syntax_issue};
+use crate::parse::{asset, options, prop, string_args, syntax_issue};
 use crate::resolve::options as resolve_options;
 use crate::runtime::{class_names, VERIFY_CLASSES};
 use kdl::{KdlDocument, KdlNode};
@@ -61,13 +61,6 @@ fn priority(node: &KdlNode, src: &Source, issues: &mut Issues) -> Priority {
             Priority::Invalid
         }
     }
-}
-
-fn prop<'a>(node: &'a KdlNode, key: &str) -> Option<&'a str> {
-    node.entries()
-        .iter()
-        .find(|e| e.name().map(|n| n.value()) == Some(key))
-        .and_then(|e| e.value().as_string())
 }
 
 impl Module {
