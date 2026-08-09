@@ -21,6 +21,8 @@ const IN_REPO: &str = "\
                       copy a module in from a collection repo.kdl declares,
                       choosing from what they hold, and offer to list it in an
                       image
+  create cosign-key   generate the keypair the images this repository publishes
+                      are signed with
   create mok-key      generate the secure boot key the kernel modules it builds
                       are signed with
   check               read every manifest and say what is wrong with it
@@ -329,6 +331,15 @@ fn run() -> Result<ExitCode, String> {
             tect::create::module(&root, name, pkgs, with, image_arg, &prompt)?;
             return Ok(ExitCode::SUCCESS);
         }
+        ["create", "cosign-key"] => {
+            only(&given, &["root", "module"], "create cosign-key")?;
+            let root = repo_root(root_arg)?;
+            if refused(&root) {
+                return Ok(ExitCode::from(REPO_ERROR));
+            }
+            tect::key::cosign(&root, module_arg, &prompt)?;
+            return Ok(ExitCode::SUCCESS);
+        }
         ["create", "mok-key"] => {
             only(&given, &["root", "module", "cn"], "create mok-key")?;
             let root = repo_root(root_arg)?;
@@ -394,8 +405,8 @@ fn run() -> Result<ExitCode, String> {
         ["registry", ..] => return Err("`registry` takes `namespace` or `ref`".into()),
         ["create", ..] => {
             return Err(
-                "`create` takes `repo <name>`, `image <name>`, `module <name>` \
-                    or `mok-key`"
+                "`create` takes `repo <name>`, `image <name>`, `module <name>`, \
+                        `cosign-key` or `mok-key`"
                     .into(),
             )
         }
