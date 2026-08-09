@@ -1,0 +1,52 @@
+{
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package-asset-core-pins-tracked-and-manual",
+      "name": "tracked-and-manual",
+      "downloadLocation": "https://example.com/download/v1.0.0/tool.tar.gz",
+      "filesAnalyzed": false,
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "NOTHEX"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "copyrightText": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "comment": "Pinned build input, declared by the core/pins module",
+      "versionInfo": "1.0.0"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-asset-core-pins-no-tracking",
+      "name": "no-tracking",
+      "downloadLocation": "https://example.com/download/v{tag}/tool.tar.gz; rm -rf /",
+      "filesAnalyzed": false,
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": ""
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "copyrightText": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "comment": "Pinned build input, declared by the core/pins module",
+      "versionInfo": "1.0.0"
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-asset-core-pins-tracked-and-manual"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-asset-core-pins-no-tracking"
+    }
+  ]
+}

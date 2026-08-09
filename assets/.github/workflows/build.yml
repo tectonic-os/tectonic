@@ -465,7 +465,7 @@ jobs:
                  (.relatedSpdxElement | startswith("SPDXRef-File-"))) | not))
           ' "${RUNNER_TEMP}/sbom.spdx.json" > "${RUNNER_TEMP}/sbom.packages.spdx.json"
 
-          ./scripts/sbom-assets.sh "$TARGET" > "${RUNNER_TEMP}/assets.spdx.json"
+          ./scripts/tect.sh sbom "$TARGET" > "${RUNNER_TEMP}/assets.spdx.json"
           jq -c --slurpfile add "${RUNNER_TEMP}/assets.spdx.json" '
             .packages += $add[0].packages
             | .relationships += $add[0].relationships

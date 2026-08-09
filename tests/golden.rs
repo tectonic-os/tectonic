@@ -36,6 +36,7 @@ fn capture(name: &str, root: &Path) {
         ("plan", "plan.json"),
         ("section", "section.txt"),
         ("summary", "summary.md"),
+        ("sbom", "sbom.json"),
     ] {
         compare(name, file, &tect::run(command, None, here).stdout);
     }

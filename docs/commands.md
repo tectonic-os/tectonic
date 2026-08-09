@@ -137,6 +137,12 @@ What one target is made of, as a markdown table: every module it builds, with
 its description and the options it resolved. The default target when none is
 named. This is what a build writes into its job summary.
 
+### `sbom [target]`
+
+The pinned payloads one target carries, as SPDX packages and the relationships
+that describe them. A scan of the built image cannot see where a downloaded
+asset came from, so this is merged into the SBOM the scan produces.
+
 ## Inside a build layer
 
 These read the image around them rather than a repository, run where the

@@ -182,6 +182,10 @@ pub fn run(command: &str, arg: Option<&str>, root: &Path) -> Run {
         "summary" => target
             .and_then(|name| emit::summary::render(&list, &name))
             .unwrap_or_default(),
+        "sbom" => target
+            .and_then(|name| emit::sbom::build(&list, &name))
+            .map(|json| json.render())
+            .unwrap_or_default(),
         "graph" | "graph-json" => match one {
             Some(i) => {
                 let graph = emit::graph::of(&list.images[i]);
