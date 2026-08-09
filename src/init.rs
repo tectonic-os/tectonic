@@ -41,7 +41,7 @@ pub fn id(name: &str) -> Result<String, String> {
     let id = name.to_lowercase().replace(' ', "-");
     if !is_name(&id) {
         return Err(format!(
-            "`{name}` does not derive a usable image name: lowercase letters, digits and \
+            "`{name}` does not derive a usable name: lowercase letters, digits and \
              dashes, starting with a letter"
         ));
     }
