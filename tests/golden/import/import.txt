@@ -1,0 +1,21 @@
+==== the registry
+one
+two
+==== import flatpak
+imported modules/one/flatpak
+==== import browser
+ambiguous: one, two
+==== import one/browser
+imported modules/one/browser
+==== import nosuch
+no module called `nosuch` in one, two
+==== import one/nosuch
+no module called `nosuch` in one
+==== import flatpak
+modules/one/flatpak is already there; delete it to import over it
+==== the tree
+modules/.gitkeep
+modules/one/browser/module.kdl
+modules/one/flatpak/files/usr/share/example/remotes.list
+modules/one/flatpak/module.kdl
+==== check

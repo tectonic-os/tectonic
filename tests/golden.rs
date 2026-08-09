@@ -51,8 +51,8 @@ fn capture(name: &str, root: &Path) {
 
 /// A repository `tect init` wrote, captured like any other fixture: what it
 /// scaffolds has to resolve, generate and report nothing.
-fn init_repo() -> PathBuf {
-    let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("init");
+fn init_repo(name: &str) -> PathBuf {
+    let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(name);
     let _ = std::fs::remove_dir_all(&root);
     tect::init::write(&root, "Example", "someone", &crate_dir().join("assets")).unwrap();
     root
@@ -86,6 +86,81 @@ fn verify(name: &str, root: &Path) {
     compare(name, "verify.txt", &out);
 }
 
+/// `module import`, against two collections on this machine: what one name
+/// resolves to, what a name both of them carry does, and that the tree it wrote
+/// checks like any other module.
+fn import(name: &str, root: &Path) {
+    let mut out = String::new();
+    let collections = crate_dir().join("tests/collections");
+    std::fs::write(
+        root.join("repo.kdl"),
+        format!(
+            "schema-version 1\n\nsources {{\n    one {:?}\n    two {:?}\n}}\n",
+            collections.join("one").display(),
+            collections.join("two").display()
+        ),
+    )
+    .unwrap();
+    std::env::set_current_dir(root).expect("the imported-into repository exists");
+    let here = Path::new(".");
+
+    let (sources, issues, _) = tect::sources(here);
+    out.push_str(&format!("==== the registry\n{}", issues.plain()));
+    for collection in &sources {
+        out.push_str(&format!("{}\n", collection.name));
+    }
+
+    for wanted in [
+        "flatpak",
+        "browser",
+        "one/browser",
+        "nosuch",
+        "one/nosuch",
+        "flatpak",
+    ] {
+        out.push_str(&format!("==== import {wanted}\n"));
+        let module = tect::import::split(wanted).1;
+        match tect::import::find(here, &sources, wanted) {
+            Err(message) => out.push_str(&format!("{message}\n")),
+            Ok(found) if found.len() > 1 => {
+                let owners: Vec<&str> = found.iter().map(|f| f.owner.as_str()).collect();
+                out.push_str(&format!("ambiguous: {}\n", owners.join(", ")));
+            }
+            Ok(found) => match tect::import::vendor(here, &found[0], module) {
+                Ok(dest) => out.push_str(&format!("imported {}\n", dest.display())),
+                Err(message) => out.push_str(&format!("{message}\n")),
+            },
+        }
+    }
+
+    out.push_str("==== the tree\n");
+    let mut written: Vec<String> = walk(Path::new("modules"))
+        .iter()
+        .map(|p| format!("{}\n", p.display()))
+        .collect();
+    written.sort();
+    out.extend(written);
+
+    out.push_str(&format!(
+        "==== check\n{}",
+        tect::run("check", None, here).issues.plain()
+    ));
+    compare(name, "import.txt", &out);
+}
+
+/// Every file under `dir`, which is what an import wrote.
+fn walk(dir: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+        let path = entry.path();
+        match path.is_dir() {
+            true => out.extend(walk(&path)),
+            false => out.push(path),
+        }
+    }
+    out
+}
+
 /// The reference in docs/schema.md, re-rendered from the tables. The renderer
 /// is what checks that every marker names a schema and every schema is marked.
 #[test]
@@ -116,10 +191,11 @@ fn golden() {
     names.sort();
     assert!(!names.is_empty());
 
-    let init = init_repo();
+    let init = init_repo("init");
     for name in names {
         capture(&name, &dir.join(&name));
     }
     capture("init", &init);
     verify("init", &init);
+    import("import", &init_repo("import"));
 }

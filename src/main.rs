@@ -22,6 +22,12 @@ usage: tect [--root <dir>] <command>
                     what, what requires it, what only orders against it,
                     and what the base already carries. Markdown, holding a
                     mermaid diagram, unless `json` is asked for
+  module import <name>
+                    copy one module out of a source collection into
+                    modules/<owner>/<name>, where <owner> names the
+                    collection repo.kdl declares it in. `<owner>/<name>`
+                    picks between two collections that both have it.
+                    Listing it in an image is a separate operation
   generate          write the Containerfile per image, the per-module build
                     scripts and both renderings of the graph, under
                     generated/, and list what was written
@@ -144,6 +150,45 @@ fn init(args: &[&str], root_arg: Option<PathBuf>, owner: Option<String>) -> Resu
     Ok(())
 }
 
+/// Copies one module in, asking which collection only when a name is in more
+/// than one and there is someone to ask. Nothing here touches an image file.
+fn import(name: &str, root: &Path) -> Result<ExitCode, String> {
+    let (sources, issues, context) = tect::sources(root);
+    if issues.report(&context) {
+        return Ok(ExitCode::from(REPO_ERROR));
+    }
+
+    let found = tect::import::find(root, &sources, name)?;
+    let module = tect::import::split(name).1;
+    let one = match found.as_slice() {
+        [one] => one,
+        many => {
+            let owners: Vec<&str> = many.iter().map(|f| f.owner.as_str()).collect();
+            let listed = owners.join(", ");
+            if !std::io::stdin().is_terminal() {
+                return Err(format!(
+                    "`{module}` is in {listed}; name which one, as `{}/{module}`",
+                    owners[0]
+                ));
+            }
+            let answer = ask(&format!("`{module}` is in {listed}; which one"))?;
+            many.iter()
+                .find(|f| f.owner == answer)
+                .ok_or_else(|| format!("`{answer}` is not one of {listed}"))?
+        }
+    };
+
+    let dest = tect::import::vendor(root, one, module)?;
+    println!(
+        "imported {}\n\n\
+         next, to build it, list it in an image:\n\
+         \x20 module \"{}/{module}\"\n",
+        dest.display(),
+        one.owner
+    );
+    Ok(ExitCode::SUCCESS)
+}
+
 /// Writes what `generate` produced, after clearing the directory so an image or
 /// a module that is gone leaves with its files. Everything under `generated/`
 /// is written from here, which is what `verify` holds it to.
@@ -231,6 +276,13 @@ fn main() -> ExitCode {
         ("check", []) | ("generate", []) | ("verify", []) => None,
         ("section", []) | ("graph" | "graph-json", []) => None,
         ("section", [image]) => Some(*image),
+        ("module", ["import", _]) => None,
+        ("module", _) => {
+            return usage_error(format!(
+                "`module` takes `import <name>`, not {}",
+                rest.join(" ")
+            ))
+        }
         ("plan" | "check" | "section" | "graph" | "graph-json" | "generate" | "verify", _) => {
             return usage_error(format!("`{}` does not take {}", args[0], rest.join(" ")))
         }
@@ -252,6 +304,13 @@ fn main() -> ExitCode {
             }
         }
     };
+
+    if command == "module" {
+        return match import(rest[1], &root) {
+            Ok(code) => code,
+            Err(message) => usage_error(message),
+        };
+    }
 
     let run = tect::run(command, image_arg, &root);
 

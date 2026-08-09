@@ -96,7 +96,7 @@ fn put(path: &Path, text: &str) -> Result<(), String> {
     fs::write(path, text).map_err(|err| format!("{}: {err}", path.display()))
 }
 
-fn copy_tree(from: &Path, to: &Path) -> Result<(), String> {
+pub(crate) fn copy_tree(from: &Path, to: &Path) -> Result<(), String> {
     fs::create_dir_all(to).map_err(|err| format!("{}: {err}", to.display()))?;
     let entries = fs::read_dir(from).map_err(|err| format!("{}: {err}", from.display()))?;
     for entry in entries {

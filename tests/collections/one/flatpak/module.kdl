@@ -1,0 +1,9 @@
+description "Flatpak client and a daily update timer"
+
+supports "fedora"
+
+packages {
+    fedora "flatpak"
+}
+
+provides "flatpak"

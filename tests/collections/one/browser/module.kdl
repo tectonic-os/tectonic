@@ -1,0 +1,7 @@
+description "A browser, from the first collection"
+
+supports "fedora"
+
+packages {
+    fedora "firefox"
+}

@@ -1,0 +1,7 @@
+description "A browser, from the second collection"
+
+supports "fedora"
+
+packages {
+    fedora "chromium"
+}
