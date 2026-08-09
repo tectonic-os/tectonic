@@ -4,6 +4,7 @@
 
 use ratatui::backend::Backend;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
+use ratatui::crossterm::terminal;
 use ratatui::layout::{Constraint, Layout};
 use ratatui::style::{Style, Stylize};
 use ratatui::text::{Line, Span};
@@ -44,7 +45,9 @@ pub fn select(question: &str, options: &[Choice]) -> Result<Option<usize>, Strin
     let origin = terminal.get_frame().area().as_position();
     let _ = terminal.clear();
     let _ = terminal.set_cursor_position(origin);
-    ratatui::restore();
+    let _ = terminal.show_cursor();
+    // Not `ratatui::restore`, which also leaves an alternate screen never entered.
+    let _ = terminal::disable_raw_mode();
     chosen
 }
 
