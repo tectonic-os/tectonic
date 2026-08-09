@@ -4,7 +4,7 @@
 use crate::diag::{Issue, Issues, Source};
 use crate::model::options::{check_values, Opt, OptType, Value, Variant};
 use crate::parse::schema::{Arg, Kind, Node, Prop, Say};
-use crate::parse::{child, kids, string_arg};
+use crate::parse::{child, kids, prop, string_arg};
 use kdl::{KdlNode, KdlValue};
 
 #[rustfmt::skip]
@@ -63,13 +63,6 @@ pub fn args(node: &KdlNode) -> Vec<Value> {
         .collect()
 }
 
-fn prop<'a>(node: &'a KdlNode, key: &str) -> Option<&'a KdlValue> {
-    node.entries()
-        .iter()
-        .find(|e| e.name().map(|n| n.value()) == Some(key))
-        .map(|e| e.value())
-}
-
 /// `option "fonts" type="list" { description "..."; default "A" "B" }`
 pub fn parse_option(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Opt> {
     let name = string_arg(node)?.to_string();
@@ -94,7 +87,7 @@ pub fn parse_option(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option
         );
     }
 
-    let ty = match prop(node, "type").and_then(|v| v.as_string()) {
+    let ty = match prop(node, "type") {
         Some(t) => match OptType::parse(t) {
             Some(ty) => ty,
             None => {
