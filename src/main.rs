@@ -144,20 +144,13 @@ fn init(args: &[&str], root_arg: Option<PathBuf>, owner: Option<String>) -> Resu
     Ok(())
 }
 
-/// Writes what `generate` produced, after clearing what it owns so an image or
-/// a module that is gone leaves with its files. A Containerfile is the one
-/// thing here with no extension.
+/// Writes what `generate` produced, after clearing the directory so an image or
+/// a module that is gone leaves with its files. Everything under `generated/`
+/// is written from here, which is what `verify` holds it to.
 fn write_generated(root: &Path, files: &[(PathBuf, String)]) -> Result<(), String> {
-    if let Ok(entries) = std::fs::read_dir(root.join("generated")) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let result = match path.extension() {
-                Some(ext) if ext == "d" => std::fs::remove_dir_all(&path),
-                None if path.is_file() => std::fs::remove_file(&path),
-                _ => continue,
-            };
-            result.map_err(|err| format!("{}: {err}", path.display()))?;
-        }
+    let dir = root.join("generated");
+    if dir.is_dir() {
+        std::fs::remove_dir_all(&dir).map_err(|err| format!("{}: {err}", dir.display()))?;
     }
     for (path, text) in files {
         let path = root.join(path);
