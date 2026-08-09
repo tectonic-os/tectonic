@@ -252,7 +252,9 @@ arg "KERNEL"
 Build order is resolved from `requires` and `after`, never from the order of
 the list, which is only a tie-break. A `requires` nothing provides fails the
 check and names every module that would satisfy it; an `after` nothing
-provides is ignored.
+provides is ignored. A capability name is lowercase letters, digits and
+dashes, starting with a letter, since the generated graph writes it into a
+mermaid label and a markdown table cell without quoting it.
 
 `collects` claims a filename across the whole image and `contributes` says
 this module ships one. Each contribution is staged as
