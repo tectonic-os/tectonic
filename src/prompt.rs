@@ -97,7 +97,8 @@ impl Prompt {
             return Ok(chosen);
         }
         for (index, option) in options.iter().enumerate() {
-            println!("  {}) {}  {}", index + 1, option.label, option.detail);
+            let line = format!("{}  {}", option.label, option.detail);
+            println!("  {}) {}", index + 1, line.trim_end());
         }
         println!("  0) none");
         let answer = self.read(&format!("{question} [0-{}]", options.len()))?;
