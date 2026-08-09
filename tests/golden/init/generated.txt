@@ -4,7 +4,6 @@
 # scripts/Containerfile.skeleton and the example image definition.
 
 FROM scratch AS ctx
-COPY build-phases/ /
 COPY lib/ /lib/
 COPY modules/ /modules/
 COPY generated/ /generated/
@@ -12,29 +11,15 @@ COPY generated/ /generated/
 FROM scratch AS tect
 COPY out/tect /tect
 
-# ---- BEGIN GENERATED (build phases and modules) ----
+# ---- BEGIN GENERATED (module layers) ----
 
 ### Base Image
 FROM quay.io/fedora/fedora-bootc:44
 
-## Build phases and modules
-
-# ---- phase 00-setup.sh ----
-RUN --mount=type=bind,from=ctx,source=/00-setup.sh,target=/ctx/00-setup.sh \
-    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
-    --mount=type=cache,target=/var/cache \
-    --mount=type=cache,target=/var/log \
-    --mount=type=tmpfs,target=/tmp \
-    /ctx/00-setup.sh
+## Module layers
 
 # ---- flavour gate ----
 ARG FLAVOUR
-
-# ---- finalize hook order ----
-ARG FINALIZE_ORDER=""
-
-# ---- collected file destinations ----
-ARG COLLECT_TARGETS=""
 
 # ---- image version ----
 ARG IMAGE_VERSION=dev
@@ -46,29 +31,9 @@ ARG IMAGE_URL="https://github.com/someone/example"
 ARG IMAGE_ISSUES_URL="https://github.com/someone/example/issues"
 ARG IMAGE_REGISTRY=""
 
-# ---- phase 50-flavour.sh ----
-RUN --mount=type=bind,from=ctx,source=/50-flavour.sh,target=/ctx/50-flavour.sh \
-    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
-    --mount=type=bind,from=ctx,source=/modules,target=/ctx/modules \
-    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
-    --mount=type=cache,target=/var/cache \
-    --mount=type=cache,target=/var/log \
-    --mount=type=tmpfs,target=/tmp \
-    FLAVOUR=${FLAVOUR} IMAGE_VERSION=${IMAGE_VERSION} FINALIZE_ORDER="${FINALIZE_ORDER}" \
-    COLLECT_TARGETS="${COLLECT_TARGETS}" \
-    IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_URL="${IMAGE_URL}" IMAGE_ISSUES_URL="${IMAGE_ISSUES_URL}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" /ctx/50-flavour.sh
-
-# ---- phase 99-finalize.sh ----
-RUN --mount=type=bind,from=ctx,source=/99-finalize.sh,target=/ctx/99-finalize.sh \
-    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
-    --mount=type=bind,from=ctx,source=/modules,target=/ctx/modules \
-    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
-    --mount=type=cache,target=/var/cache \
-    --mount=type=cache,target=/var/log \
-    --mount=type=tmpfs,target=/tmp \
-    FLAVOUR=${FLAVOUR} IMAGE_VERSION=${IMAGE_VERSION} FINALIZE_ORDER="${FINALIZE_ORDER}" \
-    COLLECT_TARGETS="${COLLECT_TARGETS}" \
-    IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_URL="${IMAGE_URL}" IMAGE_ISSUES_URL="${IMAGE_ISSUES_URL}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" /ctx/99-finalize.sh
+# ---- os-release ----
+RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    IMAGE_VERSION="${IMAGE_VERSION}" IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_URL="${IMAGE_URL}" IMAGE_ISSUES_URL="${IMAGE_ISSUES_URL}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" /ctx/tect os-release
 
 # ---- END GENERATED ----
 

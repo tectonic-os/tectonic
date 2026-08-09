@@ -1,17 +1,16 @@
 //! The generated Containerfile: the skeleton the repository keeps, with the
-//! build phases and module layers spliced between its markers.
+//! module layers and the finalize layer spliced between its markers.
 
-use crate::emit::module_build;
+use crate::emit::{finalize, module_build};
 use crate::model::image::{Entry, Image};
 use crate::model::module::Module;
-use crate::parse::disk::MODULE_SLOT;
 use crate::resolve::collect::Collection;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 /// The hand-written half, which a repository owns and this splices into.
 pub const SKELETON: &str = "scripts/Containerfile.skeleton";
-pub const BEGIN: &str = "# ---- BEGIN GENERATED (build phases and modules) ----";
+pub const BEGIN: &str = "# ---- BEGIN GENERATED (module layers) ----";
 pub const END: &str = "# ---- END GENERATED ----";
 
 /// Where the assembled Containerfile for one image is written.
@@ -65,7 +64,7 @@ const IMAGE_VERSION_ARG: &str = "\
 ARG IMAGE_VERSION=dev";
 
 /// What the image calls itself, from its own file, plus the registry the build
-/// was pointed at, as the ARGs the phases below the modules read.
+/// was pointed at, as the ARGs the layers below the modules read.
 fn identity(image: &Image) -> Vec<(&'static str, String)> {
     let mut vars: Vec<(&'static str, String)> = Vec::new();
     for (name, value) in [
@@ -83,15 +82,9 @@ fn identity(image: &Image) -> Vec<(&'static str, String)> {
     vars
 }
 
-pub fn section(
-    image: &Image,
-    collection: &Collection,
-    phases: &[(u32, String)],
-    root: &Path,
-) -> String {
+pub fn section(image: &Image, collection: &Collection, root: &Path) -> String {
     let mut out = String::new();
     let mut flavour_arg_emitted = false;
-    let mut finalize: Vec<String> = Vec::new();
 
     if let Some(base) = &image.base {
         let _ = write!(
@@ -102,11 +95,7 @@ pub fn section(
         );
     }
 
-    let _ = write!(out, "## Build phases and modules\n\n");
-
-    for (_, file) in phases.iter().filter(|(number, _)| *number < MODULE_SLOT) {
-        let _ = write!(out, "{}\n\n", phase(file, false, ""));
-    }
+    let _ = write!(out, "## Module layers\n\n");
 
     for entry in &image.entries {
         // A module that could not be read is already an issue, and there is
@@ -136,33 +125,11 @@ pub fn section(
         }
         let _ = writeln!(out, "# ---- {} ----", entry.path);
         let _ = write!(out, "{}\n\n", blocks.join("\n\n"));
-
-        let dir = root.join("modules").join(entry.dir());
-        if dir.join("finalize.sh").is_file() {
-            finalize.push(match &entry.flavour {
-                Some(f) => format!("{}:{f}", entry.dir()),
-                None => entry.dir(),
-            });
-        }
     }
 
     if !flavour_arg_emitted {
         let _ = write!(out, "{FLAVOUR_ARG}\n\n");
     }
-
-    let _ = write!(
-        out,
-        "# ---- finalize hook order ----\n\
-         ARG FINALIZE_ORDER=\"{}\"\n\n",
-        finalize.join(" ")
-    );
-
-    let _ = write!(
-        out,
-        "# ---- collected file destinations ----\n\
-         ARG COLLECT_TARGETS=\"{}\"\n\n",
-        collection.destinations.join(" ")
-    );
 
     let _ = write!(out, "{IMAGE_VERSION_ARG}\n\n");
 
@@ -178,38 +145,61 @@ pub fn section(
         .map(|(name, _)| format!("{name}=\"${{{name}}}\" "))
         .collect();
 
-    for (_, file) in phases.iter().filter(|(number, _)| *number >= MODULE_SLOT) {
-        let _ = write!(out, "{}\n\n", phase(file, true, &identity_env));
+    let _ = write!(
+        out,
+        "# ---- os-release ----\n\
+         RUN {TECT_MOUNT}IMAGE_VERSION=\"${{IMAGE_VERSION}}\" {identity_env}/ctx/tect os-release\n\n"
+    );
+
+    if let Some(layer) = finalize_layer(image, collection, &identity_env, root) {
+        let _ = write!(out, "{layer}\n\n");
     }
 
     out
 }
 
-/// One phase layer.
-fn phase(file: &str, below_modules: bool, identity_env: &str) -> String {
-    let mut out = format!(
-        "# ---- phase {file} ----\n\
-         RUN --mount=type=bind,from=ctx,source=/{file},target=/ctx/{file} \\\n    "
-    );
-    if below_modules {
-        out.push_str("--mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \\\n    ");
-        out.push_str("--mount=type=bind,from=ctx,source=/modules,target=/ctx/modules \\\n    ");
+/// The one layer below the modules: the collected files assembled, then every
+/// finalize hook, with only the module directories those hooks read mounted.
+fn finalize_layer(
+    image: &Image,
+    collection: &Collection,
+    identity_env: &str,
+    root: &Path,
+) -> Option<String> {
+    let hooks = finalize::hooks(image, root);
+    if collection.assembled.is_empty() && hooks.is_empty() {
+        return None;
     }
+    let script = finalize::path(image).display().to_string();
+    let mut out = format!(
+        "# ---- finalize ----\n\
+         RUN --mount=type=bind,from=ctx,source=/{script},target=/ctx/finalize.sh \\\n    \
+         --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \\\n    "
+    );
+
+    let mut mounted: Vec<String> = Vec::new();
+    for entry in hooks {
+        let dir = entry.dir();
+        if mounted.contains(&dir) {
+            continue;
+        }
+        let _ = write!(
+            out,
+            "--mount=type=bind,from=ctx,source=/modules/{dir},target=/ctx/modules/{dir} \\\n    "
+        );
+        mounted.push(dir);
+    }
+
     out.push_str(TECT_MOUNT);
     out.push_str(
         "--mount=type=cache,target=/var/cache \\\n    \
          --mount=type=cache,target=/var/log \\\n    \
-         --mount=type=tmpfs,target=/tmp \\\n    ",
+         --mount=type=tmpfs,target=/tmp \\\n    \
+         FLAVOUR=${FLAVOUR} IMAGE_VERSION=\"${IMAGE_VERSION}\" \\\n    ",
     );
-    if below_modules {
-        out.push_str(
-            "FLAVOUR=${FLAVOUR} IMAGE_VERSION=${IMAGE_VERSION} FINALIZE_ORDER=\"${FINALIZE_ORDER}\" \\\n    ",
-        );
-        out.push_str("COLLECT_TARGETS=\"${COLLECT_TARGETS}\" \\\n    ");
-        out.push_str(identity_env);
-    }
-    let _ = write!(out, "/ctx/{file}");
-    out
+    out.push_str(identity_env);
+    out.push_str("bash /ctx/finalize.sh");
+    Some(out)
 }
 
 /// The layer is the mounts and the build inputs only a Containerfile can

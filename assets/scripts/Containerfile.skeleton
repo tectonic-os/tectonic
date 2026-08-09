@@ -1,6 +1,5 @@
 # syntax=docker/dockerfile:1.25.0@sha256:0adf442eae370b6087e08edc7c50b552d80ddf261576f4ebd6421006b2461f12
 FROM scratch AS ctx
-COPY build-phases/ /
 COPY lib/ /lib/
 COPY modules/ /modules/
 COPY generated/ /generated/
@@ -8,7 +7,7 @@ COPY generated/ /generated/
 FROM scratch AS tect
 COPY out/tect /tect
 
-# ---- BEGIN GENERATED (build phases and modules) ----
+# ---- BEGIN GENERATED (module layers) ----
 # ---- END GENERATED ----
 
 ARG CONTRACT_FILES=""

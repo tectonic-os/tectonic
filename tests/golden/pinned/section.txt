@@ -1,7 +1,7 @@
 ### Base Image
 FROM quay.io/fedora/fedora-bootc:44
 
-## Build phases and modules
+## Module layers
 
 # ---- core/hello ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/hello,target=/ctx/modules/core/hello \
@@ -26,12 +26,6 @@ RUN --mount=type=bind,from=ctx,source=/modules/.remote/steam-tweaks,target=/ctx/
 # ---- flavour gate ----
 ARG FLAVOUR
 
-# ---- finalize hook order ----
-ARG FINALIZE_ORDER=""
-
-# ---- collected file destinations ----
-ARG COLLECT_TARGETS=""
-
 # ---- image version ----
 ARG IMAGE_VERSION=dev
 
@@ -39,4 +33,8 @@ ARG IMAGE_VERSION=dev
 ARG IMAGE_ID="pinned"
 ARG IMAGE_NAME="Pinned"
 ARG IMAGE_REGISTRY=""
+
+# ---- os-release ----
+RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    IMAGE_VERSION="${IMAGE_VERSION}" IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" /ctx/tect os-release
 

@@ -25,6 +25,21 @@ export MODDIR
 
 mkdir -p /usr/share/menu/justfile.apps.d
 cat /ctx/modules/core/network/justfile.inc > /usr/share/menu/justfile.apps.d/0100-core-network.part
+==== generated/collecting.d/finalize.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+# ---- /usr/share/menu/justfile.apps ----
+parts=()
+for part in /usr/share/menu/justfile.apps.d/0100-core-network.part /usr/share/menu/justfile.apps.d/0900-core-power.part; do
+    [ -f "$part" ] || continue
+    parts+=("$part")
+done
+if [ ${#parts[@]} -gt 0 ]; then
+    cat "${parts[@]}" > /usr/share/menu/justfile.apps
+fi
+rm -rf /usr/share/menu/justfile.apps.d
 ==== generated/collecting.graph.md
 # Collecting capability graph
 

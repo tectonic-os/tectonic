@@ -5,6 +5,15 @@ set -euxo pipefail
 
 MODDIR=/ctx/modules/core/shared
 export MODDIR
+==== generated/server.d/finalize.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+# ---- core/shared ----
+MODDIR=/ctx/modules/core/shared
+export MODDIR
+source /ctx/modules/core/shared/finalize.sh
 ==== generated/server.graph.md
 # Server capability graph
 
@@ -77,6 +86,22 @@ export MODDIR
 if [ "${FLAVOUR:-}" != "dev" ]; then
     echo "skipping core/dev-tools: not built for '${FLAVOUR:-the ungated build}'"
     exit 0
+fi
+==== generated/workstation.d/finalize.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+# ---- core/shared ----
+MODDIR=/ctx/modules/core/shared
+export MODDIR
+source /ctx/modules/core/shared/finalize.sh
+
+# ---- core/dev-tools ----
+if [ "${FLAVOUR:-}" = "dev" ]; then
+    MODDIR=/ctx/modules/core/dev-tools
+    export MODDIR
+    source /ctx/modules/core/dev-tools/finalize.sh
 fi
 ==== generated/workstation.graph.md
 # Workstation capability graph

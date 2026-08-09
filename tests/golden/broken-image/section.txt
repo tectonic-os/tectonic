@@ -1,13 +1,7 @@
-## Build phases and modules
+## Module layers
 
 # ---- flavour gate ----
 ARG FLAVOUR
-
-# ---- finalize hook order ----
-ARG FINALIZE_ORDER=""
-
-# ---- collected file destinations ----
-ARG COLLECT_TARGETS=""
 
 # ---- image version ----
 ARG IMAGE_VERSION=dev
@@ -15,4 +9,8 @@ ARG IMAGE_VERSION=dev
 # ---- image identity ----
 ARG IMAGE_ID="Not An Id"
 ARG IMAGE_REGISTRY=""
+
+# ---- os-release ----
+RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    IMAGE_VERSION="${IMAGE_VERSION}" IMAGE_ID="${IMAGE_ID}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" /ctx/tect os-release
 
