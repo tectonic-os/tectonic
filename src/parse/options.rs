@@ -3,18 +3,44 @@
 
 use crate::diag::{Issue, Issues, Source};
 use crate::model::options::{check_values, Opt, OptType, Value, Variant};
-use crate::parse::schema::Node;
+use crate::parse::schema::{Arg, Kind, Node, Prop, Say};
+use crate::parse::{child, kids, string_arg};
 use kdl::{KdlNode, KdlValue};
 
-pub const OPTION: Node = Node::new(
-    "option",
-    "One value an image may set on this module, reaching the build as OPT_*.",
-);
+#[rustfmt::skip]
+pub const OPTION: Node = Node::new("option",
+    "One value an image may set on this module, reaching the build as OPT_*.")
+    .arg(Arg::Str, Say::new("`option` needs a name", "no name given",
+        "`option \"fonts\" type=\"list\" { ... }`"))
+    .unique(Say::new("option `{}` is declared twice", "already declared above", ""))
+    .props(&[
+        Prop { name: "type", kind: Kind::Str,
+            desc: "What the option holds: string, bool or list.",
+            say: Say::NONE },
+    ], Say::new("unknown option property `{}`", "not part of the schema",
+        "an option carries `type`, and everything else as child nodes"))
+    .children(&[
+        Node::new("description", "What setting the option does, for the generated reference.")
+            .once(""),
+        Node::new("default", "What the module builds with when no image sets it.")
+            .arg(Arg::Strs, Say::NONE)
+            .once(""),
+    ], Say::new("unknown node `{}` in an option", "not part of the schema",
+        "an option holds `description` and `default`"));
 
-pub const VARIANT: Node = Node::new(
-    "variant",
-    "A named set of option values an image selects with `variant=`.",
-);
+#[rustfmt::skip]
+pub const VARIANT: Node = Node::new("variant",
+    "A named set of option values an image selects with `variant=`.")
+    .arg(Arg::Str, Say::new("`variant` needs a name", "no name given", ""))
+    .unique(Say::new("variant `{}` is declared twice", "already declared above", ""))
+    .props(&[], Say::new("unknown variant property `{}`", "not part of the schema",
+        "a variant carries its name, and everything else as child nodes"))
+    .children(&[
+        Node::new("description", "What the variant is for.").once(""),
+        Node::new("set", "One option this variant sets, and what it sets it to.")
+            .arg(Arg::Str, Say::new("`set` needs an option name", "no option named", "")),
+    ], Say::new("unknown node `{}` in a variant", "not part of the schema",
+        "a variant holds `description` and `set`"));
 
 impl From<&KdlValue> for Value {
     fn from(value: &KdlValue) -> Self {
@@ -46,20 +72,7 @@ fn prop<'a>(node: &'a KdlNode, key: &str) -> Option<&'a KdlValue> {
 
 /// `option "fonts" type="list" { description "..."; default "A" "B" }`
 pub fn parse_option(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Opt> {
-    let name = match args(node)
-        .first()
-        .and_then(|v| v.as_string().map(str::to_string))
-    {
-        Some(n) => n,
-        None => {
-            issues.push(
-                Issue::new("`option` needs a name", src)
-                    .at(node.name().span(), "no name given")
-                    .help("`option \"fonts\" type=\"list\" { ... }`"),
-            );
-            return None;
-        }
-    };
+    let name = string_arg(node)?.to_string();
 
     if !name
         .chars()
@@ -103,20 +116,7 @@ pub fn parse_option(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option
         }
     };
 
-    let mut default = None;
-    for child in node.children().map(|c| c.nodes()).unwrap_or_default() {
-        match child.name().value() {
-            "description" => {}
-            "default" => default = Some(args(child)),
-            other => issues.push(
-                Issue::new(format!("unknown node `{other}` in an option"), src)
-                    .at(child.name().span(), "not part of the schema")
-                    .help("an option holds `description` and `default`"),
-            ),
-        }
-    }
-
-    let Some(default) = default else {
+    let Some(default) = child(node, "default").map(args) else {
         issues.push(
             Issue::new(format!("option `{name}` declares no default"), src)
                 .at(node.name().span(), "every option needs one")
@@ -136,46 +136,19 @@ pub fn parse_option(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option
 }
 
 /// `variant "wine-only" { description "..."; set "dotnet" #false }`
-pub fn parse_variant(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Variant> {
-    let Some(name) = args(node)
-        .first()
-        .and_then(|v| v.as_string().map(str::to_string))
-    else {
-        issues.push(
-            Issue::new("`variant` needs a name", src).at(node.name().span(), "no name given"),
-        );
-        return None;
-    };
-
-    let mut sets = Vec::new();
-    for child in node.children().map(|c| c.nodes()).unwrap_or_default() {
-        match child.name().value() {
-            "description" => {}
-            "set" => {
-                let values = args(child);
-                let Some(opt) = values.first().and_then(|v| v.as_string()) else {
-                    issues.push(
-                        Issue::new("`set` needs an option name", src)
-                            .at(child.name().span(), "no option named"),
-                    );
-                    continue;
-                };
-                sets.push((
-                    opt.to_string(),
-                    values[1..].to_vec(),
-                    child.name().span().into(),
-                ));
-            }
-            other => issues.push(
-                Issue::new(format!("unknown node `{other}` in a variant"), src)
-                    .at(child.name().span(), "not part of the schema")
-                    .help("a variant holds `description` and `set`"),
-            ),
-        }
-    }
+pub fn parse_variant(node: &KdlNode) -> Option<Variant> {
+    let sets = kids(node)
+        .iter()
+        .filter(|c| c.name().value() == "set")
+        .filter_map(|c| {
+            let values = args(c);
+            let opt = values.first()?.as_string()?.to_string();
+            Some((opt, values[1..].to_vec(), c.name().span().into()))
+        })
+        .collect();
 
     Some(Variant {
-        name,
+        name: string_arg(node)?.to_string(),
         sets,
         span: node.name().span().into(),
     })

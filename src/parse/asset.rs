@@ -2,13 +2,45 @@
 
 use crate::diag::{Issue, Issues, Source, Span};
 use crate::model::asset::{Asset, ShaFrom};
-use crate::parse::schema::Node;
+use crate::parse::schema::{Arg, Kind, Node, Prop, Say};
+use crate::parse::{kids, prop, string_arg};
 use kdl::KdlNode;
 
-pub const ASSET: Node = Node::new(
-    "asset",
-    "A pinned upstream payload the module fetches, reaching the build as ASSET_*.",
-);
+const NEEDS_VALUE: Say = Say::new("`{}` needs a value", "nothing given", "");
+
+#[rustfmt::skip]
+pub const ASSET: Node = Node::new("asset",
+    "A pinned upstream payload the module fetches, reaching the build as ASSET_*.")
+    .arg(Arg::Str, Say::new("`asset` needs a name", "no name given",
+        "`asset \"starship\" { ... }`; the name becomes the ASSET_* env prefix"))
+    .unique(Say::new("asset `{}` is declared twice", "already declared above",
+        "two assets under one name would resolve to the same ASSET_* env"))
+    .props(&[], Say::new("unknown asset property `{}`", "not part of the schema",
+        "an asset carries its fields as child nodes, not properties"))
+    .children(&[
+        Node::new("renovate", "The custom manager Renovate matches to keep the pin current.")
+            .once(""),
+        Node::new("manual", "Why nothing tracks this pin.")
+            .arg(Arg::Str, Say::new("`manual` needs a reason", "no reason given",
+                "say why nothing tracks this pin, or the next reader takes the absence for an \
+                 oversight"))
+            .once(""),
+        Node::new("version", "The pinned version, which the URL expands and Renovate rewrites.")
+            .arg(Arg::Str, NEEDS_VALUE).once(""),
+        Node::new("url", "Where the payload is fetched from.")
+            .arg(Arg::Str, NEEDS_VALUE).once(""),
+        Node::new("sha256", "What the fetched payload is verified against.")
+            .arg(Arg::Str, NEEDS_VALUE).once("")
+            .props(&[
+                Prop { name: "from", kind: Kind::One(&["asset", "sidecar", "manual"]),
+                    desc: "Where the hash is refreshed from.",
+                    say: Say::new("`from` must be asset, sidecar or manual", "not a source",
+                        "asset, the default, hashes the asset itself; sidecar reads the \
+                         <url>.sha256 upstream publishes; manual means nothing recomputes it") },
+            ], Say::new("unknown sha256 property `{}`", "not part of the schema",
+                "`sha256` accepts `from`")),
+    ], Say::new("unknown node `{}` in an asset", "not part of the schema",
+        "an asset holds `renovate` or `manual`, `version`, `url` and `sha256`"));
 
 /// The datasources the Renovate custom managers in .github/renovate.json5
 /// match.
@@ -18,20 +50,7 @@ const DATASOURCES: [&str; 3] = ["github-releases", "github-tags", "git-refs"];
 /// }`
 pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Asset> {
     let span: Span = node.name().span().into();
-    let Some(name) = node
-        .entries()
-        .iter()
-        .find(|e| e.name().is_none())
-        .and_then(|e| e.value().as_string())
-        .map(str::to_string)
-    else {
-        issues.push(
-            Issue::new("`asset` needs a name", src)
-                .at(span, "no name given")
-                .help("`asset \"starship\" { ... }`; the name becomes the ASSET_* env prefix"),
-        );
-        return None;
-    };
+    let name = string_arg(node)?.to_string();
 
     if name.is_empty()
         || !name
@@ -42,20 +61,6 @@ pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Asset>
             Issue::new(format!("invalid asset name `{name}`"), src)
                 .at(span, "lowercase, digits and dashes only")
                 .help("the name becomes an env var, uppercased with dashes as underscores and prefixed ASSET_"),
-        );
-    }
-
-    for entry in node.entries().iter().filter(|e| e.name().is_some()) {
-        issues.push(
-            Issue::new(
-                format!(
-                    "unknown asset property `{}`",
-                    entry.name().map(|n| n.value()).unwrap_or_default()
-                ),
-                src,
-            )
-            .at(entry.span(), "not part of the schema")
-            .help("an asset carries its fields as child nodes, not properties"),
         );
     }
 
@@ -73,49 +78,22 @@ pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Asset>
     let mut version_span: Option<Span> = None;
     let mut previous: Option<&str> = None;
 
-    for child in node.children().map(|c| c.nodes()).unwrap_or_default() {
+    for child in kids(node) {
         let kind = child.name().value();
         let child_span: Span = child.name().span().into();
-        let string = |issues: &mut Issues| match child
-            .entries()
-            .iter()
-            .find(|e| e.name().is_none())
-            .and_then(|e| e.value().as_string())
-        {
-            Some(v) if !v.is_empty() => Some(v.to_string()),
-            _ => {
-                issues.push(
-                    Issue::new(format!("`{kind}` needs a value"), src)
-                        .at(child_span, "nothing given"),
-                );
-                None
-            }
-        };
+        let value = string_arg(child)
+            .filter(|v| !v.is_empty())
+            .map(str::to_string);
 
         match kind {
             "renovate" => {
                 renovate = Some(child_span);
                 check_renovate(child, src, issues);
             }
-            "manual" => {
-                manual = Some(child_span);
-                let reason = child
-                    .entries()
-                    .iter()
-                    .find(|e| e.name().is_none())
-                    .and_then(|e| e.value().as_string())
-                    .unwrap_or_default();
-                if reason.is_empty() {
-                    issues.push(
-                        Issue::new("`manual` needs a reason", src)
-                            .at(child_span, "no reason given")
-                            .help("say why nothing tracks this pin, or the next reader takes the absence for an oversight"),
-                    );
-                }
-            }
+            "manual" => manual = Some(child_span),
             "version" => {
                 version_span = Some(child_span);
-                asset.version = string(issues);
+                asset.version = value;
                 if renovate.is_some() && previous != Some("renovate") {
                     issues.push(
                         Issue::new(
@@ -127,16 +105,14 @@ pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Asset>
                     );
                 }
             }
-            "url" => asset.url = string(issues),
+            "url" => asset.url = value,
             "sha256" => {
-                asset.sha256 = string(issues);
-                parse_from(child, &mut asset, src, issues);
+                asset.sha256 = value;
+                if let Some(from) = prop(child, "from").and_then(ShaFrom::parse) {
+                    asset.from = from;
+                }
             }
-            other => issues.push(
-                Issue::new(format!("unknown node `{other}` in an asset"), src)
-                    .at(child_span, "not part of the schema")
-                    .help("an asset holds `renovate` or `manual`, `version`, `url` and `sha256`"),
-            ),
+            _ => {}
         }
         previous = Some(kind);
     }
@@ -297,28 +273,6 @@ pub fn check_renovate(node: &KdlNode, src: &Source, issues: &mut Issues) {
                 .at(span, "depName= is required")
                 .help("`owner/repo` for the github datasources, the clone URL for git-refs"),
         );
-    }
-}
-
-fn parse_from(node: &KdlNode, asset: &mut Asset, src: &Source, issues: &mut Issues) {
-    for entry in node.entries().iter().filter(|e| e.name().is_some()) {
-        let key = entry.name().map(|n| n.value()).unwrap_or_default();
-        if key != "from" {
-            issues.push(
-                Issue::new(format!("unknown sha256 property `{key}`"), src)
-                    .at(entry.span(), "not part of the schema")
-                    .help("`sha256` accepts `from`"),
-            );
-            continue;
-        }
-        match entry.value().as_string().and_then(ShaFrom::parse) {
-            Some(from) => asset.from = from,
-            None => issues.push(
-                Issue::new("`from` must be asset, sidecar or manual", src)
-                    .at(entry.span(), "not a source")
-                    .help("asset, the default, hashes the asset itself; sidecar reads the <url>.sha256 upstream publishes; manual means nothing recomputes it"),
-            ),
-        }
     }
 }
 

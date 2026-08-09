@@ -509,43 +509,21 @@ impl Module {
                 }
                 "option" => {
                     if let Some(opt) = options::parse_option(node, src, issues) {
-                        if module.options.iter().any(|o| o.name == opt.name) {
-                            issues.push(
-                                Issue::new(format!("option `{}` is declared twice", opt.name), src)
-                                    .at(opt.span, "already declared above"),
-                            );
-                        } else {
+                        if !module.options.iter().any(|o| o.name == opt.name) {
                             module.options.push(opt);
                         }
                     }
                 }
                 "asset" => {
                     if let Some(pin) = asset::parse(node, src, issues) {
-                        if module.assets.iter().any(|a| a.name == pin.name) {
-                            issues.push(
-                                Issue::new(
-                                    format!("asset `{}` is declared twice", pin.name),
-                                    src,
-                                )
-                                .at(pin.span, "already declared above")
-                                .help("two assets under one name would resolve to the same ASSET_* env"),
-                            );
-                        } else {
+                        if !module.assets.iter().any(|a| a.name == pin.name) {
                             module.assets.push(pin);
                         }
                     }
                 }
                 "variant" => {
-                    if let Some(variant) = options::parse_variant(node, src, issues) {
-                        if module.variants.iter().any(|v| v.name == variant.name) {
-                            issues.push(
-                                Issue::new(
-                                    format!("variant `{}` is declared twice", variant.name),
-                                    src,
-                                )
-                                .at(variant.span, "already declared above"),
-                            );
-                        } else {
+                    if let Some(variant) = options::parse_variant(node) {
+                        if !module.variants.iter().any(|v| v.name == variant.name) {
                             module.variants.push(variant);
                         }
                     }
