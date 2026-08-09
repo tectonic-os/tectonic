@@ -49,8 +49,13 @@ Writes `<image-id>.kdl` at the repository root, where the id is the machine
 name the name derives, so "My Desktop" writes `my-desktop.kdl`. Every root
 `.kdl` but `repo.kdl` is one image.
 
-Asks for the name and the base image, which defaults to
-`quay.io/fedora/fedora-bootc:44` and accepts any reference; `--base`.
+Asks for the name, then offers the bases the tool knows; `--base`. Choosing
+none asks for a reference instead, defaulting to
+`quay.io/fedora/fedora-bootc:44`, so any image can be built on. A base out of
+the catalog writes its family and what it already ships into `base`, and a
+base from outside it asks for the family and writes no `provides`: nothing
+knows what an unknown image carries, so `check` reports what no module
+satisfies.
 
 A repository with no image at all is a valid state. `check` says what is
 missing rather than failing, and `generate` says there is nothing to write.

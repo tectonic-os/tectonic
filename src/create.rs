@@ -7,9 +7,6 @@ use crate::ui::Choice;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-/// What a repository that has chosen nothing builds on.
-const BASE: &str = "quay.io/fedora/fedora-bootc:44";
-
 const OWNERSHIP: &str = "your account or org on github (not tectonic-os)";
 
 /// The tree, an image in it, then the remote, which is optional and last.
@@ -71,15 +68,46 @@ pub fn image(
 ) -> Result<(), String> {
     let name = prompt.text(name, "image name", flag, None)?;
     let id = crate::init::id(&name)?;
-    let base = prompt.text(base, "base image", "`--base`", Some(BASE))?;
+    let base = match base {
+        Some(given) => given,
+        None => choose_base(prompt)?,
+    };
+    let known = crate::base::find(&base);
+    let family = match known {
+        Some(known) => known.family.to_string(),
+        None => prompt.text(
+            None,
+            "base family",
+            "`--base`, naming a base the catalog knows",
+            Some(crate::base::DEFAULT.family),
+        )?,
+    };
 
     let file = root.join(format!("{id}.kdl"));
     if file.exists() {
         return Err(format!("{} is already there", file.display()));
     }
-    crate::init::put(&file, &image_kdl(&name, &id, owner, &base))?;
+    crate::init::put(&file, &image_kdl(&name, &id, owner, &base, &family, known))?;
     println!("wrote {}", file.display());
     Ok(())
+}
+
+/// One of the bases the catalog holds, or one typed in: an unknown base is not
+/// an error, it is a base nothing can say anything about.
+fn choose_base(prompt: &Prompt) -> Result<String, String> {
+    let options: Vec<Choice> = crate::base::CATALOG
+        .iter()
+        .map(|base| Choice::new(base.image, base.about))
+        .collect();
+    match prompt.choose("which base, or none to name another", &options)? {
+        Some(chosen) => Ok(crate::base::CATALOG[chosen].image.to_string()),
+        None => prompt.text(
+            None,
+            "base image",
+            "`--base`",
+            Some(crate::base::DEFAULT.image),
+        ),
+    }
 }
 
 /// One module in the repository, and the offer to list it in an image, which
@@ -117,14 +145,28 @@ pub fn module(
         false => pkgs,
     };
 
-    crate::init::put(&file, &module_kdl(&name, &pkgs, &with)?)?;
+    crate::init::put(&file, &module_kdl(&name, &family(root), &pkgs, &with)?)?;
     println!("wrote modules/{path}/module.kdl");
     add_to_image(root, &path, image_name, prompt)
 }
 
-fn module_kdl(name: &str, pkgs: &[String], with: &[(String, String)]) -> Result<String, String> {
+/// The family the repository already builds on.
+fn family(root: &Path) -> String {
+    let (list, _) = crate::model::image::List::load(root);
+    list.images
+        .iter()
+        .find_map(|image| image.base.as_ref().map(|base| base.family.clone()))
+        .unwrap_or_else(|| crate::base::DEFAULT.family.to_string())
+}
+
+fn module_kdl(
+    name: &str,
+    family: &str,
+    pkgs: &[String],
+    with: &[(String, String)],
+) -> Result<String, String> {
     let mut text = format!(
-        "description \"{}\"\n\nsupports \"fedora\"\n",
+        "description \"{}\"\n\nsupports \"{family}\"\n",
         quotable(name)?
     );
     for (verb, value) in with {
@@ -135,7 +177,7 @@ fn module_kdl(name: &str, pkgs: &[String], with: &[(String, String)]) -> Result<
         for pkg in pkgs {
             listed.push_str(&format!(" \"{}\"", quotable(pkg)?));
         }
-        text.push_str(&format!("\npackages {{\n    fedora{listed}\n}}\n"));
+        text.push_str(&format!("\npackages {{\n    {family}{listed}\n}}\n"));
     }
     Ok(text)
 }
@@ -212,7 +254,14 @@ fn append_module(file: &Path, path: &str) -> Result<(), String> {
     std::fs::write(file, text).map_err(|err| format!("{}: {err}", file.display()))
 }
 
-fn image_kdl(name: &str, id: &str, owner: Option<&str>, base: &str) -> String {
+fn image_kdl(
+    name: &str,
+    id: &str,
+    owner: Option<&str>,
+    base: &str,
+    family: &str,
+    known: Option<&crate::base::Base>,
+) -> String {
     let urls = match owner {
         Some(owner) => format!(
             "\x20   url \"https://github.com/{owner}/{id}\"\n\
@@ -220,13 +269,25 @@ fn image_kdl(name: &str, id: &str, owner: Option<&str>, base: &str) -> String {
         ),
         None => String::new(),
     };
+    let mut ships = String::new();
+    if let Some(known) = known {
+        for (node, names) in [
+            ("provides", known.provides),
+            ("provides-file", known.provides_files),
+        ] {
+            if !names.is_empty() {
+                let listed: Vec<String> = names.iter().map(|name| format!("\"{name}\"")).collect();
+                ships.push_str(&format!("\x20       {node} {}\n", listed.join(" ")));
+            }
+        }
+    }
     format!(
         "image {{\n\
          \x20   name \"{name}\"\n\
          {urls}\n\
          \x20   base \"{base}\" {{\n\
-         \x20       family \"fedora\"\n\
-         \x20       provides \"rechunking\" \"initramfs-generation\" \"mac-policy\"\n\
+         \x20       family \"{family}\"\n\
+         {ships}\
          \x20   }}\n\
          \n\
          \x20   modules {{\n\
@@ -270,4 +331,53 @@ fn remote(owner: &str, id: &str, prompt: &Prompt) -> Result<bool, String> {
         .status()
         .map(|status| status.success())
         .map_err(|err| format!("gh: {err}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_catalogued_base_writes_what_it_ships_and_an_unknown_one_writes_nothing() {
+        let bazzite = "ghcr.io/ublue-os/bazzite:stable";
+        let known = image_kdl(
+            "Bazzite",
+            "bazzite",
+            None,
+            bazzite,
+            "fedora",
+            crate::base::find(bazzite),
+        );
+        assert!(
+            known.contains("        provides \"rechunking\" \"flatpak\"\n"),
+            "{known}"
+        );
+        assert!(
+            known.contains("        provides-file \"/usr/bin/flatpak\"\n"),
+            "{known}"
+        );
+
+        let unknown = image_kdl("Own", "own", None, "example.invalid/own:1", "fedora", None);
+        assert!(!unknown.contains("provides"), "{unknown}");
+        assert!(
+            unknown.contains("base \"example.invalid/own:1\" {\n        family \"fedora\"\n"),
+            "{unknown}"
+        );
+    }
+
+    /// A capability the catalog misspells is written into every image scaffolded
+    /// on that base, where it suppresses nothing and satisfies nothing.
+    #[test]
+    fn every_catalogued_name_is_a_name() {
+        use crate::model::image::is_name;
+        for base in crate::base::CATALOG {
+            assert!(is_name(base.family), "{}", base.image);
+            for name in base.provides {
+                assert!(is_name(name), "{} provides {name}", base.image);
+            }
+            for path in base.provides_files {
+                assert!(path.starts_with('/'), "{} provides {path}", base.image);
+            }
+        }
+    }
 }
