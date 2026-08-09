@@ -119,6 +119,10 @@ impl Issues {
         self.0.push(issue);
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     /// Every issue rendered without colour or hyperlinks, at a fixed width, so
     /// the same repository produces the same bytes on any terminal.
     pub fn plain(&self) -> String {

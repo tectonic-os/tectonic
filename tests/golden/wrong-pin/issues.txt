@@ -1,0 +1,10 @@
+  x this repository is pinned to tect 0.0.1
+   ,-[./repo.kdl:3:1]
+ 2 | 
+ 3 | tect-version "0.0.1"
+   : ^^^^^^|^^^^^
+   :       `-- this is tect 0.0.0
+   `----
+  help: run the pinned release, which `scripts/tect.sh` fetches, or `tect
+        update-repo` to move the pin to this one
+

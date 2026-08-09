@@ -4,5 +4,6 @@
    : ^^^^^^^|^^^^^^
    :        `-- this tool knows 1
    `----
-  help: the repository is ahead of the tool; take a newer release
+  help: the repository is ahead of the tool; `tect-version` names the release
+        that reads it, and `scripts/tect.sh` fetches that one
 

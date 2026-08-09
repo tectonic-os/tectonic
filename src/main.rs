@@ -126,6 +126,12 @@ fn repo_root(given: Option<PathBuf>) -> Result<PathBuf, String> {
         .ok_or_else(|| format!("no repo.kdl in {} or any parent directory", here.display()))
 }
 
+/// A repository this release may not work in, refused before it writes into it.
+/// Everything that reads one is refused where it loads it.
+fn refused(root: &Path) -> bool {
+    tect::compatible(root).report(&root.join("repo.kdl").display().to_string())
+}
+
 /// Copies one module in, asking which one when no name was given and which
 /// collection when a name is in more than one, then offers it to an image.
 fn import(
@@ -266,6 +272,9 @@ fn run() -> Result<ExitCode, String> {
             only(&given, &["root", "owner", "base"], "create image")?;
             let name = one_name(rest, "create image")?;
             let root = repo_root(root_arg)?;
+            if refused(&root) {
+                return Ok(ExitCode::from(REPO_ERROR));
+            }
             tect::create::image(
                 &root,
                 name,
@@ -280,6 +289,9 @@ fn run() -> Result<ExitCode, String> {
             only(&given, &["root", "image", "pkg", "with"], "create module")?;
             let name = one_name(rest, "create module")?;
             let root = repo_root(root_arg)?;
+            if refused(&root) {
+                return Ok(ExitCode::from(REPO_ERROR));
+            }
             tect::create::module(&root, name, pkgs, with, image_arg, &prompt)?;
             return Ok(ExitCode::SUCCESS);
         }

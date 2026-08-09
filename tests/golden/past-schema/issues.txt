@@ -1,0 +1,10 @@
+  x this repository is written against schema version 0
+   ,-[./repo.kdl:1:1]
+ 1 | schema-version 0
+   : ^^^^^^^|^^^^^^
+   :        `-- this tool knows 1
+   `----
+  help: `tect update-repo` moves the repository to schema 1; nothing else is
+        read until it does, because every diagnostic under a grammar this
+        release does not have would be noise
+

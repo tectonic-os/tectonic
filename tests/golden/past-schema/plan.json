@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "default_image": null,
+  "default_image_name": null,
+  "pr_image": null,
+  "default_target": null,
+  "default_published": null,
+  "pr_target": null,
+  "pr_published": null,
+  "ungated_target": null,
+  "ungated_published": null,
+  "cache_image": null,
+  "workflows": [],
+  "remotes": [],
+  "assets": [],
+  "images": []
+}

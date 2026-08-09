@@ -1,7 +1,7 @@
 //! repo.kdl, and the walk over every image file beside it.
 
 use crate::diag::{Issue, Issues, Source, Span};
-use crate::model::image::{List, WorkflowToggle, REPO_FILE, SCHEMA_VERSION};
+use crate::model::image::{List, WorkflowToggle, REPO_FILE, SCHEMA_VERSION, TECT_VERSION};
 use crate::parse::image::IMAGE;
 use crate::parse::remote::{parse_collection, COLLECTION};
 use crate::parse::schema::{check_doc, Arg, Kind, Node, Prop, Say};
@@ -73,61 +73,96 @@ const IMAGE_FILE: Node = Node::new("image file", "One image, in a file of its ow
          declared inside it, because they are what the image is rather than what the repository \
          is"));
 
-/// Everything one schema version's grammar produces.
-type Reader = fn(&Path) -> (List, Issues);
-
-/// The reader for a schema version. One version, one reader, today: a version
-/// this release cannot read is refused rather than parsed against the wrong
-/// grammar, and a new version adds an arm here rather than forking the reader.
-fn reader(version: i128) -> Option<Reader> {
-    match version {
-        v if v == i128::from(SCHEMA_VERSION) => Some(List::read),
-        _ => None,
-    }
+/// What repo.kdl declares about which tool reads it.
+struct Pins {
+    schema: Option<(i128, Span)>,
+    tect: Option<(String, Span)>,
+    src: Source,
 }
 
-/// The version repo.kdl declares, read before anything else because it decides
-/// which reader sees the rest. A repo.kdl that is missing, unparseable or
-/// declares nothing usable falls through to the current reader, which is what
-/// reports it.
-fn declared_version(root: &Path) -> Option<(i128, Span, Source)> {
+/// Read directly rather than through the grammar, and before anything else,
+/// because they decide whether this release reads the rest at all. A repo.kdl
+/// that is missing, unparseable or declares neither falls through to the
+/// reader, which is what reports it.
+fn pins(root: &Path) -> Option<Pins> {
     let path = root.join(REPO_FILE);
     let text = std::fs::read_to_string(&path).ok()?;
     let doc: KdlDocument = text.parse().ok()?;
-    let node = doc
-        .nodes()
-        .iter()
-        .find(|n| n.name().value() == "schema-version")?;
-    let version = int_arg(node)?;
-    let src = Source::new(path.display().to_string(), text);
-    Some((version, node.name().span().into(), src))
+    let node = |name: &str| {
+        doc.nodes()
+            .iter()
+            .find(|n| n.name().value() == name)
+            .cloned()
+    };
+    Some(Pins {
+        schema: node("schema-version").and_then(|n| Some((int_arg(&n)?, n.name().span().into()))),
+        tect: node("tect-version")
+            .and_then(|n| Some((string_arg(&n)?.to_string(), n.name().span().into()))),
+        src: Source::new(path.display().to_string(), text),
+    })
 }
 
-impl List {
-    /// The declared schema version, then the reader it selects.
-    pub fn load(root: &Path) -> (Self, Issues) {
-        let Some((version, span, src)) = declared_version(root) else {
-            return List::read(root);
-        };
-        if let Some(read) = reader(version) {
-            return read(root);
-        }
+/// Whether this release may work in the repository at all. `parse/` understands
+/// one schema, so a repository written against another is refused rather than
+/// read against the wrong grammar; and a repository pinned to another release
+/// is refused rather than generating what that release would not, which is the
+/// case `scripts/tect.sh` does not cover because it fetches the pin.
+pub fn compatible(root: &Path) -> Issues {
+    let mut issues = Issues::default();
+    let Some(pins) = pins(root) else {
+        return issues;
+    };
 
-        let mut issues = Issues::default();
+    if let Some((version, span)) = pins
+        .schema
+        .filter(|(v, _)| *v != i128::from(SCHEMA_VERSION))
+    {
+        let ahead = version > i128::from(SCHEMA_VERSION);
         issues.push(
             Issue::new(
                 format!("this repository is written against schema version {version}"),
-                &src,
+                &pins.src,
             )
             .at(span, format!("this tool knows {SCHEMA_VERSION}"))
-            .help(if version > i128::from(SCHEMA_VERSION) {
-                "the repository is ahead of the tool; take a newer release"
-            } else {
-                "the tool is ahead of the repository; nothing else is read, because every \
-                 diagnostic under a grammar this release does not have would be noise"
+            .help(match ahead {
+                true => "the repository is ahead of the tool; `tect-version` names the release \
+                         that reads it, and `scripts/tect.sh` fetches that one"
+                    .to_string(),
+                false => format!(
+                    "`tect update-repo` moves the repository to schema {SCHEMA_VERSION}; nothing \
+                     else is read until it does, because every diagnostic under a grammar this \
+                     release does not have would be noise"
+                ),
             }),
         );
-        (List::empty(root), issues)
+        return issues;
+    }
+
+    if let Some((version, span)) = pins.tect.filter(|(v, _)| v != TECT_VERSION) {
+        issues.push(
+            Issue::new(
+                format!("this repository is pinned to tect {version}"),
+                &pins.src,
+            )
+            .at(span, format!("this is tect {TECT_VERSION}"))
+            .help(
+                "run the pinned release, which `scripts/tect.sh` fetches, or `tect update-repo` \
+                 to move the pin to this one",
+            ),
+        );
+    }
+    issues
+}
+
+impl List {
+    /// The versions first: a repository this release cannot work in is refused
+    /// before anything in it is read.
+    pub fn load(root: &Path) -> (Self, Issues) {
+        let issues = compatible(root);
+        match issues.is_empty() {
+            true => List::read(root),
+            false => (List::empty(root), issues),
+        }
     }
 
     fn empty(root: &Path) -> Self {
