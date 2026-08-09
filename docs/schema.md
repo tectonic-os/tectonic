@@ -107,6 +107,17 @@ target and no other, and everything else builds for all of them.
 A list entry sets the options its module declares, one child node per option,
 named as the module named it.
 
+`base { provides }` is what the upstream image already ships. A listed module
+whose every `provides` and `provides-file` the base already carries is
+suppressed: it is not ordered, not built, and nothing it ships reaches the
+image, since its layer would provision what is already there a second time.
+The generated graph lists what was suppressed and `plan.json` carries it
+beside the modules that did build. A module the base covers only in part still
+builds, and declaring what the base already provides is an error there.
+
+Options and variants on a suppressed module still resolve, so a value set on
+one is still checked and still reaches the plan; it just reaches no layer.
+
 <!-- schema: image -->
 
 ### `image`
@@ -130,7 +141,7 @@ The image every layer builds on, and what building on it may assume.
 | Node | Takes | Meaning |
 | --- | --- | --- |
 | `family` | a string, exactly one | The base's family, matched against every module's `supports`. |
-| `provides` | one or more strings | Capabilities the base satisfies that no module could implement portably. |
+| `provides` | one or more strings | Capabilities the upstream image already ships; a module providing only these is suppressed. |
 | `provides-file` | one or more strings | Absolute paths the base guarantees, which a module may require. |
 | `signed` | `#true` or `#false`, at most one | Whether the base publishes a cosign signature. |
 

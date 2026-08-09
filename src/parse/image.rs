@@ -67,7 +67,7 @@ pub const IMAGE: Node = Node::new("image",
                         "every module declares which families it `supports`, and the two are \
                          checked against each other")),
                 Node::new("provides",
-                    "Capabilities the base satisfies that no module could implement portably.")
+                    "Capabilities the upstream image already ships; a module providing only these is suppressed.")
                     .arg(Arg::Strs, Say::NONE),
                 Node::new("provides-file",
                     "Absolute paths the base guarantees, which a module may require.")
