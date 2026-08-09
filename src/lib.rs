@@ -83,6 +83,7 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
         }
         image.entries = entries;
 
+        resolve::graph::suppress(image);
         let order = resolve::order::sort(image, &mut issues);
         resolve::order::apply(image, &order);
         resolve::graph::check_graph(image, root, &disk, &mut issues);

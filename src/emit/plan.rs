@@ -180,6 +180,16 @@ fn target(list: &List, image: &Image, resolved: &Resolved, target: &Target) -> J
             Json::array(entries.iter().map(|entry| self::module(entry))),
         ),
         (
+            "suppressed",
+            Json::array(
+                image
+                    .suppressed
+                    .iter()
+                    .filter(|entry| in_target(entry, flavour))
+                    .map(self::module),
+            ),
+        ),
+        (
             "secrets",
             unique(&modules, |m| {
                 m.secrets.iter().map(|d| d.name.clone()).collect()

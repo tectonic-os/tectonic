@@ -1,0 +1,83 @@
+==== generated/suppressed.d/apps/browser.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/apps/browser
+export MODDIR
+==== generated/suppressed.graph.md
+# Suppressed capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["ghcr.io/ublue-os/bazzite:stable"]
+    m0["apps/browser"]
+    base -->|"/usr/bin/flatpak, flatpak"| m0
+```
+
+## Capabilities
+
+| Name | Kind | Provided by | Required by | After |
+|---|---|---|---|---|
+| `/usr/bin/flatpak` | file | `base` | `apps/browser` |  |
+| `flatpak` | capability | `base` | `apps/browser` |  |
+| `rechunking` | capability | `base` |  |  |
+
+## Suppressed
+
+The base already provides everything these declare, so nothing builds
+them.
+
+| Module | Provides |
+|---|---|
+| `apps/flatpak` | `flatpak`, `/usr/bin/flatpak` |
+==== generated/suppressed.graph.json
+{
+  "image": "suppressed",
+  "capabilities": [
+    {
+      "name": "/usr/bin/flatpak",
+      "kind": "file",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [
+        "apps/browser"
+      ],
+      "after": []
+    },
+    {
+      "name": "flatpak",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [
+        "apps/browser"
+      ],
+      "after": []
+    },
+    {
+      "name": "rechunking",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    }
+  ],
+  "overrides": [],
+  "suppressed": [
+    {
+      "module": "apps/flatpak",
+      "provides": [
+        "flatpak",
+        "/usr/bin/flatpak"
+      ]
+    }
+  ]
+}

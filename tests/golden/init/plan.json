@@ -73,6 +73,7 @@
           "pr": true,
           "siblings": [],
           "modules": [],
+          "suppressed": [],
           "secrets": [],
           "contract_files": [],
           "verify_exceptions": [],

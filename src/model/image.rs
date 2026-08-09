@@ -68,6 +68,9 @@ pub struct Image {
     pub base: Option<Base>,
     pub flavours: Vec<Flavour>,
     pub entries: Vec<Entry>,
+    /// Entries the base makes redundant: everything the module provides, the
+    /// base already ships, so nothing builds it.
+    pub suppressed: Vec<Entry>,
     pub span: Span,
 }
 

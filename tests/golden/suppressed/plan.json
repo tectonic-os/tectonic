@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "default_image": "suppressed",
+  "default_image_name": "Suppressed",
+  "pr_image": "suppressed",
+  "default_target": "suppressed/none",
+  "default_published": "suppressed",
+  "pr_target": "suppressed/none",
+  "pr_published": "suppressed",
+  "ungated_target": "suppressed/none",
+  "ungated_published": "suppressed",
+  "cache_image": "suppressed-cache",
+  "workflows": [],
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "suppressed",
+      "name": "Suppressed",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "base": {
+        "image": "ghcr.io/ublue-os/bazzite:stable",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking",
+          "flatpak"
+        ],
+        "provides_files": [
+          "/usr/bin/flatpak"
+        ]
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "suppressed/none",
+          "image": "suppressed",
+          "flavour": null,
+          "published": "suppressed",
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "apps/browser",
+              "dir": "apps/browser",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "A flatpak application, which the base satisfies the runtime for",
+              "options": {}
+            }
+          ],
+          "suppressed": [
+            {
+              "path": "apps/flatpak",
+              "dir": "apps/flatpak",
+              "flavour": null,
+              "variant": "beta",
+              "remote": null,
+              "description": "Installs flatpak and enables the remotes an image asks for",
+              "options": {
+                "OPT_REMOTES": "flathub flathub-beta",
+                "OPT_SYSTEM_WIDE": "0"
+              }
+            }
+          ],
+          "secrets": [],
+          "contract_files": [
+            "/usr/bin/flatpak"
+          ],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

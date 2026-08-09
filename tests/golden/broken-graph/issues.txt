@@ -27,8 +27,9 @@
    :     `-- already provided by the base
  6 | provides "shell-tools"
    `----
-  help: the `base` node in ./image.kdl declares it. Drop it from the module,
-        or drop it from the base if the base no longer carries it
+  help: a module the base covers entirely is suppressed instead. This one also
+        provides `shell-tools`, so its layer still builds and would provision
+        `rechunking` a second time: split it, or drop the declaration
 
   x `core/three` does not support the `fedora` base family
   help: it declares support for: debian

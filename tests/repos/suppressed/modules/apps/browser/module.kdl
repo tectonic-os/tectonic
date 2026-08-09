@@ -1,0 +1,6 @@
+description "A flatpak application, which the base satisfies the runtime for"
+
+supports "fedora"
+
+requires "flatpak"
+requires-file "/usr/bin/flatpak"

@@ -55,6 +55,7 @@
               }
             }
           ],
+          "suppressed": [],
           "secrets": [],
           "contract_files": [],
           "verify_exceptions": [],

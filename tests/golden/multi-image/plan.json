@@ -52,6 +52,7 @@
               "options": {}
             }
           ],
+          "suppressed": [],
           "secrets": [],
           "contract_files": [
             "/usr/bin/eza"
@@ -125,6 +126,7 @@
               "options": {}
             }
           ],
+          "suppressed": [],
           "secrets": [],
           "contract_files": [
             "/usr/bin/eza"
@@ -166,6 +168,7 @@
               "options": {}
             }
           ],
+          "suppressed": [],
           "secrets": [],
           "contract_files": [
             "/usr/bin/eza"
@@ -216,6 +219,7 @@
               "options": {}
             }
           ],
+          "suppressed": [],
           "secrets": [],
           "contract_files": [
             "/usr/bin/eza"

@@ -154,6 +154,7 @@ impl List {
             base: None,
             flavours: Vec::new(),
             entries: Vec::new(),
+            suppressed: Vec::new(),
             span: node.name().span().into(),
         };
 

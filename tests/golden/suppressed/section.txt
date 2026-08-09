@@ -1,0 +1,32 @@
+### Base Image
+FROM ghcr.io/ublue-os/bazzite:stable
+
+## Build phases and modules
+
+# ---- apps/browser ----
+RUN --mount=type=bind,from=ctx,source=/modules/apps/browser,target=/ctx/modules/apps/browser \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/generated/suppressed.d/apps/browser.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/module.sh
+
+# ---- flavour gate ----
+ARG FLAVOUR
+
+# ---- finalize hook order ----
+ARG FINALIZE_ORDER=""
+
+# ---- collected file destinations ----
+ARG COLLECT_TARGETS=""
+
+# ---- image version ----
+ARG IMAGE_VERSION=dev
+
+# ---- image identity ----
+ARG IMAGE_ID="suppressed"
+ARG IMAGE_NAME="Suppressed"
+ARG IMAGE_REGISTRY=""
+

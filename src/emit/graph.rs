@@ -38,6 +38,9 @@ pub struct Graph<'a> {
     nodes: Vec<Node>,
     caps: BTreeMap<&'a str, Cap>,
     overrides: Vec<(&'a str, &'a str)>,
+    /// Modules the base covers entirely, and what each of them declares. Not
+    /// nodes: nothing builds them, so they have no edges.
+    suppressed: Vec<(&'a str, Vec<&'a str>)>,
 }
 
 pub fn of(image: &Image) -> Graph<'_> {
@@ -46,6 +49,7 @@ pub fn of(image: &Image) -> Graph<'_> {
         nodes: Vec::new(),
         caps: BTreeMap::new(),
         overrides: Vec::new(),
+        suppressed: Vec::new(),
     };
 
     if let Some(base) = &image.base {
@@ -84,6 +88,18 @@ pub fn of(image: &Image) -> Graph<'_> {
         for decl in &module.overrides {
             graph.overrides.push((&module.path, &decl.name));
         }
+    }
+
+    for module in image.suppressed.iter().filter_map(|e| e.module.as_ref()) {
+        graph.suppressed.push((
+            &module.path,
+            module
+                .provides
+                .iter()
+                .chain(module.provides_files.iter())
+                .map(|decl| decl.name.as_str())
+                .collect(),
+        ));
     }
 
     graph
@@ -184,6 +200,15 @@ impl<'a> Graph<'a> {
                     ])
                 })),
             ),
+            (
+                "suppressed",
+                Json::array(self.suppressed.iter().map(|(module, provides)| {
+                    Json::object([
+                        ("module", Json::string(*module)),
+                        ("provides", Json::strings(provides.iter().copied())),
+                    ])
+                })),
+            ),
         ])
     }
 
@@ -237,6 +262,19 @@ impl<'a> Graph<'a> {
                     self.list(&cap.required_by),
                     self.list(&cap.after),
                 );
+            }
+        }
+
+        if !self.suppressed.is_empty() {
+            out.push_str(
+                "\n## Suppressed\n\n\
+                 The base already provides everything these declare, so nothing builds\n\
+                 them.\n\n\
+                 | Module | Provides |\n|---|---|\n",
+            );
+            for (module, provides) in &self.suppressed {
+                let provides: Vec<String> = provides.iter().map(|name| code(name)).collect();
+                let _ = writeln!(out, "| {} | {} |", code(module), provides.join(", "));
             }
         }
 

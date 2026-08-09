@@ -77,5 +77,6 @@ graph LR
       "module": "core/third",
       "path": "/usr/lib/nothing.conf"
     }
-  ]
+  ],
+  "suppressed": []
 }
