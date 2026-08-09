@@ -87,6 +87,44 @@ description and what it requires, and asks which one.
 Then it offers to list the module in an image, the same offer `create module`
 ends with; `--image`.
 
+### `create cosign-key`
+
+Generates the keypair the images this repository publishes are signed with and
+a signature policy verifies updates against. `cosign` generates it, so it has
+to be installed.
+
+The public half goes into the files/ overlay of the module declaring
+`provides-file "/etc/pki/containers/cosign.pub"`, which is where the build
+workflow reads it from; `--module` picks between two that declare it, and so
+does the prompt when there is a terminal. The private half is written to
+`cosign.key` at the repository root.
+
+The key carries no password, which is what the workflow decrypts it with. Set
+it as the `SIGNING_SECRET` repository secret.
+
+### `create mok-key`
+
+Generates the Secure Boot key the build signs kernel modules and the kernel
+with. `openssl` generates it.
+
+The certificate is written as DER, which is what `sign-file` and `mokutil`
+read, into the files/ overlay of the module declaring
+`provides-file "/usr/share/secureboot/sb_cert.der"`; `--module` as above. The
+private half is written to `MOK.priv` at the repository root.
+
+`--cn` is the certificate's common name, which is what the enrolment prompt
+shows, and it defaults to the repository directory's name. Set the private
+half as the `MOK_PRIVKEY` repository secret; `$MOK_KEY_PATH` points a local
+build at it. Every machine that boots the image enrols the certificate once
+with `mokutil --import`, and until it does the modules signed with it will not
+load.
+
+Neither command replaces a key that is already there, because the private half
+cannot be recovered. The zero-byte file a module ships as a placeholder is not
+a key. Both private halves are named in the `.gitignore` the scaffolding
+writes; a repository whose `.gitignore` does not cover them is told so rather
+than edited.
+
 ### `check`
 
 Reads every manifest and reports every problem at the line that caused it,

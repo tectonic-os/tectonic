@@ -43,6 +43,11 @@ This is the whole surface today. The rest of it is not built yet.
                           copy a module out of a collection repo.kdl names,
                           into modules/<owner>/<name>, choosing from what the
                           collections hold when no name is given
+    tect create cosign-key
+                          the keypair the published images are signed with,
+                          public half into the module that declares it
+    tect create mok-key   the secure boot key the built kernel modules are
+                          signed with, certificate as DER for mokutil
     tect check            validate every manifest, and say where and why
     tect generate         write the Containerfile per image, the per-module
                           build scripts and the graph, under generated/
