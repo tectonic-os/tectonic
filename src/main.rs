@@ -21,6 +21,8 @@ const IN_REPO: &str = "\
                       copy a module in from a collection repo.kdl declares,
                       choosing from what they hold, and offer to list it in an
                       image
+  create mok-key      generate the secure boot key the kernel modules it builds
+                      are signed with
   check               read every manifest and say what is wrong with it
   generate            write the build files, and list what was written
   build [target]      verify the build files, then build the image
@@ -212,6 +214,8 @@ fn run() -> Result<ExitCode, String> {
     let root_arg = take_flag(&mut args, "root")?.map(PathBuf::from);
     let owner = take_flag(&mut args, "owner")?;
     let image_arg = take_flag(&mut args, "image")?;
+    let module_arg = take_flag(&mut args, "module")?;
+    let cn = take_flag(&mut args, "cn")?;
     let base = take_flag(&mut args, "base")?;
     let format = take_flag(&mut args, "format")?;
     let target = take_flag(&mut args, "target")?;
@@ -234,6 +238,8 @@ fn run() -> Result<ExitCode, String> {
         ("root", root_arg.is_some()),
         ("owner", owner.is_some()),
         ("image", image_arg.is_some()),
+        ("module", module_arg.is_some()),
+        ("cn", cn.is_some()),
         ("base", base.is_some()),
         ("format", format.is_some()),
         ("target", target.is_some()),
@@ -323,6 +329,15 @@ fn run() -> Result<ExitCode, String> {
             tect::create::module(&root, name, pkgs, with, image_arg, &prompt)?;
             return Ok(ExitCode::SUCCESS);
         }
+        ["create", "mok-key"] => {
+            only(&given, &["root", "module", "cn"], "create mok-key")?;
+            let root = repo_root(root_arg)?;
+            if refused(&root) {
+                return Ok(ExitCode::from(REPO_ERROR));
+            }
+            tect::key::mok(&root, module_arg, cn, &prompt)?;
+            return Ok(ExitCode::SUCCESS);
+        }
         ["import", "module", rest @ ..] => {
             only(&given, &["root", "image"], "import module")?;
             let name = one_name(rest, "import module")?;
@@ -378,7 +393,11 @@ fn run() -> Result<ExitCode, String> {
         }
         ["registry", ..] => return Err("`registry` takes `namespace` or `ref`".into()),
         ["create", ..] => {
-            return Err("`create` takes `repo <name>`, `image <name>` or `module <name>`".into())
+            return Err(
+                "`create` takes `repo <name>`, `image <name>`, `module <name>` \
+                    or `mok-key`"
+                    .into(),
+            )
         }
         ["import", ..] => return Err("`import` takes `module <name>`".into()),
         _ => {}

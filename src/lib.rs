@@ -7,6 +7,7 @@ pub mod emit;
 pub mod fetch;
 pub mod import;
 pub mod init;
+pub mod key;
 pub mod model;
 pub mod parse;
 pub mod prompt;
