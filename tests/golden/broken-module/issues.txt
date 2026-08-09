@@ -19,7 +19,7 @@
    : ^^|^^
    :   `-- not part of the schema
    `----
-  help: SCHEMA.md documents every node a manifest may hold
+  help: docs/schema.md documents every node a manifest may hold
 
   x unknown node `drives`
    ,-[./modules/core/nameless/module.kdl:3:1]
@@ -28,7 +28,7 @@
    : ^^^|^^
    :    `-- not part of the schema
    `----
-  help: SCHEMA.md documents every node a manifest may hold
+  help: docs/schema.md documents every node a manifest may hold
 
   x `core/nameless` declares no description
   help: one line, present tense, no trailing period; it names the module in
