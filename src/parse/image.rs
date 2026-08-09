@@ -548,3 +548,88 @@ impl Image {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kdl::KdlDocument;
+
+    fn messages(text: &str) -> Vec<String> {
+        let doc: KdlDocument = text.parse().expect("valid KDL");
+        let src = Source::new("image.kdl", text);
+        let mut issues = Issues::default();
+        check(&doc.nodes()[0], &IMAGE, &src, &mut issues);
+        issues
+            .plain()
+            .lines()
+            .filter_map(|line| line.strip_prefix("  x "))
+            .map(str::to_string)
+            .collect()
+    }
+
+    /// Every shape the golden corpus has no broken fixture for.
+    #[test]
+    fn the_table_catches_what_the_corpus_does_not() {
+        let found = messages(
+            r#"
+image "stray" {
+    id
+    base "quay.io/fedora/fedora-bootc:44" {
+        signed "yes"
+        colour "red"
+    }
+    base "quay.io/fedora/fedora-bootc:43"
+    flavours {
+        dev sparkle=#true
+        dim default="yes"
+        bad "arg"
+    }
+    modules {
+        flavour "dev" {
+            packages
+        }
+        module
+        module "core/one" flavor="x"
+        drives
+    }
+    palette "red"
+}
+"#,
+        );
+        assert_eq!(
+            found,
+            [
+                "`image` takes no argument",
+                "`id` needs a value",
+                "`signed` needs #true or #false",
+                "unknown base property `colour`",
+                "`base` declares no `family`",
+                "`base` is declared twice",
+                "unknown flavour property `sparkle`",
+                "`default` must be #true or #false",
+                "a flavour takes no arguments",
+                "`packages` is not allowed inside a flavour block",
+                "`module` needs a path",
+                "unknown module property `flavor`",
+                "unknown node `drives` in `modules`",
+                "unknown image property `palette`",
+                "`image` declares no `name`",
+            ]
+        );
+    }
+
+    #[test]
+    fn an_empty_flavours_block_is_a_block_with_nothing_in_it() {
+        let found = messages(
+            r#"
+image {
+    name "X"
+    base "quay.io/fedora/fedora-bootc:44" { family "fedora" }
+    flavours { }
+    modules { }
+}
+"#,
+        );
+        assert_eq!(found, ["`flavours` has no flavours in it"]);
+    }
+}
