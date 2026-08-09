@@ -35,6 +35,34 @@ instead of reporting every node it cannot place.
 A workflow is named by its file stem under `.github/workflows/`, and one
 nobody names runs. The block is how a repository turns something off.
 
+`sources` is the registry `tect module import <name>` resolves against. Each
+collection is named by the owner its modules land under, so
+`import flatpak` from the collection below writes
+`modules/tectonic-os/flatpak`, and the image lists it as
+`module "tectonic-os/flatpak"`.
+
+```kdl
+sources {
+    tectonic-os "https://github.com/tectonic-os/modules/archive/refs/tags/{ref}.tar.gz" {
+        renovate datasource="github-tags" depName="tectonic-os/modules"
+        ref "v1.0.0"
+        sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+    }
+    scratch "../modules"
+}
+```
+
+A collection whose location is an `https` or `file` URL is a pinned archive,
+fetched and verified exactly like an out-of-tree module. Anything else is a
+directory on this machine, relative to the repository root, which is read
+where it is: nothing is downloaded, so there is nothing to pin or hash. That
+is what makes iterating on a collection possible without re-tarring it on
+every edit.
+
+A name here is checked when it is imported from, not when the repository is
+checked: a directory that exists on one machine and not another is not a
+repository problem.
+
 <!-- schema: repo -->
 
 | Node | Takes | Meaning |
@@ -56,6 +84,26 @@ One workflow, named by the node, and whether it runs.
 | Property | Value | Meaning |
 | --- | --- | --- |
 | `enabled=` | `#true` or `#false`, required | Whether the workflow runs at all. |
+
+### `sources`
+
+The module collections `tect module import` resolves a name against.
+
+*at most one, never empty*
+
+#### `<name>`
+
+One module collection, named by the owner its modules land under in modules/.
+
+*a string*
+
+Also holds [`renovate`](#renovate) and [`manual`](#manual).
+
+| Node | Takes | Meaning |
+| --- | --- | --- |
+| `ref` | a string, at most one | The tag or commit the archive is fetched at. |
+| `sha256` | a string, at most one | What the fetched archive is verified against. |
+| `path` | a string, at most one | The directory inside the archive the modules sit in, when they are not at its root. |
 
 <!-- /schema: repo -->
 

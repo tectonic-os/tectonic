@@ -23,3 +23,31 @@ impl Remote {
         self.url.replace("{ref}", &self.git_ref)
     }
 }
+
+/// One module collection an import resolves against, named by the owner its
+/// modules land under in `modules/`.
+pub struct Collection {
+    pub name: String,
+    pub at: At,
+    pub span: Span,
+}
+
+/// Where a collection is.
+pub enum At {
+    /// A directory on this machine, read where it is: nothing is fetched, so
+    /// there is nothing to hash.
+    Dir(String),
+    /// A pinned archive, fetched and verified like any other pin.
+    Archive(Remote),
+}
+
+impl Collection {
+    /// The directory inside the collection holding the modules, which is its
+    /// root unless the archive says otherwise.
+    pub fn subtree(&self) -> Option<&str> {
+        match &self.at {
+            At::Dir(_) => None,
+            At::Archive(remote) => remote.path.as_deref(),
+        }
+    }
+}

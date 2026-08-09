@@ -3,7 +3,7 @@
 use crate::diag::{Source, Span};
 use crate::model::module::Module;
 use crate::model::options::Value;
-use crate::model::remote::{Remote, REMOTE_DIR};
+use crate::model::remote::{Collection, Remote, REMOTE_DIR};
 
 /// The schema every file in the repository is written against.
 pub const SCHEMA_VERSION: u32 = 1;
@@ -146,6 +146,8 @@ pub struct List {
     pub images: Vec<Image>,
     /// Only the workflows named in repo.kdl.
     pub workflows: Vec<WorkflowToggle>,
+    /// The module collections an import resolves a name against.
+    pub sources: Vec<Collection>,
     /// Which image a build with nothing named builds, and which one a pull
     /// request builds.
     pub default_image_id: Option<String>,

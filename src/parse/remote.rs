@@ -1,7 +1,9 @@
-//! `source`, the out-of-tree module pin on a list entry.
+//! `source`, the out-of-tree module pin on a list entry, and `sources`, the
+//! collections an import resolves against.
 
 use crate::diag::{Issue, Issues, Source, Span};
-use crate::model::remote::Remote;
+use crate::model::image::is_name;
+use crate::model::remote::{At, Collection, Remote};
 use crate::parse::asset::{MANUAL, RENOVATE};
 use crate::parse::schema::{Arg, Node, Say};
 use crate::parse::{kids, string_arg};
@@ -11,6 +13,14 @@ use kdl::KdlNode;
 const ARCHIVES: [&str; 5] = [".tar.gz", ".tgz", ".tar.xz", ".tar.zst", ".tar.bz2"];
 
 const NEEDS_VALUE: Say = Say::new("`{}` needs a value", "nothing given", "");
+
+/// What every pin declares: the ref it is taken at, and the hash it is held to.
+const REF: Node = Node::new("ref", "The tag or commit the archive is fetched at.")
+    .arg(Arg::Str, NEEDS_VALUE)
+    .once("");
+const SHA256: Node = Node::new("sha256", "What the fetched archive is verified against.")
+    .arg(Arg::Str, NEEDS_VALUE)
+    .once("");
 
 /// The pin on a list entry, which is the same shape as an `asset`.
 #[rustfmt::skip]
@@ -23,14 +33,34 @@ pub const SOURCE: Node = Node::new("source",
     .children(&[
         RENOVATE,
         MANUAL,
-        Node::new("ref", "The tag or commit the archive is fetched at.")
-            .arg(Arg::Str, NEEDS_VALUE).once(""),
-        Node::new("sha256", "What the fetched archive is verified against.")
-            .arg(Arg::Str, NEEDS_VALUE).once(""),
+        REF,
+        SHA256,
         Node::new("path", "The module's directory inside the archive.")
             .arg(Arg::Str, NEEDS_VALUE).once(""),
     ], Say::new("unknown node `{}` in a source", "not part of the schema",
         "a source holds `renovate` or `manual`, `ref`, `sha256` and `path`"));
+
+/// One collection in the registry, named by the owner rather than by the
+/// schema, which is why the node's name is empty.
+#[rustfmt::skip]
+pub const COLLECTION: Node = Node::new("",
+    "One module collection, named by the owner its modules land under in modules/.")
+    .arg(Arg::Str, Say::new("`{}` says nothing about where the collection is",
+        "no location given",
+        "a directory on this machine, `{} \"../modules\"`, or a pinned archive, \
+         `{} \"https://host/owner/repo/archive/{ref}.tar.gz\" { ... }`"))
+    .props(&[], Say::new("unknown collection property `{}`", "not part of the schema",
+        "a collection carries its fields as child nodes, not properties"))
+    .children(&[
+        RENOVATE,
+        MANUAL,
+        REF,
+        SHA256,
+        Node::new("path", "The directory inside the archive the modules sit in, when they are \
+                           not at its root.")
+            .arg(Arg::Str, NEEDS_VALUE).once(""),
+    ], Say::new("unknown node `{}` in a collection", "not part of the schema",
+        "a collection holds `renovate` or `manual`, `ref`, `sha256` and `path`"));
 
 fn datasource(node: &KdlNode) -> Option<&str> {
     node.entries()
@@ -143,6 +173,51 @@ pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Remote
     check_path(&remote, src, issues);
 
     Some(remote)
+}
+
+/// `sources { tectonic-os "https://host/owner/modules/archive/{ref}.tar.gz" {
+/// ... }; scratch "../modules" }` The node's name is the owner. A location that
+/// is not a URL is a directory on this machine, which is read where it is, so
+/// nothing is fetched and there is nothing to pin or hash.
+pub fn parse_collection(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Collection> {
+    let name = node.name().value().to_string();
+    let span: Span = node.name().span().into();
+    let at = string_arg(node)?;
+
+    if !is_name(&name) {
+        issues.push(
+            Issue::new(format!("invalid collection name `{name}`"), src)
+                .at(span, "lowercase, digits and dashes, starting with a letter")
+                .help("the name is the directory imports land in, `modules/<name>/<module>`, and reaches every image that lists one of them"),
+        );
+        return None;
+    }
+
+    if at.starts_with("https://") || at.starts_with("file://") {
+        let remote = parse(node, src, issues)?;
+        return Some(Collection {
+            name,
+            at: At::Archive(remote),
+            span,
+        });
+    }
+
+    for child in kids(node) {
+        let kind = child.name().value();
+        if matches!(kind, "renovate" | "manual" | "ref" | "sha256") {
+            issues.push(
+                Issue::new(format!("`{name}` is a directory, so `{kind}` says nothing"), src)
+                    .at(child.name().span(), "nothing is fetched")
+                    .help("a collection on this machine is read where it is; a pin belongs on one that is downloaded"),
+            );
+        }
+    }
+
+    Some(Collection {
+        name,
+        at: At::Dir(at.to_string()),
+        span,
+    })
 }
 
 fn check_url(remote: &Remote, tracked: bool, src: &Source, issues: &mut Issues) {
