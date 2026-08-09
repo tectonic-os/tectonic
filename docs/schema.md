@@ -35,7 +35,7 @@ instead of reporting every node it cannot place.
 A workflow is named by its file stem under `.github/workflows/`, and one
 nobody names runs. The block is how a repository turns something off.
 
-`sources` is the registry `tect module import <name>` resolves against. Each
+`sources` is the registry `tect import module <name>` resolves against. Each
 collection is named by the owner its modules land under, so
 `import flatpak` from the collection below writes
 `modules/tectonic-os/flatpak`, and the image lists it as
@@ -87,7 +87,7 @@ One workflow, named by the node, and whether it runs.
 
 ### `sources`
 
-The module collections `tect module import` resolves a name against.
+The module collections `tect import module` resolves a name against.
 
 *at most one, never empty*
 

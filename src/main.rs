@@ -31,8 +31,8 @@ const RULE: &str = "\
 Every command takes a flag for everything it needs. What no flag gave is asked
 for, and `--no-tui` asks nothing, failing and naming the flag instead.
 
-Data goes to stdout and diagnostics to stderr; exit 1 is the invocation, exit
-2 the repository.
+docs/commands.md is the reference. Data goes to stdout and diagnostics to
+stderr; exit 1 is the invocation, exit 2 the repository.
 ";
 
 /// The invocation is wrong: an unknown command, a bad argument, no repository.

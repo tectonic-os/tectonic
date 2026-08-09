@@ -1,4 +1,4 @@
-//! `module import`: one module out of a source collection, copied into the
+//! `import module`: one module out of a source collection, copied into the
 //! tree. Nothing here writes an image file: what a repository holds and what an
 //! image is made of are different questions.
 
