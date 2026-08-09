@@ -198,6 +198,14 @@ fn run() -> Result<ExitCode, String> {
     let image_arg = take_flag(&mut args, "image")?;
     let base = take_flag(&mut args, "base")?;
     let format = take_flag(&mut args, "format")?;
+    let pkgs = take_flags(&mut args, "pkg")?;
+    let with = take_flags(&mut args, "with")?
+        .iter()
+        .map(|pair| match pair.split_once('=') {
+            Some((verb, value)) => Ok((verb.to_string(), value.to_string())),
+            None => Err(format!("`--with` is `verb=value`, not `{pair}`")),
+        })
+        .collect::<Result<Vec<_>, String>>()?;
 
     let mut given: Vec<&str> = Vec::new();
     for (flag, present) in [
@@ -206,6 +214,8 @@ fn run() -> Result<ExitCode, String> {
         ("image", image_arg.is_some()),
         ("base", base.is_some()),
         ("format", format.is_some()),
+        ("pkg", !pkgs.is_empty()),
+        ("with", !with.is_empty()),
     ] {
         if present {
             given.push(flag);
@@ -257,6 +267,13 @@ fn run() -> Result<ExitCode, String> {
                 "a name argument",
                 &prompt,
             )?;
+            return Ok(ExitCode::SUCCESS);
+        }
+        ["create", "module", rest @ ..] => {
+            only(&given, &["root", "image", "pkg", "with"], "create module")?;
+            let name = one_name(rest, "create module")?;
+            let root = repo_root(root_arg)?;
+            tect::create::module(&root, name, pkgs, with, image_arg, &prompt)?;
             return Ok(ExitCode::SUCCESS);
         }
         ["import", "module", name] => {

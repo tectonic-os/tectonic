@@ -95,6 +95,50 @@ fn verify(name: &str, root: &Path) {
     compare(name, "verify.txt", &out);
 }
 
+/// `create module`, from flags alone: what it writes, what the splice does to
+/// the image file it lists the module in, and that the result checks.
+fn create(name: &str, root: &Path) {
+    std::env::set_current_dir(root).expect("the created-into repository exists");
+    let here = Path::new(".");
+    let silent = tect::prompt::Prompt::silent();
+
+    tect::create::module(
+        here,
+        Some("My Editor".into()),
+        vec!["nano".into()],
+        vec![("provides".into(), "editor".into())],
+        Some("example".into()),
+        &silent,
+    )
+    .unwrap();
+    tect::create::module(
+        here,
+        Some("plain".into()),
+        Vec::new(),
+        Vec::new(),
+        None,
+        &silent,
+    )
+    .unwrap();
+
+    let mut out = String::new();
+    for file in [
+        "modules/my-editor/module.kdl",
+        "modules/plain/module.kdl",
+        "example.kdl",
+    ] {
+        out.push_str(&format!(
+            "==== {file}\n{}",
+            std::fs::read_to_string(file).unwrap()
+        ));
+    }
+    out.push_str(&format!(
+        "==== check\n{}",
+        tect::run("check", None, here).issues.plain()
+    ));
+    compare(name, "create.txt", &out);
+}
+
 /// `module import`, against two collections on this machine: what one name
 /// resolves to, what a name both of them carry does, and that the tree it wrote
 /// checks like any other module.
@@ -206,5 +250,6 @@ fn golden() {
     }
     capture("init", &init);
     verify("init", &init);
+    create("create", &init_repo("create"));
     import("import", &init_repo("import"));
 }

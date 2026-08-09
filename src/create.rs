@@ -81,6 +81,128 @@ pub fn image(
     Ok(id)
 }
 
+/// One module in the repository, and the offer to list it in an image, which
+/// is a separate operation.
+pub fn module(
+    root: &Path,
+    name: Option<String>,
+    pkgs: Vec<String>,
+    with: Vec<(String, String)>,
+    image_name: Option<String>,
+    prompt: &Prompt,
+) -> Result<(), String> {
+    let name = prompt.text(name, "module name", "a name argument", None)?;
+    let path = name
+        .split('/')
+        .map(crate::init::id)
+        .collect::<Result<Vec<_>, _>>()?
+        .join("/");
+    let file = root.join("modules").join(&path).join("module.kdl");
+    if file.exists() {
+        return Err(format!("modules/{path} is already there"));
+    }
+
+    let pkgs = match pkgs.is_empty() && prompt.confirm("does it install packages")? {
+        true => prompt
+            .text(
+                None,
+                "package names, separated by spaces",
+                "`--pkg`",
+                Some(""),
+            )?
+            .split_whitespace()
+            .map(str::to_string)
+            .collect(),
+        false => pkgs,
+    };
+
+    crate::init::put(&file, &module_kdl(&name, &pkgs, &with)?)?;
+    println!("wrote modules/{path}/module.kdl");
+    add_to_image(root, &path, image_name, prompt)
+}
+
+fn module_kdl(name: &str, pkgs: &[String], with: &[(String, String)]) -> Result<String, String> {
+    let mut text = format!(
+        "description \"{}\"\n\nsupports \"fedora\"\n",
+        quotable(name)?
+    );
+    for (verb, value) in with {
+        text.push_str(&format!("{} \"{}\"\n", quotable(verb)?, quotable(value)?));
+    }
+    if !pkgs.is_empty() {
+        let mut listed = String::new();
+        for pkg in pkgs {
+            listed.push_str(&format!(" \"{}\"", quotable(pkg)?));
+        }
+        text.push_str(&format!("\npackages {{\n    fedora{listed}\n}}\n"));
+    }
+    Ok(text)
+}
+
+/// A value that would have to be escaped to survive being written into KDL.
+fn quotable(value: &str) -> Result<&str, String> {
+    match value.contains(['"', '\\', '\n']) {
+        true => Err(format!(
+            "`{value}` is not writable into a manifest as it is"
+        )),
+        false => Ok(value),
+    }
+}
+
+/// Which image, or none: it asks even when there is one, because having a
+/// module in the repository and listing it in an image are different decisions.
+pub fn add_to_image(
+    root: &Path,
+    path: &str,
+    given: Option<String>,
+    prompt: &Prompt,
+) -> Result<(), String> {
+    let (list, _) = crate::model::image::List::load(root);
+    let ids: Vec<String> = list.images.iter().map(|image| image.id.clone()).collect();
+    if ids.is_empty() {
+        println!("no image lists it yet; `tect create image <name>` writes one");
+        return Ok(());
+    }
+
+    let chosen = match given {
+        Some(id) => Some(ids.iter().position(|known| *known == id).ok_or_else(|| {
+            format!(
+                "`{id}` is not a declared image; there is {}",
+                ids.join(", ")
+            )
+        })?),
+        None => prompt.choose("list it in an image", &ids)?,
+    };
+    let Some(chosen) = chosen else {
+        println!("next, to build it, list it in an image:\n\x20 module \"{path}\"");
+        return Ok(());
+    };
+
+    let file = Path::new(list.images[chosen].src.name());
+    append_module(file, path)?;
+    println!("listed \"{path}\" in {}", file.display());
+    Ok(())
+}
+
+/// One `module` line before the closing brace of the image's `modules` block.
+/// Every other byte is left where it was: the tool creates whole files and
+/// appends module lines, and never rewrites a value.
+fn append_module(file: &Path, path: &str) -> Result<(), String> {
+    let mut text =
+        std::fs::read_to_string(file).map_err(|err| format!("{}: {err}", file.display()))?;
+    let close = crate::parse::image::modules_close(&text)
+        .ok_or_else(|| format!("{} has no `modules` block to add to", file.display()))?;
+
+    let start = text[..close].rfind('\n').map_or(0, |at| at + 1);
+    let indent = &text[start..close];
+    let (at, line) = match indent.trim().is_empty() {
+        true => (start, format!("{indent}    module \"{path}\"\n")),
+        false => (close, format!("module \"{path}\" ")),
+    };
+    text.insert_str(at, &line);
+    std::fs::write(file, text).map_err(|err| format!("{}: {err}", file.display()))
+}
+
 fn image_kdl(name: &str, id: &str, owner: Option<&str>, base: &str) -> String {
     let urls = match owner {
         Some(owner) => format!(

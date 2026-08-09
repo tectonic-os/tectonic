@@ -1,0 +1,29 @@
+==== modules/my-editor/module.kdl
+description "My Editor"
+
+supports "fedora"
+provides "editor"
+
+packages {
+    fedora "nano"
+}
+==== modules/plain/module.kdl
+description "plain"
+
+supports "fedora"
+==== example.kdl
+image {
+    name "Example"
+    url "https://github.com/someone/example"
+    issues-url "https://github.com/someone/example/issues"
+
+    base "quay.io/fedora/fedora-bootc:44" {
+        family "fedora"
+        provides "rechunking" "initramfs-generation" "mac-policy"
+    }
+
+    modules {
+        module "my-editor"
+    }
+}
+==== check

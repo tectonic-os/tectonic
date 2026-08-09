@@ -6,7 +6,7 @@ use crate::model::remote::{Remote, REMOTE_DIR};
 use crate::parse::schema::{Arg, Kind, Node, Prop, Say};
 use crate::parse::{bool_arg, check_capability, child, flag, kids, options, prop, remote};
 use crate::parse::{string_arg, string_args, text};
-use kdl::KdlNode;
+use kdl::{KdlDocument, KdlNode};
 
 const NEEDS_VALUE: Say = Say::new("`{}` needs a value", "nothing given", "");
 
@@ -126,6 +126,16 @@ pub const IMAGE: Node = Node::new("image",
     ], Say::new("unknown image property `{}`", "not part of the schema",
         "an image accepts `id`, `name`, `pretty-name`, `url` and `issues-url`, and the `base`, \
          `flavours` and `modules` blocks"));
+
+/// Where a `module` line goes: the offset of the closing brace of the image's
+/// `modules` block. Appending is a text splice over this span, so nothing
+/// outside here has to hold a KDL document to write one line.
+pub fn modules_close(text: &str) -> Option<usize> {
+    let doc: KdlDocument = text.parse().ok()?;
+    let image = doc.nodes().iter().find(|n| n.name().value() == "image")?;
+    let span: Span = child(image, "modules")?.span().into();
+    text[..span.offset + span.len].rfind('}')
+}
 
 /// Every `name "a" "b"` under a node, as declarations pointing at the node.
 fn decls(node: &KdlNode, name: &str) -> Vec<Decl> {
@@ -406,7 +416,6 @@ impl Image {
 mod tests {
     use super::*;
     use crate::parse::schema::check;
-    use kdl::KdlDocument;
 
     fn messages(text: &str) -> Vec<String> {
         let doc: KdlDocument = text.parse().expect("valid KDL");
@@ -470,6 +479,14 @@ image "stray" {
                 "`image` declares no `name`",
             ]
         );
+    }
+
+    #[test]
+    fn the_modules_block_ends_at_a_closing_brace() {
+        let text = "image {\n    modules {\n        module \"one\"\n    }\n}\n";
+        let at = modules_close(text).expect("a modules block");
+        assert_eq!(&text[at..=at], "}");
+        assert_eq!(&text[at - 5..at], "\n    ");
     }
 
     #[test]
