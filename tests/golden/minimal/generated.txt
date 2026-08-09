@@ -7,3 +7,38 @@ MODDIR=/ctx/modules/core/hello
 export MODDIR
 
 dnf5 install -y fastfetch
+==== generated/minimal.graph.md
+# Minimal capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["quay.io/fedora/fedora-bootc:44"]
+    m0["core/hello"]
+```
+
+## Capabilities
+
+| Name | Kind | Provided by | Required by | After |
+|---|---|---|---|---|
+| `rechunking` | capability | `base` |  |  |
+==== generated/minimal.graph.json
+{
+  "image": "minimal",
+  "capabilities": [
+    {
+      "name": "rechunking",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    }
+  ],
+  "overrides": []
+}

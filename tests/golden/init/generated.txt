@@ -78,3 +78,55 @@ RUN bootc container lint
 RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     CONTRACT_FILES="${CONTRACT_FILES}" \
     VERIFY_EXCEPTIONS="${VERIFY_EXCEPTIONS}" /ctx/tect validate-image
+==== generated/example.graph.md
+# Example capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["quay.io/fedora/fedora-bootc:44"]
+```
+
+## Capabilities
+
+| Name | Kind | Provided by | Required by | After |
+|---|---|---|---|---|
+| `initramfs-generation` | capability | `base` |  |  |
+| `mac-policy` | capability | `base` |  |  |
+| `rechunking` | capability | `base` |  |  |
+==== generated/example.graph.json
+{
+  "image": "example",
+  "capabilities": [
+    {
+      "name": "initramfs-generation",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "mac-policy",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "rechunking",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    }
+  ],
+  "overrides": []
+}

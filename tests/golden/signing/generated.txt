@@ -12,3 +12,83 @@ set -euxo pipefail
 
 MODDIR=/ctx/modules/drivers/kvmfr
 export MODDIR
+==== generated/signing.graph.md
+# Signing capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["quay.io/fedora/fedora-bootc:44"]
+    m0["kernel/signed-kernel"]
+    m1["drivers/kvmfr"]
+    base -->|"initramfs-generation"| m0
+    m0 -->|"/usr/libexec/kernel-devel-helpers.sh, kernel-devel"| m1
+```
+
+## Capabilities
+
+| Name | Kind | Provided by | Required by | After |
+|---|---|---|---|---|
+| `/usr/libexec/kernel-devel-helpers.sh` | file, build only | `kernel/signed-kernel` | `drivers/kvmfr` |  |
+| `/usr/share/secureboot/sb_cert.der` | file | `kernel/signed-kernel` |  |  |
+| `initramfs-generation` | capability | `base` | `kernel/signed-kernel` |  |
+| `kernel-devel` | capability | `kernel/signed-kernel` | `drivers/kvmfr` |  |
+| `rechunking` | capability | `base` |  |  |
+==== generated/signing.graph.json
+{
+  "image": "signing",
+  "capabilities": [
+    {
+      "name": "/usr/libexec/kernel-devel-helpers.sh",
+      "kind": "file",
+      "build_only": true,
+      "provider": "kernel/signed-kernel",
+      "required_by": [
+        "drivers/kvmfr"
+      ],
+      "after": []
+    },
+    {
+      "name": "/usr/share/secureboot/sb_cert.der",
+      "kind": "file",
+      "build_only": false,
+      "provider": "kernel/signed-kernel",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "initramfs-generation",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [
+        "kernel/signed-kernel"
+      ],
+      "after": []
+    },
+    {
+      "name": "kernel-devel",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "kernel/signed-kernel",
+      "required_by": [
+        "drivers/kvmfr"
+      ],
+      "after": []
+    },
+    {
+      "name": "rechunking",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    }
+  ],
+  "overrides": []
+}

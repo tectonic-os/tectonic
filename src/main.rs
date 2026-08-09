@@ -17,9 +17,14 @@ usage: tect [--root <dir>] <command>
                     than deriving anything from a name
   section [image]   the generated Containerfile module section for an
                     image; the default image when none is given
-  generate          write the Containerfile per image and the per-module
-                    build scripts, under generated/, and list what was
-                    written
+  graph [--format md|json]
+                    the default image's capability graph: what provides
+                    what, what requires it, what only orders against it,
+                    and what the base already carries. Markdown, holding a
+                    mermaid diagram, unless `json` is asked for
+  generate          write the Containerfile per image, the per-module build
+                    scripts and both renderings of the graph, under
+                    generated/, and list what was written
   verify            re-emit all of that and compare it against what is
                     committed under generated/, naming what differs
   check             validate every manifest, printing what is wrong
@@ -173,6 +178,10 @@ fn main() -> ExitCode {
         Ok(owner) => owner,
         Err(message) => return usage_error(message),
     };
+    let format_arg = match take_flag(&mut args, "format") {
+        Ok(format) => format,
+        Err(message) => return usage_error(message),
+    };
 
     let command = match args.first().map(String::as_str) {
         Some("-h") | Some("--help") => {
@@ -184,6 +193,16 @@ fn main() -> ExitCode {
             eprint!("{USAGE}");
             return ExitCode::from(USAGE_ERROR);
         }
+    };
+
+    let command = match (command, format_arg.as_deref()) {
+        ("graph", None | Some("md")) => "graph",
+        ("graph", Some("json")) => "graph-json",
+        ("graph", Some(other)) => {
+            return usage_error(format!("`--format` is md or json, not `{other}`"))
+        }
+        (command, Some(_)) => return usage_error(format!("`{command}` does not take `--format`")),
+        (command, None) => command,
     };
 
     let rest: Vec<&str> = args[1..].iter().map(String::as_str).collect();
@@ -217,10 +236,10 @@ fn main() -> ExitCode {
     let image_arg = match (command, rest.as_slice()) {
         ("plan", []) | ("plan", ["--json"]) => None,
         ("check", []) | ("generate", []) | ("verify", []) => None,
-        ("section", []) => None,
+        ("section", []) | ("graph" | "graph-json", []) => None,
         ("section", [image]) => Some(*image),
-        ("plan" | "check" | "section" | "generate" | "verify", _) => {
-            return usage_error(format!("`{command}` does not take {}", rest.join(" ")))
+        ("plan" | "check" | "section" | "graph" | "graph-json" | "generate" | "verify", _) => {
+            return usage_error(format!("`{}` does not take {}", args[0], rest.join(" ")))
         }
         (other, _) => return usage_error(format!("unknown command `{other}`")),
     };

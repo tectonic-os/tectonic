@@ -19,3 +19,40 @@ set -euxo pipefail
 
 MODDIR=/ctx/modules/core/unclaimed
 export MODDIR
+==== generated/broken-collect.graph.md
+# Broken Collect capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["quay.io/fedora/fedora-bootc:44"]
+    m0["core/menu"]
+    m1["core/absent"]
+    m2["core/unclaimed"]
+```
+
+## Capabilities
+
+| Name | Kind | Provided by | Required by | After |
+|---|---|---|---|---|
+| `rechunking` | capability | `base` |  |  |
+==== generated/broken-collect.graph.json
+{
+  "image": "broken-collect",
+  "capabilities": [
+    {
+      "name": "rechunking",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    }
+  ],
+  "overrides": []
+}

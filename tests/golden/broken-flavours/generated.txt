@@ -17,3 +17,38 @@ if [ "${FLAVOUR:-}" != "server" ]; then
     echo "skipping core/hello: not built for '${FLAVOUR:-the ungated build}'"
     exit 0
 fi
+==== generated/broken-flavours.graph.md
+# Broken Flavours capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["quay.io/fedora/fedora-bootc:44"]
+    m0["core/hello"]
+```
+
+## Capabilities
+
+| Name | Kind | Provided by | Required by | After |
+|---|---|---|---|---|
+| `rechunking` | capability | `base` |  |  |
+==== generated/broken-flavours.graph.json
+{
+  "image": "broken-flavours",
+  "capabilities": [
+    {
+      "name": "rechunking",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    }
+  ],
+  "overrides": []
+}

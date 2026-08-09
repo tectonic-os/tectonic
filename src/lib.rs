@@ -130,6 +130,7 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
                 &resolved.collected,
                 root,
             ));
+            files.extend(emit::graph::files(image));
         }
     }
 
@@ -139,6 +140,16 @@ pub fn run(command: &str, image_arg: Option<&str>, root: &Path) -> Run {
 
     let stdout = match command {
         "plan" => emit::plan::build(&list, &resolved, &workflows).render(),
+        "graph" | "graph-json" => match one {
+            Some(i) => {
+                let graph = emit::graph::of(&list.images[i]);
+                match command {
+                    "graph" => graph.markdown(),
+                    _ => graph.json().render(),
+                }
+            }
+            None => String::new(),
+        },
         "section" => match one {
             Some(i) => emit::containerfile::section(
                 &list.images[i],

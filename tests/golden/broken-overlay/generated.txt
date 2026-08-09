@@ -31,3 +31,51 @@ else
 fi
 
 source /ctx/modules/core/third/module.sh
+==== generated/broken-overlay.graph.md
+# Broken Overlay capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["quay.io/fedora/fedora-bootc:44"]
+    m0["core/first"]
+    m1["core/second"]
+    m2["core/third"]
+```
+
+## Capabilities
+
+| Name | Kind | Provided by | Required by | After |
+|---|---|---|---|---|
+| `rechunking` | capability | `base` |  |  |
+
+## Overrides
+
+| Module | Path |
+|---|---|
+| `core/third` | `/usr/lib/nothing.conf` |
+==== generated/broken-overlay.graph.json
+{
+  "image": "broken-overlay",
+  "capabilities": [
+    {
+      "name": "rechunking",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    }
+  ],
+  "overrides": [
+    {
+      "module": "core/third",
+      "path": "/usr/lib/nothing.conf"
+    }
+  ]
+}

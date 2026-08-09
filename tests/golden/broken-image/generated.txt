@@ -1,0 +1,18 @@
+==== generated/Not An Id.graph.md
+#  capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+```
+==== generated/Not An Id.graph.json
+{
+  "image": "Not An Id",
+  "capabilities": [],
+  "overrides": []
+}

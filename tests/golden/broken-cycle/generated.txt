@@ -12,3 +12,63 @@ set -euxo pipefail
 
 MODDIR=/ctx/modules/core/b
 export MODDIR
+==== generated/broken-cycle.graph.md
+# Broken Cycle capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["quay.io/fedora/fedora-bootc:44"]
+    m0["core/a"]
+    m1["core/b"]
+    m0 -->|"a"| m1
+    m1 -->|"b"| m0
+```
+
+## Capabilities
+
+| Name | Kind | Provided by | Required by | After |
+|---|---|---|---|---|
+| `a` | capability | `core/a` | `core/b` |  |
+| `b` | capability | `core/b` | `core/a` |  |
+| `rechunking` | capability | `base` |  |  |
+==== generated/broken-cycle.graph.json
+{
+  "image": "broken-cycle",
+  "capabilities": [
+    {
+      "name": "a",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "core/a",
+      "required_by": [
+        "core/b"
+      ],
+      "after": []
+    },
+    {
+      "name": "b",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "core/b",
+      "required_by": [
+        "core/a"
+      ],
+      "after": []
+    },
+    {
+      "name": "rechunking",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    }
+  ],
+  "overrides": []
+}

@@ -12,3 +12,39 @@ set -euxo pipefail
 
 MODDIR=/ctx/modules/.remote/steam-tweaks
 export MODDIR
+==== generated/pinned.graph.md
+# Pinned capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["quay.io/fedora/fedora-bootc:44"]
+    m0["core/hello"]
+    m1["steam-tweaks"]
+```
+
+## Capabilities
+
+| Name | Kind | Provided by | Required by | After |
+|---|---|---|---|---|
+| `rechunking` | capability | `base` |  |  |
+==== generated/pinned.graph.json
+{
+  "image": "pinned",
+  "capabilities": [
+    {
+      "name": "rechunking",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    }
+  ],
+  "overrides": []
+}

@@ -25,3 +25,40 @@ export MODDIR
 
 mkdir -p /usr/share/menu/justfile.apps.d
 cat /ctx/modules/core/network/justfile.inc > /usr/share/menu/justfile.apps.d/0100-core-network.part
+==== generated/collecting.graph.md
+# Collecting capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["quay.io/fedora/fedora-bootc:44"]
+    m0["core/menu"]
+    m1["core/power"]
+    m2["core/network"]
+```
+
+## Capabilities
+
+| Name | Kind | Provided by | Required by | After |
+|---|---|---|---|---|
+| `rechunking` | capability | `base` |  |  |
+==== generated/collecting.graph.json
+{
+  "image": "collecting",
+  "capabilities": [
+    {
+      "name": "rechunking",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    }
+  ],
+  "overrides": []
+}

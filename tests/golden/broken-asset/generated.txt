@@ -11,3 +11,38 @@ export ASSET_TRACKED_AND_MANUAL_URL="https://example.com/download/v1.0.0/tool.ta
 export ASSET_TRACKED_AND_MANUAL_SHA256="NOTHEX"
 export ASSET_NO_TRACKING_VERSION="1.0.0"
 export ASSET_NO_TRACKING_URL="https://example.com/download/v{tag}/tool.tar.gz; rm -rf /"
+==== generated/broken-asset.graph.md
+# Broken Asset capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["quay.io/fedora/fedora-bootc:44"]
+    m0["core/pins"]
+```
+
+## Capabilities
+
+| Name | Kind | Provided by | Required by | After |
+|---|---|---|---|---|
+| `rechunking` | capability | `base` |  |  |
+==== generated/broken-asset.graph.json
+{
+  "image": "broken-asset",
+  "capabilities": [
+    {
+      "name": "rechunking",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    }
+  ],
+  "overrides": []
+}

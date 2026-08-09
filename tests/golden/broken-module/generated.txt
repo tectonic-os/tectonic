@@ -5,3 +5,47 @@ set -euxo pipefail
 
 MODDIR=/ctx/modules/core/nameless
 export MODDIR
+==== generated/broken-module.graph.md
+# Broken Module capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["quay.io/fedora/fedora-bootc:44"]
+    m0["core/nameless"]
+```
+
+## Capabilities
+
+| Name | Kind | Provided by | Required by | After |
+|---|---|---|---|---|
+| `rechunking` | capability | `base` |  |  |
+| `shell-tools` | capability | `core/nameless` |  |  |
+==== generated/broken-module.graph.json
+{
+  "image": "broken-module",
+  "capabilities": [
+    {
+      "name": "rechunking",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "shell-tools",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "core/nameless",
+      "required_by": [],
+      "after": []
+    }
+  ],
+  "overrides": []
+}
