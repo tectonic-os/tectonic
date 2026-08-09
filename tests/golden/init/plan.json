@@ -24,10 +24,6 @@
       "enabled": true
     },
     {
-      "file": "checksums.yml",
-      "enabled": true
-    },
-    {
       "file": "cleanup-registry.yml",
       "enabled": true
     },

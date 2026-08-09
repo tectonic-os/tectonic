@@ -30,13 +30,124 @@ env:
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"  # do not edit
 
 jobs:
+  # First, so everything below reads the fixed-up tree rather than a second
+  # workflow run over it.
+  checksums:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    outputs:
+      ref: ${{ steps.fixup.outputs.ref }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref || '' }}
+          fetch-depth: 0
+
+      - name: Recompute stale checksums and push a fixup
+        id: fixup
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+
+          base="$(git merge-base "origin/${BASE_REF}" HEAD)"
+          changed="$(git diff --name-only "$base" HEAD \
+            | grep -E '^(modules/.*/module\.kdl|modules\.kdl)$' || true)"
+          if [ -z "$changed" ]; then
+            echo "No manifest changed against ${BASE_REF}, nothing to do."
+            exit 0
+          fi
+          echo "Changed manifests:"
+          echo "$changed"
+
+          fixed=()
+
+          if grep -qE '^[^/]+\.kdl$' <<< "$changed"; then
+            while IFS='|' read -r name _ ref pinned url _ file; do
+              if ! curl -fsSL --retry 3 "$url" -o "${RUNNER_TEMP}/module"; then
+                echo "::error file=${file}::${name} ${ref}: ${url} did not download. A ref whose archive URL does not follow from it needs the source template in ${file} updated by hand."
+                exit 1
+              fi
+              actual="$(sha256sum "${RUNNER_TEMP}/module" | cut -d' ' -f1)"
+              rm -f "${RUNNER_TEMP}/module"
+
+              if [ "$actual" = "$pinned" ]; then
+                echo "${name} ${ref}: hash already matches."
+                continue
+              fi
+              sed -i "s/sha256 \"${pinned}\"/sha256 \"${actual}\"/" "${file}"
+              fixed+=("${name} ${ref}")
+              echo "${name} ${ref}: hash updated."
+            done < <(./scripts/tect.sh plan --json | jq -r '.remotes[]
+              | [.name, .dir, .ref, .sha256, .url, (.path // ""), .file] | join("|")')
+          fi
+
+          ./scripts/fetch-modules.sh
+          while IFS='|' read -r module name file version pinned from url; do
+            grep -qxF "$file" <<< "$changed" || continue
+            [ -n "$pinned" ] || continue
+            if [ "$from" = "manual" ]; then
+              echo "${module} ${name}: hash is maintained by hand, skipping."
+              continue
+            fi
+
+            target="$url"
+            [ "$from" != "sidecar" ] || target="${url}.sha256"
+            if ! curl -fsSL --retry 3 "$target" -o "${RUNNER_TEMP}/asset"; then
+              echo "::error file=${file}::${name} ${version}: ${target} did not download. A version bump whose asset filename does not follow from the version needs the url in ${file} updated by hand."
+              exit 1
+            fi
+            if [ "$from" = "sidecar" ]; then
+              actual="$(cut -d' ' -f1 < "${RUNNER_TEMP}/asset")"
+            else
+              actual="$(sha256sum "${RUNNER_TEMP}/asset" | cut -d' ' -f1)"
+            fi
+            rm -f "${RUNNER_TEMP}/asset"
+
+            if [ "$actual" = "$pinned" ]; then
+              echo "${module} ${name} ${version}: hash already matches."
+              continue
+            fi
+            sed -i "s/sha256 \"${pinned}\"/sha256 \"${actual}\"/" "$file"
+            fixed+=("${name} ${version}")
+            echo "${module} ${name} ${version}: hash updated."
+          done < <(./scripts/tect.sh plan --json | jq -r '.assets[]
+            | [.module, .name, .manifest, (.version // ""), (.sha256 // ""), .from,
+               (.url // "")] | join("|")')
+
+          ./scripts/tect.sh generate
+
+          if git diff --quiet; then
+            echo "Nothing to fix up."
+            exit 0
+          fi
+
+          if [ "${#fixed[@]}" -gt 0 ]; then
+            message="update checksums: $(IFS=', '; echo "${fixed[*]}")"
+          else
+            message="regenerate the build files for the bumped pins"
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "$message"
+          git push origin "HEAD:${BRANCH}"
+          echo "ref=${BRANCH}" >> "$GITHUB_OUTPUT"
+
   lint:
+    needs: checksums
     runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.checksums.outputs.ref }}
 
       - name: Install shfmt
         env:
@@ -52,23 +163,29 @@ jobs:
         run: ./scripts/lint.sh
 
   actionlint:
+    needs: checksums
     runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.checksums.outputs.ref }}
 
       - name: Run actionlint
         uses: docker://rhysd/actionlint:1.7.12
 
   script-tests:
+    needs: checksums
     runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.checksums.outputs.ref }}
 
       - name: Discover and run kernel-freshness tests
         run: |
@@ -79,7 +196,7 @@ jobs:
           done
 
   compute-matrix:
-    needs: [lint, actionlint, script-tests]
+    needs: [checksums, lint, actionlint, script-tests]
     if: github.event_name != 'push' || github.actor != 'renovate[bot]'
     runs-on: ubuntu-24.04
     outputs:
@@ -87,6 +204,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.checksums.outputs.ref }}
       - id: set
         run: |
           selection='[.images[].targets[].name]'
@@ -97,7 +216,7 @@ jobs:
           echo "targets=${targets}" >> "$GITHUB_OUTPUT"
 
   build_push:
-    needs: compute-matrix
+    needs: [checksums, compute-matrix]
     name: Build and push image (${{ matrix.target }})
     runs-on: ubuntu-24.04
 
@@ -117,6 +236,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.checksums.outputs.ref }}
 
       - name: Resolve the plan
         env:
