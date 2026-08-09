@@ -5,7 +5,9 @@ use crate::model::image::{Entry, Image, List};
 use crate::model::module::{Collect, Contribution, Decl, Module, PackageGroup, VerifyException};
 use crate::model::remote::REMOTE_DIR;
 use crate::parse::disk::Disk;
-use crate::parse::{asset, options, prop, string_args, syntax_issue};
+use crate::parse::schema::{check_doc, Arg, Kind, Node, Prop, Say};
+use crate::parse::{asset, boolean, flag, options, prop, prop_span};
+use crate::parse::{string_arg, string_args, syntax_issue};
 use crate::resolve::options as resolve_options;
 use crate::runtime::{class_names, VERIFY_CLASSES};
 use kdl::{KdlDocument, KdlNode};
@@ -34,6 +36,120 @@ fn bad_token(value: &str) -> Option<&'static str> {
     None
 }
 
+const PRIORITY: Say = Say::new(
+    "`priority` is a number from 0 to 9999",
+    "not a priority",
+    "it becomes the NNNN in the staged filename, so four digits is the whole range there is",
+);
+
+/// The manifest's grammar, and the whole of it.
+#[rustfmt::skip]
+pub const MODULE: Node = Node::new("module",
+    "One module: what it builds on, what it needs from the rest, and what it installs.")
+    .children(&[
+        Node::new("description", "One line naming the module in the resolved build summary.")
+            .arg(Arg::Str, Say::new("`description` needs a string", "no description given", ""))
+            .once(""),
+        Node::new("supports", "The base families this module builds on, matched against the \
+             image's `family`.")
+            .arg(Arg::Strs, Say::NONE),
+
+        Node::new("provides", "A capability this module satisfies for the modules that require it.")
+            .arg(Arg::Strs, Say::new("`{}` needs a capability name", "nothing named", "")),
+        Node::new("requires", "A capability another module has to provide, which also orders the \
+             build.")
+            .arg(Arg::Strs, Say::new("`{}` needs a capability name", "nothing named", "")),
+        Node::new("after", "A module this one builds after without requiring anything of it.")
+            .arg(Arg::Strs, Say::new("`{}` needs a capability name", "nothing named", "")),
+
+        Node::new("provides-file", "An absolute path this module guarantees, which another module \
+             may require.")
+            .arg(Arg::Strs, Say::NONE)
+            .props(&[
+                Prop { name: "build-only", kind: Kind::Bool,
+                    desc: "Whether the path exists only while the build runs.",
+                    say: Say::new("`build-only` takes #true or #false", "not a boolean", "") },
+            ], Say::new("unknown `provides-file` property `{}`", "not part of the schema",
+                "`provides-file` accepts `build-only`")),
+        Node::new("requires-file", "An absolute path some other module has to ship.")
+            .arg(Arg::Strs, Say::NONE)
+            .props(&[], Say::new("`{}` is not a `requires-file` property",
+                "only `provides-file` declares a lifetime", "")),
+        Node::new("overrides", "An absolute path this module replaces deliberately.")
+            .arg(Arg::Strs, Say::NONE)
+            .props(&[], Say::new("`{}` is not an `overrides` property",
+                "only `provides-file` declares a lifetime", "")),
+
+        Node::new("secret", "A build secret this module's layer mounts.")
+            .arg(Arg::Strs, Say::new("`{}` needs a name", "nothing named", "")),
+        Node::new("arg", "A build argument this module's layer reads.")
+            .arg(Arg::Strs, Say::new("`{}` needs a name", "nothing named", "")),
+
+        Node::new("allow-verify",
+            "One `tect validate-image` diagnostic accepted on one unit rather than image-wide.")
+            .arg(Arg::Str, Say::NONE)
+            .props(&[
+                Prop { name: "unit", kind: Kind::Str,
+                    desc: "The unit the exception applies to.",
+                    say: Say::new("`unit` must be a string", "not a string", "") },
+            ], Say::new("unknown `allow-verify` property `{}`", "not part of the schema",
+                "`allow-verify` accepts `unit`")),
+
+        Node::new("collects", "A filename this module gathers from every module that ships one.")
+            .arg(Arg::Str, Say::NONE)
+            .props(&[
+                Prop { name: "into", kind: Kind::Str,
+                    desc: "The absolute path the assembled file is written to.",
+                    say: Say::NONE },
+                Prop { name: "priority", kind: Kind::Int(0, 9999),
+                    desc: "Where a contribution lands when it declares none.",
+                    say: PRIORITY },
+            ], Say::new("unknown `collects` property `{}`", "not part of the schema",
+                "`collects` accepts `into` and `priority`")),
+        Node::new("contributes", "A file this module ships for another module to collect.")
+            .arg(Arg::Str, Say::NONE)
+            .props(&[
+                Prop { name: "priority", kind: Kind::Int(0, 9999),
+                    desc: "Where this file lands in the assembled one.",
+                    say: PRIORITY },
+            ], Say::new("unknown `contributes` property `{}`", "not part of the schema",
+                "`contributes` accepts `priority`")),
+
+        Node::new("fragment",
+            "Where the module's Containerfile.inc goes relative to the generated layer.")
+            .arg(Arg::None, Say::new("`fragment` takes no arguments", "unexpected value",
+                "`fragment position=\"after\"`"))
+            .once("")
+            .props(&[
+                Prop { name: "position", kind: Kind::One(&["before", "after"]),
+                    desc: "Whether the fragment goes above or below the generated block.",
+                    say: Say::new("`position` must be \"before\" or \"after\"", "not a position",
+                        "before, the default, puts the fragment above the generated block; after \
+                         puts it below") },
+                Prop { name: "standard-layer", kind: Kind::Bool,
+                    desc: "Whether the generated block is emitted at all.",
+                    say: Say::new("`standard-layer` must be #true or #false", "not a boolean", "") },
+            ], Say::new("unknown fragment property `{}`", "not part of the schema",
+                "a fragment accepts `position` and `standard-layer`")),
+
+        options::OPTION,
+        options::VARIANT,
+        asset::ASSET,
+
+        Node::new("packages", "The packages this module installs, listed per base family.")
+            .children(&[
+                Node::new("", "One base family, and the packages to install on it.")
+                    .arg(Arg::Strs, Say::NONE)
+                    .props(&[
+                        Prop { name: "enablerepo", kind: Kind::Str,
+                            desc: "A repository enabled for this install and disabled otherwise.",
+                            say: Say::NONE },
+                    ], Say::new("unknown property `{}` in packages block", "not part of the schema",
+                        "a family entry in `packages` accepts `enablerepo`")),
+            ], Say::NONE),
+    ], Say::new("unknown node `{}`", "not part of the schema",
+        "SCHEMA.md documents every node a manifest may hold"));
+
 /// A declared `priority=`, four digits at most because that is what the staged
 /// filename carries and the filename is what orders the assembly.
 enum Priority {
@@ -42,7 +158,7 @@ enum Priority {
     Set(u32),
 }
 
-fn priority(node: &KdlNode, src: &Source, issues: &mut Issues) -> Priority {
+fn priority(node: &KdlNode) -> Priority {
     let Some(entry) = node
         .entries()
         .iter()
@@ -52,14 +168,7 @@ fn priority(node: &KdlNode, src: &Source, issues: &mut Issues) -> Priority {
     };
     match entry.value().as_integer() {
         Some(value) if (0..=9999).contains(&value) => Priority::Set(value as u32),
-        _ => {
-            issues.push(
-                Issue::new("`priority` is a number from 0 to 9999", src)
-                    .at(entry.span(), "not a priority")
-                    .help("it becomes the NNNN in the staged filename, so four digits is the whole range there is"),
-            );
-            Priority::Invalid
-        }
+        _ => Priority::Invalid,
     }
 }
 
@@ -163,16 +272,16 @@ impl Module {
             src: src.clone(),
         };
 
-        let mut fragment_span: Option<Span> = None;
+        check_doc(&doc, &MODULE, src, issues);
+
+        let mut fragment_seen = false;
         for node in doc.nodes() {
             match node.name().value() {
-                "description" => match string_args(node).first() {
-                    Some(d) if !d.is_empty() => module.description = d.to_string(),
-                    _ => issues.push(
-                        Issue::new("`description` needs a string", src)
-                            .at(node.name().span(), "no description given"),
-                    ),
-                },
+                "description" => {
+                    if module.description.is_empty() {
+                        module.description = string_arg(node).unwrap_or_default().to_string();
+                    }
+                }
                 "supports" => {
                     for family in string_args(node) {
                         if !FAMILIES.contains(&family) {
@@ -196,12 +305,6 @@ impl Module {
                             span: node.name().span().into(),
                         })
                         .collect::<Vec<_>>();
-                    if decls.is_empty() {
-                        issues.push(
-                            Issue::new(format!("`{kind}` needs a capability name"), src)
-                                .at(node.name().span(), "nothing named"),
-                        );
-                    }
                     match kind {
                         "provides" => module.provides.extend(decls),
                         "requires" => module.requires.extend(decls),
@@ -209,30 +312,7 @@ impl Module {
                     }
                 }
                 kind @ ("provides-file" | "requires-file" | "overrides") => {
-                    let build_only = match node
-                        .entries()
-                        .iter()
-                        .find(|e| e.name().map(|n| n.value()) == Some("build-only"))
-                    {
-                        None => false,
-                        Some(entry) if kind != "provides-file" => {
-                            issues.push(
-                                Issue::new(format!("`build-only` is not a `{kind}` property"), src)
-                                    .at(entry.span(), "only `provides-file` declares a lifetime"),
-                            );
-                            false
-                        }
-                        Some(entry) => match entry.value().as_bool() {
-                            Some(value) => value,
-                            None => {
-                                issues.push(
-                                    Issue::new("`build-only` takes #true or #false", src)
-                                        .at(entry.span(), "not a boolean"),
-                                );
-                                false
-                            }
-                        },
-                    };
+                    let build_only = kind == "provides-file" && flag(node, "build-only");
                     for path in string_args(node) {
                         if !path.starts_with('/') {
                             issues.push(
@@ -257,14 +337,7 @@ impl Module {
                     }
                 }
                 kind @ ("secret" | "arg") => {
-                    let names = string_args(node);
-                    if names.is_empty() {
-                        issues.push(
-                            Issue::new(format!("`{kind}` needs a name"), src)
-                                .at(node.name().span(), "nothing named"),
-                        );
-                    }
-                    for name in names {
+                    for name in string_args(node) {
                         let decl = Decl {
                             name: name.to_string(),
                             span: node.name().span().into(),
@@ -278,30 +351,8 @@ impl Module {
                 }
                 "allow-verify" => {
                     let span: Span = node.name().span().into();
-                    let class = string_args(node).first().map(|s| s.to_string());
-                    let mut unit = None;
-                    for prop in node.entries() {
-                        let Some(key) = prop.name().map(|n| n.value()) else {
-                            continue; // the class itself
-                        };
-                        match key {
-                            "unit" => match prop.value().as_string() {
-                                Some(v) => unit = Some(v.to_string()),
-                                None => issues.push(
-                                    Issue::new("`unit` must be a string", src)
-                                        .at(prop.span(), "not a string"),
-                                ),
-                            },
-                            other => issues.push(
-                                Issue::new(
-                                    format!("unknown `allow-verify` property `{other}`"),
-                                    src,
-                                )
-                                .at(prop.span(), "not part of the schema")
-                                .help("`allow-verify` accepts `unit`"),
-                            ),
-                        }
-                    }
+                    let class = string_arg(node).map(str::to_string);
+                    let unit = prop(node, "unit").map(str::to_string);
 
                     match (class, unit) {
                         (Some(class), Some(unit)) => {
@@ -363,7 +414,7 @@ impl Module {
                 "collects" => {
                     let collected = string_args(node).first().map(|s| s.to_string());
                     let into = prop(node, "into");
-                    let priority = priority(node, src, issues);
+                    let priority = priority(node);
                     match (collected, into, priority) {
                         (Some(collected), Some(into), Priority::Set(priority))
                             if into.starts_with('/') =>
@@ -396,7 +447,7 @@ impl Module {
                 }
                 "contributes" => {
                     let contributed = string_args(node).first().map(|s| s.to_string());
-                    let priority = priority(node, src, issues);
+                    let priority = priority(node);
                     match (contributed, priority) {
                         (Some(contributed), Priority::Set(priority)) => {
                             if !dir.join(&contributed).is_file() {
@@ -440,15 +491,10 @@ impl Module {
                     }
                 }
                 "fragment" => {
-                    if let Some(first) = fragment_span {
-                        issues.push(
-                            Issue::new("`fragment` is declared twice", src)
-                                .at(first, "first here")
-                                .at(node.name().span(), "and again here"),
-                        );
+                    if fragment_seen {
                         continue;
                     }
-                    fragment_span = Some(node.name().span().into());
+                    fragment_seen = true;
                     if module.fragment.is_none() {
                         issues.push(
                             Issue::new(
@@ -505,11 +551,7 @@ impl Module {
                     }
                 }
                 "packages" => module.parse_packages(node, src, issues),
-                other => issues.push(
-                    Issue::new(format!("unknown node `{other}`"), src)
-                        .at(node.name().span(), "not part of the schema")
-                        .help("SCHEMA.md documents every node a manifest may hold"),
-                ),
+                _ => {}
             }
         }
 
@@ -579,45 +621,12 @@ impl Module {
     /// additive case: the fragment goes above the generated block and the
     /// block is still emitted.
     fn parse_fragment(&mut self, node: &KdlNode, src: &Source, issues: &mut Issues) {
-        let mut position_span: Option<Span> = None;
-        for prop in node.entries() {
-            let Some(key) = prop.name().map(|n| n.value()) else {
-                issues.push(
-                    Issue::new("`fragment` takes no arguments", src)
-                        .at(prop.span(), "unexpected value")
-                        .help("`fragment position=\"after\"`"),
-                );
-                continue;
-            };
-            match key {
-                "position" => match prop.value().as_string() {
-                    Some(p @ ("before" | "after")) => {
-                        self.fragment_after = p == "after";
-                        position_span = Some(prop.span().into());
-                    }
-                    _ => issues.push(
-                        Issue::new("`position` must be \"before\" or \"after\"", src)
-                            .at(prop.span(), "not a position")
-                            .help("before, the default, puts the fragment above the generated block; after puts it below"),
-                    ),
-                },
-                "standard-layer" => match prop.value().as_bool() {
-                    Some(v) => self.standard_layer = v,
-                    None => issues.push(
-                        Issue::new("`standard-layer` must be #true or #false", src)
-                            .at(prop.span(), "not a boolean"),
-                    ),
-                },
-                other => issues.push(
-                    Issue::new(format!("unknown fragment property `{other}`"), src)
-                        .at(prop.span(), "not part of the schema")
-                        .help("a fragment accepts `position` and `standard-layer`"),
-                ),
-            }
-        }
+        let position = prop(node, "position").filter(|p| matches!(*p, "before" | "after"));
+        self.fragment_after = position == Some("after");
+        self.standard_layer = boolean(node, "standard-layer").unwrap_or(true);
 
         if !self.standard_layer {
-            if let Some(span) = position_span {
+            if let Some(span) = position.and_then(|_| prop_span(node, "position")) {
                 issues.push(
                     Issue::new(
                         "`position` says nothing without a standard layer",
@@ -685,29 +694,19 @@ impl Module {
                 continue;
             }
             let mut enablerepo: Option<String> = None;
-            for entry in child.entries() {
-                let Some(key) = entry.name().map(|n| n.value()) else {
-                    continue;
-                };
-                match key {
-                    "enablerepo" => match entry.value().as_string() {
-                        Some(v) if !v.is_empty() => match bad_token(v) {
-                            Some(problem) => issues.push(
-                                Issue::new(format!("repo ID `{v}` {problem}"), src)
-                                    .at(entry.span(), "would not survive the RUN line")
-                                    .help(TOKEN_HELP),
-                            ),
-                            None => enablerepo = Some(v.to_string()),
-                        },
-                        _ => issues.push(
-                            Issue::new("`enablerepo` needs a repo ID string", src)
-                                .at(entry.span(), "not a string"),
+            if let Some(span) = prop_span(child, "enablerepo") {
+                match prop(child, "enablerepo").filter(|v| !v.is_empty()) {
+                    Some(repo) => match bad_token(repo) {
+                        Some(problem) => issues.push(
+                            Issue::new(format!("repo ID `{repo}` {problem}"), src)
+                                .at(span, "would not survive the RUN line")
+                                .help(TOKEN_HELP),
                         ),
+                        None => enablerepo = Some(repo.to_string()),
                     },
-                    other => issues.push(
-                        Issue::new(format!("unknown property `{other}` in packages block"), src)
-                            .at(entry.span(), "not part of the schema")
-                            .help("a family entry in `packages` accepts `enablerepo`"),
+                    None => issues.push(
+                        Issue::new("`enablerepo` needs a repo ID string", src)
+                            .at(span, "not a string"),
                     ),
                 }
             }

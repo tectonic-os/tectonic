@@ -9,7 +9,7 @@ pub mod remote;
 pub mod repo;
 pub mod schema;
 
-use crate::diag::{Issue, Source};
+use crate::diag::{Issue, Source, Span};
 use kdl::KdlNode;
 
 /// A syntax error as one issue, carrying what the parser found so it is
@@ -64,13 +64,25 @@ pub(crate) fn prop<'a>(node: &'a KdlNode, key: &str) -> Option<&'a str> {
         .and_then(|e| e.value().as_string())
 }
 
-/// A named entry of a node, as a boolean, defaulting to off.
-pub(crate) fn flag(node: &KdlNode, key: &str) -> bool {
+/// A named entry of a node, as a boolean.
+pub(crate) fn boolean(node: &KdlNode, key: &str) -> Option<bool> {
     node.entries()
         .iter()
         .find(|e| e.name().map(|n| n.value()) == Some(key))
         .and_then(|e| e.value().as_bool())
-        .unwrap_or(false)
+}
+
+/// A named entry of a node, as a boolean, defaulting to off.
+pub(crate) fn flag(node: &KdlNode, key: &str) -> bool {
+    boolean(node, key).unwrap_or(false)
+}
+
+/// Where a named entry sits, for a diagnostic about the property itself.
+pub(crate) fn prop_span(node: &KdlNode, key: &str) -> Option<Span> {
+    node.entries()
+        .iter()
+        .find(|e| e.name().map(|n| n.value()) == Some(key))
+        .map(|e| e.span().into())
 }
 
 pub(crate) fn kids(node: &KdlNode) -> &[KdlNode] {

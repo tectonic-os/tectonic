@@ -3,7 +3,18 @@
 
 use crate::diag::{Issue, Issues, Source};
 use crate::model::options::{check_values, Opt, OptType, Value, Variant};
+use crate::parse::schema::Node;
 use kdl::{KdlNode, KdlValue};
+
+pub const OPTION: Node = Node::new(
+    "option",
+    "One value an image may set on this module, reaching the build as OPT_*.",
+);
+
+pub const VARIANT: Node = Node::new(
+    "variant",
+    "A named set of option values an image selects with `variant=`.",
+);
 
 impl From<&KdlValue> for Value {
     fn from(value: &KdlValue) -> Self {
