@@ -67,46 +67,59 @@ fn in_repo() -> bool {
         .is_some()
 }
 
-/// Removes every `--<flag> <value>` and `--<flag>=<value>` from the arguments.
-fn take_flags(args: &mut Vec<String>, flag: &str) -> Result<Vec<String>, String> {
-    let mut values = Vec::new();
-    let mut i = 0;
-    while i < args.len() {
-        let taken = if let Some(v) = args[i].strip_prefix(&format!("--{flag}=")) {
-            values.push(v.to_string());
-            1
-        } else if args[i] == format!("--{flag}") {
-            values.push(
-                args.get(i + 1)
-                    .ok_or(format!("`--{flag}` takes a value"))?
-                    .clone(),
-            );
-            2
-        } else {
-            i += 1;
-            continue;
-        };
-        args.drain(i..i + taken);
+/// The words left after every flag is taken out, and the flags that were there,
+/// which is what `only` holds a command to.
+struct Args {
+    words: Vec<String>,
+    given: Vec<&'static str>,
+}
+
+impl Args {
+    /// Removes every `--<flag> <value>` and `--<flag>=<value>`.
+    fn flags(&mut self, flag: &'static str) -> Result<Vec<String>, String> {
+        let mut values = Vec::new();
+        let mut i = 0;
+        while i < self.words.len() {
+            let taken = if let Some(v) = self.words[i].strip_prefix(&format!("--{flag}=")) {
+                values.push(v.to_string());
+                1
+            } else if self.words[i] == format!("--{flag}") {
+                values.push(
+                    self.words
+                        .get(i + 1)
+                        .ok_or(format!("`--{flag}` takes a value"))?
+                        .clone(),
+                );
+                2
+            } else {
+                i += 1;
+                continue;
+            };
+            self.words.drain(i..i + taken);
+        }
+        if !values.is_empty() {
+            self.given.push(flag);
+        }
+        Ok(values)
     }
-    Ok(values)
-}
 
-fn take_flag(args: &mut Vec<String>, flag: &str) -> Result<Option<String>, String> {
-    Ok(take_flags(args, flag)?.pop())
-}
+    fn flag(&mut self, flag: &'static str) -> Result<Option<String>, String> {
+        Ok(self.flags(flag)?.pop())
+    }
 
-/// Removes `--<flag>`.
-fn take_switch(args: &mut Vec<String>, flag: &str) -> bool {
-    let before = args.len();
-    args.retain(|arg| arg != &format!("--{flag}"));
-    args.len() != before
-}
+    /// Removes `--<flag>`. Not recorded: a switch belongs to every command.
+    fn switch(&mut self, flag: &str) -> bool {
+        let before = self.words.len();
+        self.words.retain(|arg| arg != &format!("--{flag}"));
+        self.words.len() != before
+    }
 
-/// A flag the command does not read is a failure rather than a silent no-op.
-fn only(given: &[&str], takes: &[&str], command: &str) -> Result<(), String> {
-    match given.iter().find(|flag| !takes.contains(flag)) {
-        Some(flag) => Err(format!("`{command}` does not take `--{flag}`")),
-        None => Ok(()),
+    /// A flag the command does not read is a failure rather than a silent no-op.
+    fn only(&self, takes: &[&str], command: &str) -> Result<(), String> {
+        match self.given.iter().find(|flag| !takes.contains(flag)) {
+            Some(flag) => Err(format!("`{command}` does not take `--{flag}`")),
+            None => Ok(()),
+        }
     }
 }
 
@@ -210,25 +223,29 @@ fn main() -> ExitCode {
 }
 
 fn run() -> Result<ExitCode, String> {
-    let mut args: Vec<String> = std::env::args().skip(1).collect();
-    let prompt = Prompt::new(take_switch(&mut args, "no-tui"));
-    let cache_to = take_switch(&mut args, "cache-to");
-    let no_cache_from = take_switch(&mut args, "no-cache-from");
-    let root_arg = take_flag(&mut args, "root")?.map(PathBuf::from);
-    let owner = take_flag(&mut args, "owner")?;
-    let image_arg = take_flag(&mut args, "image")?;
-    let module_arg = take_flag(&mut args, "module")?;
-    let cn = take_flag(&mut args, "cn")?;
-    let base = take_flag(&mut args, "base")?;
-    let format = take_flag(&mut args, "format")?;
-    let target = take_flag(&mut args, "target")?;
-    let tags = take_flags(&mut args, "tag")?;
-    let kernel = take_flag(&mut args, "kernel")?;
-    let backend = take_flag(&mut args, "backend")?;
-    let oci_output = take_flag(&mut args, "oci-output")?;
-    let secrets = take_flags(&mut args, "secret")?;
-    let pkgs = take_flags(&mut args, "pkg")?;
-    let with = take_flags(&mut args, "with")?
+    let mut args = Args {
+        words: std::env::args().skip(1).collect(),
+        given: Vec::new(),
+    };
+    let prompt = Prompt::new(args.switch("no-tui"));
+    let cache_to = args.switch("cache-to");
+    let no_cache_from = args.switch("no-cache-from");
+    let root_arg = args.flag("root")?.map(PathBuf::from);
+    let owner = args.flag("owner")?;
+    let image_arg = args.flag("image")?;
+    let module_arg = args.flag("module")?;
+    let cn = args.flag("cn")?;
+    let base = args.flag("base")?;
+    let format = args.flag("format")?;
+    let target = args.flag("target")?;
+    let tags = args.flags("tag")?;
+    let kernel = args.flag("kernel")?;
+    let backend = args.flag("backend")?;
+    let oci_output = args.flag("oci-output")?;
+    let secrets = args.flags("secret")?;
+    let pkgs = args.flags("pkg")?;
+    let with = args
+        .flags("with")?
         .iter()
         .map(|pair| match pair.split_once('=') {
             Some((verb, value)) => Ok((verb.to_string(), value.to_string())),
@@ -236,30 +253,7 @@ fn run() -> Result<ExitCode, String> {
         })
         .collect::<Result<Vec<_>, String>>()?;
 
-    let mut given: Vec<&str> = Vec::new();
-    for (flag, present) in [
-        ("root", root_arg.is_some()),
-        ("owner", owner.is_some()),
-        ("image", image_arg.is_some()),
-        ("module", module_arg.is_some()),
-        ("cn", cn.is_some()),
-        ("base", base.is_some()),
-        ("format", format.is_some()),
-        ("target", target.is_some()),
-        ("tag", !tags.is_empty()),
-        ("kernel", kernel.is_some()),
-        ("backend", backend.is_some()),
-        ("oci-output", oci_output.is_some()),
-        ("secret", !secrets.is_empty()),
-        ("pkg", !pkgs.is_empty()),
-        ("with", !with.is_empty()),
-    ] {
-        if present {
-            given.push(flag);
-        }
-    }
-
-    let words: Vec<&str> = args.iter().map(String::as_str).collect();
+    let words: Vec<&str> = args.words.iter().map(String::as_str).collect();
     match words.first() {
         None => {
             eprint!("{}", usage(in_repo()));
@@ -273,14 +267,14 @@ fn run() -> Result<ExitCode, String> {
     }
 
     if let ["create", "repo", rest @ ..] = words.as_slice() {
-        only(&given, &["root", "owner", "image", "base"], "create repo")?;
+        args.only(&["root", "owner", "image", "base"], "create repo")?;
         let name = one_name(rest, "create repo")?;
         tect::create::repo(name, owner, image_arg, base, root_arg, &prompt)?;
         return Ok(ExitCode::SUCCESS);
     }
 
     if let ["fetch", "modules"] = words.as_slice() {
-        only(&given, &["root"], "fetch modules")?;
+        args.only(&["root"], "fetch modules")?;
         let root = repo_root(root_arg)?;
         let (list, issues, context) = tect::declarations(&root);
         if issues.report(&context) {
@@ -306,7 +300,7 @@ fn run() -> Result<ExitCode, String> {
 
     match words.as_slice() {
         ["create", "image", rest @ ..] => {
-            only(&given, &["root", "owner", "base"], "create image")?;
+            args.only(&["root", "owner", "base"], "create image")?;
             let name = one_name(rest, "create image")?;
             let root = repo_root(root_arg)?;
             if refused(&root) {
@@ -323,7 +317,7 @@ fn run() -> Result<ExitCode, String> {
             return Ok(ExitCode::SUCCESS);
         }
         ["create", "module", rest @ ..] => {
-            only(&given, &["root", "image", "pkg", "with"], "create module")?;
+            args.only(&["root", "image", "pkg", "with"], "create module")?;
             let name = one_name(rest, "create module")?;
             let root = repo_root(root_arg)?;
             if refused(&root) {
@@ -333,7 +327,7 @@ fn run() -> Result<ExitCode, String> {
             return Ok(ExitCode::SUCCESS);
         }
         ["create", "cosign-key"] => {
-            only(&given, &["root", "module"], "create cosign-key")?;
+            args.only(&["root", "module"], "create cosign-key")?;
             let root = repo_root(root_arg)?;
             if refused(&root) {
                 return Ok(ExitCode::from(REPO_ERROR));
@@ -342,7 +336,7 @@ fn run() -> Result<ExitCode, String> {
             return Ok(ExitCode::SUCCESS);
         }
         ["create", "mok-key"] => {
-            only(&given, &["root", "module", "cn"], "create mok-key")?;
+            args.only(&["root", "module", "cn"], "create mok-key")?;
             let root = repo_root(root_arg)?;
             if refused(&root) {
                 return Ok(ExitCode::from(REPO_ERROR));
@@ -351,13 +345,12 @@ fn run() -> Result<ExitCode, String> {
             return Ok(ExitCode::SUCCESS);
         }
         ["import", "module", rest @ ..] => {
-            only(&given, &["root", "image"], "import module")?;
+            args.only(&["root", "image"], "import module")?;
             let name = one_name(rest, "import module")?;
             return import(name, &repo_root(root_arg)?, image_arg, &prompt);
         }
         ["build", rest @ ..] => {
-            only(
-                &given,
+            args.only(
                 &[
                     "root",
                     "target",
@@ -386,12 +379,12 @@ fn run() -> Result<ExitCode, String> {
             });
         }
         ["registry", "namespace"] => {
-            only(&given, &["root"], "registry namespace")?;
+            args.only(&["root"], "registry namespace")?;
             println!("{}", tect::registry::namespace(&repo_root(root_arg)?)?);
             return Ok(ExitCode::SUCCESS);
         }
         ["registry", "ref"] => {
-            only(&given, &["root", "target", "tag"], "registry ref")?;
+            args.only(&["root", "target", "tag"], "registry ref")?;
             let root = repo_root(root_arg)?;
             let (list, issues, context) = tect::declarations(&root);
             if issues.report(&context) {
@@ -418,8 +411,7 @@ fn run() -> Result<ExitCode, String> {
     let Some(command) = Command::parse(words[0]) else {
         return Err(format!("unknown command `{}`", words[0]));
     };
-    only(
-        &given,
+    args.only(
         match command {
             Command::Graph => &["root", "format"],
             _ => &["root"],
