@@ -2,6 +2,7 @@
 //! also a command: `create repo` calls `create image` in place rather than
 //! writing an image of its own.
 
+use crate::model::image::REPO_FILE;
 use crate::prompt::Prompt;
 use crate::ui::Choice;
 use std::path::{Path, PathBuf};
@@ -68,6 +69,7 @@ pub fn image(
 ) -> Result<(), String> {
     let name = prompt.text(name, "image name", flag, None)?;
     let id = crate::init::id(&name)?;
+    let implicit = implicit_default(root);
     let base = match base {
         Some(given) => given,
         None => choose_base(prompt)?,
@@ -89,7 +91,34 @@ pub fn image(
     }
     crate::init::put(&file, &image_kdl(&name, &id, owner, &base, &family, known))?;
     println!("wrote {}", file.display());
+    if let Some(was) = implicit.filter(|was| *was != id) {
+        append_default_image(root, &was)?;
+        println!("named \"{was}\" the default image in {REPO_FILE}");
+    }
     Ok(())
+}
+
+/// The image a repository with one of them and no `default-image` falls back
+/// to, which a second image takes away unless it is written down.
+fn implicit_default(root: &Path) -> Option<String> {
+    let (list, _) = crate::model::image::List::load(root);
+    match (&list.default_image_id, list.images.as_slice()) {
+        (None, [only]) => Some(only.id.clone()),
+        _ => None,
+    }
+}
+
+/// One `default-image` line at the end of repo.kdl, which does not carry the
+/// node: an append, never a rewrite.
+fn append_default_image(root: &Path, id: &str) -> Result<(), String> {
+    let file = root.join(REPO_FILE);
+    let mut text =
+        std::fs::read_to_string(&file).map_err(|err| format!("{}: {err}", file.display()))?;
+    if !text.ends_with('\n') {
+        text.push('\n');
+    }
+    text.push_str(&format!("\ndefault-image \"{id}\"\n"));
+    std::fs::write(&file, text).map_err(|err| format!("{}: {err}", file.display()))
 }
 
 /// One of the bases the catalog holds, or one typed in: an unknown base is not

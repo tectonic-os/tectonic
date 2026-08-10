@@ -60,8 +60,15 @@ satisfies.
 A repository with no image at all is a valid state. `check` says what is
 missing rather than failing, and `generate` says there is nothing to write.
 
-A second image makes a bare build ambiguous, which `check` reports: name one
-of them in `default-image` in `repo.kdl`.
+A second image makes a bare build ambiguous, so writing one into a repository
+that declares no `default-image` appends one naming the image already there:
+what a bare build built before is what it still builds. The line is appended
+and nothing else in `repo.kdl` moves. A repository that already declares a
+default keeps it.
+
+Nothing reports a missing default until a command has to pick an image with
+nothing naming one, so `check`, `generate` and anything given an image of its
+own never see it.
 
 ### `create module [name]`
 
