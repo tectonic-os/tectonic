@@ -51,7 +51,7 @@ pub fn run(root: &Path, opts: &Options) -> Result<bool, String> {
         eprintln!("tect: {line}");
     }
     // Never regenerated here: a build proves the committed files are current.
-    let gate = crate::run("verify", None, root);
+    let gate = crate::run(crate::Command::Verify, None, root);
     if gate.issues.report(&gate.context) {
         return Ok(true);
     }

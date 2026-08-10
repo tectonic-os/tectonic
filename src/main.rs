@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use tect::prompt::Prompt;
 use tect::ui::Choice;
+use tect::Command;
 
 const HEAD: &str = "usage: tect [--root <dir>] <command>\n";
 
@@ -414,52 +415,45 @@ fn run() -> Result<ExitCode, String> {
         _ => {}
     }
 
+    let Some(command) = Command::parse(words[0]) else {
+        return Err(format!("unknown command `{}`", words[0]));
+    };
     only(
         &given,
-        match words[0] {
-            "graph" => &["root", "format"],
+        match command {
+            Command::Graph => &["root", "format"],
             _ => &["root"],
         },
         words[0],
     )?;
-    let command = match (words[0], format.as_deref()) {
-        ("graph", None | Some("md")) => "graph",
-        ("graph", Some("json")) => "graph-json",
-        ("graph", Some(other)) => {
+    let command = match (command, format.as_deref()) {
+        (Command::Graph, None | Some("md")) => Command::Graph,
+        (Command::Graph, Some("json")) => Command::GraphJson,
+        (Command::Graph, Some(other)) => {
             return Err(format!("`--format` is md or json, not `{other}`"));
         }
         (command, _) => command,
     };
 
     let rest = &words[1..];
-    let image_arg = match (command, rest) {
-        ("plan", []) | ("plan", ["--json"]) => None,
-        ("check", []) | ("generate", []) | ("verify", []) => None,
-        ("section", []) | ("graph" | "graph-json", []) => None,
-        ("section", [image]) => Some(*image),
-        ("summary" | "sbom", []) => None,
-        ("summary" | "sbom", [target]) => Some(*target),
-        (
-            "plan" | "check" | "section" | "graph" | "graph-json" | "generate" | "verify"
-            | "summary" | "sbom",
-            _,
-        ) => {
-            return Err(format!("`{}` does not take {}", words[0], rest.join(" ")));
-        }
-        (other, _) => return Err(format!("unknown command `{other}`")),
+    let arg = match rest {
+        [] => None,
+        ["--json"] if command == Command::Plan => None,
+        [one] if command.arg().is_some() => Some(*one),
+        _ => return Err(format!("`{}` does not take {}", words[0], rest.join(" "))),
     };
 
     let root = repo_root(root_arg)?;
-    let run = tect::run(command, image_arg, &root);
+    let run = tect::run(command, arg, &root);
 
     if run.issues.report(&run.context) {
         return Ok(ExitCode::from(REPO_ERROR));
     }
-    if command == "generate" {
+    if command == Command::Generate {
         write_generated(&root, &run.files)?;
     }
     print!("{}", run.stdout);
-    if command == "check" {
+    if command == Command::Check {
         match run.images {
             0 => eprintln!("tect: no image yet; `tect create image <name>` writes one"),
             _ => eprintln!(
@@ -474,10 +468,10 @@ fn run() -> Result<ExitCode, String> {
             ),
         }
     }
-    if command == "generate" && run.files.is_empty() {
+    if command == Command::Generate && run.files.is_empty() {
         eprintln!("tect: nothing to generate; `tect create image <name>` writes an image");
     }
-    if command == "verify" {
+    if command == Command::Verify {
         let count = run.files.len();
         eprintln!(
             "tect: {count} generated file{} match the manifests",
