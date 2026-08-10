@@ -224,6 +224,28 @@ fn walk(dir: &Path) -> Vec<PathBuf> {
     out
 }
 
+/// Which commands the missing default belongs to: the ones that had to pick an
+/// image with nothing naming one, and no others.
+fn no_default(root: &Path) {
+    std::env::set_current_dir(root).expect("fixture root exists");
+    let here = Path::new(".");
+    for quiet in ["check", "generate"] {
+        let issues = tect::run(quiet, None, here).issues.plain();
+        assert!(issues.is_empty(), "{quiet} reported {issues}");
+    }
+    for quiet in [("section", "server"), ("graph", "server")] {
+        let issues = tect::run(quiet.0, Some(quiet.1), here).issues.plain();
+        assert!(issues.is_empty(), "{} reported {issues}", quiet.0);
+    }
+    for loud in ["plan", "section", "graph", "summary", "sbom"] {
+        let issues = tect::run(loud, None, here).issues.plain();
+        assert!(
+            issues.contains("2 images are declared and none is the default"),
+            "{loud} reported {issues}"
+        );
+    }
+}
+
 /// The reference in docs/schema.md, re-rendered from the tables. The renderer
 /// is what checks that every marker names a schema and every schema is marked.
 #[test]
@@ -258,6 +280,7 @@ fn golden() {
     for name in names {
         capture(&name, &dir.join(&name));
     }
+    no_default(&dir.join("no-default"));
     capture("init", &init);
     verify("init", &init);
     create("create", &init_repo("create"));

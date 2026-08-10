@@ -178,6 +178,18 @@ pub fn run(command: &str, arg: Option<&str>, root: &Path) -> Run {
                 .help(format!("targets: {}", targets.join(", "))),
         );
     }
+    let needs_default = match command {
+        "summary" | "sbom" => target_arg.is_none(),
+        "graph" | "graph-json" | "section" => image_arg.is_none(),
+        "plan" => true,
+        _ => false,
+    };
+    if needs_default {
+        if let Some(issue) = list.no_default() {
+            issues.push(issue);
+        }
+    }
+
     let target = target_arg
         .map(str::to_string)
         .or_else(|| list.default_target().map(|t| t.to_string()));

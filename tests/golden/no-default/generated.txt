@@ -1,0 +1,163 @@
+==== generated/server.d/core/shared.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/shared
+export MODDIR
+==== generated/server.d/finalize.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+# ---- core/shared ----
+MODDIR=/ctx/modules/core/shared
+export MODDIR
+source /ctx/modules/core/shared/finalize.sh
+==== generated/server.graph.md
+# Server capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["quay.io/fedora/fedora-bootc:44"]
+    m0["core/shared"]
+```
+
+## Capabilities
+
+| Name | Kind | Provided by | Required by | After |
+|---|---|---|---|---|
+| `/usr/bin/eza` | file | `core/shared` |  |  |
+| `rechunking` | capability | `base` |  |  |
+| `shell-tools` | capability | `core/shared` |  |  |
+==== generated/server.graph.json
+{
+  "image": "server",
+  "capabilities": [
+    {
+      "name": "/usr/bin/eza",
+      "kind": "file",
+      "build_only": false,
+      "provider": "core/shared",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "rechunking",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "shell-tools",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "core/shared",
+      "required_by": [],
+      "after": []
+    }
+  ],
+  "overrides": [],
+  "suppressed": []
+}
+==== generated/workstation.d/core/shared.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/shared
+export MODDIR
+==== generated/workstation.d/core/dev-tools@dev.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/dev-tools
+export MODDIR
+
+if [ "${FLAVOUR:-}" != "dev" ]; then
+    echo "skipping core/dev-tools: not built for '${FLAVOUR:-the ungated build}'"
+    exit 0
+fi
+==== generated/workstation.d/finalize.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+# ---- core/shared ----
+MODDIR=/ctx/modules/core/shared
+export MODDIR
+source /ctx/modules/core/shared/finalize.sh
+
+# ---- core/dev-tools ----
+if [ "${FLAVOUR:-}" = "dev" ]; then
+    MODDIR=/ctx/modules/core/dev-tools
+    export MODDIR
+    source /ctx/modules/core/dev-tools/finalize.sh
+fi
+==== generated/workstation.graph.md
+# Workstation capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["quay.io/fedora/fedora-bootc:44"]
+    m0["core/shared"]
+    m1["core/dev-tools [dev]"]
+    m0 -->|"shell-tools"| m1
+```
+
+## Capabilities
+
+| Name | Kind | Provided by | Required by | After |
+|---|---|---|---|---|
+| `/usr/bin/eza` | file | `core/shared` |  |  |
+| `rechunking` | capability | `base` |  |  |
+| `shell-tools` | capability | `core/shared` | `core/dev-tools` |  |
+==== generated/workstation.graph.json
+{
+  "image": "workstation",
+  "capabilities": [
+    {
+      "name": "/usr/bin/eza",
+      "kind": "file",
+      "build_only": false,
+      "provider": "core/shared",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "rechunking",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "shell-tools",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "core/shared",
+      "required_by": [
+        "core/dev-tools"
+      ],
+      "after": []
+    }
+  ],
+  "overrides": [],
+  "suppressed": []
+}

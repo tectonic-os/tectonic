@@ -36,7 +36,12 @@ pub fn run(root: &Path, opts: &Options) -> Result<bool, String> {
         Some(name) => return Err(format!("unknown backend `{name}` (buildx or buildah)")),
     };
 
-    let (list, issues, context) = crate::declarations(root);
+    let (list, mut issues, context) = crate::declarations(root);
+    if opts.target.is_none() {
+        if let Some(issue) = list.no_default() {
+            issues.push(issue);
+        }
+    }
     if issues.report(&context) {
         return Ok(true);
     }

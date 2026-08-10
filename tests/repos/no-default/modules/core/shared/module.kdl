@@ -1,0 +1,6 @@
+description "A module both images in this repository enable"
+
+supports "fedora"
+
+provides "shell-tools"
+provides-file "/usr/bin/eza"

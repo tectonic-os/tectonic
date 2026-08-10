@@ -1,0 +1,239 @@
+{
+  "schema_version": 1,
+  "default_image": null,
+  "default_image_name": null,
+  "pr_image": null,
+  "default_target": null,
+  "default_published": null,
+  "pr_target": null,
+  "pr_published": null,
+  "ungated_target": null,
+  "ungated_published": null,
+  "cache_image": null,
+  "workflows": [],
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "server",
+      "name": "Server",
+      "pretty_name": "",
+      "file": "./server.kdl",
+      "url": "",
+      "issues_url": "",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "provides_files": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "server/none",
+          "image": "server",
+          "flavour": null,
+          "published": "server",
+          "default": false,
+          "pr": false,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "core/shared",
+              "dir": "core/shared",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "A module both images in this repository enable",
+              "options": {}
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [
+            "/usr/bin/eza"
+          ],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {
+            "/usr/bin/eza": "core/shared"
+          },
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    },
+    {
+      "id": "workstation",
+      "name": "Workstation",
+      "pretty_name": "",
+      "file": "./workstation.kdl",
+      "url": "",
+      "issues_url": "",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "provides_files": []
+      },
+      "flavours": [
+        {
+          "name": "base",
+          "default": true,
+          "pr_build": false
+        },
+        {
+          "name": "dev",
+          "default": false,
+          "pr_build": false
+        }
+      ],
+      "default_flavour": "base",
+      "targets": [
+        {
+          "name": "workstation/none",
+          "image": "workstation",
+          "flavour": null,
+          "published": "workstation",
+          "default": false,
+          "pr": false,
+          "siblings": [
+            {
+              "name": "workstation/base",
+              "published": "workstation-base"
+            },
+            {
+              "name": "workstation/dev",
+              "published": "workstation-dev"
+            }
+          ],
+          "modules": [
+            {
+              "path": "core/shared",
+              "dir": "core/shared",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "A module both images in this repository enable",
+              "options": {}
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [
+            "/usr/bin/eza"
+          ],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {
+            "/usr/bin/eza": "core/shared"
+          },
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        },
+        {
+          "name": "workstation/base",
+          "image": "workstation",
+          "flavour": "base",
+          "published": "workstation-base",
+          "default": false,
+          "pr": false,
+          "siblings": [
+            {
+              "name": "workstation/none",
+              "published": "workstation"
+            },
+            {
+              "name": "workstation/dev",
+              "published": "workstation-dev"
+            }
+          ],
+          "modules": [
+            {
+              "path": "core/shared",
+              "dir": "core/shared",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "A module both images in this repository enable",
+              "options": {}
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [
+            "/usr/bin/eza"
+          ],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {
+            "/usr/bin/eza": "core/shared"
+          },
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        },
+        {
+          "name": "workstation/dev",
+          "image": "workstation",
+          "flavour": "dev",
+          "published": "workstation-dev",
+          "default": false,
+          "pr": false,
+          "siblings": [
+            {
+              "name": "workstation/none",
+              "published": "workstation"
+            },
+            {
+              "name": "workstation/base",
+              "published": "workstation-base"
+            }
+          ],
+          "modules": [
+            {
+              "path": "core/shared",
+              "dir": "core/shared",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "A module both images in this repository enable",
+              "options": {}
+            },
+            {
+              "path": "core/dev-tools",
+              "dir": "core/dev-tools",
+              "flavour": "dev",
+              "variant": null,
+              "remote": null,
+              "description": "Compilers and language servers, behind the dev flavour",
+              "options": {}
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [
+            "/usr/bin/eza"
+          ],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {
+            "/usr/bin/eza": "core/shared"
+          },
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

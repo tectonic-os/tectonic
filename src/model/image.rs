@@ -1,6 +1,6 @@
 //! The image files: one `.kdl` at the repository root per image.
 
-use crate::diag::{Source, Span};
+use crate::diag::{Issue, Source, Span};
 use crate::model::module::Module;
 use crate::model::options::Value;
 use crate::model::remote::{Collection, Remote, REMOTE_DIR};
@@ -205,6 +205,27 @@ impl List {
                 _ => None,
             },
         }
+    }
+
+    /// Why there is no default, for a command that had to pick one. Raised
+    /// there rather than at load: a command given an image never needed one.
+    pub fn no_default(&self) -> Option<Issue> {
+        let first = self.images.first().filter(|_| self.images.len() > 1)?;
+        self.default_image_id.is_none().then(|| {
+            Issue::new(
+                format!(
+                    "{} images are declared and none is the default",
+                    self.images.len()
+                ),
+                &self.repo_src,
+            )
+            .help(format!(
+                "the default image is what a command given no image answers about, and what a \
+                 bare `tect build` builds; a repository with one image falls back to that one, \
+                 and a repository with more says which: `default-image \"{}\"` in {REPO_FILE}",
+                first.id
+            ))
+        })
     }
 
     /// The image a pull request builds, which falls back to the default the

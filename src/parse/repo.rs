@@ -25,7 +25,8 @@ pub const REPO: Node = Node::new("repo",
                         "\"`, the release the build fetches and every command checks itself \
                          against")))
             .once(""),
-        Node::new("default-image", "The image a build that names no target builds.")
+        Node::new("default-image",
+            "The image a command given no image answers about, and a build with no target builds.")
             .arg(Arg::Str, Say::new("`{}` needs an image name", "no image given",
                 "`default-image \"workstation\"`, naming one of the images declared at the root"))
             .once(""),
@@ -328,23 +329,9 @@ impl List {
             );
         }
 
-        if self.images.len() > 1 {
-            match &self.default_image_id {
-                None => issues.push(
-                    Issue::new(
-                        format!(
-                            "{} images are declared and none is the default",
-                            self.images.len()
-                        ),
-                        &self.repo_src,
-                    )
-                    .help(format!(
-                        "`default-image \"{}\"` in {REPO_FILE}, naming which one a build \
-                         with no target builds",
-                        self.images[0].id
-                    )),
-                ),
-                Some(id) if !self.images.iter().any(|i| &i.id == id) => issues.push(
+        if let Some(id) = &self.default_image_id {
+            if !self.images.iter().any(|i| &i.id == id) {
+                issues.push(
                     Issue::new(
                         format!("`default-image` names `{id}`, which is not a declared image"),
                         &self.repo_src,
@@ -357,8 +344,7 @@ impl List {
                             .collect::<Vec<_>>()
                             .join(", ")
                     )),
-                ),
-                Some(_) => {}
+                );
             }
         }
 

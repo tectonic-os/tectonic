@@ -79,7 +79,7 @@ repository problem.
 | --- | --- | --- |
 | `schema-version` | a number, at most one | The schema release this repository is written against, which picks the reader. |
 | `tect-version` | a string, at most one | The tect release this repository is built with, which every command holds itself to. |
-| `default-image` | a string, at most one | The image a build that names no target builds. |
+| `default-image` | a string, at most one | The image a command given no image answers about, and a build with no target builds. |
 | `pr-image` | a string, at most one | The image a pull request builds. |
 
 ### `workflows`
