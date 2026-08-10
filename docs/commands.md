@@ -8,6 +8,10 @@ The repository is the nearest directory at or above the working directory
 holding a `repo.kdl`, or `--root`. Data goes to stdout and diagnostics to
 stderr; exit 1 is the invocation, exit 2 the repository.
 
+Usage is printed when the invocation was what was wrong: an unknown command, a
+flag the command does not read, a bad argument, no repository. A command that
+failed part way through its work prints the error and nothing else.
+
 ## Flags, and what is asked for
 
 Every command takes a flag for everything it needs.

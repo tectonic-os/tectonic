@@ -48,6 +48,28 @@ const USAGE_ERROR: u8 = 1;
 /// The repository is wrong, and every problem was printed to stderr.
 const REPO_ERROR: u8 = 2;
 
+/// Why a command did not run. Usage answers an invocation and says nothing
+/// about an operation that failed part way, so only the first prints it.
+enum Error {
+    Invocation(String),
+    Operation(String),
+}
+
+impl Error {
+    fn message(&self) -> &str {
+        match self {
+            Self::Invocation(message) | Self::Operation(message) => message,
+        }
+    }
+}
+
+/// Anything the library reports is an operation that failed.
+impl From<String> for Error {
+    fn from(message: String) -> Self {
+        Self::Operation(message)
+    }
+}
+
 /// Only what can run here: outside a repository that is `create repo`, and the
 /// rest is listed as needing one.
 fn usage(in_repo: bool) -> String {
@@ -76,7 +98,7 @@ struct Args {
 
 impl Args {
     /// Removes every `--<flag> <value>` and `--<flag>=<value>`.
-    fn flags(&mut self, flag: &'static str) -> Result<Vec<String>, String> {
+    fn flags(&mut self, flag: &'static str) -> Result<Vec<String>, Error> {
         let mut values = Vec::new();
         let mut i = 0;
         while i < self.words.len() {
@@ -87,7 +109,7 @@ impl Args {
                 values.push(
                     self.words
                         .get(i + 1)
-                        .ok_or(format!("`--{flag}` takes a value"))?
+                        .ok_or_else(|| Error::Invocation(format!("`--{flag}` takes a value")))?
                         .clone(),
                 );
                 2
@@ -103,7 +125,7 @@ impl Args {
         Ok(values)
     }
 
-    fn flag(&mut self, flag: &'static str) -> Result<Option<String>, String> {
+    fn flag(&mut self, flag: &'static str) -> Result<Option<String>, Error> {
         Ok(self.flags(flag)?.pop())
     }
 
@@ -115,40 +137,46 @@ impl Args {
     }
 
     /// A flag the command does not read is a failure rather than a silent no-op.
-    fn only(&self, takes: &[&str], command: &str) -> Result<(), String> {
+    fn only(&self, takes: &[&str], command: &str) -> Result<(), Error> {
         match self.given.iter().find(|flag| !takes.contains(flag)) {
-            Some(flag) => Err(format!("`{command}` does not take `--{flag}`")),
+            Some(flag) => Err(Error::Invocation(format!(
+                "`{command}` does not take `--{flag}`"
+            ))),
             None => Ok(()),
         }
     }
 }
 
 /// The optional name a `create` takes, and nothing else.
-fn one_name(rest: &[&str], command: &str) -> Result<Option<String>, String> {
+fn one_name(rest: &[&str], command: &str) -> Result<Option<String>, Error> {
     match rest {
         [] => Ok(None),
         [name] => Ok(Some((*name).to_string())),
-        _ => Err(format!(
+        _ => Err(Error::Invocation(format!(
             "`{command}` takes one name, not {}",
             rest.join(" ")
-        )),
+        ))),
     }
 }
 
 /// `--root`, else the nearest directory at or above here holding a repo.kdl.
-fn repo_root(given: Option<PathBuf>) -> Result<PathBuf, String> {
+fn repo_root(given: Option<PathBuf>) -> Result<PathBuf, Error> {
     if let Some(root) = given {
         return Ok(root);
     }
     let here = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    tect::find_root(&here)
-        .ok_or_else(|| format!("no repo.kdl in {} or any parent directory", here.display()))
+    tect::find_root(&here).ok_or_else(|| {
+        Error::Invocation(format!(
+            "no repo.kdl in {} or any parent directory",
+            here.display()
+        ))
+    })
 }
 
 /// The repository, or `None` when this release may not work in it and said so.
 /// A command that writes is refused here; everything that reads one is refused
 /// where it loads it.
-fn open(given: Option<PathBuf>) -> Result<Option<PathBuf>, String> {
+fn open(given: Option<PathBuf>) -> Result<Option<PathBuf>, Error> {
     let root = repo_root(given)?;
     let refused = tect::compatible(&root).report(&root.join("repo.kdl").display().to_string());
     Ok((!refused).then_some(root))
@@ -161,7 +189,7 @@ fn import(
     root: &Path,
     image_arg: Option<String>,
     prompt: &Prompt,
-) -> Result<ExitCode, String> {
+) -> Result<ExitCode, Error> {
     let (sources, issues, context) = tect::sources(root);
     if issues.report(&context) {
         return Ok(ExitCode::from(REPO_ERROR));
@@ -217,15 +245,17 @@ fn write_generated(root: &Path, files: &[(PathBuf, String)]) -> Result<(), Strin
 fn main() -> ExitCode {
     match run() {
         Ok(code) => code,
-        Err(message) => {
-            eprintln!("tect: {message}");
-            eprint!("{}", usage(in_repo()));
+        Err(error) => {
+            eprintln!("tect: {}", error.message());
+            if let Error::Invocation(_) = error {
+                eprint!("{}", usage(in_repo()));
+            }
             ExitCode::from(USAGE_ERROR)
         }
     }
 }
 
-fn run() -> Result<ExitCode, String> {
+fn run() -> Result<ExitCode, Error> {
     let mut args = Args {
         words: std::env::args().skip(1).collect(),
         given: Vec::new(),
@@ -252,9 +282,11 @@ fn run() -> Result<ExitCode, String> {
         .iter()
         .map(|pair| match pair.split_once('=') {
             Some((verb, value)) => Ok((verb.to_string(), value.to_string())),
-            None => Err(format!("`--with` is `verb=value`, not `{pair}`")),
+            None => Err(Error::Invocation(format!(
+                "`--with` is `verb=value`, not `{pair}`"
+            ))),
         })
-        .collect::<Result<Vec<_>, String>>()?;
+        .collect::<Result<Vec<_>, Error>>()?;
 
     let words: Vec<&str> = args.words.iter().map(String::as_str).collect();
     match words.first() {
@@ -395,20 +427,24 @@ fn run() -> Result<ExitCode, String> {
             );
             return Ok(ExitCode::SUCCESS);
         }
-        ["registry", ..] => return Err("`registry` takes `namespace` or `ref`".into()),
-        ["create", ..] => {
-            return Err(
-                "`create` takes `repo <name>`, `image <name>`, `module <name>`, \
-                        `cosign-key` or `mok-key`"
-                    .into(),
-            )
+        ["registry", ..] => {
+            return Err(Error::Invocation(
+                "`registry` takes `namespace` or `ref`".into(),
+            ))
         }
-        ["import", ..] => return Err("`import` takes `module <name>`".into()),
+        ["create", ..] => {
+            return Err(Error::Invocation(
+                "`create` takes `repo <name>`, `image <name>`, `module <name>`, \
+                 `cosign-key` or `mok-key`"
+                    .into(),
+            ))
+        }
+        ["import", ..] => return Err(Error::Invocation("`import` takes `module <name>`".into())),
         _ => {}
     }
 
     let Some(command) = Command::parse(words[0]) else {
-        return Err(format!("unknown command `{}`", words[0]));
+        return Err(Error::Invocation(format!("unknown command `{}`", words[0])));
     };
     args.only(
         match command {
@@ -421,7 +457,9 @@ fn run() -> Result<ExitCode, String> {
         (Command::Graph, None | Some("md")) => Command::Graph,
         (Command::Graph, Some("json")) => Command::GraphJson,
         (Command::Graph, Some(other)) => {
-            return Err(format!("`--format` is md or json, not `{other}`"));
+            return Err(Error::Invocation(format!(
+                "`--format` is md or json, not `{other}`"
+            )));
         }
         (command, _) => command,
     };
@@ -431,7 +469,13 @@ fn run() -> Result<ExitCode, String> {
         [] => None,
         ["--json"] if command == Command::Plan => None,
         [one] if command.arg().is_some() => Some(*one),
-        _ => return Err(format!("`{}` does not take {}", words[0], rest.join(" "))),
+        _ => {
+            return Err(Error::Invocation(format!(
+                "`{}` does not take {}",
+                words[0],
+                rest.join(" ")
+            )));
+        }
     };
 
     let root = repo_root(root_arg)?;
