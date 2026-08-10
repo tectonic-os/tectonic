@@ -145,10 +145,13 @@ fn repo_root(given: Option<PathBuf>) -> Result<PathBuf, String> {
         .ok_or_else(|| format!("no repo.kdl in {} or any parent directory", here.display()))
 }
 
-/// A repository this release may not work in, refused before it writes into it.
-/// Everything that reads one is refused where it loads it.
-fn refused(root: &Path) -> bool {
-    tect::compatible(root).report(&root.join("repo.kdl").display().to_string())
+/// The repository, or `None` when this release may not work in it and said so.
+/// A command that writes is refused here; everything that reads one is refused
+/// where it loads it.
+fn open(given: Option<PathBuf>) -> Result<Option<PathBuf>, String> {
+    let root = repo_root(given)?;
+    let refused = tect::compatible(&root).report(&root.join("repo.kdl").display().to_string());
+    Ok((!refused).then_some(root))
 }
 
 /// Copies one module in, asking which one when no name was given and which
@@ -302,10 +305,9 @@ fn run() -> Result<ExitCode, String> {
         ["create", "image", rest @ ..] => {
             args.only(&["root", "owner", "base"], "create image")?;
             let name = one_name(rest, "create image")?;
-            let root = repo_root(root_arg)?;
-            if refused(&root) {
+            let Some(root) = open(root_arg)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
-            }
+            };
             tect::create::image(
                 &root,
                 name,
@@ -319,28 +321,25 @@ fn run() -> Result<ExitCode, String> {
         ["create", "module", rest @ ..] => {
             args.only(&["root", "image", "pkg", "with"], "create module")?;
             let name = one_name(rest, "create module")?;
-            let root = repo_root(root_arg)?;
-            if refused(&root) {
+            let Some(root) = open(root_arg)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
-            }
+            };
             tect::create::module(&root, name, pkgs, with, image_arg, &prompt)?;
             return Ok(ExitCode::SUCCESS);
         }
         ["create", "cosign-key"] => {
             args.only(&["root", "module"], "create cosign-key")?;
-            let root = repo_root(root_arg)?;
-            if refused(&root) {
+            let Some(root) = open(root_arg)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
-            }
+            };
             tect::key::cosign(&root, module_arg, &prompt)?;
             return Ok(ExitCode::SUCCESS);
         }
         ["create", "mok-key"] => {
             args.only(&["root", "module", "cn"], "create mok-key")?;
-            let root = repo_root(root_arg)?;
-            if refused(&root) {
+            let Some(root) = open(root_arg)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
-            }
+            };
             tect::key::mok(&root, module_arg, cn, &prompt)?;
             return Ok(ExitCode::SUCCESS);
         }
