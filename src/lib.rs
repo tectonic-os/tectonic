@@ -277,6 +277,7 @@ pub fn run(command: Command, arg: Option<&str>, root: &Path) -> Run {
             files.extend(emit::finalize::script(image, &resolved.collected, root));
             files.extend(emit::graph::files(image));
         }
+        files.extend(emit::seed::file(&list));
     }
 
     if command == Command::Verify {

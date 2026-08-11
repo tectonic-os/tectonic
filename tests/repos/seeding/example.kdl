@@ -1,0 +1,24 @@
+image {
+    name "Example"
+    url "https://github.com/someone/example"
+    issues-url "https://github.com/someone/example/issues"
+
+    base "quay.io/fedora/fedora-bootc:44" {
+        family "fedora"
+        provides "rechunking"
+    }
+
+    flavours {
+        nvidia
+    }
+
+    modules {
+        module "hello"
+        module "tectonic-os/flatpak" variant="beta" {
+            system-wide #false
+        }
+        flavour "nvidia" {
+            module "drivers"
+        }
+    }
+}

@@ -1,0 +1,25 @@
+description "A module imported from the collection this repository publishes"
+
+supports "fedora"
+
+provides "flatpak"
+provides-file "/usr/bin/flatpak"
+
+option "remotes" type="list" {
+    description "Remotes to enable"
+    default "flathub"
+}
+
+option "system-wide" type="bool" {
+    description "Install remotes for every user rather than the builder"
+    default #true
+}
+
+variant "beta" {
+    description "Flathub and its beta remote"
+    set "remotes" "flathub" "flathub-beta"
+}
+
+packages {
+    fedora "flatpak"
+}

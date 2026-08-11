@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "default_image": "example",
+  "default_image_name": "Example",
+  "pr_image": "example",
+  "default_target": "example/none",
+  "default_published": "example",
+  "pr_target": "example/none",
+  "pr_published": "example",
+  "ungated_target": "example/none",
+  "ungated_published": "example",
+  "cache_image": "example-cache",
+  "workflows": [],
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "example",
+      "name": "Example",
+      "pretty_name": "",
+      "file": "./example.kdl",
+      "url": "https://github.com/someone/example",
+      "issues_url": "https://github.com/someone/example/issues",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "provides_files": []
+      },
+      "flavours": [
+        {
+          "name": "nvidia",
+          "default": false,
+          "pr_build": false
+        }
+      ],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "example/none",
+          "image": "example",
+          "flavour": null,
+          "published": "example",
+          "default": true,
+          "pr": true,
+          "siblings": [
+            {
+              "name": "example/nvidia",
+              "published": "example-nvidia"
+            }
+          ],
+          "modules": [
+            {
+              "path": "hello",
+              "dir": "hello",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "A module this repository writes and publishes",
+              "options": {}
+            },
+            {
+              "path": "tectonic-os/flatpak",
+              "dir": "tectonic-os/flatpak",
+              "flavour": null,
+              "variant": "beta",
+              "remote": null,
+              "description": "A module imported from the collection this repository publishes",
+              "options": {
+                "OPT_REMOTES": "flathub flathub-beta",
+                "OPT_SYSTEM_WIDE": "0"
+              }
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [
+            "/usr/bin/flatpak"
+          ],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {
+            "/usr/bin/flatpak": "tectonic-os/flatpak"
+          },
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        },
+        {
+          "name": "example/nvidia",
+          "image": "example",
+          "flavour": "nvidia",
+          "published": "example-nvidia",
+          "default": false,
+          "pr": false,
+          "siblings": [
+            {
+              "name": "example/none",
+              "published": "example"
+            }
+          ],
+          "modules": [
+            {
+              "path": "hello",
+              "dir": "hello",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "A module this repository writes and publishes",
+              "options": {}
+            },
+            {
+              "path": "tectonic-os/flatpak",
+              "dir": "tectonic-os/flatpak",
+              "flavour": null,
+              "variant": "beta",
+              "remote": null,
+              "description": "A module imported from the collection this repository publishes",
+              "options": {
+                "OPT_REMOTES": "flathub flathub-beta",
+                "OPT_SYSTEM_WIDE": "0"
+              }
+            },
+            {
+              "path": "drivers",
+              "dir": "drivers",
+              "flavour": "nvidia",
+              "variant": null,
+              "remote": null,
+              "description": "A module only one flavour builds",
+              "options": {}
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [
+            "/usr/bin/flatpak"
+          ],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {
+            "/usr/bin/flatpak": "tectonic-os/flatpak"
+          },
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

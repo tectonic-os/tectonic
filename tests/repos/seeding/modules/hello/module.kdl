@@ -1,0 +1,7 @@
+description "A module this repository writes and publishes"
+
+supports "fedora"
+
+packages {
+    fedora "fastfetch"
+}

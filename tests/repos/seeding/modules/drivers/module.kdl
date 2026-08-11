@@ -1,0 +1,7 @@
+description "A module only one flavour builds"
+
+supports "fedora"
+
+packages {
+    fedora "akmod-nvidia"
+}
