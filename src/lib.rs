@@ -129,6 +129,9 @@ pub struct Run {
     /// Seeded bases a collection describes instead. Only `check` looks, since
     /// it is the only command a collection's catalog is any of the business of.
     pub shadowed: Vec<base::Shadow>,
+    /// The reading this ran against, so a caller that needs one after a command
+    /// acts on what the command saw rather than reading the tree again.
+    pub(crate) list: List,
 }
 
 /// The Containerfile skeleton, when the repository has one to splice into. A
@@ -328,6 +331,7 @@ pub fn run(command: Command, arg: Option<&str>, root: &Path) -> Run {
         suppressed: list.images.iter().map(|i| i.suppressed.len()).sum(),
         flavours: list.images.iter().map(|i| i.flavours.len()).sum(),
         shadowed,
+        list,
     }
 }
 
