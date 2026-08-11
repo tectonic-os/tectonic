@@ -352,62 +352,12 @@ impl Module {
                         module.description = string_arg(node).unwrap_or_default().to_string();
                     }
                 }
-                "supports" => {
-                    for family in string_args(node) {
-                        if !FAMILIES.contains(&family) {
-                            issues.push(
-                                Issue::new(format!("unknown base family `{family}`"), src)
-                                    .at(
-                                        node.name().span(),
-                                        "not a family this repository builds on",
-                                    )
-                                    .help(format!("known families: {}", FAMILIES.join(", "))),
-                            );
-                        }
-                        module.supports.push(family.to_string());
-                    }
-                }
+                "supports" => module.parse_supports(node, src, issues),
                 kind @ ("provides" | "requires" | "after") => {
-                    let decls = string_args(node)
-                        .iter()
-                        .map(|c| Decl {
-                            name: c.to_string(),
-                            span: node.name().span().into(),
-                        })
-                        .collect::<Vec<_>>();
-                    for decl in &decls {
-                        check_capability(&decl.name, decl.span, src, issues);
-                    }
-                    match kind {
-                        "provides" => module.provides.extend(decls),
-                        "requires" => module.requires.extend(decls),
-                        _ => module.after.extend(decls),
-                    }
+                    module.parse_capabilities(kind, node, src, issues)
                 }
                 kind @ ("provides-file" | "requires-file" | "overrides") => {
-                    let build_only = kind == "provides-file" && flag(node, "build-only");
-                    for path in string_args(node) {
-                        if !path.starts_with('/') {
-                            issues.push(
-                                Issue::new(format!("`{path}` is not an absolute path"), src)
-                                    .at(node.name().span(), "an exact path in the image"),
-                            );
-                        }
-                        let decl = Decl {
-                            name: path.to_string(),
-                            span: node.name().span().into(),
-                        };
-                        match kind {
-                            "provides-file" => {
-                                if build_only {
-                                    module.provides_files_build_only.push(path.to_string());
-                                }
-                                module.provides_files.push(decl);
-                            }
-                            "requires-file" => module.requires_files.push(decl),
-                            _ => module.overrides.push(decl),
-                        }
-                    }
+                    module.parse_paths(kind, node, src, issues)
                 }
                 kind @ ("secret" | "arg") => {
                     for name in string_args(node) {
@@ -422,147 +372,9 @@ impl Module {
                         }
                     }
                 }
-                "allow-verify" => {
-                    let span: Span = node.name().span().into();
-                    let class = string_arg(node).map(str::to_string);
-                    let unit = prop(node, "unit").map(str::to_string);
-
-                    match (class, unit) {
-                        (Some(class), Some(unit)) => {
-                            if !VERIFY_CLASSES.iter().any(|(name, _)| *name == class) {
-                                issues.push(
-                                    Issue::new(
-                                        format!("`{class}` is not a verify diagnostic class"),
-                                        src,
-                                    )
-                                    .at(span, "not one of the known classes")
-                                    .help(format!(
-                                        "known classes: {}. They are named rather than written as patterns, and `tect validate-image` holds what each one stands for",
-                                        class_names()
-                                    )),
-                                );
-                            } else if let Some(dup) = module
-                                .verify_exceptions
-                                .iter()
-                                .find(|e| e.class == class && e.unit == unit)
-                            {
-                                issues.push(
-                                    Issue::new(
-                                        format!("`{class}` is allowed twice on `{unit}`"),
-                                        src,
-                                    )
-                                    .at(dup.span, "first here")
-                                    .at(span, "and again here"),
-                                );
-                            } else {
-                                module.verify_exceptions.push(VerifyException {
-                                    class,
-                                    unit,
-                                    span,
-                                });
-                            }
-                        }
-                        (class, unit) => {
-                            let missing = if class.is_none() {
-                                "a diagnostic class"
-                            } else if unit.is_none() {
-                                "unit=, the unit it applies to"
-                            } else {
-                                "both a class and a unit"
-                            };
-                            issues.push(
-                                Issue::new(
-                                    format!("`allow-verify` needs {missing}"),
-                                    src,
-                                )
-                                .at(span, "incomplete")
-                                .help(
-                                    "`allow-verify \"man-page-missing\" unit=\"plasmalogin.service\"`, \
-                                     which accepts one diagnostic on one unit rather than image-wide",
-                                ),
-                            );
-                        }
-                    }
-                }
-                "collects" => {
-                    let collected = string_args(node).first().map(|s| s.to_string());
-                    let into = prop(node, "into");
-                    let priority = priority(node);
-                    match (collected, into, priority) {
-                        (Some(collected), Some(into), Priority::Set(priority))
-                            if into.starts_with('/') =>
-                        {
-                            module.collects.push(Collect {
-                                file: collected,
-                                into: into.to_string(),
-                                priority,
-                                span: node.name().span().into(),
-                            })
-                        }
-                        (_, _, Priority::Invalid) => {}
-                        (collected, into, priority) => {
-                            let missing = if collected.is_none() {
-                                "the filename it collects"
-                            } else if into.is_none() {
-                                "into=, where the build puts them"
-                            } else if matches!(priority, Priority::Missing) {
-                                "priority=, where a contribution lands when it names none"
-                            } else {
-                                "an absolute into="
-                            };
-                            issues.push(
-                                Issue::new(format!("`collects` needs {missing}"), src)
-                                    .at(node.name().span(), "incomplete")
-                                    .help("`collects \"justfile.inc\" into=\"/usr/share/just/justfile.apps\" priority=500`"),
-                            );
-                        }
-                    }
-                }
-                "contributes" => {
-                    let contributed = string_args(node).first().map(|s| s.to_string());
-                    let priority = priority(node);
-                    match (contributed, priority) {
-                        (Some(contributed), Priority::Set(priority)) => {
-                            if !dir.join(&contributed).is_file() {
-                                issues.push(
-                                    Issue::new(
-                                        format!("`{}` orders a {contributed} it does not ship", path),
-                                        src,
-                                    )
-                                    .at(node.name().span(), "nothing to order")
-                                    .help("shipping the file is what contributes it; this node only says where it lands"),
-                                );
-                            } else if let Some(dup) =
-                                module.contributes.iter().find(|c| c.file == contributed)
-                            {
-                                issues.push(
-                                    Issue::new(format!("`{contributed}` is ordered twice"), src)
-                                        .at(dup.span, "first here")
-                                        .at(node.name().span(), "and again here"),
-                                );
-                            } else {
-                                module.contributes.push(Contribution {
-                                    file: contributed,
-                                    priority,
-                                    span: node.name().span().into(),
-                                });
-                            }
-                        }
-                        (_, Priority::Invalid) => {}
-                        (contributed, _) => {
-                            let missing = if contributed.is_none() {
-                                "the filename it contributes"
-                            } else {
-                                "priority=, which is the only thing it declares"
-                            };
-                            issues.push(
-                                Issue::new(format!("`contributes` needs {missing}"), src)
-                                    .at(node.name().span(), "incomplete")
-                                    .help("`contributes \"justfile.inc\" priority=900`, for a module that has to land after the rest"),
-                            );
-                        }
-                    }
-                }
+                "allow-verify" => module.parse_allow_verify(node, src, issues),
+                "collects" => module.parse_collects(node, src, issues),
+                "contributes" => module.parse_contributes(node, &dir, src, issues),
                 "fragment" => {
                     if fragment_seen {
                         continue;
@@ -686,6 +498,202 @@ impl Module {
         }
 
         Some(module)
+    }
+
+    /// `supports "fedora"` The families this repository knows how to build on.
+    fn parse_supports(&mut self, node: &KdlNode, src: &Source, issues: &mut Issues) {
+        for family in string_args(node) {
+            if !FAMILIES.contains(&family) {
+                issues.push(
+                    Issue::new(format!("unknown base family `{family}`"), src)
+                        .at(node.name().span(), "not a family this repository builds on")
+                        .help(format!("known families: {}", FAMILIES.join(", "))),
+                );
+            }
+            self.supports.push(family.to_string());
+        }
+    }
+
+    /// `provides "a" "b"`, and the two nodes that carry the same list: what
+    /// another module may require, and what only orders the build.
+    fn parse_capabilities(
+        &mut self,
+        kind: &str,
+        node: &KdlNode,
+        src: &Source,
+        issues: &mut Issues,
+    ) {
+        let decls = string_args(node)
+            .iter()
+            .map(|c| Decl {
+                name: c.to_string(),
+                span: node.name().span().into(),
+            })
+            .collect::<Vec<_>>();
+        for decl in &decls {
+            check_capability(&decl.name, decl.span, src, issues);
+        }
+        match kind {
+            "provides" => self.provides.extend(decls),
+            "requires" => self.requires.extend(decls),
+            _ => self.after.extend(decls),
+        }
+    }
+
+    /// `provides-file "/usr/bin/x" build-only=#true`, and the two nodes with the
+    /// same shape: what has to be there, and what is replaced deliberately.
+    fn parse_paths(&mut self, kind: &str, node: &KdlNode, src: &Source, issues: &mut Issues) {
+        let build_only = kind == "provides-file" && flag(node, "build-only");
+        for path in string_args(node) {
+            if !path.starts_with('/') {
+                issues.push(
+                    Issue::new(format!("`{path}` is not an absolute path"), src)
+                        .at(node.name().span(), "an exact path in the image"),
+                );
+            }
+            let decl = Decl {
+                name: path.to_string(),
+                span: node.name().span().into(),
+            };
+            match kind {
+                "provides-file" => {
+                    if build_only {
+                        self.provides_files_build_only.push(path.to_string());
+                    }
+                    self.provides_files.push(decl);
+                }
+                "requires-file" => self.requires_files.push(decl),
+                _ => self.overrides.push(decl),
+            }
+        }
+    }
+
+    /// `allow-verify "man-page-missing" unit="x.service"` One known diagnostic
+    /// accepted on one unit, which is why both halves are required.
+    fn parse_allow_verify(&mut self, node: &KdlNode, src: &Source, issues: &mut Issues) {
+        let span: Span = node.name().span().into();
+        let class = string_arg(node).map(str::to_string);
+        let unit = prop(node, "unit").map(str::to_string);
+
+        let (Some(class), Some(unit)) = (class, unit) else {
+            let missing = match (string_arg(node), prop(node, "unit")) {
+                (None, _) => "a diagnostic class",
+                (_, None) => "unit=, the unit it applies to",
+                _ => "both a class and a unit",
+            };
+            issues.push(
+                Issue::new(format!("`allow-verify` needs {missing}"), src)
+                    .at(span, "incomplete")
+                    .help(
+                        "`allow-verify \"man-page-missing\" unit=\"plasmalogin.service\"`, \
+                         which accepts one diagnostic on one unit rather than image-wide",
+                    ),
+            );
+            return;
+        };
+
+        if !VERIFY_CLASSES.iter().any(|(name, _)| *name == class) {
+            issues.push(
+                Issue::new(format!("`{class}` is not a verify diagnostic class"), src)
+                    .at(span, "not one of the known classes")
+                    .help(format!(
+                        "known classes: {}. They are named rather than written as patterns, and `tect validate-image` holds what each one stands for",
+                        class_names()
+                    )),
+            );
+        } else if let Some(dup) = self
+            .verify_exceptions
+            .iter()
+            .find(|e| e.class == class && e.unit == unit)
+        {
+            issues.push(
+                Issue::new(format!("`{class}` is allowed twice on `{unit}`"), src)
+                    .at(dup.span, "first here")
+                    .at(span, "and again here"),
+            );
+        } else {
+            self.verify_exceptions
+                .push(VerifyException { class, unit, span });
+        }
+    }
+
+    /// `collects "justfile.inc" into="/usr/share/just/justfile.apps"
+    /// priority=500` The filename gathered from every module shipping one, and
+    /// where the assembled result goes.
+    fn parse_collects(&mut self, node: &KdlNode, src: &Source, issues: &mut Issues) {
+        let collected = string_args(node).first().map(|s| s.to_string());
+        let into = prop(node, "into");
+        match (collected, into, priority(node)) {
+            (Some(collected), Some(into), Priority::Set(priority)) if into.starts_with('/') => {
+                self.collects.push(Collect {
+                    file: collected,
+                    into: into.to_string(),
+                    priority,
+                    span: node.name().span().into(),
+                })
+            }
+            (_, _, Priority::Invalid) => {}
+            (collected, into, priority) => {
+                let missing = if collected.is_none() {
+                    "the filename it collects"
+                } else if into.is_none() {
+                    "into=, where the build puts them"
+                } else if matches!(priority, Priority::Missing) {
+                    "priority=, where a contribution lands when it names none"
+                } else {
+                    "an absolute into="
+                };
+                issues.push(
+                    Issue::new(format!("`collects` needs {missing}"), src)
+                        .at(node.name().span(), "incomplete")
+                        .help("`collects \"justfile.inc\" into=\"/usr/share/just/justfile.apps\" priority=500`"),
+                );
+            }
+        }
+    }
+
+    /// `contributes "justfile.inc" priority=900` A file this module ships for
+    /// another to collect, so shipping it is what the node is about.
+    fn parse_contributes(&mut self, node: &KdlNode, dir: &Path, src: &Source, issues: &mut Issues) {
+        let contributed = string_args(node).first().map(|s| s.to_string());
+        match (contributed, priority(node)) {
+            (Some(contributed), Priority::Set(priority)) => {
+                if !dir.join(&contributed).is_file() {
+                    issues.push(
+                        Issue::new(
+                            format!("`{}` orders a {contributed} it does not ship", self.path),
+                            src,
+                        )
+                        .at(node.name().span(), "nothing to order")
+                        .help("shipping the file is what contributes it; this node only says where it lands"),
+                    );
+                } else if let Some(dup) = self.contributes.iter().find(|c| c.file == contributed) {
+                    issues.push(
+                        Issue::new(format!("`{contributed}` is ordered twice"), src)
+                            .at(dup.span, "first here")
+                            .at(node.name().span(), "and again here"),
+                    );
+                } else {
+                    self.contributes.push(Contribution {
+                        file: contributed,
+                        priority,
+                        span: node.name().span().into(),
+                    });
+                }
+            }
+            (_, Priority::Invalid) => {}
+            (contributed, _) => {
+                let missing = match contributed.is_none() {
+                    true => "the filename it contributes",
+                    false => "priority=, which is the only thing it declares",
+                };
+                issues.push(
+                    Issue::new(format!("`contributes` needs {missing}"), src)
+                        .at(node.name().span(), "incomplete")
+                        .help("`contributes \"justfile.inc\" priority=900`, for a module that has to land after the rest"),
+                );
+            }
+        }
     }
 
     /// `fragment position="after" standard-layer=#false` Defaults are the
