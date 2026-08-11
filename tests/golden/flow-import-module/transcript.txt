@@ -3,8 +3,9 @@ Tectonic v0.0.0
   1) one/browser  A browser, from the first collection
   2) two/browser  A browser, from the second collection (requires flatpak)
   3) one/flatpak  Flatpak client and a daily update timer
+  4) one/signature-policy  Sigstore signature verification for the image's own updates
   0) none
-which module [0-3]: 1
+which module [0-4]: 1
 
   1) example  Example
   0) none

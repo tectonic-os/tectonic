@@ -396,6 +396,31 @@ fn flow_repo_two(name: &str) -> PathBuf {
     root
 }
 
+/// The same, with the two fixture collections declared, which is what a search
+/// for the module declaring something reads.
+fn flow_repo_sourced(name: &str) -> PathBuf {
+    let root = flow_repo(name);
+    let collections = crate_dir().join("tests/collections");
+    let mut repo = std::fs::read_to_string(root.join("repo.kdl")).unwrap();
+    repo.push_str(&format!(
+        "\nsources {{\n    one {:?}\n    two {:?}\n}}\n",
+        collections.join("one").display(),
+        collections.join("two").display()
+    ));
+    std::fs::write(root.join("repo.kdl"), repo).unwrap();
+    root
+}
+
+/// A module declaring a key, which is what `create key` reads everything but
+/// the kind out of.
+const KEYHOLDER: &str = "description \"Signs the modules it builds\"\n\n\
+     supports \"fedora\"\n\n\
+     key \"secureboot\" {\n\
+     \x20   generator \"openssl\" profile=\"module-signing\" bits=4096\n\
+     \x20   public \"/usr/share/secureboot/sb_cert.der\" format=\"der\"\n\
+     \x20   private \"MOK.priv\"\n\
+     }\n";
+
 /// Every flow that prompts, answered from a script: what a person sees, and
 /// that a question the script does not answer fails rather than waits.
 #[test]
@@ -436,20 +461,29 @@ fn flows() {
         &module,
     );
 
-    let root = flow_repo("flow-import");
-    let collections = crate_dir().join("tests/collections");
-    let mut repo = std::fs::read_to_string(root.join("repo.kdl")).unwrap();
-    repo.push_str(&format!(
-        "\nsources {{\n    one {:?}\n    two {:?}\n}}\n",
-        collections.join("one").display(),
-        collections.join("two").display()
-    ));
-    std::fs::write(root.join("repo.kdl"), repo).unwrap();
     flow(
         "flow-import-module",
-        &root,
+        &flow_repo_sourced("flow-import"),
         None,
         &["--root", ".", "import", "module"],
+    );
+
+    // Neither branch reaches a generator, so neither needs one installed.
+    flow(
+        "flow-key-absent",
+        &flow_repo_sourced("flow-key-none"),
+        None,
+        &["--root", ".", "create", "key", "cosign"],
+    );
+
+    let root = flow_repo("flow-key");
+    std::fs::create_dir_all(root.join("modules/signed-kernel")).unwrap();
+    std::fs::write(root.join("modules/signed-kernel/module.kdl"), KEYHOLDER).unwrap();
+    flow(
+        "flow-key-kinds",
+        &root,
+        None,
+        &["--root", ".", "create", "key"],
     );
 }
 

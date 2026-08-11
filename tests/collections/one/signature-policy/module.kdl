@@ -1,0 +1,11 @@
+description "Sigstore signature verification for the image's own updates"
+
+supports "fedora"
+
+provides "signature-policy"
+
+key "cosign" {
+    generator "cosign"
+    public "/etc/pki/containers/cosign.pub"
+    private "cosign.key"
+}

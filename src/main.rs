@@ -43,10 +43,8 @@ const IN_REPO: &str = "\
                       copy a module in from a collection repo.kdl declares,
                       choosing from what they hold, and offer to list it in an
                       image
-  create cosign-key   generate the keypair the images this repository publishes
-                      are signed with
-  create mok-key      generate the secure boot key the kernel modules it builds
-                      are signed with
+  create key <kind>   generate a key one of this repository's modules declares,
+                      such as the one its published images are signed with
   check               read every manifest and say what is wrong with it
   generate            write the build files, and list what was written
   build [target]      verify the build files, then build the image
@@ -430,20 +428,13 @@ fn run() -> Result<ExitCode, Error> {
             tect::create::Module::collect(&root, name, pkgs, with, images, &prompt)?.apply()?;
             return Ok(ExitCode::SUCCESS);
         }
-        ["create", "cosign-key"] => {
-            args.only(&["root", "module"], "create cosign-key")?;
+        ["create", "key", rest @ ..] => {
+            args.only(&["root", "module", "cn"], "create key")?;
+            let kind = one_name(rest, "create key")?;
             let Some(root) = open(root_arg)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
-            tect::key::Cosign::collect(&root, module_arg, &prompt)?.apply(&root)?;
-            return Ok(ExitCode::SUCCESS);
-        }
-        ["create", "mok-key"] => {
-            args.only(&["root", "module", "cn"], "create mok-key")?;
-            let Some(root) = open(root_arg)? else {
-                return Ok(ExitCode::from(REPO_ERROR));
-            };
-            tect::key::Mok::collect(&root, module_arg, cn, &prompt)?.apply(&root)?;
+            tect::key::Key::collect(&root, kind, module_arg, cn, &prompt)?.apply(&root)?;
             return Ok(ExitCode::SUCCESS);
         }
         ["import", "module", rest @ ..] => {
@@ -511,8 +502,8 @@ fn run() -> Result<ExitCode, Error> {
         }
         ["create", ..] => {
             return Err(Error::Invocation(
-                "`create` takes `repo <name>`, `image <name>`, `module <name>`, \
-                 `cosign-key` or `mok-key`"
+                "`create` takes `repo <name>`, `image <name>`, `module <name>` \
+                 or `key <kind>`"
                     .into(),
             ))
         }

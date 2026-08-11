@@ -5,6 +5,7 @@ two
 one/browser  A browser, from the first collection
 two/browser  A browser, from the second collection (requires flatpak)
 one/flatpak  Flatpak client and a daily update timer
+one/signature-policy  Sigstore signature verification for the image's own updates
 ==== import flatpak
 imported modules/one/flatpak
 ==== import browser

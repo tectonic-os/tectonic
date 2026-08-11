@@ -1,7 +1,8 @@
-//! `create cosign-key` and `create mok-key`. The public half goes into the
-//! files/ overlay of the module that declares the path, and the private half at
-//! the repository root, which is what the scaffolded `.gitignore` names.
+//! `create key <kind>`. Which key exists, where each half of it goes and what
+//! generates it come out of the module declaring it; the generators, and the
+//! text that follows one, are the tool's.
 
+use crate::model::module::Key as Declared;
 use crate::model::remote::REMOTE_DIR;
 use crate::parse::disk::Disk;
 use crate::prompt::Prompt;
@@ -10,174 +11,264 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// What the module ships the public half as, which is the path it declares
-/// `provides-file` for.
-const COSIGN_PUB: &str = "/etc/pki/containers/cosign.pub";
-const SB_CERT: &str = "/usr/share/secureboot/sb_cert.der";
-
-/// The private half, at the repository root and never in a commit.
-const COSIGN_KEY: &str = "cosign.key";
-const MOK_PRIV: &str = "MOK.priv";
-
-/// The keypair the published image is signed with, and the policy module
-/// verifies updates against.
-pub struct Cosign {
+/// One key, as the module declaring it describes it and as this repository
+/// puts it on disk.
+pub struct Key {
+    declared: Declared,
     public: PathBuf,
     private: PathBuf,
+    /// The certificate's common name, for the generator that writes one.
+    cn: Option<String>,
 }
 
-impl Cosign {
-    pub fn collect(root: &Path, module: Option<String>, prompt: &Prompt) -> Result<Self, String> {
-        let dir = provider(root, COSIGN_PUB, module, prompt)?;
-        let public = overlay(root, &dir, COSIGN_PUB);
-        let private = root.join(COSIGN_KEY);
-        unwritten(&public)?;
-        unwritten(&private)?;
-        Ok(Self { public, private })
-    }
-
-    pub fn apply(&self, root: &Path) -> Result<(), String> {
-        let work = workspace("cosign")?;
-        let mut generate = Command::new("cosign");
-        generate
-            .arg("generate-key-pair")
-            .current_dir(&work)
-            .env("COSIGN_PASSWORD", "");
-        finish(
-            generate,
-            "cosign",
-            "get it from https://github.com/sigstore/cosign/releases, or `dnf install cosign`",
-        )?;
-
-        install(&work.join("cosign.pub"), &self.public, 0o644)?;
-        println!("wrote {}", shown(root, &self.public));
-        install(&work.join("cosign.key"), &self.private, 0o600)?;
-        println!("wrote {COSIGN_KEY}");
-        let _ = std::fs::remove_dir_all(&work);
-
-        println!(
-            "\nthe key carries no password, which is what the build workflow decrypts it with.\n\n\
-             next:\n\
-             \x20 commit {}\n\
-             \x20 gh secret set SIGNING_SECRET < {COSIGN_KEY}\n",
-            shown(root, &self.public)
-        );
-        warn_unignored(root, COSIGN_KEY);
-        Ok(())
-    }
-}
-
-/// The Secure Boot key the build signs kernel modules and the kernel with. The
-/// certificate is written as DER, which is what `sign-file` and `mokutil` read.
-pub struct Mok {
-    cert: PathBuf,
-    private: PathBuf,
-    cn: String,
-}
-
-impl Mok {
+impl Key {
     pub fn collect(
         root: &Path,
+        kind: Option<String>,
         module: Option<String>,
         cn: Option<String>,
         prompt: &Prompt,
     ) -> Result<Self, String> {
-        let dir = provider(root, SB_CERT, module, prompt)?;
-        let cert = overlay(root, &dir, SB_CERT);
-        let private = root.join(MOK_PRIV);
-        unwritten(&cert)?;
+        let mut disk = Disk::scan(root);
+        let kind = match kind {
+            Some(kind) => kind,
+            None => which(&disk, prompt)?,
+        };
+
+        let mut declaring = disk.keys.remove(&kind).unwrap_or_default();
+        declaring.retain(|(dir, _)| !dir.starts_with(&format!("{REMOTE_DIR}/")));
+        if declaring.is_empty() {
+            return Err(absent(root, &kind, &disk));
+        }
+        let at = provider(&declaring, &kind, module, prompt)?;
+        let (dir, declared) = declaring.swap_remove(at);
+
+        let public = overlay(root, &dir, &declared.public);
+        let private = root.join(&declared.private);
+        unwritten(&public)?;
         unwritten(&private)?;
 
-        let named = crate::create::named_after_root(root).unwrap_or_else(|| "tectonic".to_string());
-        let fallback = format!("{named} Secure Boot");
-        let cn = prompt.text(
+        // The openssl generator is set up by its profile, and there is one.
+        let cn = match (declared.generator.as_str(), declared.profile.as_deref()) {
+            ("cosign", _) => None,
+            ("openssl", Some("module-signing")) => Some(common_name(root, cn, prompt)?),
+            (generator, _) => {
+                return Err(format!(
+                    "`{generator}` generates a key for a profile, and `key \"{kind}\"` names none; \
+                     `generator \"{generator}\" profile=\"module-signing\"` is the one it has"
+                ))
+            }
+        };
+
+        Ok(Self {
+            declared,
+            public,
+            private,
             cn,
-            "common name, which is what the enrolment prompt shows",
-            "`--cn`",
-            Some(&fallback),
-        )?;
-        common_name(&cn)?;
-        Ok(Self { cert, private, cn })
+        })
     }
 
     pub fn apply(&self, root: &Path) -> Result<(), String> {
-        let work = workspace("mok")?;
-        let config = work.join("openssl.cnf");
-        crate::init::put(&config, &openssl_config(&self.cn))?;
-        let mut generate = Command::new("openssl");
-        generate
-            .args([
-                "req", "-x509", "-new", "-nodes", "-utf8", "-sha256", "-days", "36500", "-batch",
-                "-newkey", "rsa:4096", "-outform", "DER",
-            ])
-            .arg("-config")
-            .arg(&config)
-            .arg("-out")
-            .arg(work.join("cert.der"))
-            .arg("-keyout")
-            .arg(work.join("key.pem"));
-        finish(generate, "openssl", "`dnf install openssl`")?;
+        let work = workspace(&self.declared.kind)?;
+        let (public, private) = match self.declared.generator.as_str() {
+            "cosign" => cosign(&work),
+            _ => openssl(
+                &work,
+                &self.declared,
+                self.cn.as_deref().unwrap_or_default(),
+            ),
+        }?;
 
-        install(&work.join("cert.der"), &self.cert, 0o644)?;
-        println!("wrote {}", shown(root, &self.cert));
-        install(&work.join("key.pem"), &self.private, 0o600)?;
-        println!("wrote {MOK_PRIV}");
+        install(&public, &self.public, 0o644)?;
+        println!("wrote {}", shown(root, &self.public));
+        install(&private, &self.private, 0o600)?;
+        println!("wrote {}", self.declared.private);
         let _ = std::fs::remove_dir_all(&work);
 
-        println!(
-            "\nnext:\n\
-             \x20 commit {cert}\n\
-             \x20 gh secret set MOK_PRIVKEY < {MOK_PRIV}\n\
-             \x20 MOK_KEY_PATH={MOK_PRIV} is what a local build reads it from\n\
-             \n\
-             every machine that boots this image enrols the certificate once, and\n\
-             until it does the modules signed with it will not load:\n\
-             \x20 sudo mokutil --import {cert}\n\
-             \x20 it asks for a one-time password; reboot, choose Enroll MOK, and\n\
-             \x20 give the same password\n",
-            cert = shown(root, &self.cert)
-        );
-        warn_unignored(root, MOK_PRIV);
+        print!("{}", self.next(root));
+        warn_unignored(root, &self.declared.private);
         Ok(())
+    }
+
+    /// What the key is not usable without, which is prose and therefore the
+    /// tool's rather than the manifest's. One follow-up per generator.
+    fn next(&self, root: &Path) -> String {
+        let public = shown(root, &self.public);
+        let private = &self.declared.private;
+        match self.declared.generator.as_str() {
+            "cosign" => format!(
+                "\nthe key carries no password, which is what the build workflow decrypts it with.\n\n\
+                 next:\n\
+                 \x20 commit {public}\n\
+                 \x20 gh secret set SIGNING_SECRET < {private}\n"
+            ),
+            _ => format!(
+                "\nnext:\n\
+                 \x20 commit {public}\n\
+                 \x20 gh secret set MOK_PRIVKEY < {private}\n\
+                 \x20 MOK_KEY_PATH={private} is what a local build reads it from\n\
+                 \n\
+                 every machine that boots this image enrols the certificate once, and\n\
+                 until it does the modules signed with it will not load:\n\
+                 \x20 sudo mokutil --import {public}\n\
+                 \x20 it asks for a one-time password; reboot, choose Enroll MOK, and\n\
+                 \x20 give the same password\n"
+            ),
+        }
     }
 }
 
-/// The module whose files/ overlay ships `path`. A fetched module is not
-/// offered: its tree is replaced on the next fetch and is not committed.
+/// Which key, where the command named none.
+fn which(disk: &Disk, prompt: &Prompt) -> Result<String, String> {
+    let kinds: Vec<&String> = disk.keys.keys().collect();
+    if kinds.is_empty() {
+        return Err(undeclared("", disk));
+    }
+    let options: Vec<Choice> = kinds.iter().map(|kind| Choice::new(*kind, "")).collect();
+    prompt
+        .choose("which key", &options)?
+        .map(|at| kinds[at].clone())
+        .ok_or_else(|| {
+            format!(
+                "`tect create key <kind>` names which key; this repository declares {}",
+                listed(disk)
+            )
+        })
+}
+
+/// Which module holds the public half, where more than one declares the kind.
+/// A fetched module is not offered: its tree is replaced on the next fetch and
+/// is not committed.
 fn provider(
-    root: &Path,
-    path: &str,
+    declaring: &[(String, Declared)],
+    kind: &str,
     given: Option<String>,
     prompt: &Prompt,
-) -> Result<String, String> {
-    let mut found = Disk::scan(root).providers.remove(path).unwrap_or_default();
-    found.retain(|dir| !dir.starts_with(&format!("{REMOTE_DIR}/")));
-
+) -> Result<usize, String> {
+    let dirs: Vec<&str> = declaring.iter().map(|(dir, _)| dir.as_str()).collect();
     if let Some(given) = given {
-        return match found.contains(&given) {
-            true => Ok(given),
-            false => Err(format!(
-                "`modules/{given}` does not declare `provides-file \"{path}\"`"
-            )),
-        };
+        return dirs
+            .iter()
+            .position(|dir| *dir == given)
+            .ok_or_else(|| format!("`modules/{given}` does not declare `key \"{kind}\"`"));
     }
-    match found.as_slice() {
-        [] => Err(format!(
-            "no module declares `provides-file \"{path}\"`, and that module is where \
-             the public half goes; write or import one first"
-        )),
-        [one] => Ok(one.clone()),
+    match dirs.as_slice() {
+        [_] => Ok(0),
         many => {
-            let options: Vec<Choice> = many.iter().map(|dir| Choice::new(dir, "")).collect();
             let listed = many.join(", ");
+            let options: Vec<Choice> = many.iter().map(|dir| Choice::new(*dir, "")).collect();
             prompt
-                .choose(&format!("{listed} all ship `{path}`; which one"), &options)?
-                .map(|chosen| many[chosen].clone())
+                .choose(
+                    &format!("{listed} all declare the {kind} key; which one"),
+                    &options,
+                )?
                 .ok_or_else(|| {
-                    format!("`{path}` is declared by {listed}; name one with `--module`")
+                    format!("the {kind} key is declared by {listed}; name one with `--module`")
                 })
         }
     }
+}
+
+/// Nothing here declares the kind: which module in the declared collections
+/// does, and the line that fetches it.
+fn absent(root: &Path, kind: &str, disk: &Disk) -> String {
+    let (sources, ..) = crate::sources(root);
+    let found: Vec<String> = crate::import::catalog(root, &sources)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|module| module.keys.iter().any(|declared| declared == kind))
+        .map(|module| module.qualified)
+        .collect();
+    match found.first() {
+        Some(first) => format!(
+            "The {} module must be imported before creating {kind} keys.\n\
+             You can add it with `tect import module {first}`",
+            found.join(" or ")
+        ),
+        None => undeclared(kind, disk),
+    }
+}
+
+/// Nothing in the repository and nothing in its collections declares it, so
+/// what is missing is the declaration itself.
+fn undeclared(kind: &str, disk: &Disk) -> String {
+    let kind = match kind.is_empty() {
+        true => "<kind>",
+        false => kind,
+    };
+    let here = match disk.keys.is_empty() {
+        true => String::new(),
+        false => format!("\nThe keys declared here are {}.", listed(disk)),
+    };
+    format!(
+        "nothing here or in the collections this repository declares carries a {kind} key.\n\
+         The module shipping the public half is what declares one, as `key \"{kind}\"` \
+         naming a generator, the path the image ships the public half at, and the file \
+         the private half is written to.{here}"
+    )
+}
+
+fn listed(disk: &Disk) -> String {
+    disk.keys
+        .keys()
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// The common name the enrolment prompt shows, defaulting to the repository's.
+fn common_name(root: &Path, given: Option<String>, prompt: &Prompt) -> Result<String, String> {
+    let named = crate::create::named_after_root(root).unwrap_or_else(|| "tectonic".to_string());
+    let cn = prompt.text(
+        given,
+        "common name, which is what the enrolment prompt shows",
+        "`--cn`",
+        Some(&format!("{named} Secure Boot")),
+    )?;
+    usable(&cn)?;
+    Ok(cn)
+}
+
+/// The keypair a published image is signed with, and the policy module verifies
+/// updates against.
+fn cosign(work: &Path) -> Result<(PathBuf, PathBuf), String> {
+    let mut generate = Command::new("cosign");
+    generate
+        .arg("generate-key-pair")
+        .current_dir(work)
+        .env("COSIGN_PASSWORD", "");
+    finish(
+        generate,
+        "cosign",
+        "get it from https://github.com/sigstore/cosign/releases, or `dnf install cosign`",
+    )?;
+    Ok((work.join("cosign.pub"), work.join("cosign.key")))
+}
+
+/// A self-signed certificate and its key, at the declared size and in the
+/// declared form.
+fn openssl(work: &Path, declared: &Declared, cn: &str) -> Result<(PathBuf, PathBuf), String> {
+    let config = work.join("openssl.cnf");
+    crate::init::put(&config, &module_signing(cn))?;
+    let public = work.join("public");
+    let private = work.join("private.pem");
+
+    let mut generate = Command::new("openssl");
+    generate
+        .args([
+            "req", "-x509", "-new", "-nodes", "-utf8", "-sha256", "-days", "36500", "-batch",
+            "-newkey",
+        ])
+        .arg(format!("rsa:{}", declared.bits))
+        .args(["-outform", &declared.format.to_uppercase()])
+        .arg("-config")
+        .arg(&config)
+        .arg("-out")
+        .arg(&public)
+        .arg("-keyout")
+        .arg(&private);
+    finish(generate, "openssl", "`dnf install openssl`")?;
+    Ok((public, private))
 }
 
 /// Where a module's files/ overlay puts `path` on disk.
@@ -243,14 +334,14 @@ fn shown(root: &Path, path: &Path) -> String {
 }
 
 /// A common name that survives being written into an openssl config as it is.
-fn common_name(cn: &str) -> Result<&str, String> {
-    let usable = !cn.is_empty()
+fn usable(cn: &str) -> Result<&str, String> {
+    let ok = !cn.is_empty()
         && cn.len() <= 64
         && cn.trim() == cn
         && cn
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || " -._".contains(c));
-    match usable {
+    match ok {
         true => Ok(cn),
         false => Err(format!(
             "`{cn}` is not a usable common name: up to 64 letters, digits, spaces, \
@@ -261,7 +352,7 @@ fn common_name(cn: &str) -> Result<&str, String> {
 
 /// `keyUsage` and `codeSigning` are what the kernel checks a module signing
 /// certificate for, and what shim accepts as a MOK.
-fn openssl_config(cn: &str) -> String {
+fn module_signing(cn: &str) -> String {
     format!(
         "[req]\n\
          distinguished_name = dn\n\
@@ -294,6 +385,17 @@ mod tests {
     use super::*;
     use std::process::Stdio;
 
+    const SECUREBOOT: &str = r#"description "x"
+
+supports "fedora"
+
+key "secureboot" {
+    generator "openssl" profile="module-signing" bits=4096
+    public "/usr/share/secureboot/sb_cert.der" format="der"
+    private "MOK.priv"
+}
+"#;
+
     fn have(tool: &str) -> bool {
         Command::new(tool)
             .arg("version")
@@ -303,37 +405,40 @@ mod tests {
             .is_ok_and(|status| status.success())
     }
 
-    fn repo(name: &str, provides: &str) -> PathBuf {
+    fn repo(name: &str, manifest: &str) -> PathBuf {
         let root = std::env::temp_dir().join(name);
         let _ = std::fs::remove_dir_all(&root);
-        crate::init::put(
-            &root.join("modules/keyholder/module.kdl"),
-            &format!("description \"x\"\n\nsupports \"fedora\"\n\nprovides-file \"{provides}\"\n"),
-        )
-        .unwrap();
+        crate::init::put(&root.join("modules/keyholder/module.kdl"), manifest).unwrap();
         root
-    }
-
-    fn openssl(args: &[&str]) -> Vec<u8> {
-        let out = Command::new("openssl").args(args).output().unwrap();
-        assert!(out.status.success(), "openssl {args:?}");
-        out.stdout
     }
 
     /// The pair the build needs: `sign-file` reads the PEM key and the DER
     /// certificate, so both parse and both carry the same public key. Then that
     /// the second run refuses rather than replacing either half.
     #[test]
-    fn mok_key_is_well_formed() {
+    fn a_secure_boot_key_is_well_formed() {
         if !have("openssl") {
             return;
         }
-        let root = repo("tect-mok-key-test", SB_CERT);
-        let ask = || Mok::collect(&root, None, Some("Test Key".into()), &Prompt::silent());
+        let root = repo("tect-secureboot-key-test", SECUREBOOT);
+        let ask = || {
+            Key::collect(
+                &root,
+                Some("secureboot".into()),
+                None,
+                Some("Test Key".into()),
+                &Prompt::silent(),
+            )
+        };
         ask().unwrap().apply(&root).unwrap();
 
-        let cert = overlay(&root, "keyholder", SB_CERT);
-        let private = root.join(MOK_PRIV);
+        let openssl = |args: &[&str]| {
+            let out = Command::new("openssl").args(args).output().unwrap();
+            assert!(out.status.success(), "openssl {args:?}");
+            out.stdout
+        };
+        let cert = overlay(&root, "keyholder", "/usr/share/secureboot/sb_cert.der");
+        let private = root.join("MOK.priv");
         let from_cert = openssl(&[
             "x509",
             "-inform",
@@ -351,11 +456,18 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// A kind no module here declares, and none of the collections either.
     #[test]
-    fn a_module_has_to_declare_the_file() {
-        let root = repo("tect-no-provider-test", "/usr/bin/elsewhere");
-        let message = provider(&root, SB_CERT, None, &Prompt::silent()).unwrap_err();
-        assert!(message.contains("no module declares"));
+    fn a_module_has_to_declare_the_key() {
+        let root = repo("tect-no-key-test", SECUREBOOT);
+        let message = Key::collect(&root, Some("cosign".into()), None, None, &Prompt::silent())
+            .map(|_| ())
+            .unwrap_err();
+        assert!(message.contains("carries a cosign key"), "{message}");
+        assert!(
+            message.contains("declared here are secureboot"),
+            "{message}"
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 }

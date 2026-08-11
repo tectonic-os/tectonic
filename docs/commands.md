@@ -148,43 +148,45 @@ description and what it requires, and asks which one.
 Then it offers to list the module in the images it is to be built into, the
 same offer `create module` ends with; `--image`, repeatable.
 
-### `create cosign-key`
+### `create key <kind>`
 
-Generates the keypair the images this repository publishes are signed with and
-a signature policy verifies updates against. `cosign` generates it, so it has
-to be installed.
+Generates one of the keys the repository's modules declare. The argument names
+which; everything else comes out of the module's `key` node, so the tool holds
+no path of its own. With no argument the declared kinds are listed and one is
+asked for.
 
-The public half goes into the files/ overlay of the module declaring
-`provides-file "/etc/pki/containers/cosign.pub"`, which is where the build
-workflow reads it from; `--module` picks between two that declare it, and so
-does the prompt when there is a terminal. The private half is written to
-`cosign.key` at the repository root.
+The public half goes into the files/ overlay of the module that declared it,
+which is where the build reads it from and what makes the path a contract path
+the module provides. `--module` picks between two modules declaring the same
+kind, and so does the prompt when there is a terminal. The private half is
+written at the repository root, under the name the declaration gives it.
 
-The key carries no password, which is what the workflow decrypts it with. Set
-it as the `SIGNING_SECRET` repository secret.
+No module here declaring the kind is not a missing file but a missing module,
+so the failure names the one in the declared collections that does, the
+collection it comes from, and the `import module` line that fetches it. Where
+no collection has one either, it says what declaration to write.
 
-### `create mok-key`
+The generators are the tool's and closed, and each carries what follows a key
+it wrote:
 
-Generates the Secure Boot key the build signs kernel modules and the kernel
-with. `openssl` generates it.
+- `cosign` writes the keypair a published image is signed with and a signature
+  policy verifies updates against. `cosign` has to be installed. The key
+  carries no password, which is what the build workflow decrypts it with; set
+  it as the `SIGNING_SECRET` repository secret.
+- `openssl profile="module-signing"` writes the Secure Boot certificate the
+  build signs kernel modules and the kernel with, at the declared `bits` and in
+  the declared `format`; DER is what `sign-file` and `mokutil` read. `--cn` is
+  the certificate's common name, which is what the enrolment prompt shows, and
+  it defaults to the repository directory's name. Set the private half as the
+  `MOK_PRIVKEY` repository secret; `$MOK_KEY_PATH` points a local build at it.
+  Every machine that boots the image enrols the certificate once with
+  `mokutil --import`, and until it does the modules signed with it will not
+  load.
 
-The certificate is written as DER, which is what `sign-file` and `mokutil`
-read, into the files/ overlay of the module declaring
-`provides-file "/usr/share/secureboot/sb_cert.der"`; `--module` as above. The
-private half is written to `MOK.priv` at the repository root.
-
-`--cn` is the certificate's common name, which is what the enrolment prompt
-shows, and it defaults to the repository directory's name. Set the private
-half as the `MOK_PRIVKEY` repository secret; `$MOK_KEY_PATH` points a local
-build at it. Every machine that boots the image enrols the certificate once
-with `mokutil --import`, and until it does the modules signed with it will not
-load.
-
-Neither command replaces a key that is already there, because the private half
-cannot be recovered. The zero-byte file a module ships as a placeholder is not
-a key. Both private halves are named in the `.gitignore` the scaffolding
-writes; a repository whose `.gitignore` does not cover them is told so rather
-than edited.
+A key already there is never replaced, because the private half cannot be
+recovered. The zero-byte file a module ships as a placeholder is not a key. The
+private halves are named in the `.gitignore` the scaffolding writes; a
+repository whose `.gitignore` does not cover one is told so rather than edited.
 
 ### `check`
 
