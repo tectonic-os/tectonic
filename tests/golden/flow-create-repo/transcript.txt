@@ -1,0 +1,21 @@
+Tectonic v0.0.0
+
+repository name: Example
+owner, your account or org on github (not tectonic-os): someone
+create an image in it now [Y/n]: yes
+image name: Desktop
+  1) quay.io/fedora/fedora-bootc:44  Fedora 44, nothing above the base system
+  2) ghcr.io/ublue-os/bazzite:stable  KDE, gaming and hardware support over kinoite-main
+  3) ghcr.io/ublue-os/aurora:stable  KDE developer workstation over kinoite-main
+  4) ghcr.io/ublue-os/bluefin:stable  GNOME developer workstation over silverblue-main
+  5) ghcr.io/ublue-os/kinoite-main:44  Fedora Kinoite with the ublue additions, what bazzite builds on
+  0) none
+which base, or none to name another [0-5]: 1
+wrote Example into example
+wrote example/desktop.kdl
+
+next, in example:
+  git init && git add -A && git commit
+  gh repo create someone/example --source=. --push
+
+==== exit 0

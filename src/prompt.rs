@@ -3,21 +3,33 @@
 //! when there is not.
 
 use crate::ui::Choice;
+use std::cell::Cell;
 use std::io::{IsTerminal, Write};
+
+/// A file of answers, one per line, which a run answers from instead of asking.
+/// What the transcript goldens drive the binary with.
+const SCRIPT: &str = "TECT_ANSWERS";
 
 pub struct Prompt {
     ask: bool,
     /// Whether an answer may be asked for with a widget rather than plain
     /// lines, which redirected output rules out.
     draw: bool,
+    /// The answers a scripted run reads, and how far through them it is.
+    script: Option<(Vec<String>, Cell<usize>)>,
 }
 
 impl Prompt {
     pub fn new(no_tui: bool) -> Self {
+        if let Some(path) = std::env::var_os(SCRIPT) {
+            let text = std::fs::read_to_string(path).unwrap_or_default();
+            return Self::scripted(text.lines().map(str::to_string).collect());
+        }
         let ask = !no_tui && std::io::stdin().is_terminal();
         Self {
             ask,
             draw: ask && std::io::stdout().is_terminal(),
+            script: None,
         }
     }
 
@@ -26,10 +38,29 @@ impl Prompt {
         Self {
             ask: false,
             draw: false,
+            script: None,
+        }
+    }
+
+    /// The answers in order, whatever the terminal is. A question they run out
+    /// for fails, so an unexpected one is a failure rather than a wait.
+    pub fn scripted(answers: Vec<String>) -> Self {
+        Self {
+            ask: true,
+            draw: false,
+            script: Some((answers, Cell::new(0))),
         }
     }
 
     fn read(&self, question: &str) -> Result<String, String> {
+        if let Some((answers, at)) = &self.script {
+            let answer = answers
+                .get(at.get())
+                .ok_or_else(|| format!("nothing left in {SCRIPT} to answer `{question}` with"))?;
+            at.set(at.get() + 1);
+            println!("{question}: {answer}");
+            return Ok(answer.trim().to_string());
+        }
         print!("{question}: ");
         std::io::stdout().flush().map_err(|err| err.to_string())?;
         let mut answer = String::new();

@@ -1,0 +1,7 @@
+Tectonic v0.0.0
+
+module name: Other
+Error: nothing left in TECT_ANSWERS to answer `does it install packages [Y/n]` with.
+
+You can find the available commands by typing 'tect' or 'tect --help'
+==== exit 1

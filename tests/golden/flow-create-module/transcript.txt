@@ -1,0 +1,11 @@
+Tectonic v0.0.0
+
+module name: My Editor
+does it install packages [Y/n]: yes
+package names, separated by spaces []: nano vim
+  1) example  Example
+  0) none
+list it in an image [0-1]: 1
+wrote modules/my-editor/module.kdl
+listed "my-editor" in ./example.kdl
+==== exit 0

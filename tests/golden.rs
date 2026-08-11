@@ -261,6 +261,113 @@ fn no_default(root: &Path) {
     }
 }
 
+/// One scripted flow: the command run in a temporary repository, both streams
+/// merged into the order a person reads them, byte-compared against the
+/// transcript the fixture holds beside its answers.
+///
+/// `PATH` is emptied, so nothing a flow offers to exec is found on this machine
+/// and none of it reaches the network.
+fn flow(name: &str, dir: &Path, args: &[&str]) {
+    let fixture = crate_dir().join("tests/golden").join(name);
+    let log = tmp().join(format!("{name}.log"));
+    let file = std::fs::File::create(&log).unwrap();
+    let status = std::process::Command::new(env!("CARGO_BIN_EXE_tect"))
+        .args(args)
+        .current_dir(dir)
+        .env("PATH", "")
+        .env("TECT_ANSWERS", fixture.join("answers.txt"))
+        .env("TECT_ASSETS", crate_dir().join("assets"))
+        .stdout(std::process::Stdio::from(file.try_clone().unwrap()))
+        .stderr(std::process::Stdio::from(file))
+        .status()
+        .unwrap();
+    let transcript = format!(
+        "{}==== exit {}\n",
+        std::fs::read_to_string(&log).unwrap(),
+        status.code().unwrap_or_default()
+    );
+    compare(name, "transcript.txt", &transcript);
+}
+
+fn tmp() -> PathBuf {
+    PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+}
+
+/// An empty directory, and the repository a flow runs in, both written by the
+/// tool itself from flags alone.
+fn tect(dir: &Path, args: &[&str]) {
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_tect"))
+        .args(args)
+        .current_dir(dir)
+        .env("PATH", "")
+        .env("TECT_ASSETS", crate_dir().join("assets"))
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+fn empty(name: &str) -> PathBuf {
+    let dir = tmp().join(name);
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+fn flow_repo(name: &str) -> PathBuf {
+    let root = empty(name);
+    tect(
+        &root,
+        &[
+            "--no-tui", "--root", ".", "create", "repo", "Example", "--owner", "someone",
+            "--image", "Example",
+        ],
+    );
+    root
+}
+
+/// Every flow that prompts, answered from a script: what a person sees, and
+/// that a question the script does not answer fails rather than waits.
+#[test]
+fn flows() {
+    flow("flow-create-repo", &empty("flow-new"), &["create", "repo"]);
+
+    let root = flow_repo("flow-image");
+    flow(
+        "flow-create-image",
+        &root,
+        &["--root", ".", "create", "image"],
+    );
+
+    let root = flow_repo("flow-module");
+    let module = ["--root", ".", "create", "module"];
+    flow("flow-create-module", &root, &module);
+    flow(
+        "flow-module-taken",
+        &root,
+        &[&module[..], &["My Editor"]].concat(),
+    );
+    flow("flow-unanswered", &root, &module);
+
+    let root = flow_repo("flow-import");
+    let collections = crate_dir().join("tests/collections");
+    let mut repo = std::fs::read_to_string(root.join("repo.kdl")).unwrap();
+    repo.push_str(&format!(
+        "\nsources {{\n    one {:?}\n    two {:?}\n}}\n",
+        collections.join("one").display(),
+        collections.join("two").display()
+    ));
+    std::fs::write(root.join("repo.kdl"), repo).unwrap();
+    flow(
+        "flow-import-module",
+        &root,
+        &["--root", ".", "import", "module"],
+    );
+}
+
 /// The reference in docs/schema.md, re-rendered from the tables. The renderer
 /// is what checks that every marker names a schema and every schema is marked.
 #[test]

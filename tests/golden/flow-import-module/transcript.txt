@@ -1,0 +1,13 @@
+Tectonic v0.0.0
+
+  1) one/browser  A browser, from the first collection
+  2) two/browser  A browser, from the second collection (requires flatpak)
+  3) one/flatpak  Flatpak client and a daily update timer
+  0) none
+which module [0-3]: 1
+  1) example  Example
+  0) none
+list it in an image [0-1]: 1
+imported modules/one/browser
+listed "one/browser" in ./example.kdl
+==== exit 0

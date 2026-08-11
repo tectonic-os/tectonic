@@ -1,0 +1,6 @@
+Tectonic v0.0.0
+
+Error: modules/my-editor is already there.
+
+You can find the available commands by typing 'tect' or 'tect --help'
+==== exit 1
