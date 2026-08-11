@@ -26,4 +26,19 @@ image {
         module "my-editor"
     }
 }
+==== server.kdl
+image {
+    name "Server"
+    url "https://github.com/someone/example"
+    issues-url "https://github.com/someone/example/issues"
+
+    base "quay.io/fedora/fedora-bootc:44" {
+        family "fedora"
+        provides "rechunking" "initramfs-generation" "mac-policy"
+    }
+
+    modules {
+        module "my-editor"
+    }
+}
 ==== check

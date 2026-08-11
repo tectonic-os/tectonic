@@ -8,20 +8,7 @@ Creating example...
 This repo is designed to run scheduled builds of the repo's images via
 Github or Forgejo actions.
 Would you like to configure this now? (Yes/No)
-Yes
-
-  1) github.com  Github, and the workflows Tectonic ships
-  2) forgejo  a Forgejo instance, whose address you give
-  0) none
-Where will the repo be hosted? [0-2]: 2
-
-What is the address of the Forgejo instance?
-forge.example.org
-
-What is your username on forge.example.org?
-forge.example.org/someone
-
-Added forge.example.org/someone/example as the origin repo
+No
 
 Tectonic defines images through kdl files. These image files define the base
 image and modules to be included in the built image.
@@ -29,7 +16,7 @@ Would you like to create an image file now? (Yes/No)
 Yes
 
 What will the image be called? [Example]
-Desktop
+
 
   1) quay.io/fedora/fedora-bootc:44  Fedora 44, nothing above the base system
   2) ghcr.io/ublue-os/bazzite:stable  KDE, gaming and hardware support over kinoite-main
@@ -41,10 +28,9 @@ What is the base image for this image? [0-5]: 1
 
 wrote Example into example
 initialised a git repository in example
-wrote example/desktop.kdl
+wrote example/example.kdl
 
 next, in example:
   git add -A && git commit
-  git remote add origin https://forge.example.org/someone/example && git push -u origin main
 
 ==== exit 0

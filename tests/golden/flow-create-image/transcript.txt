@@ -1,6 +1,6 @@
 Tectonic v0.0.0
 
-What will the image be called?
+What will the image be called? [example]
 Beta
 
   1) quay.io/fedora/fedora-bootc:44  Fedora 44, nothing above the base system

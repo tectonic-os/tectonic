@@ -27,7 +27,7 @@ image and modules to be included in the built image.
 Would you like to create an image file now? (Yes/No)
 Yes
 
-What will the image be called?
+What will the image be called? [Example]
 Desktop
 
   1) quay.io/fedora/fedora-bootc:44  Fedora 44, nothing above the base system

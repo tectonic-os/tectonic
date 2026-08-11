@@ -88,7 +88,8 @@ impl Mok {
         unwritten(&cert)?;
         unwritten(&private)?;
 
-        let fallback = format!("{} Secure Boot", named_after_root(root));
+        let named = crate::create::named_after_root(root).unwrap_or_else(|| "tectonic".to_string());
+        let fallback = format!("{named} Secure Boot");
         let cn = prompt.text(
             cn,
             "common name, which is what the enrolment prompt shows",
@@ -239,15 +240,6 @@ fn shown(root: &Path, path: &Path) -> String {
         .unwrap_or(path)
         .display()
         .to_string()
-}
-
-fn named_after_root(root: &Path) -> String {
-    std::fs::canonicalize(root)
-        .ok()
-        .as_deref()
-        .and_then(Path::file_name)
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "tectonic".to_string())
 }
 
 /// A common name that survives being written into an openssl config as it is.

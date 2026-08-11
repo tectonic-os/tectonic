@@ -127,19 +127,25 @@ impl Prompt {
         question: &str,
         flag: &str,
         prefix: &str,
+        default: Option<&str>,
     ) -> Result<String, String> {
         if let Some(value) = given.filter(|value| !value.is_empty()) {
             return Ok(value);
         }
-        let missing = || {
-            Err(format!(
+        let missing = || match default {
+            Some(default) => Ok(default.to_string()),
+            None => Err(format!(
                 "give {flag}, since nothing can be asked here: {question}"
-            ))
+            )),
         };
         if !self.ask {
             return missing();
         }
-        match self.read(question, &format!("{question}\n{prefix}"))? {
+        let question = match default {
+            Some(default) => format!("{question} [{default}]"),
+            None => question.to_string(),
+        };
+        match self.read(&question, &format!("{question}\n{prefix}"))? {
             answer if answer.is_empty() => missing(),
             answer => Ok(answer),
         }

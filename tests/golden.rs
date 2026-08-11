@@ -107,19 +107,32 @@ fn verify(name: &str, root: &Path) {
     compare(name, "verify.txt", &out);
 }
 
-/// `create module`, from flags alone: what it writes, what the splice does to
-/// the image file it lists the module in, and that the result checks.
+/// `create image` and `create module`, from flags alone: the URL a second image
+/// takes from the repository, what the splice does to both image files a module
+/// is listed in, and that the result checks.
 fn create(name: &str, root: &Path) {
     std::env::set_current_dir(root).expect("the created-into repository exists");
     let here = Path::new(".");
     let silent = tect::prompt::Prompt::silent();
 
+    tect::create::Image::collect(
+        here,
+        Some("Server".into()),
+        None,
+        "example",
+        None,
+        "a name argument",
+        &silent,
+    )
+    .unwrap()
+    .apply(here)
+    .unwrap();
     tect::create::Module::collect(
         here,
         Some("My Editor".into()),
         vec!["nano".into()],
         vec![("provides".into(), "editor".into())],
-        vec!["example".into()],
+        vec!["example".into(), "server".into()],
         &silent,
     )
     .unwrap()
@@ -142,6 +155,7 @@ fn create(name: &str, root: &Path) {
         "modules/my-editor/module.kdl",
         "modules/plain/module.kdl",
         "example.kdl",
+        "server.kdl",
     ] {
         out.push_str(&format!(
             "==== {file}\n{}",
@@ -358,16 +372,18 @@ fn empty(name: &str) -> PathBuf {
     dir
 }
 
+/// A repository written into a directory named after itself, which is what a
+/// `create repo` with no `--root` produces and what the name a flow defaults to
+/// is read off.
 fn flow_repo(name: &str) -> PathBuf {
-    let root = empty(name);
+    let dir = empty(name);
     tect(
-        &root,
+        &dir,
         &[
-            "--no-tui", "--root", ".", "create", "repo", "Example", "--owner", "someone",
-            "--image", "Example",
+            "--no-tui", "create", "repo", "Example", "--owner", "someone", "--image", "Example",
         ],
     );
-    root
+    dir.join("example")
 }
 
 /// The same, with a second image to list a module in.
@@ -391,14 +407,14 @@ fn flows() {
         ("flow-create-repo-signed-out", Some(SIGNED_OUT)),
         ("flow-create-repo-signed-in", Some(SIGNED_IN)),
         ("flow-create-repo-forgejo", None),
+        ("flow-image-default", None),
     ] {
         flow(name, &empty(&format!("{name}-in")), gh, &repo);
     }
 
-    let root = flow_repo("flow-image");
     flow(
         "flow-create-image",
-        &root,
+        &flow_repo("flow-image"),
         None,
         &["--root", ".", "create", "image"],
     );

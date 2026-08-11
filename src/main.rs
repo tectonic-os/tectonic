@@ -400,9 +400,25 @@ fn run() -> Result<ExitCode, Error> {
             let Some(root) = open(root_arg)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
-            let origin = owner.map(|owner| tect::create::origin(tect::create::HOST, &owner));
-            tect::create::Image::collect(&root, name, base, origin, "a name argument", &prompt)?
-                .apply(&root)?;
+            // Every image in a repository shares its URL, so the id in one is
+            // the repository's, which is what the tree it sits in is called.
+            let repo = tect::create::named_after_root(&root).unwrap_or_default();
+            let url = owner.map(|owner| {
+                format!(
+                    "{}/{repo}",
+                    tect::create::origin(tect::create::HOST, &owner)
+                )
+            });
+            tect::create::Image::collect(
+                &root,
+                name,
+                base,
+                &repo,
+                url,
+                "a name argument",
+                &prompt,
+            )?
+            .apply(&root)?;
             return Ok(ExitCode::SUCCESS);
         }
         ["create", "module", rest @ ..] => {
