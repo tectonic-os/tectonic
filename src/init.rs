@@ -11,18 +11,16 @@ const INSTALLED: [&str; 2] = [
     "/usr/share/tectonic/assets",
 ];
 
-/// The collection every repository starts able to import from, written into
-/// repo.kdl as it is. It follows a branch rather than a tag, so it carries no
-/// `sha256` and says so: a tag would version every module in the collection
-/// together, and nothing would cut one per module change.
-pub const SOURCES: &str = "\
-sources {
-    tectonic-os \"https://github.com/tectonic-os/modules/archive/refs/heads/{ref}.tar.gz\" {
-        unpinned \"the collection this tool is published alongside, followed at its branch head\"
-        ref \"main\"
-    }
+/// The `sources` block a new repo.kdl is scaffolded with, which is one of the
+/// assets rather than a value in here: editing it changes what every
+/// repository created afterwards declares, and deleting it scaffolds none. It
+/// is spliced into repo.kdl, so the copy that lands at the root is taken out
+/// again.
+pub const SOURCES_FILE: &str = "repo.sources.kdl";
+
+pub fn sources(assets: &Path) -> String {
+    fs::read_to_string(assets.join(SOURCES_FILE)).unwrap_or_default()
 }
-";
 
 /// The scaffolding directory, looked for in this order: `TECT_ASSETS`, an
 /// `assets` directory beside the binary, which is how the release tarball
@@ -85,13 +83,21 @@ pub fn write(root: &Path, name: &str, assets: &Path) -> Result<(), String> {
     }
 
     copy_tree(assets, root)?;
+    let scaffold = root.join(SOURCES_FILE);
+    let sources = match sources(assets) {
+        block if block.is_empty() => block,
+        block => format!("\n{block}"),
+    };
+    if scaffold.is_file() {
+        fs::remove_file(&scaffold).map_err(|err| format!("{}: {err}", scaffold.display()))?;
+    }
     put(
         &root.join(REPO_FILE),
         &format!(
             "schema-version {SCHEMA_VERSION}\n\n\
              // renovate: datasource=github-releases depName=tectonic-os/tectonic\n\
-             tect-version \"{TECT_VERSION}\"\n\n\
-             {SOURCES}"
+             tect-version \"{TECT_VERSION}\"\n\
+             {sources}"
         ),
     )?;
     put(&root.join("README.md"), &format!("# {name}\n"))?;

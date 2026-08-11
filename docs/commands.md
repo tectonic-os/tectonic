@@ -66,6 +66,14 @@ collection would version every module in it together. Delete the block, or
 replace it with a tagged and hashed pin, if that trade is not one you want;
 `docs/schema.md` says what each spelling costs.
 
+That block is not compiled in. It is `repo.sources.kdl` in the assets
+directory, which is the release tarball's `assets/` beside the binary, or
+`~/.local/share/tectonic/assets/` on an installed copy. Editing it changes
+what every repository created afterwards declares, and deleting it scaffolds
+no `sources` at all, which is a valid repository that imports from nothing
+until you write one. It is the only asset that does not land in the
+repository: it is spliced into `repo.kdl` instead.
+
 It asks for the name, then whether the images are to be built on a schedule.
 That is what a remote is for, so yes asks where the repository is hosted,
 `--host`, which is `github.com` unless the picker or the flag names another,

@@ -1,0 +1,11 @@
+// The collections `tect import module` resolves a name against. This one
+// follows a branch rather than a tag, so it carries no sha256: every import
+// takes whatever the branch holds then, and nothing checks what arrived. A
+// tag would verify every fetch, at the cost of versioning every module in the
+// collection together.
+sources {
+    tectonic-os "https://github.com/tectonic-os/modules/archive/refs/heads/{ref}.tar.gz" {
+        unpinned "the collection this tool is published alongside, followed at its branch head"
+        ref "main"
+    }
+}

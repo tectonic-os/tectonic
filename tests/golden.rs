@@ -406,7 +406,7 @@ fn flow_repo_sourced(name: &str) -> PathBuf {
     // two whose contents the flows are written against.
     let mut repo = std::fs::read_to_string(root.join("repo.kdl"))
         .unwrap()
-        .replace(tect::init::SOURCES, "");
+        .replace(&tect::init::sources(&crate_dir().join("assets")), "");
     repo.push_str(&format!(
         "sources {{\n    one {:?}\n    two {:?}\n}}\n",
         collections.join("one").display(),
