@@ -30,6 +30,18 @@ pub struct Base {
     pub span: Span,
 }
 
+impl Base {
+    /// Whether two entries describe a base the same way, which is what makes
+    /// one of them worth reporting.
+    fn differs(&self, other: &Base) -> bool {
+        self.family != other.family
+            || self.provides != other.provides
+            || self.provides_files != other.provides_files
+            || self.about != other.about
+            || self.signed != other.signed
+    }
+}
+
 /// One base the tool ships with, which is the same thing written where no file
 /// has to be read to have it.
 pub struct Seed {
@@ -95,8 +107,9 @@ pub const SEED: &[Seed] = &[
 /// What an image that has chosen nothing builds on.
 pub const DEFAULT: &Seed = &SEED[0];
 
-/// A seeded base a collection describes instead, which is how a stale entry is
-/// corrected without a tool release.
+/// A seeded base a collection describes differently, which is how a stale entry
+/// is corrected without a tool release. One that repeats the seed corrects
+/// nothing and is not reported.
 pub struct Shadow {
     pub image: String,
     pub collection: String,
@@ -140,10 +153,12 @@ pub fn catalog(
             declared.push((base.image.clone(), collection.name.clone()));
             match bases.iter().position(|known| known.image == base.image) {
                 Some(at) => {
-                    shadows.push(Shadow {
-                        image: base.image.clone(),
-                        collection: collection.name.clone(),
-                    });
+                    if bases[at].differs(&base) {
+                        shadows.push(Shadow {
+                            image: base.image.clone(),
+                            collection: collection.name.clone(),
+                        });
+                    }
                     bases[at] = base;
                 }
                 None => bases.push(base),

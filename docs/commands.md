@@ -99,10 +99,10 @@ The catalog is a seed the tool ships with, which is why the picker works with
 nothing fetched and no network, and every collection `repo.kdl` declares in
 `sources` extends it with a `bases.kdl` at its root. A collection describing a
 base the tool ships an entry for wins, which is how a stale entry is corrected
-without a tool release, and `check` names the collection that replaced it. A
-base two collections describe is an error. Nothing is fetched to read one: a
-collection that is not on this machine extends nothing, and the seed is what
-the picker offers.
+without a tool release, and `check` names the collection wherever the two
+differ. A base two collections describe is an error. Nothing is fetched to read
+one: a collection that is not on this machine extends nothing, and the seed is
+what the picker offers.
 
 `url` and `issues-url` are the repository's own, not the image's: every image
 in a repository is published out of one remote, so the id in them is the
@@ -202,8 +202,9 @@ repository whose `.gitignore` does not cover one is told so rather than edited.
 Reads every manifest and reports every problem at the line that caused it,
 with the counts on the last line: images, modules, flavours, and how many
 listed modules the base already provides and nothing therefore builds. Above
-them it names every base a declared collection describes that the tool ships
-an entry for, since the collection's is what an image is scaffolded from.
+them it names every base a declared collection describes differently from the
+entry the tool ships, since the collection's is what an image is scaffolded
+from.
 
 ### `generate`
 

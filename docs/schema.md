@@ -310,10 +310,11 @@ base "ghcr.io/ublue-os/bazzite:stable" {
 ```
 
 An entry wins over the seeded one of the same reference, which is how a stale
-one is corrected without a tool release, and `check` names the collection that
-replaced it. A base two collections describe is an error, the way a collection
-declared twice is. Nothing is fetched to read one: a collection that is not on
-this machine already extends nothing, and the seed is what the picker offers.
+one is corrected without a tool release, and `check` names the collection
+wherever the two differ. A base two collections describe is an error, the way a
+collection declared twice is. Nothing is fetched to read one: a collection that
+is not on this machine already extends nothing, and the seed is what the picker
+offers.
 
 <!-- schema: bases -->
 
