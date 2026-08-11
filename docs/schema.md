@@ -73,6 +73,21 @@ A name here is checked when it is imported from, not when the repository is
 checked: a directory that exists on one machine and not another is not a
 repository problem.
 
+`seed` nominates the image a new repository may start from, and `generate`
+writes it to `generated/seed.kdl`.
+
+```kdl
+seed "workstation" collection="tectonic-os"
+```
+
+The seed carries the base, the module list and the collections those modules
+come from, and nothing about this repository: no name, no URL, no owner. Each
+module is named by the collection it is fetched through, which is why
+`collection` is required and has to be one of the collections in `sources`: a
+repository is seedable only if it publishes its own `modules/` as a collection
+too. An image listing a module nothing can import that way is reported, since
+the seed of it would leave a new repository unbuildable.
+
 <!-- schema: repo -->
 
 | Node | Takes | Meaning |
@@ -81,6 +96,16 @@ repository problem.
 | `tect-version` | a string, at most one | The tect release this repository is built with, which every command holds itself to. |
 | `default-image` | a string, at most one | The image a command given no image answers about, and a build with no target builds. |
 | `pr-image` | a string, at most one | The image a pull request builds. |
+
+### `seed`
+
+The image this repository publishes a declaration of, for a new repository to start from.
+
+*a string, at most one*
+
+| Property | Value | Meaning |
+| --- | --- | --- |
+| `collection=` | a string, required | The collection this repository publishes its own modules as, which is what names them in the seed. |
 
 ### `workflows`
 

@@ -1,11 +1,11 @@
 //! repo.kdl, and the walk over every image file beside it.
 
 use crate::diag::{Issue, Issues, Source, Span};
-use crate::model::image::{List, WorkflowToggle, REPO_FILE, SCHEMA_VERSION, TECT_VERSION};
+use crate::model::image::{List, Seed, WorkflowToggle, REPO_FILE, SCHEMA_VERSION, TECT_VERSION};
 use crate::parse::image::IMAGE;
 use crate::parse::remote::{parse_collection, COLLECTION};
 use crate::parse::schema::{check_doc, Arg, Kind, Node, Prop, Say};
-use crate::parse::{boolean, int_arg, kids, string_arg, syntax_issue};
+use crate::parse::{boolean, int_arg, kids, prop, string_arg, syntax_issue};
 use kdl::{KdlDocument, KdlNode};
 use std::path::Path;
 
@@ -34,6 +34,25 @@ pub const REPO: Node = Node::new("repo",
             .arg(Arg::Str, Say::new("`{}` needs an image name", "no image given",
                 "`pr-image \"workstation\"`, since a pull request builds one target"))
             .once(""),
+        Node::new("seed",
+            "The image this repository publishes a declaration of, for a new repository to start \
+             from.")
+            .arg(Arg::Str, Say::new("`{}` needs an image name", "no image given",
+                "`seed \"workstation\" collection=\"owner\"`, naming one of the images declared \
+                 at the root"))
+            .once("a repository publishes one seed")
+            .props(&[
+                Prop { name: "collection", kind: Kind::Str,
+                    desc: "The collection this repository publishes its own modules as, which is \
+                           what names them in the seed.",
+                    say: Say::new("`{}` must be a collection name", "not a string", ""),
+                    missing: Say::new("`{}` says nothing about where its modules are published",
+                        "no `collection`",
+                        "`{} collection=\"owner\"`, one of the collections in `sources`: every \
+                         module in a seed is fetched through one, so a repository publishing no \
+                         collection of its own has nothing a seeded repository can import") },
+            ], Say::new("unknown seed property `{}`", "not part of the schema",
+                "a seed accepts `collection`")),
         Node::new("workflows",
             "The shipped workflows this repository turns off, named by file stem.")
             .once("a second block would split one set of toggles in two")
@@ -62,7 +81,7 @@ pub const REPO: Node = Node::new("repo",
                 "omit the block entirely; a repository with nothing here imports from nothing"))
             .children(&[COLLECTION], Say::NONE),
     ], Say::new("unknown node `{}` in repo.kdl", "not part of the schema",
-        "repo.kdl holds `schema-version`, `tect-version`, `default-image`, `pr-image`, a \
+        "repo.kdl holds `schema-version`, `tect-version`, `default-image`, `pr-image`, `seed`, a \
          `workflows` block and a `sources` block: what is true of the repository rather than of \
          any image in it. An image goes in a file of its own"));
 
@@ -173,6 +192,7 @@ impl List {
             sources: Vec::new(),
             default_image_id: None,
             pr_image_id: None,
+            seed: None,
             schema_version: None,
             schema_version_seen: false,
             repo_src: Source::new(root.join(REPO_FILE).display().to_string(), ""),
@@ -255,6 +275,12 @@ impl List {
                 }
                 (true, "pr-image") => {
                     self.pr_image_id = string_arg(node).map(str::to_string);
+                }
+                (true, "seed") => {
+                    self.seed = string_arg(node).map(|image| Seed {
+                        image: image.to_string(),
+                        collection: prop(node, "collection").unwrap_or_default().to_string(),
+                    });
                 }
                 (true, "schema-version") => {
                     self.schema_version_seen = true;
@@ -358,6 +384,74 @@ impl List {
                     .help("a pull request builds one target, of one declared image"),
                 );
             }
+        }
+
+        if let Some(seed) = &self.seed {
+            self.check_seed(seed, issues);
+        }
+    }
+
+    /// Whether the seeded image is one a seeded repository could resolve: it
+    /// carries module names and nothing else, so every one of them has to be
+    /// fetchable from a collection this repository declares.
+    fn check_seed(&self, seed: &Seed, issues: &mut Issues) {
+        let Some(image) = self.images.iter().find(|i| i.id == seed.image) else {
+            issues.push(
+                Issue::new(
+                    format!(
+                        "`seed` names `{}`, which is not a declared image",
+                        seed.image
+                    ),
+                    &self.repo_src,
+                )
+                .help("a repository publishes a seed of one of the images declared at its root"),
+            );
+            return;
+        };
+
+        let declared = |name: &str| self.sources.iter().any(|c| c.name == name);
+        if !declared(&seed.collection) {
+            issues.push(
+                Issue::new(
+                    format!(
+                        "`{}` is not a collection this repository declares",
+                        seed.collection
+                    ),
+                    &self.repo_src,
+                )
+                .help(
+                    "a repository is seedable only if it publishes its own modules/ as a \
+                     collection, and declares it in `sources` under the owner they are imported \
+                     as: that is what a seeded repository fetches them through",
+                ),
+            );
+        }
+
+        for entry in &image.entries {
+            let owner = entry
+                .qualified(&seed.collection)
+                .and_then(|name| name.split('/').next().map(str::to_string));
+            match &owner {
+                Some(owner) if declared(owner) => continue,
+                _ => {}
+            }
+            issues.push(
+                Issue::new(
+                    format!("`{}` is in no collection the seed can name", entry.path),
+                    &image.src,
+                )
+                .at(
+                    entry.span,
+                    match owner {
+                        Some(owner) => format!("`{owner}` is not declared in `sources`"),
+                        None => "pinned to a source of its own".to_string(),
+                    },
+                )
+                .help(
+                    "a seed lists a module by name and nothing else, so one nothing can import \
+                     leaves a seeded repository unbuildable",
+                ),
+            );
         }
     }
 

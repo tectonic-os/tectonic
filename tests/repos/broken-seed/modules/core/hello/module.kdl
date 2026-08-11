@@ -1,0 +1,3 @@
+description "A module no declared collection provides"
+
+supports "fedora"

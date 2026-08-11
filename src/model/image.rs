@@ -138,6 +138,25 @@ impl Entry {
             None => self.path.clone(),
         }
     }
+
+    /// What a seed calls this module: one this repository imported is already
+    /// named by the collection it came from, one of its own takes the
+    /// collection this repository publishes as, and one pinned to a source of
+    /// its own comes from no collection at all.
+    pub fn qualified(&self, publishes_as: &str) -> Option<String> {
+        match (&self.remote, self.path.contains('/')) {
+            (Some(_), _) => None,
+            (None, true) => Some(self.path.clone()),
+            (None, false) => Some(format!("{publishes_as}/{}", self.path)),
+        }
+    }
+}
+
+/// The image a repository publishes a seed of, and the collection it publishes
+/// its own modules as, which is what every module in the seed is named by.
+pub struct Seed {
+    pub image: String,
+    pub collection: String,
 }
 
 /// The repository's declarations: every image in it, and the handful of
@@ -155,6 +174,8 @@ pub struct List {
     /// request builds.
     pub default_image_id: Option<String>,
     pub pr_image_id: Option<String>,
+    /// The image this repository publishes a seed of, when it publishes one.
+    pub seed: Option<Seed>,
     /// What repo.kdl declares, which is `SCHEMA_VERSION` or the load failed.
     pub schema_version: Option<u32>,
     /// Whether the node was there at all, so a malformed one is reported once

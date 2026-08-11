@@ -1,0 +1,3 @@
+description "A module pinned to a source of its own"
+
+supports "fedora"
