@@ -178,18 +178,27 @@ fn one_name(rest: &[&str], command: &str) -> Result<Option<String>, Error> {
     }
 }
 
-/// `--root`, else the nearest directory at or above here holding a repo.kdl.
+/// `--root`, else the nearest directory at or above here holding a repo.kdl,
+/// named the way `--root .` names one: every path a command prints hangs off
+/// this, and a person reads `modules/x` rather than where their home is.
 fn repo_root(given: Option<PathBuf>) -> Result<PathBuf, Error> {
     if let Some(root) = given {
         return Ok(root);
     }
     let here = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    tect::find_root(&here).ok_or_else(|| {
+    let found = tect::find_root(&here).ok_or_else(|| {
         Error::Invocation(format!(
             "no repo.kdl in {} or any parent directory",
             here.display()
         ))
-    })
+    })?;
+    Ok(
+        match here.strip_prefix(&found).map(|d| d.components().count()) {
+            Ok(0) => PathBuf::from("."),
+            Ok(up) => (0..up).map(|_| "..").collect(),
+            Err(_) => found,
+        },
+    )
 }
 
 /// The repository, or `None` when this release may not work in it and said so.
