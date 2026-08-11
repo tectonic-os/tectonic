@@ -157,11 +157,13 @@ pub fn choose(root: &Path, sources: &[Collection], prompt: &Prompt) -> Result<St
 }
 
 /// The collection's tree where it is already on this machine: the directory it
-/// is, or an archive fetched at the hash it is still pinned to. Nothing is
-/// fetched, so a reader that only wants what is there costs no network.
+/// is, an archive fetched at the hash it is still pinned to, or whatever the
+/// last import of an unpinned one left. Nothing is fetched, so a reader that
+/// only wants what is there costs no network.
 pub fn cached(root: &Path, collection: &Collection) -> Option<PathBuf> {
     let dir = match &collection.at {
         At::Dir(dir) => root.join(dir),
+        At::Archive(remote) if remote.unpinned.is_some() => root.join(CACHE).join(&collection.name),
         At::Archive(remote) => {
             let pin = root.join(CACHE).join(format!("{}.pin", collection.name));
             match std::fs::read_to_string(&pin).ok().as_deref() == Some(remote.sha256.as_str()) {
@@ -174,10 +176,15 @@ pub fn cached(root: &Path, collection: &Collection) -> Option<PathBuf> {
 }
 
 /// The collection's tree on this machine: the directory it already is, or the
-/// pinned archive, fetched and verified once and kept for the next import.
+/// pinned archive, fetched and verified once and kept for the next import. An
+/// unpinned one is fetched again every time, since the ref it follows has
+/// moved by now for all anything here knows; only `import module` comes here,
+/// so that is the one command that reaches the network.
 fn tree(root: &Path, collection: &Collection) -> Result<PathBuf, String> {
-    if let Some(dir) = cached(root, collection) {
-        return Ok(dir);
+    if !collection.unpinned() {
+        if let Some(dir) = cached(root, collection) {
+            return Ok(dir);
+        }
     }
     let remote = match &collection.at {
         At::Dir(dir) => {
@@ -194,9 +201,15 @@ fn tree(root: &Path, collection: &Collection) -> Result<PathBuf, String> {
     let pin = root.join(CACHE).join(format!("{}.pin", collection.name));
     let _ = std::fs::remove_dir_all(&dir);
     let url = remote.url_resolved();
-    crate::runtime::extract(&url, &remote.sha256, &dir, &["--strip-components=1"])
+    let sha256 = remote.unpinned.is_none().then_some(remote.sha256.as_str());
+    crate::runtime::extract(&url, sha256, &dir, &["--strip-components=1"])
         .map_err(|err| format!("`{}`: {err}", collection.name))?;
-    std::fs::write(&pin, &remote.sha256).map_err(|err| format!("{}: {err}", pin.display()))?;
+    match sha256 {
+        Some(sha256) => {
+            std::fs::write(&pin, sha256).map_err(|err| format!("{}: {err}", pin.display()))?
+        }
+        None => drop(std::fs::remove_file(&pin)),
+    }
     Ok(dir)
 }
 

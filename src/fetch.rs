@@ -46,7 +46,7 @@ pub fn modules(root: &Path, list: &List) -> Result<Vec<String>, String> {
 
         let tmp = root.join(format!("out/fetch-module.{}", std::process::id()));
         let _ = fs::remove_dir_all(&tmp);
-        crate::runtime::extract(&pin.url, &pin.sha256, &tmp, &["--strip-components=1"])?;
+        crate::runtime::extract(&pin.url, Some(&pin.sha256), &tmp, &["--strip-components=1"])?;
 
         let source = match pin.path.is_empty() {
             true => tmp.clone(),
