@@ -8,9 +8,21 @@ The repository is the nearest directory at or above the working directory
 holding a `repo.kdl`, or `--root`. Data goes to stdout and diagnostics to
 stderr; exit 1 is the invocation, exit 2 the repository.
 
-Usage is printed when the invocation was what was wrong: an unknown command, a
-flag the command does not read, a bad argument, no repository. A command that
-failed part way through its work prints the error and nothing else.
+A command a person reads prints `Tectonic v<version>` and a blank line before
+anything else. The commands under "For scripts" and "Inside a build layer"
+print no banner, because their stdout is what something else reads.
+
+A failure reads:
+
+    Tectonic v0.0.0
+
+    Error: modules/firefox is already there.
+
+    You can find the available commands by typing 'tect' or 'tect --help'
+
+Usage is printed in place of that last line when the invocation was what was
+wrong: an unknown command, a flag the command does not read, a bad argument, no
+repository.
 
 ## Flags, and what is asked for
 
@@ -27,6 +39,13 @@ A yes or no step has no flag of its own. The flag that answers it is the
 answer: `--image desktop` on `create repo` means yes and names the image, and
 its absence under `--no-tui` means no.
 
+Every question is asked before anything is written, and whatever a question
+depends on is read before it is asked, so a name already taken or an image that
+is not declared is refused with nothing left behind. What is written afterwards
+is one line per step, in the order they were written, and a step that fails
+stops the command: what earlier steps wrote stays, and each of those steps is
+also a command of its own to finish the run with.
+
 ## Starting a repository
 
 ### `create repo [name]`
@@ -40,8 +59,9 @@ It asks for the name, then the owner, which is your account or org on github
 and not `tectonic-os`; `--owner`. It then offers to create an image, which is
 `create image` run in place, so `--image` and `--base` are that command's
 flags. Last, and only when `gh` is installed, it offers to create the
-repository on github. Nothing about that is a prerequisite: the tree is
-already written, and `git init`, the first commit and the push are yours.
+repository on github. Nothing about that is a prerequisite: the tree, the image
+and the remote are written in that order, each adding to the one before, and
+`git init`, the first commit and the push are yours.
 
 A repository does not nest, and one inside another is refused.
 
@@ -88,7 +108,8 @@ written to the schema like any other manifest.
 It then offers to list the module in an image. It asks which one even when
 there is only one, and none is an answer: having a module in the repository
 and listing it in an image are different decisions, which is what makes a
-repository with several images work.
+repository with several images work. `--image` naming an image the repository
+does not declare is refused before the module is written.
 
 ### `import module [name]`
 
