@@ -4,12 +4,16 @@ use crate::model::image::{is_name, REPO_FILE, SCHEMA_VERSION, TECT_VERSION};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Where the release installs the scaffolding it ships.
-const INSTALLED: &str = "/usr/share/tectonic/assets";
+/// Where the release installs the scaffolding it ships, per-user first: on a
+/// bootc or ostree host `/usr/share` is read-only.
+const INSTALLED: [&str; 2] = [
+    "/usr/local/share/tectonic/assets",
+    "/usr/share/tectonic/assets",
+];
 
 /// The scaffolding directory, looked for in this order: `TECT_ASSETS`, an
 /// `assets` directory beside the binary, which is how the release tarball
-/// unpacks, then the install path.
+/// unpacks, then the install paths. First match wins.
 pub fn assets() -> Result<PathBuf, String> {
     let mut tried: Vec<PathBuf> = Vec::new();
     if let Some(dir) = std::env::var_os("TECT_ASSETS") {
@@ -21,7 +25,10 @@ pub fn assets() -> Result<PathBuf, String> {
     {
         tried.push(dir.join("assets"));
     }
-    tried.push(PathBuf::from(INSTALLED));
+    if let Some(dir) = data_home() {
+        tried.push(dir.join("tectonic/assets"));
+    }
+    tried.extend(INSTALLED.iter().map(PathBuf::from));
 
     match tried.iter().find(|dir| dir.is_dir()) {
         Some(dir) => Ok(dir.clone()),
@@ -34,6 +41,14 @@ pub fn assets() -> Result<PathBuf, String> {
                 .join(", ")
         )),
     }
+}
+
+/// `$XDG_DATA_HOME`, else `~/.local/share`.
+fn data_home() -> Option<PathBuf> {
+    std::env::var_os("XDG_DATA_HOME")
+        .filter(|dir| !dir.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|home| Path::new(&home).join(".local/share")))
 }
 
 /// The machine name `name` derives, which every generated reference uses.
