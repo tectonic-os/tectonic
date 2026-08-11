@@ -2,11 +2,14 @@
 
 use crate::diag::{Issue, Issues, Source, Span};
 use crate::model::image::{Entry, Image, List};
-use crate::model::module::{Collect, Contribution, Decl, Module, PackageGroup, VerifyException};
+use crate::model::module::{
+    Collect, Contribution, Decl, Key, Module, PackageGroup, VerifyException,
+};
 use crate::model::remote::REMOTE_DIR;
 use crate::parse::disk::Disk;
+use crate::parse::prop_span;
 use crate::parse::schema::{check_doc, Arg, Kind, Node, Prop, Say};
-use crate::parse::{asset, boolean, check_capability, flag, options, prop, prop_span};
+use crate::parse::{asset, boolean, check_capability, child, flag, int_prop, options, prop};
 use crate::parse::{string_arg, string_args, syntax_issue};
 use crate::resolve::options as resolve_options;
 use crate::runtime::{class_names, VERIFY_CLASSES};
@@ -36,11 +39,67 @@ fn bad_token(value: &str) -> Option<&'static str> {
     None
 }
 
+/// The generators the tool implements. A manifest picks one; it never names a
+/// command of its own.
+const GENERATORS: [&str; 2] = ["cosign", "openssl"];
+
+/// The RSA size an `openssl` key is generated at when the declaration names
+/// none.
+const BITS: u32 = 4096;
+
+const NEEDED: Say = Say::new("a `key` needs `{}`", "incomplete", "");
+
 const PRIORITY: Say = Say::new(
     "`priority` is a number from 0 to 9999",
     "not a priority",
     "it becomes the NNNN in the staged filename, so four digits is the whole range there is",
 );
+
+#[rustfmt::skip]
+const KEY: Node = Node::new("key",
+    "A key `tect create key` generates for this module, and where each half of it goes.")
+    .arg(Arg::Str, Say::new("`key` needs a kind", "no kind given",
+        "`key \"cosign\" { ... }`, the kind being what `tect create key` names"))
+    .unique(Say::new("key `{}` is declared twice", "already declared above", ""))
+    .props(&[], Say::new("unknown key property `{}`", "not part of the schema",
+        "a key carries its kind, and everything else as child nodes"))
+    .children(&[
+        Node::new("generator", "Which of the generators the tool implements writes this key.")
+            .arg(Arg::One(&GENERATORS), Say::new("`{}` is not a generator the tool has",
+                "not a generator",
+                "the generators are `cosign` and `openssl`; a manifest picks one of them rather \
+                 than naming a command of its own"))
+            .once("")
+            .missing(NEEDED)
+            .props(&[
+                Prop { name: "profile", kind: Kind::One(&["module-signing"]),
+                    desc: "What the generator is set up for, where it can do more than one thing.",
+                    say: Say::new("`profile` must be \"module-signing\"", "not a profile", ""),
+                    missing: Say::NONE },
+                Prop { name: "bits", kind: Kind::Int(2048, 16384),
+                    desc: "The RSA key size, 4096 where none is named.",
+                    say: Say::new("`bits` is a number from 2048 to 16384", "not a key size", ""),
+                    missing: Say::NONE },
+            ], Say::new("unknown `generator` property `{}`", "not part of the schema",
+                "`generator` accepts `profile` and `bits`")),
+        Node::new("public",
+            "Where the public half is shipped, which is a contract path this module provides.")
+            .arg(Arg::Str, Say::new("`public` needs an absolute path", "no path given", ""))
+            .once("")
+            .missing(NEEDED)
+            .props(&[
+                Prop { name: "format", kind: Kind::One(&["pem", "der"]),
+                    desc: "What the public half is written as, PEM where none is named.",
+                    say: Say::new("`format` must be \"pem\" or \"der\"", "not a format", ""),
+                    missing: Say::NONE },
+            ], Say::new("unknown `public` property `{}`", "not part of the schema",
+                "`public` accepts `format`")),
+        Node::new("private", "What the private half is called at the repository root.")
+            .arg(Arg::Str, Say::new("`private` needs a filename", "no filename given", ""))
+            .once("")
+            .missing(NEEDED),
+    ], Say::new("unknown node `{}` in a key", "not part of the schema",
+        "a key holds `generator`, `public` and `private`"));
 
 /// The manifest's grammar, and the whole of it.
 #[rustfmt::skip]
@@ -80,6 +139,8 @@ pub const MODULE: Node = Node::new("module",
             .arg(Arg::Strs, Say::NONE)
             .props(&[], Say::new("`{}` is not an `overrides` property",
                 "only `provides-file` declares a lifetime", "")),
+
+        KEY,
 
         Node::new("secret", "A build secret this module's layer mounts.")
             .arg(Arg::Strs, Say::new("`{}` needs a name", "nothing named", "")),
@@ -267,6 +328,7 @@ impl Module {
             flavour: None,
             collects: Vec::new(),
             contributes: Vec::new(),
+            keys: Vec::new(),
             secrets: Vec::new(),
             args: Vec::new(),
             options: Vec::new(),
@@ -539,10 +601,30 @@ impl Module {
                         }
                     }
                 }
+                "key" => {
+                    if let Some(key) = parse_key(node, src, issues) {
+                        if !module.keys.iter().any(|k| k.kind == key.kind) {
+                            module.keys.push(key);
+                        }
+                    }
+                }
                 "packages" => module.parse_packages(node, src, issues),
                 _ => {}
             }
         }
+
+        // The public half is a contract path, derived rather than declared a
+        // second line down.
+        let derived: Vec<Decl> = module
+            .keys
+            .iter()
+            .filter(|key| !module.provides_files.iter().any(|d| d.name == key.public))
+            .map(|key| Decl {
+                name: key.public.clone(),
+                span: key.span,
+            })
+            .collect();
+        module.provides_files.extend(derived);
 
         if module.description.is_empty() {
             issues.push(
@@ -709,14 +791,58 @@ impl Module {
     }
 }
 
-/// What a manifest says about itself where a picker has to show it: the
-/// description and what it requires, and nothing where it does not parse.
-pub fn summary(file: &Path) -> (String, Vec<String>) {
+/// `key "cosign" { generator "cosign"; public "/etc/..."; private "cosign.key" }`
+/// The walker has already held the generator, the profile and the format to
+/// their sets, so what is left is the two paths, which are written to.
+pub fn parse_key(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Key> {
+    let kind = string_arg(node)?.to_string();
+    let generator = child(node, "generator")?;
+    let public = child(node, "public")?;
+    let private = child(node, "private")?;
+
+    let path = string_arg(public)?;
+    if !path.starts_with('/') || path.split('/').any(|part| part == "..") {
+        issues.push(
+            Issue::new(format!("`{path}` is not an absolute path in the image"), src)
+                .at(public.name().span(), "the public half goes here")
+                .help("it is the path the built image ships the public half at, and the module's files/ overlay is what puts it there"),
+        );
+        return None;
+    }
+
+    let name = string_arg(private)?;
+    if name.is_empty() || name.contains('/') || name.starts_with('.') {
+        issues.push(
+            Issue::new(format!("`{name}` is not a filename"), src)
+                .at(private.name().span(), "the private half is written here")
+                .help("the private half is written beside repo.kdl and never committed, so it is a plain name rather than a path"),
+        );
+        return None;
+    }
+
+    Some(Key {
+        kind,
+        generator: string_arg(generator)
+            .filter(|g| GENERATORS.contains(g))?
+            .to_string(),
+        profile: prop(generator, "profile").map(str::to_string),
+        bits: int_prop(generator, "bits").unwrap_or(BITS as i128) as u32,
+        public: path.to_string(),
+        format: prop(public, "format").unwrap_or("pem").to_string(),
+        private: name.to_string(),
+        span: node.name().span().into(),
+    })
+}
+
+/// What a manifest says about itself where a picker has to show it, or where a
+/// key has to be traced back to the module declaring it: the description, what
+/// it requires and the key kinds, and nothing where it does not parse.
+pub fn summary(file: &Path) -> (String, Vec<String>, Vec<String>) {
     let Some(doc) = std::fs::read_to_string(file)
         .ok()
         .and_then(|text| text.parse::<KdlDocument>().ok())
     else {
-        return (String::new(), Vec::new());
+        return (String::new(), Vec::new(), Vec::new());
     };
     let strings = |name: &str| -> Vec<String> {
         doc.nodes()
@@ -726,7 +852,11 @@ pub fn summary(file: &Path) -> (String, Vec<String>) {
             .filter_map(|entry| entry.value().as_string().map(str::to_string))
             .collect()
     };
-    (strings("description").join(" "), strings("requires"))
+    (
+        strings("description").join(" "),
+        strings("requires"),
+        strings("key"),
+    )
 }
 
 /// Every module on disk that no image lists, held to the schema on its own.

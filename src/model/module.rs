@@ -37,6 +37,22 @@ pub struct Contribution {
     pub span: Span,
 }
 
+/// A key `tect create key` generates for this module: which of the generators
+/// the tool has makes it, where the public half goes in the image, and what the
+/// private half is called at the repository root.
+pub struct Key {
+    pub kind: String,
+    pub generator: String,
+    /// What the generator is set up for, where it can do more than one thing.
+    pub profile: Option<String>,
+    pub bits: u32,
+    pub public: String,
+    /// `pem` or `der`, which is what the public half is written as.
+    pub format: String,
+    pub private: String,
+    pub span: Span,
+}
+
 /// One `systemd-analyze verify` diagnostic a module accepts on one of its
 /// units, so that a known-benign complaint does not have to be tolerated
 /// image-wide.
@@ -75,6 +91,9 @@ pub struct Module {
     pub flavour: Option<String>,
     pub collects: Vec<Collect>,
     pub contributes: Vec<Contribution>,
+    /// Keys this module holds the public half of. Each one's `public` is a
+    /// contract path, derived rather than declared a second time.
+    pub keys: Vec<Key>,
     /// Build inputs the field sets cover, so that needing a secret or a build
     /// arg does not force a module to hand-write a whole RUN block.
     pub secrets: Vec<Decl>,

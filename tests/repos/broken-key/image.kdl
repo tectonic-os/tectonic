@@ -1,0 +1,12 @@
+image {
+    name "Broken Key"
+
+    base "quay.io/fedora/fedora-bootc:44" {
+        family "fedora"
+        provides "rechunking"
+    }
+
+    modules {
+        module "core/keys"
+    }
+}

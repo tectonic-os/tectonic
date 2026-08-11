@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "default_image": "broken-key",
+  "default_image_name": "Broken Key",
+  "pr_image": "broken-key",
+  "default_target": "broken-key/none",
+  "default_published": "broken-key",
+  "pr_target": "broken-key/none",
+  "pr_published": "broken-key",
+  "ungated_target": "broken-key/none",
+  "ungated_published": "broken-key",
+  "cache_image": "broken-key-cache",
+  "workflows": [],
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "broken-key",
+      "name": "Broken Key",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "provides_files": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "broken-key/none",
+          "image": "broken-key",
+          "flavour": null,
+          "published": "broken-key",
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "core/keys",
+              "dir": "core/keys",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Every way a key declaration can be wrong",
+              "options": {}
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [
+            "/usr/share/secureboot/sb_cert.der"
+          ],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {
+            "/usr/share/secureboot/sb_cert.der": "core/keys"
+          },
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

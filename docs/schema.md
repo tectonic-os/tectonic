@@ -358,6 +358,37 @@ An absolute path this module guarantees, which another module may require.
 | --- | --- | --- |
 | `build-only=` | `#true` or `#false` | Whether the path exists only while the build runs. |
 
+### `key`
+
+A key `tect create key` generates for this module, and where each half of it goes.
+
+*a string, one per name*
+
+| Node | Takes | Meaning |
+| --- | --- | --- |
+| `private` | a string, exactly one | What the private half is called at the repository root. |
+
+#### `generator`
+
+Which of the generators the tool implements writes this key.
+
+*`cosign`, `openssl`, exactly one*
+
+| Property | Value | Meaning |
+| --- | --- | --- |
+| `profile=` | `module-signing` | What the generator is set up for, where it can do more than one thing. |
+| `bits=` | 2048 to 16384 | The RSA key size, 4096 where none is named. |
+
+#### `public`
+
+Where the public half is shipped, which is a contract path this module provides.
+
+*a string, exactly one*
+
+| Property | Value | Meaning |
+| --- | --- | --- |
+| `format=` | `pem`, `der` | What the public half is written as, PEM where none is named. |
+
 ### `allow-verify`
 
 One `tect validate-image` diagnostic accepted on one unit rather than image-wide.

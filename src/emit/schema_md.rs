@@ -44,28 +44,36 @@ fn named(node: &Node) -> String {
 }
 
 /// What the walker accepts of one node, as the reference reads it.
-fn shape(node: &Node) -> Vec<&'static str> {
-    let mut facts = Vec::new();
+fn shape(node: &Node) -> Vec<String> {
+    let mut facts: Vec<String> = Vec::new();
     match node.arg {
         Arg::None => {}
-        Arg::Str => facts.push("a string"),
-        Arg::Bool => facts.push("`#true` or `#false`"),
-        Arg::Int => facts.push("a number"),
-        Arg::Strs => facts.push("one or more strings"),
+        Arg::Str => facts.push("a string".into()),
+        Arg::Bool => facts.push("`#true` or `#false`".into()),
+        Arg::Int => facts.push("a number".into()),
+        Arg::Strs => facts.push("one or more strings".into()),
+        Arg::One(set) => facts.push(closed(set)),
     }
     match (!node.missing.text.is_empty(), node.once) {
-        (true, true) => facts.push("exactly one"),
-        (true, false) => facts.push("required"),
-        (false, true) => facts.push("at most one"),
+        (true, true) => facts.push("exactly one".into()),
+        (true, false) => facts.push("required".into()),
+        (false, true) => facts.push("at most one".into()),
         (false, false) => {}
     }
     if !node.unique.text.is_empty() {
-        facts.push("one per name");
+        facts.push("one per name".into());
     }
     if !node.empty.text.is_empty() {
-        facts.push("never empty");
+        facts.push("never empty".into());
     }
     facts
+}
+
+fn closed(set: &[&str]) -> String {
+    set.iter()
+        .map(|v| format!("`{v}`"))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn value(prop: &Prop) -> String {
@@ -73,11 +81,7 @@ fn value(prop: &Prop) -> String {
         Kind::Str => "a string".to_string(),
         Kind::Bool => "`#true` or `#false`".to_string(),
         Kind::Int(low, high) => format!("{low} to {high}"),
-        Kind::One(set) => set
-            .iter()
-            .map(|v| format!("`{v}`"))
-            .collect::<Vec<_>>()
-            .join(", "),
+        Kind::One(set) => closed(set),
     };
     if !prop.missing.text.is_empty() {
         out.push_str(", required");

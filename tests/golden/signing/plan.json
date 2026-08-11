@@ -72,8 +72,8 @@
           "verify_exceptions": [],
           "assets": [],
           "provides_files": {
-            "/usr/share/secureboot/sb_cert.der": "kernel/signed-kernel",
-            "/usr/libexec/kernel-devel-helpers.sh": "kernel/signed-kernel"
+            "/usr/libexec/kernel-devel-helpers.sh": "kernel/signed-kernel",
+            "/usr/share/secureboot/sb_cert.der": "kernel/signed-kernel"
           },
           "overlay_files": {},
           "collected_files": {},

@@ -1,0 +1,132 @@
+  x unknown key property `when`
+   ,-[./modules/core/keys/module.kdl:5:14]
+ 4 | 
+ 5 | key "cosign" when="published" {
+   :              ^^^^^^^^|^^^^^^^
+   :                      `-- not part of the schema
+ 6 |     generator "ssh-keygen"
+   `----
+  help: a key carries its kind, and everything else as child nodes
+
+  x `ssh-keygen` is not a generator the tool has
+   ,-[./modules/core/keys/module.kdl:6:5]
+ 5 | key "cosign" when="published" {
+ 6 |     generator "ssh-keygen"
+   :     ^^^^|^^^^
+   :         `-- not a generator
+ 7 |     public "etc/pki/containers/cosign.pub" format="jwk"
+   `----
+  help: the generators are `cosign` and `openssl`; a manifest picks one of
+        them rather than naming a command of its own
+
+  x `format` must be "pem" or "der"
+   ,-[./modules/core/keys/module.kdl:7:44]
+ 6 |     generator "ssh-keygen"
+ 7 |     public "etc/pki/containers/cosign.pub" format="jwk"
+   :                                            ^^^^^^|^^^^^
+   :                                                  `-- not a format
+ 8 |     private "keys/cosign.key"
+   `----
+
+  x `profile` must be "module-signing"
+    ,-[./modules/core/keys/module.kdl:12:25]
+ 11 | key "secureboot" {
+ 12 |     generator "openssl" profile="signing" bits=1
+    :                         ^^^^^^^^|^^^^^^^^
+    :                                 `-- not a profile
+ 13 |     public "/usr/share/secureboot/sb_cert.der" encoding="der"
+    `----
+
+  x `bits` is a number from 2048 to 16384
+    ,-[./modules/core/keys/module.kdl:12:43]
+ 11 | key "secureboot" {
+ 12 |     generator "openssl" profile="signing" bits=1
+    :                                           ^^^|^^
+    :                                              `-- not a key size
+ 13 |     public "/usr/share/secureboot/sb_cert.der" encoding="der"
+    `----
+
+  x unknown `public` property `encoding`
+    ,-[./modules/core/keys/module.kdl:13:48]
+ 12 |     generator "openssl" profile="signing" bits=1
+ 13 |     public "/usr/share/secureboot/sb_cert.der" encoding="der"
+    :                                                ^^^^^^^|^^^^^^
+    :                                                       `-- not part of the schema
+ 14 |     private ".hidden"
+    `----
+  help: `public` accepts `format`
+
+  x unknown node `passphrase` in a key
+    ,-[./modules/core/keys/module.kdl:15:5]
+ 14 |     private ".hidden"
+ 15 |     passphrase "hunter2"
+    :     ^^^^^|^^^^
+    :          `-- not part of the schema
+ 16 | }
+    `----
+  help: a key holds `generator`, `public` and `private`
+
+  x key `secureboot` is declared twice
+    ,-[./modules/core/keys/module.kdl:18:1]
+ 17 | 
+ 18 | key "secureboot" {
+    : ^|^
+    :  `-- already declared above
+ 19 |     generator "openssl"
+    `----
+
+  x `key` needs a kind
+    ,-[./modules/core/keys/module.kdl:24:1]
+ 23 | 
+ 24 | key
+    : ^|^
+    :  `-- no kind given
+    `----
+  help: `key "cosign" { ... }`, the kind being what `tect create key` names
+
+  x a `key` needs `generator`
+    ,-[./modules/core/keys/module.kdl:24:1]
+ 23 | 
+ 24 | key
+    : ^|^
+    :  `-- incomplete
+    `----
+
+  x a `key` needs `public`
+    ,-[./modules/core/keys/module.kdl:24:1]
+ 23 | 
+ 24 | key
+    : ^|^
+    :  `-- incomplete
+    `----
+
+  x a `key` needs `private`
+    ,-[./modules/core/keys/module.kdl:24:1]
+ 23 | 
+ 24 | key
+    : ^|^
+    :  `-- incomplete
+    `----
+
+  x `etc/pki/containers/cosign.pub` is not an absolute path in the image
+   ,-[./modules/core/keys/module.kdl:7:5]
+ 6 |     generator "ssh-keygen"
+ 7 |     public "etc/pki/containers/cosign.pub" format="jwk"
+   :     ^^^|^^
+   :        `-- the public half goes here
+ 8 |     private "keys/cosign.key"
+   `----
+  help: it is the path the built image ships the public half at, and the
+        module's files/ overlay is what puts it there
+
+  x `.hidden` is not a filename
+    ,-[./modules/core/keys/module.kdl:14:5]
+ 13 |     public "/usr/share/secureboot/sb_cert.der" encoding="der"
+ 14 |     private ".hidden"
+    :     ^^^|^^^
+    :        `-- the private half is written here
+ 15 |     passphrase "hunter2"
+    `----
+  help: the private half is written beside repo.kdl and never committed, so it
+        is a plain name rather than a path
+

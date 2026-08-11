@@ -90,6 +90,14 @@ pub(crate) fn prop<'a>(node: &'a KdlNode, key: &str) -> Option<&'a str> {
         .and_then(|e| e.value().as_string())
 }
 
+/// A named entry of a node, as an integer.
+pub(crate) fn int_prop(node: &KdlNode, key: &str) -> Option<i128> {
+    node.entries()
+        .iter()
+        .find(|e| e.name().map(|n| n.value()) == Some(key))
+        .and_then(|e| e.value().as_integer())
+}
+
 /// A named entry of a node, as a boolean.
 pub(crate) fn boolean(node: &KdlNode, key: &str) -> Option<bool> {
     node.entries()

@@ -1,6 +1,8 @@
 //! One walk of the repository's trees, for everything that asks what is on
 //! disk rather than what an image enables.
 
+use crate::diag::{Issues, Source};
+use crate::model::module::Key;
 use kdl::KdlDocument;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -10,6 +12,9 @@ pub struct Disk {
     /// Capability to every module declaring it, whether or not a list enables
     /// it, so an unsatisfied requirement can name what would satisfy it.
     pub providers: BTreeMap<String, Vec<String>>,
+    /// Key kind to every module declaring it and what each declaration says,
+    /// which is where `create key` learns everything but the kind.
+    pub keys: BTreeMap<String, Vec<(String, Key)>>,
     /// Collected filename to the module that collects it, so a contribution
     /// whose consumer is not enabled can name what to enable.
     pub collectors: BTreeMap<String, String>,
@@ -77,6 +82,24 @@ impl Disk {
                                 out.collectors.insert(file.to_string(), name.clone());
                             }
                         }
+                        // A malformed one is reported where the manifest is
+                        // checked, not here.
+                        "key" => {
+                            let src = Source::new(manifest.display().to_string(), text.clone());
+                            let Some(key) =
+                                crate::parse::module::parse_key(node, &src, &mut Issues::default())
+                            else {
+                                continue;
+                            };
+                            out.providers
+                                .entry(key.public.clone())
+                                .or_default()
+                                .push(name.clone());
+                            out.keys
+                                .entry(key.kind.clone())
+                                .or_default()
+                                .push((name.clone(), key));
+                        }
                         _ => {}
                     }
                 }
@@ -86,6 +109,9 @@ impl Disk {
         // read_dir order is the filesystem's, and a help line lists these.
         for candidates in out.providers.values_mut() {
             candidates.sort();
+        }
+        for declaring in out.keys.values_mut() {
+            declaring.sort_by(|a, b| a.0.cmp(&b.0));
         }
         out
     }
