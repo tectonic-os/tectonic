@@ -219,26 +219,16 @@ pub const MODULE: Node = Node::new("module",
     ], Say::new("unknown node `{}`", "not part of the schema",
         "docs/schema.md documents every node a manifest may hold"));
 
-/// A declared `priority=`, four digits at most because that is what the staged
-/// filename carries and the filename is what orders the assembly.
-enum Priority {
-    Missing,
-    Invalid,
-    Set(u32),
+/// A declared `priority=`, which the schema table holds to its range. `None`
+/// where one is declared is what the table already reported.
+fn priority(node: &KdlNode) -> Option<u32> {
+    int_prop(node, "priority").map(|value| value as u32)
 }
 
-fn priority(node: &KdlNode) -> Priority {
-    let Some(entry) = node
-        .entries()
-        .iter()
-        .find(|e| e.name().map(|n| n.value()) == Some("priority"))
-    else {
-        return Priority::Missing;
-    };
-    match entry.value().as_integer() {
-        Some(value) if (0..=9999).contains(&value) => Priority::Set(value as u32),
-        _ => Priority::Invalid,
-    }
+/// Whether a `priority=` is there but not a number the schema accepts, which is
+/// its diagnostic rather than a second one here.
+fn bad_priority(node: &KdlNode) -> bool {
+    prop_span(node, "priority").is_some() && priority(node).is_none()
 }
 
 impl Module {
@@ -621,10 +611,13 @@ impl Module {
     /// priority=500` The filename gathered from every module shipping one, and
     /// where the assembled result goes.
     fn parse_collects(&mut self, node: &KdlNode, src: &Source, issues: &mut Issues) {
+        if bad_priority(node) {
+            return;
+        }
         let collected = string_args(node).first().map(|s| s.to_string());
         let into = prop(node, "into");
         match (collected, into, priority(node)) {
-            (Some(collected), Some(into), Priority::Set(priority)) if into.starts_with('/') => {
+            (Some(collected), Some(into), Some(priority)) if into.starts_with('/') => {
                 self.collects.push(Collect {
                     file: collected,
                     into: into.to_string(),
@@ -632,13 +625,12 @@ impl Module {
                     span: node.name().span().into(),
                 })
             }
-            (_, _, Priority::Invalid) => {}
             (collected, into, priority) => {
                 let missing = if collected.is_none() {
                     "the filename it collects"
                 } else if into.is_none() {
                     "into=, where the build puts them"
-                } else if matches!(priority, Priority::Missing) {
+                } else if priority.is_none() {
                     "priority=, where a contribution lands when it names none"
                 } else {
                     "an absolute into="
@@ -655,9 +647,12 @@ impl Module {
     /// `contributes "justfile.inc" priority=900` A file this module ships for
     /// another to collect, so shipping it is what the node is about.
     fn parse_contributes(&mut self, node: &KdlNode, dir: &Path, src: &Source, issues: &mut Issues) {
+        if bad_priority(node) {
+            return;
+        }
         let contributed = string_args(node).first().map(|s| s.to_string());
         match (contributed, priority(node)) {
-            (Some(contributed), Priority::Set(priority)) => {
+            (Some(contributed), Some(priority)) => {
                 if !dir.join(&contributed).is_file() {
                     issues.push(
                         Issue::new(
@@ -681,7 +676,6 @@ impl Module {
                     });
                 }
             }
-            (_, Priority::Invalid) => {}
             (contributed, _) => {
                 let missing = match contributed.is_none() {
                     true => "the filename it contributes",

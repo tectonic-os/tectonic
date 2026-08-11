@@ -20,6 +20,17 @@
         whole range there is
 
   x `core/absent` orders a justfile.inc it does not ship
+   ,-[./modules/core/absent/module.kdl:5:1]
+ 4 | 
+ 5 | contributes "justfile.inc" priority=90000
+   : ^^^^^|^^^^^
+   :      `-- nothing to order
+ 6 | contributes "justfile.inc" priority=100
+   `----
+  help: shipping the file is what contributes it; this node only says where it
+        lands
+
+  x `core/absent` orders a justfile.inc it does not ship
    ,-[./modules/core/absent/module.kdl:6:1]
  5 | contributes "justfile.inc" priority=90000
  6 | contributes "justfile.inc" priority=100
