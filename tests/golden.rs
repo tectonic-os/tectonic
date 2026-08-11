@@ -61,7 +61,7 @@ fn init_repo(name: &str) -> PathBuf {
     let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(name);
     let _ = std::fs::remove_dir_all(&root);
     std::env::set_var("TECT_ASSETS", crate_dir().join("assets"));
-    tect::create::repo(
+    tect::create::Repo::collect(
         Some("Example".into()),
         Some("someone".into()),
         Some("Example".into()),
@@ -69,6 +69,8 @@ fn init_repo(name: &str) -> PathBuf {
         Some(root.clone()),
         &tect::prompt::Prompt::silent(),
     )
+    .unwrap()
+    .apply()
     .unwrap();
     root
 }
@@ -108,7 +110,7 @@ fn create(name: &str, root: &Path) {
     let here = Path::new(".");
     let silent = tect::prompt::Prompt::silent();
 
-    tect::create::module(
+    tect::create::Module::collect(
         here,
         Some("My Editor".into()),
         vec!["nano".into()],
@@ -116,8 +118,10 @@ fn create(name: &str, root: &Path) {
         Some("example".into()),
         &silent,
     )
+    .unwrap()
+    .apply()
     .unwrap();
-    tect::create::module(
+    tect::create::Module::collect(
         here,
         Some("plain".into()),
         Vec::new(),
@@ -125,6 +129,8 @@ fn create(name: &str, root: &Path) {
         None,
         &silent,
     )
+    .unwrap()
+    .apply()
     .unwrap();
 
     let mut out = String::new();
@@ -190,7 +196,9 @@ fn import(name: &str, root: &Path) {
                 let owners: Vec<&str> = found.iter().map(|f| f.owner.as_str()).collect();
                 out.push_str(&format!("ambiguous: {}\n", owners.join(", ")));
             }
-            Ok(found) => match tect::import::vendor(here, &found[0], module) {
+            Ok(found) => match tect::import::destination(here, &found[0], module)
+                .and_then(|dest| tect::import::vendor(here, &found[0], &dest).map(|()| dest))
+            {
                 Ok(dest) => out.push_str(&format!("imported {}\n", dest.display())),
                 Err(message) => out.push_str(&format!("{message}\n")),
             },

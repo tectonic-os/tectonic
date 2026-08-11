@@ -182,47 +182,66 @@ fn open(given: Option<PathBuf>) -> Result<Option<PathBuf>, Error> {
     Ok((!refused).then_some(root))
 }
 
-/// Copies one module in, asking which one when no name was given and which
-/// collection when a name is in more than one, then offers it to an image.
-fn import(
-    name: Option<String>,
-    root: &Path,
-    image_arg: Option<String>,
-    prompt: &Prompt,
-) -> Result<ExitCode, Error> {
-    let (sources, issues, context) = tect::sources(root);
-    if issues.report(&context) {
-        return Ok(ExitCode::from(REPO_ERROR));
+/// Which module is copied in, where it goes, and which image lists it: asked
+/// for before anything is written, like every other flow.
+struct Import {
+    from: tect::import::Found,
+    dest: PathBuf,
+    /// `<owner>/<name>`, which is what an image lists.
+    path: String,
+    listing: tect::create::Listing,
+}
+
+impl Import {
+    /// Asks which one when no name was given, and which collection when a name
+    /// is in more than one.
+    fn collect(
+        name: Option<String>,
+        root: &Path,
+        sources: &[tect::model::remote::Collection],
+        image_arg: Option<String>,
+        prompt: &Prompt,
+    ) -> Result<Self, Error> {
+        let name = match name {
+            Some(name) => name,
+            None => tect::import::choose(root, sources, prompt)?,
+        };
+        let mut found = tect::import::find(root, sources, &name)?;
+        let module = tect::import::split(&name).1;
+        let at = match found.as_slice() {
+            [_] => 0,
+            many => {
+                let owners: Vec<String> = many.iter().map(|f| f.owner.clone()).collect();
+                let listed = owners.join(", ");
+                let options: Vec<Choice> =
+                    owners.iter().map(|owner| Choice::new(owner, "")).collect();
+                prompt
+                    .choose(&format!("`{module}` is in {listed}; which one"), &options)?
+                    .ok_or_else(|| {
+                        format!(
+                            "`{module}` is in {listed}; name which one, as `{}/{module}`",
+                            owners[0]
+                        )
+                    })?
+            }
+        };
+        let from = found.swap_remove(at);
+        let dest = tect::import::destination(root, &from, module)?;
+        let path = format!("{}/{module}", from.owner);
+        let listing = tect::create::Listing::collect(root, image_arg, prompt)?;
+        Ok(Self {
+            from,
+            dest,
+            path,
+            listing,
+        })
     }
 
-    let name = match name {
-        Some(name) => name,
-        None => tect::import::choose(root, &sources, prompt)?,
-    };
-    let found = tect::import::find(root, &sources, &name)?;
-    let module = tect::import::split(&name).1;
-    let one = match found.as_slice() {
-        [one] => one,
-        many => {
-            let owners: Vec<String> = many.iter().map(|f| f.owner.clone()).collect();
-            let listed = owners.join(", ");
-            let options: Vec<Choice> = owners.iter().map(|owner| Choice::new(owner, "")).collect();
-            let chosen = prompt
-                .choose(&format!("`{module}` is in {listed}; which one"), &options)?
-                .ok_or_else(|| {
-                    format!(
-                        "`{module}` is in {listed}; name which one, as `{}/{module}`",
-                        owners[0]
-                    )
-                })?;
-            &many[chosen]
-        }
-    };
-
-    let dest = tect::import::vendor(root, one, module)?;
-    println!("imported {}", dest.display());
-    tect::create::add_to_image(root, &format!("{}/{module}", one.owner), image_arg, prompt)?;
-    Ok(ExitCode::SUCCESS)
+    fn apply(&self, root: &Path) -> Result<(), String> {
+        tect::import::vendor(root, &self.from, &self.dest)?;
+        println!("imported {}", self.dest.display());
+        self.listing.apply(&self.path)
+    }
 }
 
 /// Writes what `generate` produced, after clearing the directory so an image or
@@ -304,7 +323,7 @@ fn run() -> Result<ExitCode, Error> {
     if let ["create", "repo", rest @ ..] = words.as_slice() {
         args.only(&["root", "owner", "image", "base"], "create repo")?;
         let name = one_name(rest, "create repo")?;
-        tect::create::repo(name, owner, image_arg, base, root_arg, &prompt)?;
+        tect::create::Repo::collect(name, owner, image_arg, base, root_arg, &prompt)?.apply()?;
         return Ok(ExitCode::SUCCESS);
     }
 
@@ -340,14 +359,8 @@ fn run() -> Result<ExitCode, Error> {
             let Some(root) = open(root_arg)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
-            tect::create::image(
-                &root,
-                name,
-                base,
-                owner.as_deref(),
-                "a name argument",
-                &prompt,
-            )?;
+            tect::create::Image::collect(&root, name, base, owner, "a name argument", &prompt)?
+                .apply(&root)?;
             return Ok(ExitCode::SUCCESS);
         }
         ["create", "module", rest @ ..] => {
@@ -356,7 +369,7 @@ fn run() -> Result<ExitCode, Error> {
             let Some(root) = open(root_arg)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
-            tect::create::module(&root, name, pkgs, with, image_arg, &prompt)?;
+            tect::create::Module::collect(&root, name, pkgs, with, image_arg, &prompt)?.apply()?;
             return Ok(ExitCode::SUCCESS);
         }
         ["create", "cosign-key"] => {
@@ -364,7 +377,7 @@ fn run() -> Result<ExitCode, Error> {
             let Some(root) = open(root_arg)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
-            tect::key::cosign(&root, module_arg, &prompt)?;
+            tect::key::Cosign::collect(&root, module_arg, &prompt)?.apply(&root)?;
             return Ok(ExitCode::SUCCESS);
         }
         ["create", "mok-key"] => {
@@ -372,13 +385,19 @@ fn run() -> Result<ExitCode, Error> {
             let Some(root) = open(root_arg)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
-            tect::key::mok(&root, module_arg, cn, &prompt)?;
+            tect::key::Mok::collect(&root, module_arg, cn, &prompt)?.apply(&root)?;
             return Ok(ExitCode::SUCCESS);
         }
         ["import", "module", rest @ ..] => {
             args.only(&["root", "image"], "import module")?;
             let name = one_name(rest, "import module")?;
-            return import(name, &repo_root(root_arg)?, image_arg, &prompt);
+            let root = repo_root(root_arg)?;
+            let (sources, issues, context) = tect::sources(&root);
+            if issues.report(&context) {
+                return Ok(ExitCode::from(REPO_ERROR));
+            }
+            Import::collect(name, &root, &sources, image_arg, &prompt)?.apply(&root)?;
+            return Ok(ExitCode::SUCCESS);
         }
         ["build", rest @ ..] => {
             args.only(

@@ -21,103 +21,124 @@ const MOK_PRIV: &str = "MOK.priv";
 
 /// The keypair the published image is signed with, and the policy module
 /// verifies updates against.
-pub fn cosign(root: &Path, module: Option<String>, prompt: &Prompt) -> Result<(), String> {
-    let dir = provider(root, COSIGN_PUB, module, prompt)?;
-    let public = overlay(root, &dir, COSIGN_PUB);
-    let private = root.join(COSIGN_KEY);
-    unwritten(&public)?;
-    unwritten(&private)?;
+pub struct Cosign {
+    public: PathBuf,
+    private: PathBuf,
+}
 
-    let work = workspace("cosign")?;
-    let mut generate = Command::new("cosign");
-    generate
-        .arg("generate-key-pair")
-        .current_dir(&work)
-        .env("COSIGN_PASSWORD", "");
-    finish(
-        generate,
-        "cosign",
-        "get it from https://github.com/sigstore/cosign/releases, or `dnf install cosign`",
-    )?;
+impl Cosign {
+    pub fn collect(root: &Path, module: Option<String>, prompt: &Prompt) -> Result<Self, String> {
+        let dir = provider(root, COSIGN_PUB, module, prompt)?;
+        let public = overlay(root, &dir, COSIGN_PUB);
+        let private = root.join(COSIGN_KEY);
+        unwritten(&public)?;
+        unwritten(&private)?;
+        Ok(Self { public, private })
+    }
 
-    install(&work.join("cosign.pub"), &public, 0o644)?;
-    install(&work.join("cosign.key"), &private, 0o600)?;
-    let _ = std::fs::remove_dir_all(&work);
+    pub fn apply(&self, root: &Path) -> Result<(), String> {
+        let work = workspace("cosign")?;
+        let mut generate = Command::new("cosign");
+        generate
+            .arg("generate-key-pair")
+            .current_dir(&work)
+            .env("COSIGN_PASSWORD", "");
+        finish(
+            generate,
+            "cosign",
+            "get it from https://github.com/sigstore/cosign/releases, or `dnf install cosign`",
+        )?;
 
-    println!("wrote {}", shown(root, &public));
-    println!("wrote {COSIGN_KEY}");
-    println!(
-        "\nthe key carries no password, which is what the build workflow decrypts it with.\n\n\
-         next:\n\
-         \x20 commit {}\n\
-         \x20 gh secret set SIGNING_SECRET < {COSIGN_KEY}\n",
-        shown(root, &public)
-    );
-    warn_unignored(root, COSIGN_KEY);
-    Ok(())
+        install(&work.join("cosign.pub"), &self.public, 0o644)?;
+        println!("wrote {}", shown(root, &self.public));
+        install(&work.join("cosign.key"), &self.private, 0o600)?;
+        println!("wrote {COSIGN_KEY}");
+        let _ = std::fs::remove_dir_all(&work);
+
+        println!(
+            "\nthe key carries no password, which is what the build workflow decrypts it with.\n\n\
+             next:\n\
+             \x20 commit {}\n\
+             \x20 gh secret set SIGNING_SECRET < {COSIGN_KEY}\n",
+            shown(root, &self.public)
+        );
+        warn_unignored(root, COSIGN_KEY);
+        Ok(())
+    }
 }
 
 /// The Secure Boot key the build signs kernel modules and the kernel with. The
 /// certificate is written as DER, which is what `sign-file` and `mokutil` read.
-pub fn mok(
-    root: &Path,
-    module: Option<String>,
-    cn: Option<String>,
-    prompt: &Prompt,
-) -> Result<(), String> {
-    let dir = provider(root, SB_CERT, module, prompt)?;
-    let cert = overlay(root, &dir, SB_CERT);
-    let private = root.join(MOK_PRIV);
-    unwritten(&cert)?;
-    unwritten(&private)?;
+pub struct Mok {
+    cert: PathBuf,
+    private: PathBuf,
+    cn: String,
+}
 
-    let fallback = format!("{} Secure Boot", named_after_root(root));
-    let cn = prompt.text(
-        cn,
-        "common name, which is what the enrolment prompt shows",
-        "`--cn`",
-        Some(&fallback),
-    )?;
-    let cn = common_name(&cn)?;
+impl Mok {
+    pub fn collect(
+        root: &Path,
+        module: Option<String>,
+        cn: Option<String>,
+        prompt: &Prompt,
+    ) -> Result<Self, String> {
+        let dir = provider(root, SB_CERT, module, prompt)?;
+        let cert = overlay(root, &dir, SB_CERT);
+        let private = root.join(MOK_PRIV);
+        unwritten(&cert)?;
+        unwritten(&private)?;
 
-    let work = workspace("mok")?;
-    let config = work.join("openssl.cnf");
-    crate::init::put(&config, &openssl_config(cn))?;
-    let mut generate = Command::new("openssl");
-    generate
-        .args([
-            "req", "-x509", "-new", "-nodes", "-utf8", "-sha256", "-days", "36500", "-batch",
-            "-newkey", "rsa:4096", "-outform", "DER",
-        ])
-        .arg("-config")
-        .arg(&config)
-        .arg("-out")
-        .arg(work.join("cert.der"))
-        .arg("-keyout")
-        .arg(work.join("key.pem"));
-    finish(generate, "openssl", "`dnf install openssl`")?;
+        let fallback = format!("{} Secure Boot", named_after_root(root));
+        let cn = prompt.text(
+            cn,
+            "common name, which is what the enrolment prompt shows",
+            "`--cn`",
+            Some(&fallback),
+        )?;
+        common_name(&cn)?;
+        Ok(Self { cert, private, cn })
+    }
 
-    install(&work.join("cert.der"), &cert, 0o644)?;
-    install(&work.join("key.pem"), &private, 0o600)?;
-    let _ = std::fs::remove_dir_all(&work);
+    pub fn apply(&self, root: &Path) -> Result<(), String> {
+        let work = workspace("mok")?;
+        let config = work.join("openssl.cnf");
+        crate::init::put(&config, &openssl_config(&self.cn))?;
+        let mut generate = Command::new("openssl");
+        generate
+            .args([
+                "req", "-x509", "-new", "-nodes", "-utf8", "-sha256", "-days", "36500", "-batch",
+                "-newkey", "rsa:4096", "-outform", "DER",
+            ])
+            .arg("-config")
+            .arg(&config)
+            .arg("-out")
+            .arg(work.join("cert.der"))
+            .arg("-keyout")
+            .arg(work.join("key.pem"));
+        finish(generate, "openssl", "`dnf install openssl`")?;
 
-    println!("wrote {}", shown(root, &cert));
-    println!("wrote {MOK_PRIV}");
-    println!(
-        "\nnext:\n\
-         \x20 commit {cert}\n\
-         \x20 gh secret set MOK_PRIVKEY < {MOK_PRIV}\n\
-         \x20 MOK_KEY_PATH={MOK_PRIV} is what a local build reads it from\n\
-         \n\
-         every machine that boots this image enrols the certificate once, and\n\
-         until it does the modules signed with it will not load:\n\
-         \x20 sudo mokutil --import {cert}\n\
-         \x20 it asks for a one-time password; reboot, choose Enroll MOK, and\n\
-         \x20 give the same password\n",
-        cert = shown(root, &cert)
-    );
-    warn_unignored(root, MOK_PRIV);
-    Ok(())
+        install(&work.join("cert.der"), &self.cert, 0o644)?;
+        println!("wrote {}", shown(root, &self.cert));
+        install(&work.join("key.pem"), &self.private, 0o600)?;
+        println!("wrote {MOK_PRIV}");
+        let _ = std::fs::remove_dir_all(&work);
+
+        println!(
+            "\nnext:\n\
+             \x20 commit {cert}\n\
+             \x20 gh secret set MOK_PRIVKEY < {MOK_PRIV}\n\
+             \x20 MOK_KEY_PATH={MOK_PRIV} is what a local build reads it from\n\
+             \n\
+             every machine that boots this image enrols the certificate once, and\n\
+             until it does the modules signed with it will not load:\n\
+             \x20 sudo mokutil --import {cert}\n\
+             \x20 it asks for a one-time password; reboot, choose Enroll MOK, and\n\
+             \x20 give the same password\n",
+            cert = shown(root, &self.cert)
+        );
+        warn_unignored(root, MOK_PRIV);
+        Ok(())
+    }
 }
 
 /// The module whose files/ overlay ships `path`. A fetched module is not
@@ -316,13 +337,8 @@ mod tests {
             return;
         }
         let root = repo("tect-mok-key-test", SB_CERT);
-        mok(
-            &root,
-            None,
-            Some("Test Key".into()),
-            &crate::prompt::Prompt::silent(),
-        )
-        .unwrap();
+        let ask = || Mok::collect(&root, None, Some("Test Key".into()), &Prompt::silent());
+        ask().unwrap().apply(&root).unwrap();
 
         let cert = overlay(&root, "keyholder", SB_CERT);
         let private = root.join(MOK_PRIV);
@@ -338,7 +354,7 @@ mod tests {
         let from_key = openssl(&["pkey", "-in", &private.display().to_string(), "-pubout"]);
         assert_eq!(from_cert, from_key);
 
-        let again = mok(&root, None, Some("Test Key".into()), &Prompt::silent());
+        let again = ask().map(|_| ());
         assert!(again.is_err_and(|message| message.contains("never overwritten")));
         let _ = std::fs::remove_dir_all(&root);
     }

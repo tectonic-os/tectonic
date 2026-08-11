@@ -1,6 +1,9 @@
 //! `create repo`, `create image` and `create module`. Every step of a chain is
 //! also a command: `create repo` calls `create image` in place rather than
 //! writing an image of its own.
+//!
+//! Each of them collects every answer first and writes afterwards, which is why
+//! no `apply` takes a `Prompt`.
 
 use crate::model::image::REPO_FILE;
 use crate::prompt::Prompt;
@@ -10,92 +13,168 @@ use std::process::{Command, Stdio};
 
 const OWNERSHIP: &str = "your account or org on github (not tectonic-os)";
 
-/// The tree, an image in it, then the remote, which is optional and last.
-pub fn repo(
-    name: Option<String>,
-    owner: Option<String>,
-    image_name: Option<String>,
-    base: Option<String>,
-    root_arg: Option<PathBuf>,
-    prompt: &Prompt,
-) -> Result<(), String> {
-    let named_after_root = root_arg
-        .as_ref()
-        .and_then(|root| std::fs::canonicalize(root).ok())
-        .as_deref()
-        .and_then(Path::file_name)
-        .map(|name| name.to_string_lossy().into_owned());
-    let name = prompt.text(
-        name.or(named_after_root),
-        "repository name",
-        "a name argument",
-        None,
-    )?;
-    let id = crate::init::id(&name)?;
-    let root = root_arg.unwrap_or_else(|| PathBuf::from(&id));
-    refuse_nesting(&root)?;
+/// The tree, an image in it, then the remote, which is optional and last: each
+/// step after the first adds to what the one before it wrote.
+pub struct Repo {
+    name: String,
+    id: String,
+    root: PathBuf,
+    owner: String,
+    assets: PathBuf,
+    image: Option<Image>,
+    remote: bool,
+}
 
-    let owner = prompt.text(owner, &format!("owner, {OWNERSHIP}"), "`--owner`", None)?;
-    crate::init::write(&root, &name, &crate::init::assets()?)?;
-    println!("wrote {name} into {}", root.display());
+impl Repo {
+    pub fn collect(
+        name: Option<String>,
+        owner: Option<String>,
+        image_name: Option<String>,
+        base: Option<String>,
+        root_arg: Option<PathBuf>,
+        prompt: &Prompt,
+    ) -> Result<Self, String> {
+        let named_after_root = root_arg
+            .as_ref()
+            .and_then(|root| std::fs::canonicalize(root).ok())
+            .as_deref()
+            .and_then(Path::file_name)
+            .map(|name| name.to_string_lossy().into_owned());
+        let name = prompt.text(
+            name.or(named_after_root),
+            "repository name",
+            "a name argument",
+            None,
+        )?;
+        let id = crate::init::id(&name)?;
+        let root = root_arg.unwrap_or_else(|| PathBuf::from(&id));
+        refuse_nesting(&root)?;
+        let assets = crate::init::assets()?;
 
-    if image_name.is_some() || prompt.confirm("create an image in it now")? {
-        image(&root, image_name, base, Some(&owner), "`--image`", prompt)?;
+        let owner = prompt.text(owner, &format!("owner, {OWNERSHIP}"), "`--owner`", None)?;
+        let image = match image_name.is_some() || prompt.confirm("create an image in it now")? {
+            true => Some(Image::collect(
+                &root,
+                image_name,
+                base,
+                Some(owner.clone()),
+                "`--image`",
+                prompt,
+            )?),
+            false => None,
+        };
+        let remote =
+            gh_installed() && prompt.confirm(&format!("create {owner}/{id} on github now"))?;
+        Ok(Self {
+            name,
+            id,
+            root,
+            owner,
+            assets,
+            image,
+            remote,
+        })
     }
 
-    let next = match remote(&owner, &id, prompt)? {
-        true => format!(
-            "git remote add origin https://github.com/{owner}/{id} && git push -u origin main"
-        ),
-        false => format!("gh repo create {owner}/{id} --source=. --push"),
-    };
-    println!(
-        "\nnext, in {}:\n\
-         \x20 git init && git add -A && git commit\n\
-         \x20 {next}\n",
-        root.display()
-    );
-    Ok(())
+    pub fn apply(&self) -> Result<(), String> {
+        crate::init::write(&self.root, &self.name, &self.assets)?;
+        println!("wrote {} into {}", self.name, self.root.display());
+        if let Some(image) = &self.image {
+            image.apply(&self.root)?;
+        }
+        if self.remote {
+            create_remote(&self.owner, &self.id)?;
+            println!("created {}/{} on github", self.owner, self.id);
+        }
+
+        let Self { owner, id, .. } = self;
+        let next = match self.remote {
+            true => format!(
+                "git remote add origin https://github.com/{owner}/{id} && git push -u origin main"
+            ),
+            false => format!("gh repo create {owner}/{id} --source=. --push"),
+        };
+        println!(
+            "\nnext, in {}:\n\
+             \x20 git init && git add -A && git commit\n\
+             \x20 {next}\n",
+            self.root.display()
+        );
+        Ok(())
+    }
 }
 
 /// One image, in `<image-id>.kdl` at the repository root.
-pub fn image(
-    root: &Path,
-    name: Option<String>,
-    base: Option<String>,
-    owner: Option<&str>,
-    flag: &str,
-    prompt: &Prompt,
-) -> Result<(), String> {
-    let name = prompt.text(name, "image name", flag, None)?;
-    let id = crate::init::id(&name)?;
-    let implicit = implicit_default(root);
-    let base = match base {
-        Some(given) => given,
-        None => choose_base(prompt)?,
-    };
-    let known = crate::base::find(&base);
-    let family = match known {
-        Some(known) => known.family.to_string(),
-        None => prompt.text(
-            None,
-            "base family",
-            "`--base`, naming a base the catalog knows",
-            Some(crate::base::DEFAULT.family),
-        )?,
-    };
+pub struct Image {
+    name: String,
+    id: String,
+    owner: Option<String>,
+    base: String,
+    family: String,
+    file: PathBuf,
+    /// The image a second one takes the fallback away from, named in repo.kdl
+    /// so that a bare build still builds what it built before.
+    names_default: Option<String>,
+}
 
-    let file = root.join(format!("{id}.kdl"));
-    if file.exists() {
-        return Err(format!("{} is already there", file.display()));
+impl Image {
+    pub fn collect(
+        root: &Path,
+        name: Option<String>,
+        base: Option<String>,
+        owner: Option<String>,
+        flag: &str,
+        prompt: &Prompt,
+    ) -> Result<Self, String> {
+        let name = prompt.text(name, "image name", flag, None)?;
+        let id = crate::init::id(&name)?;
+        let file = root.join(format!("{id}.kdl"));
+        if file.exists() {
+            return Err(format!("{} is already there", file.display()));
+        }
+        let names_default = implicit_default(root).filter(|was| *was != id);
+
+        let base = match base {
+            Some(given) => given,
+            None => choose_base(prompt)?,
+        };
+        let family = match crate::base::find(&base) {
+            Some(known) => known.family.to_string(),
+            None => prompt.text(
+                None,
+                "base family",
+                "`--base`, naming a base the catalog knows",
+                Some(crate::base::DEFAULT.family),
+            )?,
+        };
+        Ok(Self {
+            name,
+            id,
+            owner,
+            base,
+            family,
+            file,
+            names_default,
+        })
     }
-    crate::init::put(&file, &image_kdl(&name, &id, owner, &base, &family, known))?;
-    println!("wrote {}", file.display());
-    if let Some(was) = implicit.filter(|was| *was != id) {
-        append_default_image(root, &was)?;
-        println!("named \"{was}\" the default image in {REPO_FILE}");
+
+    pub fn apply(&self, root: &Path) -> Result<(), String> {
+        let text = image_kdl(
+            &self.name,
+            &self.id,
+            self.owner.as_deref(),
+            &self.base,
+            &self.family,
+            crate::base::find(&self.base),
+        );
+        crate::init::put(&self.file, &text)?;
+        println!("wrote {}", self.file.display());
+        if let Some(was) = &self.names_default {
+            append_default_image(root, was)?;
+            println!("named \"{was}\" the default image in {REPO_FILE}");
+        }
+        Ok(())
     }
-    Ok(())
 }
 
 /// The image a repository with one of them and no `default-image` falls back
@@ -141,42 +220,62 @@ fn choose_base(prompt: &Prompt) -> Result<String, String> {
 
 /// One module in the repository, and the offer to list it in an image, which
 /// is a separate operation.
-pub fn module(
-    root: &Path,
-    name: Option<String>,
-    pkgs: Vec<String>,
-    with: Vec<(String, String)>,
-    image_name: Option<String>,
-    prompt: &Prompt,
-) -> Result<(), String> {
-    let name = prompt.text(name, "module name", "a name argument", None)?;
-    let path = name
-        .split('/')
-        .map(crate::init::id)
-        .collect::<Result<Vec<_>, _>>()?
-        .join("/");
-    let file = root.join("modules").join(&path).join("module.kdl");
-    if file.exists() {
-        return Err(format!("modules/{path} is already there"));
+pub struct Module {
+    path: String,
+    file: PathBuf,
+    text: String,
+    listing: Listing,
+}
+
+impl Module {
+    pub fn collect(
+        root: &Path,
+        name: Option<String>,
+        pkgs: Vec<String>,
+        with: Vec<(String, String)>,
+        image_name: Option<String>,
+        prompt: &Prompt,
+    ) -> Result<Self, String> {
+        let name = prompt.text(name, "module name", "a name argument", None)?;
+        let path = name
+            .split('/')
+            .map(crate::init::id)
+            .collect::<Result<Vec<_>, _>>()?
+            .join("/");
+        let file = root.join("modules").join(&path).join("module.kdl");
+        if file.exists() {
+            return Err(format!("modules/{path} is already there"));
+        }
+
+        let pkgs = match pkgs.is_empty() && prompt.confirm("does it install packages")? {
+            true => prompt
+                .text(
+                    None,
+                    "package names, separated by spaces",
+                    "`--pkg`",
+                    Some(""),
+                )?
+                .split_whitespace()
+                .map(str::to_string)
+                .collect(),
+            false => pkgs,
+        };
+
+        let text = module_kdl(&name, &family(root), &pkgs, &with)?;
+        let listing = Listing::collect(root, image_name, prompt)?;
+        Ok(Self {
+            path,
+            file,
+            text,
+            listing,
+        })
     }
 
-    let pkgs = match pkgs.is_empty() && prompt.confirm("does it install packages")? {
-        true => prompt
-            .text(
-                None,
-                "package names, separated by spaces",
-                "`--pkg`",
-                Some(""),
-            )?
-            .split_whitespace()
-            .map(str::to_string)
-            .collect(),
-        false => pkgs,
-    };
-
-    crate::init::put(&file, &module_kdl(&name, &family(root), &pkgs, &with)?)?;
-    println!("wrote modules/{path}/module.kdl");
-    add_to_image(root, &path, image_name, prompt)
+    pub fn apply(&self) -> Result<(), String> {
+        crate::init::put(&self.file, &self.text)?;
+        println!("wrote modules/{}/module.kdl", self.path);
+        self.listing.apply(&self.path)
+    }
 }
 
 /// The family the repository already builds on.
@@ -221,47 +320,63 @@ fn quotable(value: &str) -> Result<&str, String> {
     }
 }
 
-/// Which image, or none: it asks even when there is one, because having a
-/// module in the repository and listing it in an image are different decisions.
-pub fn add_to_image(
-    root: &Path,
-    path: &str,
-    given: Option<String>,
-    prompt: &Prompt,
-) -> Result<(), String> {
-    let (list, _) = crate::model::image::List::load(root);
-    let ids: Vec<String> = list.images.iter().map(|image| image.id.clone()).collect();
-    let options: Vec<Choice> = list
-        .images
-        .iter()
-        .map(|image| match image.name == image.id {
-            true => Choice::new(&image.id, ""),
-            false => Choice::new(&image.id, &image.name),
+/// Which image a module is listed in, or why none is. It asks even when there
+/// is one image, because having a module in the repository and listing it in an
+/// image are different decisions.
+pub enum Listing {
+    /// Nothing to list it in yet.
+    NoImage,
+    /// None of them, which is an answer.
+    Declined,
+    In(PathBuf),
+}
+
+impl Listing {
+    pub fn collect(root: &Path, given: Option<String>, prompt: &Prompt) -> Result<Self, String> {
+        let (list, _) = crate::model::image::List::load(root);
+        let ids: Vec<String> = list.images.iter().map(|image| image.id.clone()).collect();
+        if ids.is_empty() {
+            return Ok(Self::NoImage);
+        }
+        let options: Vec<Choice> = list
+            .images
+            .iter()
+            .map(|image| match image.name == image.id {
+                true => Choice::new(&image.id, ""),
+                false => Choice::new(&image.id, &image.name),
+            })
+            .collect();
+
+        let chosen = match given {
+            Some(id) => Some(ids.iter().position(|known| *known == id).ok_or_else(|| {
+                format!(
+                    "`{id}` is not a declared image; there is {}",
+                    ids.join(", ")
+                )
+            })?),
+            None => prompt.choose("list it in an image", &options)?,
+        };
+        Ok(match chosen {
+            Some(chosen) => Self::In(PathBuf::from(list.images[chosen].src.name())),
+            None => Self::Declined,
         })
-        .collect();
-    if ids.is_empty() {
-        println!("no image lists it yet; `tect create image <name>` writes one");
-        return Ok(());
     }
 
-    let chosen = match given {
-        Some(id) => Some(ids.iter().position(|known| *known == id).ok_or_else(|| {
-            format!(
-                "`{id}` is not a declared image; there is {}",
-                ids.join(", ")
-            )
-        })?),
-        None => prompt.choose("list it in an image", &options)?,
-    };
-    let Some(chosen) = chosen else {
-        println!("next, to build it, list it in an image:\n\x20 module \"{path}\"");
-        return Ok(());
-    };
-
-    let file = Path::new(list.images[chosen].src.name());
-    append_module(file, path)?;
-    println!("listed \"{path}\" in {}", file.display());
-    Ok(())
+    pub fn apply(&self, path: &str) -> Result<(), String> {
+        match self {
+            Self::NoImage => {
+                println!("no image lists it yet; `tect create image <name>` writes one")
+            }
+            Self::Declined => {
+                println!("next, to build it, list it in an image:\n\x20 module \"{path}\"")
+            }
+            Self::In(file) => {
+                append_module(file, path)?;
+                println!("listed \"{path}\" in {}", file.display());
+            }
+        }
+        Ok(())
+    }
 }
 
 /// One `module` line before the closing brace of the image's `modules` block.
@@ -343,23 +458,29 @@ fn refuse_nesting(root: &Path) -> Result<(), String> {
     }
 }
 
-/// Offered only where `gh` is installed, and only after the tree is written.
-/// Whether the repository is created, committed and pushed is the user's.
-fn remote(owner: &str, id: &str, prompt: &Prompt) -> Result<bool, String> {
-    let present = Command::new("gh")
+/// The remote is offered only where `gh` is installed, which is a collect-time
+/// read: whether it is created, committed and pushed is the user's.
+fn gh_installed() -> bool {
+    Command::new("gh")
         .arg("--version")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
-        .is_ok_and(|status| status.success());
-    if !present || !prompt.confirm(&format!("create {owner}/{id} on github now"))? {
-        return Ok(false);
-    }
-    Command::new("gh")
+        .is_ok_and(|status| status.success())
+}
+
+fn create_remote(owner: &str, id: &str) -> Result<(), String> {
+    match Command::new("gh")
         .args(["repo", "create", &format!("{owner}/{id}"), "--public"])
         .status()
-        .map(|status| status.success())
-        .map_err(|err| format!("gh: {err}"))
+    {
+        Ok(status) if status.success() => Ok(()),
+        Ok(status) => Err(format!(
+            "`gh repo create` exited {}",
+            status.code().unwrap_or_default()
+        )),
+        Err(err) => Err(format!("gh: {err}")),
+    }
 }
 
 #[cfg(test)]
