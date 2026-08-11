@@ -46,6 +46,40 @@ pub(crate) fn check_path(path: &str, span: Span, src: &Source, issues: &mut Issu
     );
 }
 
+/// Every `{...}` in a URL template. An unclosed brace is the rest of the URL,
+/// so it is reported rather than skipped.
+pub(crate) fn placeholders(url: &str) -> impl Iterator<Item = &str> {
+    url.match_indices('{').map(|(at, _)| {
+        url[at..]
+            .find('}')
+            .map_or(&url[at..], |end| &url[at..=at + end])
+    })
+}
+
+/// The two ways a pin's sha256 is the wrong shape. `subject` is what the
+/// message names it by, the pin having no name of its own.
+pub(crate) fn check_sha256(
+    sha256: &str,
+    subject: &str,
+    span: Span,
+    src: &Source,
+    issues: &mut Issues,
+) {
+    if sha256.len() != 64 || !sha256.chars().all(|c| c.is_ascii_hexdigit()) {
+        issues.push(
+            Issue::new(format!("{subject} has a malformed sha256"), src)
+                .at(span, "not 64 hex digits")
+                .help("sha256sum output, lowercase"),
+        );
+    } else if sha256.chars().any(|c| c.is_ascii_uppercase()) {
+        issues.push(
+            Issue::new(format!("{subject} has an uppercase sha256"), src)
+                .at(span, "lowercase, as sha256sum writes it")
+                .help("the checksum workflow rewrites this line by matching the pinned value, so its case has to be the one sha256sum produces"),
+        );
+    }
+}
+
 /// A syntax error as one issue, carrying what the parser found so it is
 /// reported through the collector rather than beside it.
 pub(crate) fn syntax_issue(err: &kdl::KdlError, file: &str, src: &Source) -> Issue {

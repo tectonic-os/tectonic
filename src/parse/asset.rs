@@ -3,7 +3,7 @@
 use crate::diag::{Issue, Issues, Source, Span};
 use crate::model::asset::{Asset, ShaFrom};
 use crate::parse::schema::{Arg, Kind, Node, Prop, Say, NEEDS_VALUE};
-use crate::parse::{kids, prop, string_arg};
+use crate::parse::{check_sha256, kids, placeholders, prop, string_arg};
 use kdl::KdlNode;
 
 /// The datasources the Renovate custom managers in .github/renovate.json5
@@ -195,19 +195,7 @@ pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Asset>
     }
 
     if let Some(sha256) = &asset.sha256 {
-        if sha256.len() != 64 || !sha256.chars().all(|c| c.is_ascii_hexdigit()) {
-            issues.push(
-                Issue::new(format!("`{}` has a malformed sha256", asset.name), src)
-                    .at(span, "not 64 hex digits")
-                    .help("sha256sum output, lowercase"),
-            );
-        } else if sha256.chars().any(|c| c.is_ascii_uppercase()) {
-            issues.push(
-                Issue::new(format!("`{}` has an uppercase sha256", asset.name), src)
-                    .at(span, "lowercase, as sha256sum writes it")
-                    .help("the checksum workflow rewrites this line by matching the pinned value, so its case has to be the one sha256sum produces"),
-            );
-        }
+        check_sha256(sha256, &format!("`{}`", asset.name), span, src, issues);
     }
 
     if asset.sha256.is_none() && asset.from != ShaFrom::Asset {
@@ -249,21 +237,15 @@ fn check_url(asset: &Asset, src: &Source, issues: &mut Issues) {
     let Some(url) = &asset.url else {
         return;
     };
-    for (index, _) in url.match_indices('{') {
-        let placeholder = url[index..]
-            .find('}')
-            .map(|end| &url[index..=index + end])
-            .unwrap_or(&url[index..]);
-        if placeholder != "{version}" {
-            issues.push(
-                Issue::new(
-                    format!("`{}` has an unknown placeholder {placeholder}", asset.name),
-                    src,
-                )
-                .at(asset.span, "not substituted")
-                .help("a URL template expands `{version}` and nothing else"),
-            );
-        }
+    for placeholder in placeholders(url).filter(|found| *found != "{version}") {
+        issues.push(
+            Issue::new(
+                format!("`{}` has an unknown placeholder {placeholder}", asset.name),
+                src,
+            )
+            .at(asset.span, "not substituted")
+            .help("a URL template expands `{version}` and nothing else"),
+        );
     }
     if url.contains("{version}") && asset.version.is_none() {
         issues.push(
