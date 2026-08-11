@@ -8,7 +8,7 @@ which module [0-3]: 1
 
   1) example  Example
   0) none
-list it in an image [0-1]: 1
+list it in images [0-1, several]: 1
 
 imported modules/one/browser
 listed "one/browser" in ./example.kdl

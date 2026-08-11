@@ -333,7 +333,7 @@ impl Module {
         name: Option<String>,
         pkgs: Vec<String>,
         with: Vec<(String, String)>,
-        image_name: Option<String>,
+        images: Vec<String>,
         prompt: &Prompt,
     ) -> Result<Self, String> {
         let name = prompt.text(name, "module name", "a name argument", None)?;
@@ -363,7 +363,7 @@ impl Module {
             };
 
         let text = module_kdl(&name, &family(root), &pkgs, &with)?;
-        let listing = Listing::collect(root, image_name, prompt)?;
+        let listing = Listing::collect(root, images, prompt)?;
         Ok(Self {
             path,
             file,
@@ -421,7 +421,7 @@ fn quotable(value: &str) -> Result<&str, String> {
     }
 }
 
-/// Which image a module is listed in, or why none is. It asks even when there
+/// Which images a module is listed in, or why none is. It asks even when there
 /// is one image, because having a module in the repository and listing it in an
 /// image are different decisions.
 pub enum Listing {
@@ -429,11 +429,11 @@ pub enum Listing {
     NoImage,
     /// None of them, which is an answer.
     Declined,
-    In(PathBuf),
+    In(Vec<PathBuf>),
 }
 
 impl Listing {
-    pub fn collect(root: &Path, given: Option<String>, prompt: &Prompt) -> Result<Self, String> {
+    pub fn collect(root: &Path, given: Vec<String>, prompt: &Prompt) -> Result<Self, String> {
         let (list, _) = crate::model::image::List::load(root);
         let ids: Vec<String> = list.images.iter().map(|image| image.id.clone()).collect();
         if ids.is_empty() {
@@ -448,18 +448,28 @@ impl Listing {
             })
             .collect();
 
-        let chosen = match given {
-            Some(id) => Some(ids.iter().position(|known| *known == id).ok_or_else(|| {
-                format!(
-                    "`{id}` is not a declared image; there is {}",
-                    ids.join(", ")
-                )
-            })?),
-            None => prompt.choose("list it in an image", &options)?,
+        let chosen: Vec<usize> = match given.is_empty() {
+            true => prompt.choose_many("list it in images", &options)?,
+            false => given
+                .iter()
+                .map(|id| {
+                    ids.iter().position(|known| known == id).ok_or_else(|| {
+                        format!(
+                            "`{id}` is not a declared image; there is {}",
+                            ids.join(", ")
+                        )
+                    })
+                })
+                .collect::<Result<_, _>>()?,
         };
-        Ok(match chosen {
-            Some(chosen) => Self::In(PathBuf::from(list.images[chosen].src.name())),
-            None => Self::Declined,
+        Ok(match chosen.is_empty() {
+            true => Self::Declined,
+            false => Self::In(
+                chosen
+                    .iter()
+                    .map(|at| PathBuf::from(list.images[*at].src.name()))
+                    .collect(),
+            ),
         })
     }
 
@@ -471,9 +481,11 @@ impl Listing {
             Self::Declined => {
                 println!("next, to build it, list it in an image:\n\x20 module \"{path}\"")
             }
-            Self::In(file) => {
-                append_module(file, path)?;
-                println!("listed \"{path}\" in {}", file.display());
+            Self::In(files) => {
+                for file in files {
+                    append_module(file, path)?;
+                    println!("listed \"{path}\" in {}", file.display());
+                }
             }
         }
         Ok(())

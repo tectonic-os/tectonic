@@ -174,11 +174,7 @@ impl Prompt {
             println!("{question}: {answer}\n");
             return Ok(chosen);
         }
-        for (index, option) in options.iter().enumerate() {
-            let line = format!("{}  {}", option.label, option.detail);
-            println!("  {}) {}", index + 1, line.trim_end());
-        }
-        println!("  0) none");
+        self.numbered(options);
         let question = format!("{question} [0-{}]", options.len());
         let answer = self.read(&question, &format!("{question}: "))?;
         match answer.parse::<usize>() {
@@ -190,5 +186,41 @@ impl Prompt {
                 .map(Some)
                 .ok_or_else(|| format!("`{answer}` is not one of them")),
         }
+    }
+
+    /// Any of a set, in the order they were answered, or none of them: the
+    /// numbered list again, taking several numbers or names on the one line.
+    /// No widget draws this, so a terminal and a script read the same thing.
+    pub fn choose_many(&self, question: &str, options: &[Choice]) -> Result<Vec<usize>, String> {
+        if !self.ask || options.is_empty() {
+            return Ok(Vec::new());
+        }
+        self.numbered(options);
+        let question = format!("{question} [0-{}, several]", options.len());
+        let answer = self.read(&question, &format!("{question}: "))?;
+
+        let mut chosen: Vec<usize> = Vec::new();
+        for word in answer.split([' ', ',']).filter(|word| !word.is_empty()) {
+            let at = match word.parse::<usize>() {
+                Ok(0) => return Ok(Vec::new()),
+                Ok(number) if number <= options.len() => number - 1,
+                _ => options
+                    .iter()
+                    .position(|option| option.label == word)
+                    .ok_or_else(|| format!("`{word}` is not one of them"))?,
+            };
+            if !chosen.contains(&at) {
+                chosen.push(at);
+            }
+        }
+        Ok(chosen)
+    }
+
+    fn numbered(&self, options: &[Choice]) {
+        for (index, option) in options.iter().enumerate() {
+            let line = format!("{}  {}", option.label, option.detail);
+            println!("  {}) {}", index + 1, line.trim_end());
+        }
+        println!("  0) none");
     }
 }

@@ -119,7 +119,7 @@ fn create(name: &str, root: &Path) {
         Some("My Editor".into()),
         vec!["nano".into()],
         vec![("provides".into(), "editor".into())],
-        Some("example".into()),
+        vec!["example".into()],
         &silent,
     )
     .unwrap()
@@ -130,7 +130,7 @@ fn create(name: &str, root: &Path) {
         Some("plain".into()),
         Vec::new(),
         Vec::new(),
-        None,
+        Vec::new(),
         &silent,
     )
     .unwrap()
@@ -370,6 +370,16 @@ fn flow_repo(name: &str) -> PathBuf {
     root
 }
 
+/// The same, with a second image to list a module in.
+fn flow_repo_two(name: &str) -> PathBuf {
+    let root = flow_repo(name);
+    tect(
+        &root,
+        &["--no-tui", "--root", ".", "create", "image", "Server"],
+    );
+    root
+}
+
 /// Every flow that prompts, answered from a script: what a person sees, and
 /// that a question the script does not answer fails rather than waits.
 #[test]
@@ -403,6 +413,12 @@ fn flows() {
         &[&module[..], &["My Editor"]].concat(),
     );
     flow("flow-unanswered", &root, None, &module);
+    flow(
+        "flow-module-two-images",
+        &flow_repo_two("flow-module-both"),
+        None,
+        &module,
+    );
 
     let root = flow_repo("flow-import");
     let collections = crate_dir().join("tests/collections");
