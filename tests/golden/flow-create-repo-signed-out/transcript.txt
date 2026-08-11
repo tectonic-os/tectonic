@@ -20,7 +20,11 @@ github.com/someone
 
 Added github.com/someone/example as the origin repo
 Would you like to create this repo on Github now? (Yes/Skip)
-Skip
+Yes
+
+You will need to login with user 'someone' to create the repo on Github.
+You can log in with the following command:
+gh auth login
 
 Tectonic defines images through kdl files. These image files define the base
 image and modules to be included in the built image.

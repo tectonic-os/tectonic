@@ -31,7 +31,7 @@ fn banner(failing: bool) {
 
 const CREATE_REPO: &str = "\
 \x20 create repo [name]  start a repository for your own images, here or in
-                      `--root`. `--owner` is your account or org on github
+                      `--root`. `--owner` is your account or org, on `--host`
 ";
 
 const IN_REPO: &str = "\
@@ -315,6 +315,7 @@ fn run() -> Result<ExitCode, Error> {
     let no_cache_from = args.switch("no-cache-from");
     let root_arg = args.flag("root")?.map(PathBuf::from);
     let owner = args.flag("owner")?;
+    let host = args.flag("host")?;
     let image_arg = args.flag("image")?;
     let module_arg = args.flag("module")?;
     let cn = args.flag("cn")?;
@@ -359,9 +360,10 @@ fn run() -> Result<ExitCode, Error> {
     }
 
     if let ["create", "repo", rest @ ..] = words.as_slice() {
-        args.only(&["root", "owner", "image", "base"], "create repo")?;
+        args.only(&["root", "host", "owner", "image", "base"], "create repo")?;
         let name = one_name(rest, "create repo")?;
-        tect::create::Repo::collect(name, owner, image_arg, base, root_arg, &prompt)?.apply()?;
+        tect::create::Repo::collect(name, host, owner, image_arg, base, root_arg, &prompt)?
+            .apply()?;
         return Ok(ExitCode::SUCCESS);
     }
 
@@ -397,7 +399,8 @@ fn run() -> Result<ExitCode, Error> {
             let Some(root) = open(root_arg)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
-            tect::create::Image::collect(&root, name, base, owner, "a name argument", &prompt)?
+            let origin = owner.map(|owner| tect::create::origin(tect::create::HOST, &owner));
+            tect::create::Image::collect(&root, name, base, origin, "a name argument", &prompt)?
                 .apply(&root)?;
             return Ok(ExitCode::SUCCESS);
         }

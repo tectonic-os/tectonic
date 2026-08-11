@@ -52,16 +52,31 @@ impl Prompt {
         }
     }
 
-    fn read(&self, question: &str) -> Result<String, String> {
+    /// Whether there is anyone to ask, which is what a line standing with a
+    /// question rather than before one has to know.
+    pub fn asks(&self) -> bool {
+        self.ask
+    }
+
+    /// `shown` is everything that stands before the answer, and `question` is
+    /// what a run with no answer left for it names. One blank line follows,
+    /// which is what separates a question from what comes after it.
+    fn read(&self, question: &str, shown: &str) -> Result<String, String> {
+        let answer = self.answer(question, shown)?;
+        println!();
+        Ok(answer)
+    }
+
+    fn answer(&self, question: &str, shown: &str) -> Result<String, String> {
         if let Some((answers, at)) = &self.script {
             let answer = answers
                 .get(at.get())
                 .ok_or_else(|| format!("nothing left in {SCRIPT} to answer `{question}` with"))?;
             at.set(at.get() + 1);
-            println!("{question}: {answer}");
+            println!("{shown}{answer}");
             return Ok(answer.trim().to_string());
         }
-        print!("{question}: ");
+        print!("{shown}");
         std::io::stdout().flush().map_err(|err| err.to_string())?;
         let mut answer = String::new();
         std::io::stdin()
@@ -92,8 +107,11 @@ impl Prompt {
             return missing();
         }
         let answer = match default {
-            Some(default) => self.read(&format!("{question} [{default}]"))?,
-            None => self.read(question)?,
+            Some(default) => {
+                let question = format!("{question} [{default}]");
+                self.read(&question, &format!("{question}: "))?
+            }
+            None => self.read(question, &format!("{question}: "))?,
         };
         match answer.is_empty() {
             true => missing(),
@@ -101,14 +119,43 @@ impl Prompt {
         }
     }
 
+    /// The same, asked over two lines: the question on its own, the answer
+    /// typed after `prefix`, so what the answer belongs to stays visible.
+    pub fn line(
+        &self,
+        given: Option<String>,
+        question: &str,
+        flag: &str,
+        prefix: &str,
+    ) -> Result<String, String> {
+        if let Some(value) = given.filter(|value| !value.is_empty()) {
+            return Ok(value);
+        }
+        let missing = || {
+            Err(format!(
+                "give {flag}, since nothing can be asked here: {question}"
+            ))
+        };
+        if !self.ask {
+            return missing();
+        }
+        match self.read(question, &format!("{question}\n{prefix}"))? {
+            answer if answer.is_empty() => missing(),
+            answer => Ok(answer),
+        }
+    }
+
     /// A step with no flag of its own: the flag that answers it is the answer,
-    /// so with nobody to ask the answer is no.
-    pub fn confirm(&self, question: &str) -> Result<bool, String> {
+    /// so with nobody to ask the answer is no. `yes` and `no` are what the two
+    /// answers are called, since not every one of them is a refusal.
+    pub fn confirm(&self, question: &str, yes: &str, no: &str) -> Result<bool, String> {
         if !self.ask {
             return Ok(false);
         }
-        let answer = self.read(&format!("{question} [Y/n]"))?;
-        Ok(!answer.starts_with(['n', 'N']))
+        let question = format!("{question} ({yes}/{no})");
+        let answer = self.read(&question, &format!("{question}\n"))?;
+        let first = |word: &str| word.chars().next().map(|c| c.to_ascii_lowercase());
+        Ok(first(&answer) != first(no))
     }
 
     /// One of a set, or none of them: an inline select list where the output is
@@ -124,7 +171,7 @@ impl Prompt {
                 Some(index) => options[index].label.as_str(),
                 None => "none",
             };
-            println!("{question}: {answer}");
+            println!("{question}: {answer}\n");
             return Ok(chosen);
         }
         for (index, option) in options.iter().enumerate() {
@@ -132,7 +179,8 @@ impl Prompt {
             println!("  {}) {}", index + 1, line.trim_end());
         }
         println!("  0) none");
-        let answer = self.read(&format!("{question} [0-{}]", options.len()))?;
+        let question = format!("{question} [0-{}]", options.len());
+        let answer = self.read(&question, &format!("{question}: "))?;
         match answer.parse::<usize>() {
             Ok(0) => Ok(None),
             Ok(number) if number <= options.len() => Ok(Some(number - 1)),

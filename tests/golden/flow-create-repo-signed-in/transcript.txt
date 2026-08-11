@@ -20,7 +20,7 @@ github.com/someone
 
 Added github.com/someone/example as the origin repo
 Would you like to create this repo on Github now? (Yes/Skip)
-Skip
+Yes
 
 Tectonic defines images through kdl files. These image files define the base
 image and modules to be included in the built image.
@@ -41,9 +41,10 @@ What is the base image for this image? [0-5]: 1
 wrote Example into example
 initialised a git repository in example
 wrote example/desktop.kdl
+created someone/example on github
 
 next, in example:
   git add -A && git commit
-  gh repo create someone/example --source=. --push
+  git remote add origin https://github.com/someone/example && git push -u origin main
 
 ==== exit 0

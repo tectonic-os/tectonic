@@ -13,14 +13,15 @@ Yes
   1) github.com  Github, and the workflows Tectonic ships
   2) forgejo  a Forgejo instance, whose address you give
   0) none
-Where will the repo be hosted? [0-2]: 1
+Where will the repo be hosted? [0-2]: 2
 
-What is your github username?
-github.com/someone
+What is the address of the Forgejo instance?
+forge.example.org
 
-Added github.com/someone/example as the origin repo
-Would you like to create this repo on Github now? (Yes/Skip)
-Skip
+What is your username on forge.example.org?
+forge.example.org/someone
+
+Added forge.example.org/someone/example as the origin repo
 
 Tectonic defines images through kdl files. These image files define the base
 image and modules to be included in the built image.
@@ -44,6 +45,6 @@ wrote example/desktop.kdl
 
 next, in example:
   git add -A && git commit
-  gh repo create someone/example --source=. --push
+  git remote add origin https://forge.example.org/someone/example && git push -u origin main
 
 ==== exit 0

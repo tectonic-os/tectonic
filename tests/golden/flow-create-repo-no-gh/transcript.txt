@@ -20,7 +20,11 @@ github.com/someone
 
 Added github.com/someone/example as the origin repo
 Would you like to create this repo on Github now? (Yes/Skip)
-Skip
+Yes
+
+To create a repo from Tectonic requires the Github CLI tool 'gh' installed.
+Would you like to install it now? (Yes/Skip Github repo creation)
+Yes
 
 Tectonic defines images through kdl files. These image files define the base
 image and modules to be included in the built image.
@@ -44,6 +48,7 @@ wrote example/desktop.kdl
 
 next, in example:
   git add -A && git commit
+  install gh from https://github.com/cli/cli
   gh repo create someone/example --source=. --push
 
 ==== exit 0

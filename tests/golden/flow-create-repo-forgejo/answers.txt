@@ -1,8 +1,8 @@
 Example
 Yes
-1
+2
+forge.example.org
 someone
-Skip
 Yes
 Desktop
 1

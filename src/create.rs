@@ -11,23 +11,50 @@ use crate::ui::Choice;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-const OWNERSHIP: &str = "your account or org on github (not tectonic-os)";
+/// Where a repository is hosted unless something says otherwise. The host is
+/// read into the origin and the image URLs and nowhere else: nothing in the
+/// tool learns about a second forge.
+pub const HOST: &str = "github.com";
 
-/// The tree, an image in it, then the remote, which is optional and last: each
-/// step after the first adds to what the one before it wrote.
+const SCHEDULED: &str = "This repo is designed to run scheduled builds of the repo's images via\n\
+     Github or Forgejo actions.\n\
+     Would you like to configure this now?";
+
+const NO_GH: &str = "To create a repo from Tectonic requires the Github CLI tool 'gh' installed.\n\
+     Would you like to install it now?";
+
+const IMAGES: &str =
+    "Tectonic defines images through kdl files. These image files define the base\n\
+     image and modules to be included in the built image.\n\
+     Would you like to create an image file now?";
+
+const GH_INSTALL: &str = "install gh from https://github.com/cli/cli";
+
+/// The prefix every URL a repository writes is built from.
+pub fn origin(host: &str, owner: &str) -> String {
+    format!("https://{host}/{owner}")
+}
+
+/// The tree, the git repository, an image in it, then the remote, which is
+/// optional and last: each step adds to what the one before it wrote.
 pub struct Repo {
     name: String,
     id: String,
     root: PathBuf,
-    owner: String,
+    host: String,
+    /// Who owns it on the host, which is absent where scheduled builds were
+    /// declined and no origin was composed.
+    owner: Option<String>,
     assets: PathBuf,
     image: Option<Image>,
     remote: bool,
+    install_gh: bool,
 }
 
 impl Repo {
     pub fn collect(
         name: Option<String>,
+        host: Option<String>,
         owner: Option<String>,
         image_name: Option<String>,
         base: Option<String>,
@@ -40,67 +67,139 @@ impl Repo {
             .as_deref()
             .and_then(Path::file_name)
             .map(|name| name.to_string_lossy().into_owned());
-        let name = prompt.text(
+        let name = prompt.line(
             name.or(named_after_root),
-            "repository name",
+            "What will the repo be called?",
             "a name argument",
-            None,
+            "",
         )?;
         let id = crate::init::id(&name)?;
         let root = root_arg.unwrap_or_else(|| PathBuf::from(&id));
         refuse_nesting(&root)?;
         let assets = crate::init::assets()?;
+        println!("Creating {id}...\n");
 
-        let owner = prompt.text(owner, &format!("owner, {OWNERSHIP}"), "`--owner`", None)?;
-        let image = match image_name.is_some() || prompt.confirm("create an image in it now")? {
+        let configure =
+            host.is_some() || owner.is_some() || prompt.confirm(SCHEDULED, "Yes", "No")?;
+        let host = match (configure, host) {
+            (true, None) => choose_host(prompt)?,
+            (_, given) => given.unwrap_or_else(|| HOST.to_string()),
+        };
+        let owner = match configure {
+            true => Some(prompt.line(owner, &username(&host), "`--owner`", &format!("{host}/"))?),
+            false => None,
+        };
+        let mut remote = false;
+        let mut install_gh = false;
+        // `gh` is github's, so the offer to create the repository is too, and
+        // it is what closes the block the origin line opens.
+        let offering = host == HOST && prompt.asks();
+        if let Some(named) = &owner {
+            println!("Added {host}/{named}/{id} as the origin repo");
+            if !offering {
+                println!();
+            }
+            if offering
+                && prompt.confirm(
+                    "Would you like to create this repo on Github now?",
+                    "Yes",
+                    "Skip",
+                )?
+            {
+                match (gh_installed(), gh_logged_in()) {
+                    (false, _) => {
+                        install_gh = prompt.confirm(NO_GH, "Yes", "Skip Github repo creation")?
+                    }
+                    (true, false) => println!(
+                        "You will need to login with user '{named}' to create the repo on Github.\n\
+                         You can log in with the following command:\n\
+                         gh auth login\n"
+                    ),
+                    (true, true) => remote = true,
+                }
+            }
+        }
+        let image = match image_name.is_some() || prompt.confirm(IMAGES, "Yes", "No")? {
             true => Some(Image::collect(
                 &root,
                 image_name,
                 base,
-                Some(owner.clone()),
+                owner.as_deref().map(|owner| origin(&host, owner)),
                 "`--image`",
                 prompt,
             )?),
             false => None,
         };
-        let remote =
-            gh_installed() && prompt.confirm(&format!("create {owner}/{id} on github now"))?;
         Ok(Self {
             name,
             id,
             root,
+            host,
             owner,
             assets,
             image,
             remote,
+            install_gh,
         })
     }
 
     pub fn apply(&self) -> Result<(), String> {
         crate::init::write(&self.root, &self.name, &self.assets)?;
         println!("wrote {} into {}", self.name, self.root.display());
+        git_init(&self.root)?;
+        println!("initialised a git repository in {}", self.root.display());
         if let Some(image) = &self.image {
             image.apply(&self.root)?;
         }
-        if self.remote {
-            create_remote(&self.owner, &self.id)?;
-            println!("created {}/{} on github", self.owner, self.id);
+        if let (true, Some(owner)) = (self.remote, &self.owner) {
+            create_remote(owner, &self.id)?;
+            println!("created {}/{} on github", owner, self.id);
         }
 
-        let Self { owner, id, .. } = self;
-        let next = match self.remote {
-            true => format!(
-                "git remote add origin https://github.com/{owner}/{id} && git push -u origin main"
-            ),
-            false => format!("gh repo create {owner}/{id} --source=. --push"),
-        };
-        println!(
-            "\nnext, in {}:\n\
-             \x20 git init && git add -A && git commit\n\
-             \x20 {next}\n",
-            self.root.display()
-        );
+        let Self { host, id, .. } = self;
+        let mut next = vec!["git add -A && git commit".to_string()];
+        if self.install_gh {
+            next.push(GH_INSTALL.to_string());
+        }
+        if let Some(owner) = &self.owner {
+            next.push(match self.remote || host != HOST {
+                true => format!(
+                    "git remote add origin {}/{id} && git push -u origin main",
+                    origin(host, owner)
+                ),
+                false => format!("gh repo create {owner}/{id} --source=. --push"),
+            });
+        }
+        let next: Vec<String> = next.iter().map(|line| format!("\x20 {line}")).collect();
+        println!("\nnext, in {}:\n{}\n", self.root.display(), next.join("\n"));
         Ok(())
+    }
+}
+
+/// Where the repository is hosted. The catalog is the two forges the workflows
+/// the tool ships know how to run under.
+fn choose_host(prompt: &Prompt) -> Result<String, String> {
+    let options = [
+        Choice::new(HOST, "Github, and the workflows Tectonic ships"),
+        Choice::new("forgejo", "a Forgejo instance, whose address you give"),
+    ];
+    match prompt.choose("Where will the repo be hosted?", &options)? {
+        Some(0) | None => Ok(HOST.to_string()),
+        _ => prompt.line(
+            None,
+            "What is the address of the Forgejo instance?",
+            "`--host`",
+            "",
+        ),
+    }
+}
+
+/// Github is asked for by name, and every other host by its address, which is
+/// all the tool knows about one.
+fn username(host: &str) -> String {
+    match host {
+        HOST => "What is your github username?".to_string(),
+        host => format!("What is your username on {host}?"),
     }
 }
 
@@ -108,7 +207,8 @@ impl Repo {
 pub struct Image {
     name: String,
     id: String,
-    owner: Option<String>,
+    /// `https://<host>/<owner>`, what the image's URLs are built from.
+    origin: Option<String>,
     base: String,
     family: String,
     file: PathBuf,
@@ -122,11 +222,11 @@ impl Image {
         root: &Path,
         name: Option<String>,
         base: Option<String>,
-        owner: Option<String>,
+        origin: Option<String>,
         flag: &str,
         prompt: &Prompt,
     ) -> Result<Self, String> {
-        let name = prompt.text(name, "image name", flag, None)?;
+        let name = prompt.line(name, "What will the image be called?", flag, "")?;
         let id = crate::init::id(&name)?;
         let file = root.join(format!("{id}.kdl"));
         if file.exists() {
@@ -150,7 +250,7 @@ impl Image {
         Ok(Self {
             name,
             id,
-            owner,
+            origin,
             base,
             family,
             file,
@@ -162,7 +262,7 @@ impl Image {
         let text = image_kdl(
             &self.name,
             &self.id,
-            self.owner.as_deref(),
+            self.origin.as_deref(),
             &self.base,
             &self.family,
             crate::base::find(&self.base),
@@ -207,7 +307,7 @@ fn choose_base(prompt: &Prompt) -> Result<String, String> {
         .iter()
         .map(|base| Choice::new(base.image, base.about))
         .collect();
-    match prompt.choose("which base, or none to name another", &options)? {
+    match prompt.choose("What is the base image for this image?", &options)? {
         Some(chosen) => Ok(crate::base::CATALOG[chosen].image.to_string()),
         None => prompt.text(
             None,
@@ -247,19 +347,20 @@ impl Module {
             return Err(format!("modules/{path} is already there"));
         }
 
-        let pkgs = match pkgs.is_empty() && prompt.confirm("does it install packages")? {
-            true => prompt
-                .text(
-                    None,
-                    "package names, separated by spaces",
-                    "`--pkg`",
-                    Some(""),
-                )?
-                .split_whitespace()
-                .map(str::to_string)
-                .collect(),
-            false => pkgs,
-        };
+        let pkgs =
+            match pkgs.is_empty() && prompt.confirm("does it install packages", "Yes", "No")? {
+                true => prompt
+                    .text(
+                        None,
+                        "package names, separated by spaces",
+                        "`--pkg`",
+                        Some(""),
+                    )?
+                    .split_whitespace()
+                    .map(str::to_string)
+                    .collect(),
+                false => pkgs,
+            };
 
         let text = module_kdl(&name, &family(root), &pkgs, &with)?;
         let listing = Listing::collect(root, image_name, prompt)?;
@@ -401,15 +502,15 @@ fn append_module(file: &Path, path: &str) -> Result<(), String> {
 fn image_kdl(
     name: &str,
     id: &str,
-    owner: Option<&str>,
+    origin: Option<&str>,
     base: &str,
     family: &str,
     known: Option<&crate::base::Base>,
 ) -> String {
-    let urls = match owner {
-        Some(owner) => format!(
-            "\x20   url \"https://github.com/{owner}/{id}\"\n\
-             \x20   issues-url \"https://github.com/{owner}/{id}/issues\"\n"
+    let urls = match origin {
+        Some(origin) => format!(
+            "\x20   url \"{origin}/{id}\"\n\
+             \x20   issues-url \"{origin}/{id}/issues\"\n"
         ),
         None => String::new(),
     };
@@ -458,13 +559,38 @@ fn refuse_nesting(root: &Path) -> Result<(), String> {
     }
 }
 
-/// The remote is offered only where `gh` is installed, which is a collect-time
-/// read: whether it is created, committed and pushed is the user's.
+/// The repository the rest of the tree is committed into. Its own output is
+/// dropped: what a run prints is the one line every other step prints.
+fn git_init(root: &Path) -> Result<(), String> {
+    match quietly(Command::new("git").arg("init").arg(root)).status() {
+        Ok(status) if status.success() => Ok(()),
+        Ok(status) => Err(format!(
+            "`git init` exited {}",
+            status.code().unwrap_or_default()
+        )),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Err(
+            "`git` is not installed, and it is what initialises the repository: \
+             `dnf install git`"
+                .to_string(),
+        ),
+        Err(err) => Err(format!("git: {err}")),
+    }
+}
+
+fn quietly(command: &mut Command) -> &mut Command {
+    command.stdout(Stdio::null()).stderr(Stdio::null())
+}
+
+/// Whether `gh` is there and signed in, both collect-time reads: what they
+/// answer is which of the offers the flow makes.
 fn gh_installed() -> bool {
-    Command::new("gh")
-        .arg("--version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
+    quietly(Command::new("gh").arg("--version"))
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
+fn gh_logged_in() -> bool {
+    quietly(Command::new("gh").args(["auth", "status"]))
         .status()
         .is_ok_and(|status| status.success())
 }
