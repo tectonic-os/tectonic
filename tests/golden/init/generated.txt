@@ -39,10 +39,12 @@ RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
 
 ARG CONTRACT_FILES=""
 ARG VERIFY_EXCEPTIONS=""
+ARG MODULE_PRESETS=""
 RUN bootc container lint
 RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     CONTRACT_FILES="${CONTRACT_FILES}" \
-    VERIFY_EXCEPTIONS="${VERIFY_EXCEPTIONS}" /ctx/tect validate-image
+    VERIFY_EXCEPTIONS="${VERIFY_EXCEPTIONS}" \
+    MODULE_PRESETS="${MODULE_PRESETS}" /ctx/tect validate-image
 ==== generated/example.graph.md
 # Example capability graph
 

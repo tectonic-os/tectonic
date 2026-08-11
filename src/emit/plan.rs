@@ -342,6 +342,35 @@ fn overlay_files(image: &Image, shipped: &overlay::Index, flavour: Option<&str>)
     }))
 }
 
+/// The preset files the target's overlays put in the image, which is what the
+/// layer checks arrived.
+pub(crate) fn preset_files(
+    image: &Image,
+    shipped: &overlay::Index,
+    flavour: Option<&str>,
+) -> Vec<String> {
+    shipped
+        .keys()
+        .filter(|path| is_preset(path))
+        .filter(|path| {
+            shipped[*path]
+                .iter()
+                .any(|&owner| in_target(&image.entries[owner], flavour))
+        })
+        .cloned()
+        .collect()
+}
+
+fn is_preset(path: &str) -> bool {
+    let Some(name) = path
+        .strip_prefix("/usr/lib/systemd/system-preset/")
+        .or_else(|| path.strip_prefix("/usr/lib/systemd/user-preset/"))
+    else {
+        return false;
+    };
+    name.starts_with(crate::runtime::MODULE_PRESET) && name.ends_with(".preset")
+}
+
 /// Every pinned asset the given modules declare, deduplicated by module and
 /// name.
 pub(crate) fn pinned<'a>(modules: &[&'a Module]) -> Vec<(&'a Module, &'a Asset)> {

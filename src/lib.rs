@@ -124,6 +124,8 @@ pub struct Run {
     /// The reading this ran against, so a caller that needs one after a command
     /// acts on what the command saw rather than reading the tree again.
     pub(crate) list: List,
+    /// Beside `list`, and in the same order as its images.
+    pub(crate) resolved: Vec<Resolved>,
 }
 
 /// The Containerfile skeleton, when the repository has one to splice into. A
@@ -325,6 +327,7 @@ pub fn run(command: Command, arg: Option<&str>, root: &Path) -> Run {
         flavours: list.images.iter().map(|i| i.flavours.len()).sum(),
         shadowed,
         list,
+        resolved,
     }
 }
 

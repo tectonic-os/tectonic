@@ -1,7 +1,7 @@
 //! The whole argv a container build runs with, derived from the plan, and then
 //! the backend that runs it.
 
-use crate::emit::plan::{contract_files, of_target, unique_pairs};
+use crate::emit::plan::{contract_files, of_target, preset_files, unique_pairs};
 use crate::model::image::{List, Target};
 use crate::model::module::Module;
 use std::fs;
@@ -67,10 +67,16 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
         gate.files.len()
     );
 
-    let list = gate.list;
+    let (list, resolved) = (gate.list, gate.resolved);
     let (image, flavour, entries) =
         of_target(&list, &target).ok_or_else(|| format!("`{target}` has no image"))?;
     let modules: Vec<&Module> = entries.iter().filter_map(|e| e.module.as_ref()).collect();
+    let presets = list
+        .images
+        .iter()
+        .position(|i| i.id == image.id)
+        .map(|i| preset_files(image, &resolved[i].shipped, flavour.as_deref()))
+        .unwrap_or_default();
     let published = published(&list, &target);
 
     let version = match env("IMAGE_VERSION") {
@@ -98,6 +104,7 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
             .collect::<Vec<_>>()
             .join(" ")
         ),
+        format!("MODULE_PRESETS={}", presets.join(" ")),
     ];
     if let Some(kernel) = &opts.kernel {
         build_args.push(format!("KERNEL={kernel}"));

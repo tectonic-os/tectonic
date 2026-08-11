@@ -316,4 +316,6 @@ unpacks it, `bin` installs one executable, `rpm` installs the package.
 
 ### `validate-image`
 
-Every check a built image has to pass.
+Every check a built image has to pass. The build passes it the preset files the
+enabled modules' overlays ship, and it fails on any of them the image does not
+have.
