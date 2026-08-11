@@ -191,10 +191,6 @@ impl Image {
 }
 
 impl List {
-    pub fn images(&self) -> Vec<&Image> {
-        self.images.iter().collect()
-    }
-
     /// The image a command answers about when it is given no image, and the
     /// one a bare build builds.
     pub fn default_image(&self) -> Option<&Image> {
@@ -240,7 +236,7 @@ impl List {
     /// Every target: for each image, the ungated set and then its flavours.
     pub fn targets(&self) -> Vec<Target> {
         let mut out = Vec::new();
-        for image in self.images() {
+        for image in &self.images {
             out.push(Target {
                 image: image.id.clone(),
                 flavour: NO_FLAVOUR.to_string(),

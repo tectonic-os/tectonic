@@ -22,7 +22,6 @@ use diag::Issues;
 use diag::Source;
 use model::image::{List, Target, REPO_FILE};
 use model::module::Module;
-use model::remote::Collection;
 pub use parse::repo::compatible;
 use resolve::Resolved;
 use std::path::{Path, PathBuf};
@@ -94,13 +93,6 @@ pub fn declarations(root: &Path) -> (List, Issues, String) {
     let (list, issues) = List::load(root);
     let context = context(&list, root);
     (list, issues, context)
-}
-
-/// The collections repo.kdl names, and anything wrong with the repository an
-/// import has to see before it writes into it.
-pub fn sources(root: &Path) -> (Vec<Collection>, Issues, String) {
-    let (list, issues, context) = declarations(root);
-    (list.sources, issues, context)
 }
 
 /// The files read, for the line a failure ends with.

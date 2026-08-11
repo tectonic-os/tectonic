@@ -22,20 +22,17 @@ pub fn path(image: &Image) -> PathBuf {
 /// Every module directory whose finalize hook this image runs, in build order
 /// and without the repeat a module listed under two flavours would produce.
 pub fn hooks<'a>(image: &'a Image, root: &Path) -> Vec<&'a Entry> {
-    let mut out: Vec<&Entry> = Vec::new();
-    for entry in &image.entries {
-        if entry.module.is_none()
-            || !root
-                .join("modules")
+    image
+        .entries
+        .iter()
+        .filter(|entry| entry.module.is_some())
+        .filter(|entry| {
+            root.join("modules")
                 .join(entry.dir())
                 .join("finalize.sh")
                 .is_file()
-        {
-            continue;
-        }
-        out.push(entry);
-    }
-    out
+        })
+        .collect()
 }
 
 /// The script, or None when there is nothing to assemble and no hook to run.

@@ -178,8 +178,8 @@ fn provider(
 /// Nothing here declares the kind: which module in the declared collections
 /// does, and the line that fetches it.
 fn absent(root: &Path, kind: &str, disk: &Disk) -> String {
-    let (sources, ..) = crate::sources(root);
-    let found: Vec<String> = crate::import::catalog(root, &sources)
+    let (list, ..) = crate::declarations(root);
+    let found: Vec<String> = crate::import::catalog(root, &list.sources)
         .unwrap_or_default()
         .into_iter()
         .filter(|module| module.keys.iter().any(|declared| declared == kind))

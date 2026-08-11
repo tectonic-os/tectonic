@@ -187,7 +187,8 @@ fn import(name: &str, root: &Path) {
     std::env::set_current_dir(root).expect("the imported-into repository exists");
     let here = Path::new(".");
 
-    let (sources, issues, _) = tect::sources(here);
+    let (list, issues, _) = tect::declarations(here);
+    let sources = list.sources;
     out.push_str(&format!("==== the registry\n{}", issues.plain()));
     for collection in &sources {
         out.push_str(&format!("{}\n", collection.name));

@@ -38,6 +38,9 @@ impl Say {
     }
 }
 
+/// A node whose whole content is one string, said the same way everywhere.
+pub const NEEDS_VALUE: Say = Say::new("`{}` needs a value", "nothing given", "");
+
 /// The positional argument a node carries.
 pub enum Arg {
     None,

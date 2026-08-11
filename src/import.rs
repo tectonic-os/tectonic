@@ -192,15 +192,8 @@ fn tree(root: &Path, collection: &Collection) -> Result<PathBuf, String> {
     let pin = root.join(CACHE).join(format!("{}.pin", collection.name));
     let _ = std::fs::remove_dir_all(&dir);
     let url = remote.url_resolved();
-    let target = dir.to_string_lossy().into_owned();
-    crate::runtime::fetch(&[
-        "tree",
-        &url,
-        &remote.sha256,
-        &target,
-        "--strip-components=1",
-    ])
-    .map_err(|err| format!("`{}`: {err}", collection.name))?;
+    crate::runtime::extract(&url, &remote.sha256, &dir, &["--strip-components=1"])
+        .map_err(|err| format!("`{}`: {err}", collection.name))?;
     std::fs::write(&pin, &remote.sha256).map_err(|err| format!("{}: {err}", pin.display()))?;
     Ok(dir)
 }
