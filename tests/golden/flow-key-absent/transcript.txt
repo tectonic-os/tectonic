@@ -1,4 +1,4 @@
-Tectonic v0.0.0
+Tectonic v0.1.0
 
 Error: The one/signature-policy module must be imported before creating cosign keys.
 You can add it with `tect import module one/signature-policy`
