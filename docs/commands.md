@@ -37,7 +37,9 @@ or not it happens to have a terminal.
 
 A yes or no step has no flag of its own. The flag that answers it is the
 answer: `--image desktop` on `create repo` means yes and names the image, and
-its absence under `--no-tui` means no.
+its absence under `--no-tui` means no. A value that may repeat has a flag that
+repeats with it, so `--image` on `create module` names every image the module
+is listed in.
 
 Every question is asked before anything is written, and whatever a question
 depends on is read before it is asked, so a name already taken or an image that
@@ -82,13 +84,23 @@ Writes `<image-id>.kdl` at the repository root, where the id is the machine
 name the name derives, so "My Desktop" writes `my-desktop.kdl`. Every root
 `.kdl` but `repo.kdl` is one image.
 
-Asks for the name, then offers the bases the tool knows; `--base`. Choosing
+Asks for the name, which defaults to what the repository is called, so a
+repository whose first image is the repository itself takes it by pressing
+return. Standing in one, the name it is called is the name of the directory it
+sits in. Then it offers the bases the tool knows; `--base`. Choosing
 none asks for a reference instead, defaulting to
 `quay.io/fedora/fedora-bootc:44`, so any image can be built on. A base out of
 the catalog writes its family and what it already ships into `base`, and a
 base from outside it asks for the family and writes no `provides`: nothing
 knows what an unknown image carries, so `check` reports what no module
 satisfies.
+
+`url` and `issues-url` are the repository's own, not the image's: every image
+in a repository is published out of one remote, so the id in them is the
+repository's. `create repo` composes it out of `--host` and `--owner`; a
+`create image` standing in a repository takes it off an image already there,
+and `--owner` names it where no image carries one. A repository that declared
+no origin writes neither field, and a second image into one matches.
 
 A repository with no image at all is a valid state. `check` says what is
 missing rather than failing, and `generate` says there is nothing to write.
@@ -114,11 +126,14 @@ repeatable, writes one more line into the manifest, so
 `--with provides=browser` declares the capability. `check` holds whatever is
 written to the schema like any other manifest.
 
-It then offers to list the module in an image. It asks which one even when
-there is only one, and none is an answer: having a module in the repository
-and listing it in an image are different decisions, which is what makes a
-repository with several images work. `--image` naming an image the repository
-does not declare is refused before the module is written.
+It then offers to list the module in the images it is to be built into. Every
+image the repository declares is numbered, several of them are an answer, given
+on the one line as `1 3` or `1,3`, and so is none: having a module in the
+repository and listing it in an image are different decisions, which is what
+makes a repository with several images work. `--image` is repeatable and says
+the same, so `--image desktop --image server` lists it in both and each is one
+line of what the run wrote. A name the repository does not declare is refused
+before the module is written.
 
 ### `import module [name]`
 
@@ -130,8 +145,8 @@ have it, and so does the prompt when there is a terminal.
 With no name it lists every module the collections hold, each with its
 description and what it requires, and asks which one.
 
-Then it offers to list the module in an image, the same offer `create module`
-ends with; `--image`.
+Then it offers to list the module in the images it is to be built into, the
+same offer `create module` ends with; `--image`, repeatable.
 
 ### `create cosign-key`
 
