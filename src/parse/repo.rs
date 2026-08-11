@@ -576,6 +576,7 @@ colour "blue"
 schema-version 1
 sources {
     owner "https://host/owner/modules/{ref}.tar.gz" branch="main" {
+        unpinned
         ref "v1"
         ref "v2"
         subtree "modules"
@@ -587,6 +588,7 @@ sources {
             found,
             [
                 "unknown collection property `branch`",
+                "`unpinned` needs a reason",
                 "`ref` is declared twice",
                 "unknown node `subtree` in a collection",
             ]

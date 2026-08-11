@@ -1,0 +1,21 @@
+schema-version 1
+
+sources {
+    unmarked "https://github.com/owner/modules/archive/refs/heads/{ref}.tar.gz" {
+        manual "nothing bumps it"
+        ref "main"
+    }
+    hashed "https://github.com/owner/modules/archive/refs/heads/{ref}.tar.gz" {
+        unpinned "trusted"
+        ref "main"
+        sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+    }
+    twice "https://github.com/owner/modules/archive/refs/heads/{ref}.tar.gz" {
+        manual "nothing bumps it"
+        unpinned "trusted"
+        ref "main"
+    }
+    here "../modules" {
+        unpinned "trusted"
+    }
+}

@@ -61,7 +61,8 @@ pub fn file(list: &List) -> Option<(PathBuf, String)> {
 
 /// One collection the seeded repository fetches its modules through. How the
 /// pin is kept current is left out: that is a decision about the repository
-/// holding it, which this is not.
+/// holding it, which this is not. One that has no hash to be kept current
+/// against is not, since a seeded repository is fetching it unverified.
 fn source(collection: &Collection, out: &mut String) {
     let name = &collection.name;
     match &collection.at {
@@ -70,8 +71,13 @@ fn source(collection: &Collection, out: &mut String) {
         }
         At::Archive(remote) => {
             let _ = writeln!(out, "\x20   {name} {:?} {{", remote.url);
+            if let Some(why) = &remote.unpinned {
+                let _ = writeln!(out, "\x20       unpinned {why:?}");
+            }
             let _ = writeln!(out, "\x20       ref {:?}", remote.git_ref);
-            let _ = writeln!(out, "\x20       sha256 {:?}", remote.sha256);
+            if remote.unpinned.is_none() {
+                let _ = writeln!(out, "\x20       sha256 {:?}", remote.sha256);
+            }
             if let Some(path) = &remote.path {
                 let _ = writeln!(out, "\x20       path {path:?}");
             }

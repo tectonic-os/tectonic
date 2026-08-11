@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "default_image": "example",
+  "default_image_name": "Example",
+  "pr_image": "example",
+  "default_target": "example/none",
+  "default_published": "example",
+  "pr_target": "example/none",
+  "pr_published": "example",
+  "ungated_target": "example/none",
+  "ungated_published": "example",
+  "cache_image": "example-cache",
+  "workflows": [],
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "example",
+      "name": "Example",
+      "pretty_name": "",
+      "file": "./example.kdl",
+      "url": "",
+      "issues_url": "",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "provides_files": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "example/none",
+          "image": "example",
+          "flavour": null,
+          "published": "example",
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "tectonic-os/hello",
+              "dir": "tectonic-os/hello",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "A module imported out of the unpinned collection",
+              "options": {}
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

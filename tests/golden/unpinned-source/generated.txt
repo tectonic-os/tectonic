@@ -1,0 +1,63 @@
+==== generated/example.d/tectonic-os/hello.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/tectonic-os/hello
+export MODDIR
+
+dnf5 install -y fastfetch
+==== generated/example.graph.md
+# Example capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["quay.io/fedora/fedora-bootc:44"]
+    m0["tectonic-os/hello"]
+```
+
+## Capabilities
+
+| Name | Kind | Provided by | Required by | After |
+|---|---|---|---|---|
+| `rechunking` | capability | `base` |  |  |
+==== generated/example.graph.json
+{
+  "image": "example",
+  "capabilities": [
+    {
+      "name": "rechunking",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    }
+  ],
+  "overrides": [],
+  "suppressed": []
+}
+==== generated/seed.kdl
+// GENERATED FILE, do not edit. Produced by `tect generate` from the
+// example image definition.
+
+schema-version 1
+
+base "quay.io/fedora/fedora-bootc:44" {
+    family "fedora"
+}
+
+sources {
+    tectonic-os "https://github.com/tectonic-os/modules/archive/refs/heads/{ref}.tar.gz" {
+        unpinned "the collection this tool is published alongside, followed at its branch head"
+        ref "main"
+    }
+}
+
+module "tectonic-os/hello"

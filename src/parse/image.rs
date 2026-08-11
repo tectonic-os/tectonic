@@ -345,7 +345,7 @@ impl Image {
                             .at(first, "first here")
                             .at(child.name().span(), "and again here"),
                     ),
-                    None => pin = remote::parse(child, src, issues),
+                    None => pin = remote::parse(child, src, false, issues),
                 }
                 continue;
             }

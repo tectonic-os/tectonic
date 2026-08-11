@@ -20,6 +20,17 @@ const SHA256: Node = Node::new("sha256", "What the fetched archive is verified a
     .arg(Arg::Str, NEEDS_VALUE)
     .once("");
 
+/// The third answer beside `renovate` and `manual`, and the only one that
+/// leaves the archive unverified.
+#[rustfmt::skip]
+const UNPINNED: Node = Node::new("unpinned",
+    "Why this follows a moving ref with no `sha256`, so every fetch takes whatever the ref \
+     holds then and nothing checks what arrived.")
+    .arg(Arg::Str, Say::new("`{}` needs a reason", "no reason given",
+        "say why this is trusted enough to fetch unverified; with no `sha256` a mistaken or \
+         compromised commit lands with nothing to catch it"))
+    .once("");
+
 /// The pin on a list entry, which is the same shape as an `asset`.
 #[rustfmt::skip]
 pub const SOURCE: Node = Node::new("source",
@@ -36,7 +47,8 @@ pub const SOURCE: Node = Node::new("source",
         Node::new("path", "The module's directory inside the archive.")
             .arg(Arg::Str, NEEDS_VALUE).once(""),
     ], Say::new("unknown node `{}` in a source", "not part of the schema",
-        "a source holds `renovate` or `manual`, `ref`, `sha256` and `path`"));
+        "a source holds `renovate` or `manual`, `ref`, `sha256` and `path`; there is no \
+         unpinned module, because the build fetches one and runs it as root without a reader"));
 
 /// One collection in the registry, named by the owner rather than by the
 /// schema, which is why the node's name is empty.
@@ -52,13 +64,15 @@ pub const COLLECTION: Node = Node::new("",
     .children(&[
         RENOVATE,
         MANUAL,
+        UNPINNED,
         REF,
         SHA256,
         Node::new("path", "The directory inside the archive the modules sit in, when they are \
                            not at its root.")
             .arg(Arg::Str, NEEDS_VALUE).once(""),
     ], Say::new("unknown node `{}` in a collection", "not part of the schema",
-        "a collection holds `renovate` or `manual`, `ref`, `sha256` and `path`"));
+        "a collection holds one of `renovate`, `manual` and `unpinned`, then `ref`, `sha256` \
+         and `path`"));
 
 fn datasource(node: &KdlNode) -> Option<&str> {
     node.entries()
@@ -68,10 +82,15 @@ fn datasource(node: &KdlNode) -> Option<&str> {
 }
 
 /// `source "https://host/owner/repo/archive/{ref}.tar.gz" { renovate ...; ref
-/// "..."; sha256 "..."; path "modules/name" }` Exactly one of `renovate` and
-/// `manual`, and the tracked line directly below `renovate`, since one regex
-/// matches the two together.
-pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Remote> {
+/// "..."; sha256 "..."; path "modules/name" }` Exactly one of `renovate`,
+/// `manual` and `unpinned`, and the tracked line directly below `renovate`,
+/// since one regex matches the two together.
+pub fn parse(
+    node: &KdlNode,
+    src: &Source,
+    unpinnable: bool,
+    issues: &mut Issues,
+) -> Option<Remote> {
     let span: Span = node.name().span().into();
     let url = string_arg(node)?.to_string();
 
@@ -79,12 +98,14 @@ pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Remote
         url,
         git_ref: String::new(),
         sha256: String::new(),
+        unpinned: None,
         path: None,
         span,
     };
 
     let mut manual: Option<Span> = None;
     let mut renovate: Option<Span> = None;
+    let mut unpinned: Option<Span> = None;
     let mut ref_span: Option<Span> = None;
     let mut previous: Option<&str> = None;
 
@@ -107,6 +128,10 @@ pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Remote
                 }
             }
             "manual" => manual = Some(child_span),
+            "unpinned" if unpinnable => {
+                unpinned = Some(child_span);
+                remote.unpinned = Some(value.unwrap_or_default());
+            }
             "ref" => {
                 ref_span = Some(child_span);
                 remote.git_ref = value.unwrap_or_default();
@@ -125,18 +150,40 @@ pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Remote
         previous = Some(kind);
     }
 
-    match (renovate, manual) {
-        (Some(_), Some(manual)) => issues.push(
-            Issue::new("the pin is declared both tracked and manual", src)
-                .at(manual, "pick one")
-                .help("`renovate` says Renovate bumps this ref, `manual` says nothing does and why"),
+    // `unpinned` is a collection's alone, so a module source is told about the
+    // two answers it has rather than the three.
+    let (needs, how, hash) = match unpinnable {
+        true => (
+            "needs `renovate`, `manual` or `unpinned`",
+            "`renovate datasource=\"github-tags\" depName=\"owner/repo\"`, `manual \"why nothing tracks it\"`, or `unpinned \"why a moving ref is trusted here\"`",
+            "the content hash is what says the archive is the one that was reviewed; `unpinned \"why it is trusted\"` is how a collection following a moving ref says it has none on purpose",
         ),
-        (None, None) => issues.push(
+        false => (
+            "needs `renovate` or `manual`",
+            "`renovate datasource=\"github-tags\" depName=\"owner/repo\"`, or `manual \"why nothing tracks it\"`",
+            "a remote module is arbitrary shell running as root in the build, so the content hash is required, not optional",
+        ),
+    };
+    let answers: Vec<(&str, Span)> = [
+        ("renovate", renovate),
+        ("manual", manual),
+        ("unpinned", unpinned),
+    ]
+    .into_iter()
+    .filter_map(|(name, at)| at.map(|at| (name, at)))
+    .collect();
+    match answers.as_slice() {
+        [] => issues.push(
             Issue::new("the pin says nothing about how it is kept current", src)
-                .at(span, "needs `renovate` or `manual`")
-                .help("`renovate datasource=\"github-tags\" depName=\"owner/repo\"`, or `manual \"why nothing tracks it\"`"),
+                .at(span, needs)
+                .help(how),
         ),
-        _ => {}
+        [_] => {}
+        [(first, _), .., (last, at)] => issues.push(
+            Issue::new(format!("the pin is declared `{first}` and `{last}`"), src)
+                .at(*at, "pick one")
+                .help(how),
+        ),
     }
 
     if ref_span.is_none() {
@@ -148,13 +195,22 @@ pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Remote
     }
 
     if remote.sha256.is_empty() {
-        issues.push(
-            Issue::new("the pin declares no `sha256`", src)
-                .at(span, "nothing to verify the archive against")
-                .help("a remote module is arbitrary shell running as root in the build, so the content hash is required, not optional"),
-        );
+        if unpinned.is_none() {
+            issues.push(
+                Issue::new("the pin declares no `sha256`", src)
+                    .at(span, "nothing to verify the archive against")
+                    .help(hash),
+            );
+        }
     } else {
         check_sha256(&remote.sha256, "the pin", span, src, issues);
+        if let Some(at) = unpinned {
+            issues.push(
+                Issue::new("the pin is declared `unpinned` but pins a `sha256`", src)
+                    .at(at, "one of the two is not true")
+                    .help("a moving ref does not hash the same twice, so the fetch would fail as soon as it moved; drop whichever of them is wrong"),
+            );
+        }
     }
 
     check_url(&remote, renovate.is_some(), src, issues);
@@ -182,7 +238,7 @@ pub fn parse_collection(node: &KdlNode, src: &Source, issues: &mut Issues) -> Op
     }
 
     if at.starts_with("https://") || at.starts_with("file://") {
-        let remote = parse(node, src, issues)?;
+        let remote = parse(node, src, true, issues)?;
         return Some(Collection {
             name,
             at: At::Archive(remote),
@@ -192,7 +248,7 @@ pub fn parse_collection(node: &KdlNode, src: &Source, issues: &mut Issues) -> Op
 
     for child in kids(node) {
         let kind = child.name().value();
-        if matches!(kind, "renovate" | "manual" | "ref" | "sha256") {
+        if matches!(kind, "renovate" | "manual" | "unpinned" | "ref" | "sha256") {
             issues.push(
                 Issue::new(format!("`{name}` is a directory, so `{kind}` says nothing"), src)
                     .at(child.name().span(), "nothing is fetched")
@@ -311,6 +367,7 @@ mod tests {
 source pin="tag" {
     renovate "now" datasource="crates" flavour="x"
     manual
+    unpinned
     ref
     sha256 "abc"
     sha256 "def"
@@ -328,6 +385,7 @@ source pin="tag" {
                 "unknown renovate property `flavour`",
                 "`renovate` declares no depName",
                 "`manual` needs a reason",
+                "unknown node `unpinned` in a source",
                 "`ref` needs a value",
                 "`sha256` is declared twice",
                 "unknown node `subtree` in a source",

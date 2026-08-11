@@ -73,6 +73,41 @@ A name here is checked when it is imported from, not when the repository is
 checked: a directory that exists on one machine and not another is not a
 repository problem.
 
+### Collections that are not pinned
+
+A collection may instead follow a branch, and `unpinned` is what says so. That
+is what `create repo` scaffolds, and it buys convenience with verification:
+
+```kdl
+sources {
+    tectonic-os "https://github.com/tectonic-os/modules/archive/refs/heads/{ref}.tar.gz" {
+        unpinned "the collection this tool is published alongside, followed at its branch head"
+        ref "main"
+    }
+}
+```
+
+Every `import module` from an unpinned collection downloads the branch again
+and takes whatever it holds at that moment. There is no `sha256`, so nothing
+checks what arrived: a mistaken commit, or a compromised one, lands with
+nothing to catch it. What limits the damage is that the import is a copy into
+your tree, which you read and commit like any other change, rather than
+something the build fetches and runs. Tagging the collection instead would
+verify every fetch, at the cost of versioning every module in it together.
+
+`unpinned` is the third answer beside `renovate` and `manual` and excludes
+both: it says the ref moves on its own. It cannot be combined with a `sha256`,
+which a moving ref would break the moment it moved, and a module's own
+`source` cannot carry it at all — the build fetches those and runs them as
+root without anyone reading them first, so their hash is not optional. A
+collection or a `source` with neither a `sha256` nor `unpinned` is still an
+error, so a hash that is dropped or mistyped is reported rather than quietly
+becoming trust in whatever answers the URL.
+
+`tect check` names every unpinned collection above its counts. It is not an
+error; it is the one thing that stops the repository being reproducible, and
+it is worth being reminded of.
+
 `seed` nominates the image a new repository may start from, and `generate`
 writes it to `generated/seed.kdl`.
 
@@ -137,6 +172,7 @@ Also holds [`renovate`](#renovate) and [`manual`](#manual).
 
 | Node | Takes | Meaning |
 | --- | --- | --- |
+| `unpinned` | a string, at most one | Why this follows a moving ref with no `sha256`, so every fetch takes whatever the ref holds then and nothing checks what arrived. |
 | `ref` | a string, at most one | The tag or commit the archive is fetched at. |
 | `sha256` | a string, at most one | What the fetched archive is verified against. |
 | `path` | a string, at most one | The directory inside the archive the modules sit in, when they are not at its root. |

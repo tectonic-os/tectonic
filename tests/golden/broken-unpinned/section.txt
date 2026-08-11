@@ -1,0 +1,20 @@
+### Base Image
+FROM quay.io/fedora/fedora-bootc:44
+
+## Module layers
+
+# ---- flavour gate ----
+ARG FLAVOUR
+
+# ---- image version ----
+ARG IMAGE_VERSION=dev
+
+# ---- image identity ----
+ARG IMAGE_ID="broken-unpinned"
+ARG IMAGE_NAME="Broken Unpinned"
+ARG IMAGE_REGISTRY=""
+
+# ---- os-release ----
+RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    IMAGE_VERSION="${IMAGE_VERSION}" IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" /ctx/tect os-release
+

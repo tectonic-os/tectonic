@@ -11,6 +11,8 @@ pub struct Remote {
     pub url: String,
     pub git_ref: String,
     pub sha256: String,
+    /// Why this follows a moving ref with no hash, where it declared one.
+    pub unpinned: Option<String>,
     /// The module's directory inside the archive, relative to its root once
     /// the leading directory is stripped.
     pub path: Option<String>,
@@ -48,6 +50,15 @@ impl Collection {
         match &self.at {
             At::Dir(_) => None,
             At::Archive(remote) => remote.path.as_deref(),
+        }
+    }
+
+    /// Whether it follows a moving ref, which is what makes every fetch of it
+    /// a different tree with nothing to verify it against.
+    pub fn unpinned(&self) -> bool {
+        match &self.at {
+            At::Dir(_) => false,
+            At::Archive(remote) => remote.unpinned.is_some(),
         }
     }
 }
