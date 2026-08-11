@@ -6,9 +6,12 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+/// Whether one line of `systemd-analyze verify` output is of a class.
+type Matches = fn(&str) -> bool;
+
 /// The diagnostic classes `allow-verify` may name, and what each one matches in
 /// `systemd-analyze verify` output.
-pub const VERIFY_CLASSES: [(&str, fn(&str) -> bool); 2] = [
+pub const VERIFY_CLASSES: [(&str, Matches); 2] = [
     ("mount-not-found", mount_not_found),
     ("man-page-missing", man_page_missing),
 ];
@@ -44,12 +47,6 @@ fn classify(line: &str) -> Option<&'static str> {
         .iter()
         .find(|(_, matches)| matches(line))
         .map(|(name, _)| *name)
-}
-
-fn matches_class(class: &str, line: &str) -> bool {
-    VERIFY_CLASSES
-        .iter()
-        .any(|(name, matches)| *name == class && matches(line))
 }
 
 // ---- os-release ----------------------------------------------------------
@@ -371,7 +368,7 @@ pub fn validate_image() -> Result<(), String> {
         .split_whitespace()
     {
         let (class, unit) = token.split_once('|').unwrap_or((token, ""));
-        if classify_known(class) {
+        if VERIFY_CLASSES.iter().any(|(name, _)| *name == class) {
             exceptions.push((class.to_string(), unit.to_string()));
         } else {
             report.fail(format!(
@@ -463,7 +460,7 @@ pub fn validate_image() -> Result<(), String> {
                 let unexpected: Vec<&str> = text
                     .lines()
                     .filter(|line| !line.trim().is_empty())
-                    .filter(|line| !allowed.iter().any(|class| matches_class(class, line)))
+                    .filter(|line| !allowed.iter().any(|class| classify(line) == Some(*class)))
                     .collect();
 
                 if unexpected.is_empty() {
@@ -499,10 +496,6 @@ pub fn validate_image() -> Result<(), String> {
     } else {
         Err(format!("{} validation check(s) failed.", report.failures))
     }
-}
-
-fn classify_known(class: &str) -> bool {
-    VERIFY_CLASSES.iter().any(|(name, _)| *name == class)
 }
 
 fn presets(scope: &str) -> Vec<PathBuf> {
