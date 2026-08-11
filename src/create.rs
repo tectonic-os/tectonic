@@ -5,6 +5,7 @@
 //! Each of them collects every answer first and writes afterwards, which is why
 //! no `apply` takes a `Prompt`.
 
+use crate::diag::Issues;
 use crate::model::image::REPO_FILE;
 use crate::prompt::Prompt;
 use crate::ui::Choice;
@@ -220,13 +221,8 @@ fn username(host: &str) -> String {
 
 /// One image, in `<image-id>.kdl` at the repository root.
 pub struct Image {
-    name: String,
-    /// The repository's own URL, which every image in it shares: they are one
-    /// repository and it is what they are published out of.
-    url: Option<String>,
-    base: String,
-    family: String,
     file: PathBuf,
+    text: String,
     /// The image a second one takes the fallback away from, named in repo.kdl
     /// so that a bare build still builds what it built before.
     names_default: Option<String>,
@@ -266,12 +262,15 @@ impl Image {
                 .map(|image| image.url.clone())
         });
 
+        // What is wrong with a collection is `check`'s to report, not a
+        // picker's: an unreadable extension leaves the seed to offer.
+        let (bases, _) = crate::base::catalog(root, &list.sources, &mut Issues::default());
         let base = match base {
             Some(given) => given,
-            None => choose_base(prompt)?,
+            None => choose_base(&bases, prompt)?,
         };
-        let family = match crate::base::find(&base) {
-            Some(known) => known.family.to_string(),
+        let family = match crate::base::find(&bases, &base) {
+            Some(known) => known.family.clone(),
             None => prompt.text(
                 None,
                 "base family",
@@ -279,25 +278,22 @@ impl Image {
                 Some(crate::base::DEFAULT.family),
             )?,
         };
+        let text = image_kdl(
+            &name,
+            url.as_deref(),
+            &base,
+            &family,
+            crate::base::find(&bases, &base),
+        );
         Ok(Self {
-            name,
-            url,
-            base,
-            family,
+            text,
             file,
             names_default,
         })
     }
 
     pub fn apply(&self, root: &Path) -> Result<(), String> {
-        let text = image_kdl(
-            &self.name,
-            self.url.as_deref(),
-            &self.base,
-            &self.family,
-            crate::base::find(&self.base),
-        );
-        crate::init::put(&self.file, &text)?;
+        crate::init::put(&self.file, &self.text)?;
         println!("wrote {}", self.file.display());
         if let Some(was) = &self.names_default {
             append_default_image(root, was)?;
@@ -331,13 +327,13 @@ fn append_default_image(root: &Path, id: &str) -> Result<(), String> {
 
 /// One of the bases the catalog holds, or one typed in: an unknown base is not
 /// an error, it is a base nothing can say anything about.
-fn choose_base(prompt: &Prompt) -> Result<String, String> {
-    let options: Vec<Choice> = crate::base::CATALOG
+fn choose_base(bases: &[crate::base::Base], prompt: &Prompt) -> Result<String, String> {
+    let options: Vec<Choice> = bases
         .iter()
-        .map(|base| Choice::new(base.image, base.about))
+        .map(|base| Choice::new(&base.image, &base.about))
         .collect();
     match prompt.choose("What is the base image for this image?", &options)? {
-        Some(chosen) => Ok(crate::base::CATALOG[chosen].image.to_string()),
+        Some(chosen) => Ok(bases[chosen].image.clone()),
         None => prompt.text(
             None,
             "base image",
@@ -557,13 +553,16 @@ fn image_kdl(
     let mut ships = String::new();
     if let Some(known) = known {
         for (node, names) in [
-            ("provides", known.provides),
-            ("provides-file", known.provides_files),
+            ("provides", &known.provides),
+            ("provides-file", &known.provides_files),
         ] {
             if !names.is_empty() {
                 let listed: Vec<String> = names.iter().map(|name| format!("\"{name}\"")).collect();
                 ships.push_str(&format!("\x20       {node} {}\n", listed.join(" ")));
             }
+        }
+        if known.signed {
+            ships.push_str("\x20       signed #true\n");
         }
     }
     format!(
@@ -656,12 +655,14 @@ mod tests {
     #[test]
     fn a_catalogued_base_writes_what_it_ships_and_an_unknown_one_writes_nothing() {
         let bazzite = "ghcr.io/ublue-os/bazzite:stable";
+        let seeded: Vec<crate::base::Base> =
+            crate::base::catalog(Path::new("."), &[], &mut crate::diag::Issues::default()).0;
         let known = image_kdl(
             "Bazzite",
             None,
             bazzite,
             "fedora",
-            crate::base::find(bazzite),
+            crate::base::find(&seeded, bazzite),
         );
         assert!(
             known.contains("        provides \"rechunking\" \"flatpak\"\n"),
@@ -686,6 +687,18 @@ mod tests {
             "{shared}"
         );
 
+        let described = crate::base::Base {
+            image: "example.invalid/own:1".to_string(),
+            family: "fedora".to_string(),
+            provides: Vec::new(),
+            provides_files: Vec::new(),
+            about: "what a collection describes".to_string(),
+            signed: true,
+            span: crate::diag::Span::default(),
+        };
+        let extended = image_kdl("Own", None, &described.image, "fedora", Some(&described));
+        assert!(extended.contains("        signed #true\n"), "{extended}");
+
         let unknown = image_kdl("Own", None, "example.invalid/own:1", "fedora", None);
         assert!(!unknown.contains("provides"), "{unknown}");
         assert!(
@@ -699,7 +712,7 @@ mod tests {
     #[test]
     fn every_catalogued_name_is_a_name() {
         use crate::model::image::is_name;
-        for base in crate::base::CATALOG {
+        for base in crate::base::SEED {
             assert!(is_name(base.family), "{}", base.image);
             for name in base.provides {
                 assert!(is_name(name), "{} provides {name}", base.image);

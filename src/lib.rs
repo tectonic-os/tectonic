@@ -126,6 +126,9 @@ pub struct Run {
     /// Listed modules the base covers, which nothing builds.
     pub suppressed: usize,
     pub flavours: usize,
+    /// Seeded bases a collection describes instead. Only `check` looks, since
+    /// it is the only command a collection's catalog is any of the business of.
+    pub shadowed: Vec<base::Shadow>,
 }
 
 /// The Containerfile skeleton, when the repository has one to splice into. A
@@ -212,6 +215,11 @@ pub fn run(command: Command, arg: Option<&str>, root: &Path) -> Run {
         mut issues,
         context,
     } = load(root);
+
+    let shadowed = match command {
+        Command::Check => base::catalog(root, &list.sources, &mut issues).1,
+        _ => Vec::new(),
+    };
 
     if let Some(unknown) = image_arg.filter(|id| !list.images.iter().any(|i| i.id == *id)) {
         let known: Vec<&str> = list.images.iter().map(|i| i.id.as_str()).collect();
@@ -319,6 +327,7 @@ pub fn run(command: Command, arg: Option<&str>, root: &Path) -> Run {
         modules: list.images.iter().map(|i| i.modules().count()).sum(),
         suppressed: list.images.iter().map(|i| i.suppressed.len()).sum(),
         flavours: list.images.iter().map(|i| i.flavours.len()).sum(),
+        shadowed,
     }
 }
 

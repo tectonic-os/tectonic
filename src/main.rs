@@ -557,6 +557,14 @@ fn run() -> Result<ExitCode, Error> {
     }
     print!("{}", run.stdout);
     if command == Command::Check {
+        for shadow in &run.shadowed {
+            eprintln!(
+                "tect: {}/{} replaces the tool's own entry for {}",
+                shadow.collection,
+                tect::base::BASES_FILE,
+                shadow.image
+            );
+        }
         match run.images {
             0 => eprintln!("tect: no image yet; `tect create image <name>` writes one"),
             _ => eprintln!(
