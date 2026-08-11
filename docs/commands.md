@@ -57,6 +57,15 @@ scripts, shell helpers, disk config and workflows the tool ships and a
 repository does not carry. Into `--root`, else a directory named for the
 repository.
 
+The `repo.kdl` it writes declares `tectonic-os/modules` in `sources`, so
+`import module` works in a repository that has just been created. That
+collection is declared `unpinned`: it is followed at its branch head rather
+than at a tag, so every import of it takes whatever the branch holds then and
+no `sha256` checks what arrived. It is scaffolded that way because tagging the
+collection would version every module in it together. Delete the block, or
+replace it with a tagged and hashed pin, if that trade is not one you want;
+`docs/schema.md` says what each spelling costs.
+
 It asks for the name, then whether the images are to be built on a schedule.
 That is what a remote is for, so yes asks where the repository is hosted,
 `--host`, which is `github.com` unless the picker or the flag names another,
@@ -157,6 +166,13 @@ description and what it requires, and asks which one.
 Then it offers to list the module in the images it is to be built into, the
 same offer `create module` ends with; `--image`, repeatable.
 
+This is the only command that fetches a collection. A pinned one is downloaded
+and verified once and kept, and everything else in the tool reads whatever is
+already on disk, which is why the base picker costs no network. An `unpinned`
+collection has no hash to key that cache on, so it is downloaded again every
+time this command runs, unverified: the module lands in your tree as a copy
+you read and commit, and that reading is what stands in for the missing hash.
+
 ### `create key <kind>`
 
 Generates one of the keys the repository's modules declare. The argument names
@@ -204,7 +220,9 @@ with the counts on the last line: images, modules, flavours, and how many
 listed modules the base already provides and nothing therefore builds. Above
 them it names every base a declared collection describes differently from the
 entry the tool ships, since the collection's is what an image is scaffolded
-from.
+from, and every collection declared `unpinned`, which is what stops the
+repository being reproducible. Neither is an error and neither changes the
+exit code.
 
 ### `generate`
 
