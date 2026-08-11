@@ -2,11 +2,32 @@
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::sync::atomic::{AtomicBool, Ordering};
+use tect::model::image::TECT_VERSION;
 use tect::prompt::Prompt;
 use tect::ui::Choice;
 use tect::Command;
 
 const HEAD: &str = "usage: tect [--root <dir>] <command>\n";
+
+/// Where a person who has run out of commands is sent, which is what an
+/// operation that failed says instead of the whole surface.
+const COMMANDS: &str = "You can find the available commands by typing 'tect' or 'tect --help'";
+
+/// Whether the banner is already on one of the streams.
+static GREETED: AtomicBool = AtomicBool::new(false);
+
+/// The head of what a person reads, once per run. Never on a command whose
+/// stdout a script parses, and on stderr when it heads an error.
+fn banner(failing: bool) {
+    if GREETED.swap(true, Ordering::Relaxed) {
+        return;
+    }
+    match failing {
+        true => eprintln!("Tectonic v{TECT_VERSION}\n"),
+        false => println!("Tectonic v{TECT_VERSION}\n"),
+    }
+}
 
 const CREATE_REPO: &str = "\
 \x20 create repo [name]  start a repository for your own images, here or in
@@ -265,9 +286,19 @@ fn main() -> ExitCode {
     match run() {
         Ok(code) => code,
         Err(error) => {
-            eprintln!("tect: {}", error.message());
-            if let Error::Invocation(_) = error {
-                eprint!("{}", usage(in_repo()));
+            banner(true);
+            let invocation = matches!(error, Error::Invocation(_));
+            let message = error.message();
+            // A message that is already a sentence, or a block of them, keeps
+            // its own punctuation.
+            let stop = match message.ends_with(['.', '!', '?']) || message.contains('\n') {
+                true => "",
+                false => ".",
+            };
+            eprintln!("Error: {message}{stop}\n");
+            match invocation {
+                true => eprint!("{}", usage(in_repo())),
+                false => eprintln!("{COMMANDS}"),
             }
             ExitCode::from(USAGE_ERROR)
         }
@@ -318,6 +349,13 @@ fn run() -> Result<ExitCode, Error> {
             return Ok(ExitCode::SUCCESS);
         }
         Some(_) => {}
+    }
+
+    if matches!(
+        words.as_slice(),
+        ["create", ..] | ["import", ..] | ["check", ..]
+    ) {
+        banner(false);
     }
 
     if let ["create", "repo", rest @ ..] = words.as_slice() {
