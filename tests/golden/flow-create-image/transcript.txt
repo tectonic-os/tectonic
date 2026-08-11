@@ -3,13 +3,14 @@ Tectonic v0.0.0
 What will the image be called? [example]
 Beta
 
-  1) quay.io/fedora/fedora-bootc:44  Fedora 44, nothing above the base system
+  1) quay.io/fedora/fedora-bootc:44  Fedora 44, as this collection describes it
   2) ghcr.io/ublue-os/bazzite:stable  KDE, gaming and hardware support over kinoite-main
   3) ghcr.io/ublue-os/aurora:stable  KDE developer workstation over kinoite-main
   4) ghcr.io/ublue-os/bluefin:stable  GNOME developer workstation over silverblue-main
   5) ghcr.io/ublue-os/kinoite-main:44  Fedora Kinoite with the ublue additions, what bazzite builds on
+  6) example.invalid/collected:1  A base only the collection knows about
   0) none
-What is the base image for this image? [0-5]: 2
+What is the base image for this image? [0-6]: 6
 
 wrote ./beta.kdl
 named "example" the default image in repo.kdl

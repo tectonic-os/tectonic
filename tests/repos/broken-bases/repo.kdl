@@ -1,0 +1,6 @@
+schema-version 1
+
+sources {
+    one "collections/one"
+    two "collections/two"
+}

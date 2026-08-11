@@ -1,0 +1,13 @@
+base "quay.io/fedora/fedora-bootc:44" {
+    about "Fedora 44, as this collection describes it"
+    family "fedora"
+    provides "rechunking" "initramfs-generation" "mac-policy"
+    signed #true
+}
+
+base "example.invalid/collected:1" {
+    about "A base only the collection knows about"
+    family "fedora"
+    provides "rechunking"
+    provides-file "/usr/bin/collected"
+}

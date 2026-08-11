@@ -1,0 +1,31 @@
+base "example.invalid/shared:1" {
+    about "And described here too"
+    family "fedora"
+}
+
+base {
+    about "Nothing names it"
+    family "fedora"
+}
+
+base "example.invalid/no-about:1" {
+    family "fedora"
+    colour "red"
+}
+
+base "example.invalid/wrong-names:1" {
+    about "A capability and a path an image cannot use"
+    family "fedora"
+    provides "Rechunking"
+    provides-file "usr/bin/flatpak"
+    signed "yes"
+}
+
+base "example.invalid/wrong-names:1" {
+    about "Described twice in one file"
+    family "fedora"
+}
+
+base "example.invalid/no-family:1" {
+    about "Nothing to build against"
+}

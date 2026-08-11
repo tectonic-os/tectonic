@@ -1,0 +1,98 @@
+  x `base` needs an image reference
+   ,-[./collections/two/bases.kdl:6:1]
+ 5 | 
+ 6 | base {
+   : ^^|^
+   :   `-- no image given
+ 7 |     about "Nothing names it"
+   `----
+  help: `base "ghcr.io/ublue-os/bazzite:stable"`, the reference an image
+        writes verbatim
+
+  x unknown node `colour` in a base
+    ,-[./collections/two/bases.kdl:13:5]
+ 12 |     family "fedora"
+ 13 |     colour "red"
+    :     ^^^|^^
+    :        `-- not part of the schema
+ 14 | }
+    `----
+  help: a base entry holds `about`, `family`, `provides`, `provides-file` and
+        `signed`: what an image built on it may assume, and what a person
+        picks it by
+
+  x `base` declares no `about`
+    ,-[./collections/two/bases.kdl:11:1]
+ 10 | 
+ 11 | base "example.invalid/no-about:1" {
+    : ^^|^
+    :   `-- nothing to pick it by
+ 12 |     family "fedora"
+    `----
+  help: `about "..."` is the line `tect create image` shows beside the
+        reference
+
+  x `signed` needs #true or #false
+    ,-[./collections/two/bases.kdl:21:5]
+ 20 |     provides-file "usr/bin/flatpak"
+ 21 |     signed "yes"
+    :     ^^^|^^
+    :        `-- not a boolean
+ 22 | }
+    `----
+  help: `signed #true` records that this base publishes a cosign signature
+
+  x `example.invalid/wrong-names:1` is described twice
+    ,-[./collections/two/bases.kdl:24:1]
+ 23 | 
+ 24 | base "example.invalid/wrong-names:1" {
+    : ^^|^
+    :   `-- already described above
+ 25 |     about "Described twice in one file"
+    `----
+  help: one base is one entry; a second would shadow the first silently
+
+  x `base` describes no `family`
+    ,-[./collections/two/bases.kdl:29:1]
+ 28 | 
+ 29 | base "example.invalid/no-family:1" {
+    : ^^|^
+    :   `-- no family
+ 30 |     about "Nothing to build against"
+    `----
+  help: the family is what an image scaffolded on this base declares, and an
+        entry without one describes nothing the tool can write
+
+  x invalid capability name `Rechunking`
+    ,-[./collections/two/bases.kdl:19:5]
+ 18 |     family "fedora"
+ 19 |     provides "Rechunking"
+    :     ^^^^|^^^
+    :         `-- lowercase, digits and dashes, starting with a letter
+ 20 |     provides-file "usr/bin/flatpak"
+    `----
+  help: the name is written into the generated graph as a mermaid label and a
+        markdown table cell, neither of which quotes anything
+
+  x `usr/bin/flatpak` is not an absolute path
+    ,-[./collections/two/bases.kdl:20:5]
+ 19 |     provides "Rechunking"
+ 20 |     provides-file "usr/bin/flatpak"
+    :     ^^^^^^|^^^^^^
+    :           `-- `provides-file` takes absolute paths
+ 21 |     signed "yes"
+    `----
+  help: the path is checked on the finished image, where nothing has a working
+        directory
+
+  x `example.invalid/shared:1` is described by two collections
+   ,-[./collections/two/bases.kdl:1:1]
+ 1 | base "example.invalid/shared:1" {
+   : ^^|^
+   :   `-- `one` describes it too
+ 2 |     about "And described here too"
+   `----
+  help: one base is one entry: two of them would each write a different family
+        and a different `provides` into an image scaffolded on it, and which
+        one did would depend on the order repo.kdl lists the collections in
+

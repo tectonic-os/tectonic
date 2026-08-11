@@ -1,0 +1,4 @@
+base "example.invalid/shared:1" {
+    about "Described here first"
+    family "fedora"
+}

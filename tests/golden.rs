@@ -437,11 +437,19 @@ fn flows() {
         flow(name, &empty(&format!("{name}-in")), gh, &repo);
     }
 
+    // Sourced, so the picker offers what the collection describes as well as
+    // what the tool ships with.
     flow(
         "flow-create-image",
-        &flow_repo("flow-image"),
+        &flow_repo_sourced("flow-image"),
         None,
         &["--root", ".", "create", "image"],
+    );
+    flow(
+        "flow-check-shadow",
+        &flow_repo_sourced("flow-shadow"),
+        None,
+        &["--root", ".", "check"],
     );
 
     let root = flow_repo("flow-module");
