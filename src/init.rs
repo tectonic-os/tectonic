@@ -11,6 +11,19 @@ const INSTALLED: [&str; 2] = [
     "/usr/share/tectonic/assets",
 ];
 
+/// The collection every repository starts able to import from, written into
+/// repo.kdl as it is. It follows a branch rather than a tag, so it carries no
+/// `sha256` and says so: a tag would version every module in the collection
+/// together, and nothing would cut one per module change.
+pub const SOURCES: &str = "\
+sources {
+    tectonic-os \"https://github.com/tectonic-os/modules/archive/refs/heads/{ref}.tar.gz\" {
+        unpinned \"the collection this tool is published alongside, followed at its branch head\"
+        ref \"main\"
+    }
+}
+";
+
 /// The scaffolding directory, looked for in this order: `TECT_ASSETS`, an
 /// `assets` directory beside the binary, which is how the release tarball
 /// unpacks, then the install paths. First match wins.
@@ -77,7 +90,8 @@ pub fn write(root: &Path, name: &str, assets: &Path) -> Result<(), String> {
         &format!(
             "schema-version {SCHEMA_VERSION}\n\n\
              // renovate: datasource=github-releases depName=tectonic-os/tectonic\n\
-             tect-version \"{TECT_VERSION}\"\n"
+             tect-version \"{TECT_VERSION}\"\n\n\
+             {SOURCES}"
         ),
     )?;
     put(&root.join("README.md"), &format!("# {name}\n"))?;

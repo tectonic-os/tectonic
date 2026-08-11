@@ -44,9 +44,11 @@ pub fn find(root: &Path, sources: &[Collection], name: &str) -> Result<Vec<Found
         ));
     }
     if sources.is_empty() {
-        return Err(
-            "repo.kdl declares no `sources`, so there is no collection to import from".to_string(),
-        );
+        return Err(format!(
+            "repo.kdl declares no `sources`, so there is no collection to import from.\n\n\
+             This is the block `tect create repo` writes:\n\n{}",
+            crate::init::SOURCES
+        ));
     }
 
     let mut searched: Vec<&str> = Vec::new();
