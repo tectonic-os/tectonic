@@ -55,13 +55,22 @@ scripts, shell helpers, disk config and workflows the tool ships and a
 repository does not carry. Into `--root`, else a directory named for the
 repository.
 
-It asks for the name, then the owner, which is your account or org on github
-and not `tectonic-os`; `--owner`. It then offers to create an image, which is
-`create image` run in place, so `--image` and `--base` are that command's
-flags. Last, and only when `gh` is installed, it offers to create the
-repository on github. Nothing about that is a prerequisite: the tree, the image
-and the remote are written in that order, each adding to the one before, and
-`git init`, the first commit and the push are yours.
+It asks for the name, then whether the images are to be built on a schedule.
+That is what a remote is for, so yes asks where the repository is hosted,
+`--host`, which is `github.com` unless the picker or the flag names another,
+and who owns it there, `--owner`, your account or org and not `tectonic-os`.
+The two compose into the origin, which is what the remote and every URL an
+image carries are built from.
+
+On github it then offers to create the repository, and where `gh` is not
+installed or not logged in it says so and what to do about it rather than
+offering. Last it offers to write an image, which is `create image` run in
+place, so `--image` and `--base` are that command's flags.
+
+The tree, the git repository, the image and the remote are written in that
+order, each adding to the one before. `git init` is the tool's, and it is all
+of git that is: the first commit, the remote and the push are yours, and the
+closing lines are the commands for them.
 
 A repository does not nest, and one inside another is refused.
 
