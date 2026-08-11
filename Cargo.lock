@@ -858,6 +858,7 @@ name = "tect"
 version = "0.0.0"
 dependencies = [
  "kdl",
+ "libc",
  "miette",
  "ratatui",
 ]

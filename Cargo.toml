@@ -7,6 +7,7 @@ description = "Reads the image files and the per-module module.kdl manifests"
 
 [dependencies]
 kdl = "6.3.4"
+libc = "0.2"
 miette = { version = "7.6.0", features = ["fancy"] }
 ratatui = { version = "0.30.2", default-features = false, features = ["crossterm"] }
 

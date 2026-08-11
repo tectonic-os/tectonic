@@ -290,6 +290,10 @@ fn write_generated(root: &Path, files: &[(PathBuf, String)]) -> Result<(), Strin
 }
 
 fn main() -> ExitCode {
+    // Rust ignores SIGPIPE, so `tect plan | head` panics on the write rather
+    // than ending the run. Every print here is a person's or a script's.
+    unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
+
     match run() {
         Ok(code) => code,
         Err(error) => {
