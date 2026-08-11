@@ -291,6 +291,48 @@ Also holds [`renovate`](#renovate) and [`manual`](#manual).
 
 <!-- /schema: source -->
 
+## The base catalog
+
+`tect create image` offers the bases it knows: what family each belongs to and
+what it already ships, so an image scaffolded on one lists no module the base
+already carries. The tool ships a seed of them, which is what a repository with
+nothing fetched still has, and a collection extends it with a `bases.kdl` at
+its root, beside the modules.
+
+```kdl
+base "ghcr.io/ublue-os/bazzite:stable" {
+    about "KDE, gaming and hardware support over kinoite-main"
+    family "fedora"
+    provides "rechunking" "flatpak"
+    provides-file "/usr/bin/flatpak"
+    signed #true
+}
+```
+
+An entry wins over the seeded one of the same reference, which is how a stale
+one is corrected without a tool release, and `check` names the collection that
+replaced it. A base two collections describe is an error, the way a collection
+declared twice is. Nothing is fetched to read one: a collection that is not on
+this machine already extends nothing, and the seed is what the picker offers.
+
+<!-- schema: bases -->
+
+### `base`
+
+One base a collection describes, named by the reference an image builds on.
+
+*a string, one per name*
+
+| Node | Takes | Meaning |
+| --- | --- | --- |
+| `about` | a string, exactly one | The line a base picker shows beside the reference. |
+| `family` | a string, exactly one | The family an image built on this base declares, matched against every module's `supports`. |
+| `provides` | one or more strings | Capabilities this base already ships, written into every image scaffolded on it. |
+| `provides-file` | one or more strings | Absolute paths this base guarantees, written into every image scaffolded on it. |
+| `signed` | `#true` or `#false`, at most one | Whether this base publishes a cosign signature, which a scaffolded image records. |
+
+<!-- /schema: bases -->
+
 ## Module manifests
 
 `module.kdl` is the module's whole interface: what it builds on, what it needs
