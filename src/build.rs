@@ -9,7 +9,6 @@ use std::os::unix::fs::PermissionsExt;
 use std::os::unix::process::CommandExt as _;
 use std::path::Path;
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Where the `tect` build stage copies the binary from, so every layer mounts
 /// the release the repository is pinned to.
@@ -74,7 +73,10 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
     let modules: Vec<&Module> = entries.iter().filter_map(|e| e.module.as_ref()).collect();
     let published = published(&list, &target);
 
-    let version = env("IMAGE_VERSION").unwrap_or_else(today);
+    let version = match env("IMAGE_VERSION") {
+        Some(named) => named,
+        None => today()?,
+    };
     let namespace = crate::registry::namespace(root);
     let mut build_args = vec![
         format!("FLAVOUR={}", flavour.unwrap_or_default()),
@@ -319,37 +321,14 @@ fn install(root: &Path) -> Result<(), String> {
 
 /// Today in UTC, as the version an image is stamped with when nothing names
 /// one.
-fn today() -> String {
-    let days = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|since| since.as_secs() / 86_400)
-        .unwrap_or_default() as i64;
-    let (year, month, day) = civil(days);
-    format!("{year:04}{month:02}{day:02}")
-}
-
-/// The civil date `days` after the epoch, by Howard Hinnant's algorithm.
-fn civil(days: i64) -> (i64, i64, i64) {
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z.rem_euclid(146_097);
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let month = if mp < 10 { mp + 3 } else { mp - 9 };
-    (
-        yoe + era * 400 + i64::from(month <= 2),
-        month,
-        doy - (153 * mp + 2) / 5 + 1,
-    )
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn civil_dates() {
-        assert_eq!(super::civil(0), (1970, 1, 1));
-        assert_eq!(super::civil(19_782), (2024, 2, 29));
-        assert_eq!(super::civil(20_000), (2024, 10, 4));
+fn today() -> Result<String, String> {
+    let out = Command::new("date")
+        .args(["-u", "+%Y%m%d"])
+        .output()
+        .map_err(|err| format!("date: {err}"))?;
+    let stamp = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    match out.status.success() && stamp.len() == 8 {
+        true => Ok(stamp),
+        false => Err(format!("date -u +%Y%m%d said `{stamp}`")),
     }
 }
