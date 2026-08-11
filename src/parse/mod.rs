@@ -1,6 +1,7 @@
 //! The only place a KDL type appears. `lint.sh` greps for it.
 
 pub mod asset;
+pub mod bases;
 pub mod disk;
 pub mod image;
 pub mod module;
@@ -26,6 +27,21 @@ pub(crate) fn check_capability(name: &str, span: Span, src: &Source, issues: &mu
             .help(
                 "the name is written into the generated graph as a mermaid label and a markdown \
                  table cell, neither of which quotes anything",
+            ),
+    );
+}
+
+/// A path a base guarantees is checked on the finished image, where nothing has
+/// a working directory for a relative one to be read against.
+pub(crate) fn check_path(path: &str, span: Span, src: &Source, issues: &mut Issues) {
+    if path.starts_with('/') {
+        return;
+    }
+    issues.push(
+        Issue::new(format!("`{path}` is not an absolute path"), src)
+            .at(span, "`provides-file` takes absolute paths")
+            .help(
+                "the path is checked on the finished image, where nothing has a working directory",
             ),
     );
 }

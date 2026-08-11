@@ -154,30 +154,42 @@ pub fn choose(root: &Path, sources: &[Collection], prompt: &Prompt) -> Result<St
     }
 }
 
+/// The collection's tree where it is already on this machine: the directory it
+/// is, or an archive fetched at the hash it is still pinned to. Nothing is
+/// fetched, so a reader that only wants what is there costs no network.
+pub fn cached(root: &Path, collection: &Collection) -> Option<PathBuf> {
+    let dir = match &collection.at {
+        At::Dir(dir) => root.join(dir),
+        At::Archive(remote) => {
+            let pin = root.join(CACHE).join(format!("{}.pin", collection.name));
+            match std::fs::read_to_string(&pin).ok().as_deref() == Some(remote.sha256.as_str()) {
+                true => root.join(CACHE).join(&collection.name),
+                false => return None,
+            }
+        }
+    };
+    dir.is_dir().then_some(dir)
+}
+
 /// The collection's tree on this machine: the directory it already is, or the
 /// pinned archive, fetched and verified once and kept for the next import.
 fn tree(root: &Path, collection: &Collection) -> Result<PathBuf, String> {
+    if let Some(dir) = cached(root, collection) {
+        return Ok(dir);
+    }
     let remote = match &collection.at {
         At::Dir(dir) => {
-            let path = root.join(dir);
-            return match path.is_dir() {
-                true => Ok(path),
-                false => Err(format!(
-                    "`{}` is {}, which is not a directory on this machine",
-                    collection.name,
-                    path.display()
-                )),
-            };
+            return Err(format!(
+                "`{}` is {}, which is not a directory on this machine",
+                collection.name,
+                root.join(dir).display()
+            ))
         }
         At::Archive(remote) => remote,
     };
 
     let dir = root.join(CACHE).join(&collection.name);
     let pin = root.join(CACHE).join(format!("{}.pin", collection.name));
-    if std::fs::read_to_string(&pin).ok().as_deref() == Some(remote.sha256.as_str()) {
-        return Ok(dir);
-    }
-
     let _ = std::fs::remove_dir_all(&dir);
     let url = remote.url_resolved();
     let target = dir.to_string_lossy().into_owned();

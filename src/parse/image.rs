@@ -4,7 +4,8 @@ use crate::diag::{Issue, Issues, Source, Span};
 use crate::model::image::{is_name, Base, Decl, Entry, Flavour, Image, List, NO_FLAVOUR};
 use crate::model::remote::{Remote, REMOTE_DIR};
 use crate::parse::schema::{Arg, Kind, Node, Prop, Say};
-use crate::parse::{bool_arg, check_capability, child, flag, kids, options, prop, remote};
+use crate::parse::{bool_arg, check_capability, check_path, child, flag, kids, options};
+use crate::parse::{prop, remote};
 use crate::parse::{string_arg, string_args, text};
 use kdl::{KdlDocument, KdlNode};
 
@@ -204,13 +205,7 @@ impl Image {
             check_capability(&decl.name, decl.span, src, issues);
         }
         for decl in &base.provides_files {
-            if !decl.name.starts_with('/') {
-                issues.push(
-                    Issue::new(format!("`{}` is not an absolute path", decl.name), src)
-                        .at(decl.span, "`provides-file` takes absolute paths")
-                        .help("the path is checked on the finished image, where nothing has a working directory"),
-                );
-            }
+            check_path(&decl.name, decl.span, src, issues);
         }
 
         self.base = Some(base);

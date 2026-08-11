@@ -2,7 +2,7 @@
 //! already reads.
 
 use crate::parse::schema::{Arg, Kind, Node, Prop};
-use crate::parse::{asset, image, module, options, remote, repo};
+use crate::parse::{asset, bases, image, module, options, remote, repo};
 use std::fmt::Write as _;
 
 /// One splice region. `declared` is false for a grammar whose own node is not
@@ -18,6 +18,7 @@ const SECTIONS: &[Section] = &[
     Section { name: "repo", node: &repo::REPO, declared: false },
     Section { name: "image", node: &image::IMAGE, declared: true },
     Section { name: "source", node: &remote::SOURCE, declared: true },
+    Section { name: "bases", node: &bases::BASES, declared: false },
     Section { name: "module", node: &module::MODULE, declared: false },
     Section { name: "option", node: &options::OPTION, declared: true },
     Section { name: "variant", node: &options::VARIANT, declared: true },
