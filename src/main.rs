@@ -471,10 +471,8 @@ fn run() -> Result<ExitCode, Error> {
                 no_cache_from,
                 cache_to,
             };
-            let refused = tect::build::run(&repo_root(root_arg)?, &opts)?;
-            return Ok(match refused {
-                true => ExitCode::from(REPO_ERROR),
-                false => ExitCode::SUCCESS,
+            return Ok(match tect::build::run(&repo_root(root_arg)?, &opts)? {
+                tect::build::Stopped::Repository => ExitCode::from(REPO_ERROR),
             });
         }
         ["registry", "namespace"] => {

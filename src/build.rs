@@ -27,9 +27,15 @@ pub struct Options {
     pub cache_to: bool,
 }
 
+/// Why a build came back rather than becoming the backend.
+pub enum Stopped {
+    /// The repository is wrong, and every problem was printed.
+    Repository,
+}
+
 /// Fetches, verifies, then replaces this process with the backend. Returns only
 /// when the repository is wrong, having reported why.
-pub fn run(root: &Path, opts: &Options) -> Result<bool, String> {
+pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
     let backend = match opts.backend.clone().or_else(|| env("BUILD_BACKEND")) {
         None => "buildah".to_string(),
         Some(name) if name == "buildx" || name == "buildah" => name,
@@ -43,7 +49,7 @@ pub fn run(root: &Path, opts: &Options) -> Result<bool, String> {
         }
     }
     if issues.report(&context) {
-        return Ok(true);
+        return Ok(Stopped::Repository);
     }
     let target = target(&list, opts.target.as_deref())?;
 
@@ -53,7 +59,7 @@ pub fn run(root: &Path, opts: &Options) -> Result<bool, String> {
     // Never regenerated here: a build proves the committed files are current.
     let gate = crate::run(crate::Command::Verify, None, root);
     if gate.issues.report(&gate.context) {
-        return Ok(true);
+        return Ok(Stopped::Repository);
     }
     eprintln!(
         "tect: {} generated files match the manifests",
