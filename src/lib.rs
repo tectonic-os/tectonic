@@ -121,6 +121,9 @@ pub struct Run {
     /// Seeded bases a collection describes instead. Only `check` looks, since
     /// it is the only command a collection's catalog is any of the business of.
     pub shadowed: Vec<base::Shadow>,
+    /// Collections following a moving ref, which is what makes the repository
+    /// build a different tree tomorrow. `check`'s alone, like `shadowed`.
+    pub unpinned: Vec<String>,
     /// The reading this ran against, so a caller that needs one after a command
     /// acts on what the command saw rather than reading the tree again.
     pub(crate) list: List,
@@ -213,9 +216,16 @@ pub fn run(command: Command, arg: Option<&str>, root: &Path) -> Run {
         context,
     } = load(root);
 
-    let shadowed = match command {
-        Command::Check => base::catalog(root, &list.sources, &mut issues).1,
-        _ => Vec::new(),
+    let (shadowed, unpinned) = match command {
+        Command::Check => (
+            base::catalog(root, &list.sources, &mut issues).1,
+            list.sources
+                .iter()
+                .filter(|c| c.unpinned())
+                .map(|c| c.name.clone())
+                .collect(),
+        ),
+        _ => (Vec::new(), Vec::new()),
     };
 
     if let Some(unknown) = image_arg.filter(|id| !list.images.iter().any(|i| i.id == *id)) {
@@ -326,6 +336,7 @@ pub fn run(command: Command, arg: Option<&str>, root: &Path) -> Run {
         suppressed: list.images.iter().map(|i| i.suppressed.len()).sum(),
         flavours: list.images.iter().map(|i| i.flavours.len()).sum(),
         shadowed,
+        unpinned,
         list,
         resolved,
     }

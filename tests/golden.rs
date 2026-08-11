@@ -456,6 +456,13 @@ fn flows() {
         None,
         &["--root", ".", "check"],
     );
+    // Unsourced, so the collection is the one `create repo` scaffolds.
+    flow(
+        "flow-check-unpinned",
+        &flow_repo("flow-unpinned"),
+        None,
+        &["--root", ".", "check"],
+    );
 
     let root = flow_repo("flow-module");
     let module = ["--root", ".", "create", "module"];

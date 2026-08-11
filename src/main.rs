@@ -576,6 +576,12 @@ fn run() -> Result<ExitCode, Error> {
                 shadow.image
             );
         }
+        for name in &run.unpinned {
+            eprintln!(
+                "tect: `{name}` is unpinned, so an import of it takes whatever its ref holds \
+                 then, unverified"
+            );
+        }
         match run.images {
             0 => eprintln!("tect: no image yet; `tect create image <name>` writes one"),
             _ => eprintln!(
