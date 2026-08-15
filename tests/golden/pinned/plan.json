@@ -59,7 +59,8 @@
               "variant": null,
               "remote": null,
               "description": "An in-tree module beside the pinned one",
-              "options": {}
+              "options": {},
+              "satisfies": []
             },
             {
               "path": "steam-tweaks",
@@ -68,7 +69,8 @@
               "variant": null,
               "remote": "steam-tweaks/v1.2.0",
               "description": "A module fetched from outside this repository",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [],

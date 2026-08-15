@@ -1,5 +1,5 @@
 1 modules, the ungated set.
 
-| Module | Description | Options |
-| --- | --- | --- |
-| `core/hello` | The smallest module a repository can hold |  |
+| Module | Description | Options | Satisfies |
+| --- | --- | --- | --- |
+| `core/hello` | The smallest module a repository can hold |  |  |

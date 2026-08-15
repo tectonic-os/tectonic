@@ -60,7 +60,8 @@
               "variant": null,
               "remote": null,
               "description": "Reads FLAVOUR from a fragment listed above the gate",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [],
@@ -94,7 +95,8 @@
               "variant": null,
               "remote": null,
               "description": "Reads FLAVOUR from a fragment listed above the gate",
-              "options": {}
+              "options": {},
+              "satisfies": []
             },
             {
               "path": "core/silent",
@@ -103,7 +105,8 @@
               "variant": null,
               "remote": null,
               "description": "Runs from a gated fragment that carries no gate",
-              "options": {}
+              "options": {},
+              "satisfies": []
             },
             {
               "path": "core/mismatched",
@@ -112,7 +115,8 @@
               "variant": null,
               "remote": null,
               "description": "Gates its fragment on a flavour it is not listed under",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [],

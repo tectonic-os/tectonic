@@ -57,7 +57,8 @@
               "variant": null,
               "remote": null,
               "description": "A module no declared collection provides",
-              "options": {}
+              "options": {},
+              "satisfies": []
             },
             {
               "path": "steam-tweaks",
@@ -66,7 +67,8 @@
               "variant": null,
               "remote": "steam-tweaks/v1.2.0",
               "description": "A module pinned to a source of its own",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [],

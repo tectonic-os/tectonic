@@ -50,7 +50,8 @@
               "variant": null,
               "remote": null,
               "description": "Requires a capability nothing in this image provides",
-              "options": {}
+              "options": {},
+              "satisfies": []
             },
             {
               "path": "core/two",
@@ -59,7 +60,8 @@
               "variant": null,
               "remote": null,
               "description": "Provides what the base already provides",
-              "options": {}
+              "options": {},
+              "satisfies": []
             },
             {
               "path": "core/three",
@@ -68,7 +70,8 @@
               "variant": null,
               "remote": null,
               "description": "Provides the same capability as another enabled module",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [],

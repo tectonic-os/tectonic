@@ -14,6 +14,14 @@ pub struct PackageGroup {
     pub span: Span,
 }
 
+/// A benchmark and the rules within it this module claims to satisfy. The
+/// tool records the claim; a later phase verifies it with `oscap`.
+pub struct Coverage {
+    pub benchmark: String,
+    pub rules: Vec<String>,
+    pub span: Span,
+}
+
 /// A capability or contract path, and where it was declared.
 pub struct Decl {
     pub name: String,
@@ -105,6 +113,7 @@ pub struct Module {
     /// Packages keyed to base family, installed by the generator before
     /// module.sh runs.
     pub packages: Vec<PackageGroup>,
+    pub satisfies: Vec<Coverage>,
     /// Resolved option name to value, ready to become env on the layer.
     pub resolved: Vec<(String, String)>,
     /// A Containerfile.inc, inlined verbatim, for a module whose needs the

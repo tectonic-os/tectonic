@@ -49,7 +49,8 @@
               "variant": null,
               "remote": null,
               "description": "Assembles every contributed justfile fragment into one file",
-              "options": {}
+              "options": {},
+              "satisfies": []
             },
             {
               "path": "core/power",
@@ -58,7 +59,8 @@
               "variant": null,
               "remote": null,
               "description": "Power recipes, contributed to the menu after the defaults",
-              "options": {}
+              "options": {},
+              "satisfies": []
             },
             {
               "path": "core/network",
@@ -67,7 +69,8 @@
               "variant": null,
               "remote": null,
               "description": "Network recipes, contributed to the menu before the defaults",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [],

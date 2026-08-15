@@ -109,3 +109,4 @@ sources {
 module "tectonic-os/hello"
 module "tectonic-os/flatpak" variant="beta"
 module "tectonic-os/drivers" flavour="nvidia"
+==== generated/plan.json

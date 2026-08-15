@@ -49,7 +49,8 @@
               "variant": null,
               "remote": null,
               "description": "The smallest module a repository can hold",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [],

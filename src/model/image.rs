@@ -176,6 +176,8 @@ pub struct List {
     pub pr_image_id: Option<String>,
     /// The image this repository publishes a seed of, when it publishes one.
     pub seed: Option<Seed>,
+    /// Whether a build stamps the generated manifest onto the image as an OCI label.
+    pub manifest_label: bool,
     /// What repo.kdl declares, which is `SCHEMA_VERSION` or the load failed.
     pub schema_version: Option<u32>,
     /// Whether the node was there at all, so a malformed one is reported once

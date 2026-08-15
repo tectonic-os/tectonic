@@ -50,7 +50,22 @@
               "variant": null,
               "remote": null,
               "description": "A kernel that signs its own modules against a Secure Boot key",
-              "options": {}
+              "options": {},
+              "satisfies": [
+                {
+                  "benchmark": "cis-fedora",
+                  "rules": [
+                    "1.1.1.1",
+                    "5.2.20"
+                  ]
+                },
+                {
+                  "benchmark": "stig",
+                  "rules": [
+                    "RHEL-09-232010"
+                  ]
+                }
+              ]
             },
             {
               "path": "drivers/kvmfr",
@@ -59,7 +74,8 @@
               "variant": null,
               "remote": null,
               "description": "A DKMS module built and signed against the kernel above",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [],

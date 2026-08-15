@@ -60,7 +60,8 @@
               "variant": null,
               "remote": null,
               "description": "A module this repository writes and publishes",
-              "options": {}
+              "options": {},
+              "satisfies": []
             },
             {
               "path": "tectonic-os/flatpak",
@@ -72,7 +73,8 @@
               "options": {
                 "OPT_REMOTES": "flathub flathub-beta",
                 "OPT_SYSTEM_WIDE": "0"
-              }
+              },
+              "satisfies": []
             }
           ],
           "suppressed": [],
@@ -110,7 +112,8 @@
               "variant": null,
               "remote": null,
               "description": "A module this repository writes and publishes",
-              "options": {}
+              "options": {},
+              "satisfies": []
             },
             {
               "path": "tectonic-os/flatpak",
@@ -122,7 +125,8 @@
               "options": {
                 "OPT_REMOTES": "flathub flathub-beta",
                 "OPT_SYSTEM_WIDE": "0"
-              }
+              },
+              "satisfies": []
             },
             {
               "path": "drivers",
@@ -131,7 +135,8 @@
               "variant": null,
               "remote": null,
               "description": "A module only one flavour builds",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [],

@@ -61,3 +61,4 @@ sources {
 }
 
 module "tectonic-os/hello"
+==== generated/plan.json

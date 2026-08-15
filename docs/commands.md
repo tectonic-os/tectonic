@@ -235,10 +235,14 @@ exit code.
 ### `generate`
 
 Writes, under `generated/`, the Containerfile for each image, the per-module
-build scripts, both renderings of the capability graph, and, when `repo.kdl`
-nominates a seedable image, the `seed.kdl` a new repository starts from. Lists
-what it wrote. The directory is cleared first, so an image or a module that is gone
-leaves with its files. `generated/` is tracked; `out/` is scratch and ignored.
+build scripts, both renderings of the capability graph, `plan.json` (the same
+document `plan --json` prints), and, when `repo.kdl` nominates a seedable
+image, the `seed.kdl` a new repository starts from. Lists what it wrote. The
+directory is cleared first, so an image or a module that is gone leaves with
+its files. `generated/` is tracked; `out/` is scratch and ignored. The
+Containerfile bakes `plan.json` into the image at
+`/usr/share/tectonic/manifest.json`, so a built image can answer what it is
+made of without the repository that built it.
 
 ### `build [target]`
 

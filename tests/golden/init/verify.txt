@@ -1,17 +1,17 @@
 ==== as generated
 ==== edited by hand
-  x `generated/example` is not what this repository generates
-    ,-[generated/example:24:1]
- 23 | # ---- image version ----
- 24 | ARG IMAGE_VERSION=by-hand
-    : ^^^^^^^^^^^^|^^^^^^^^^^^^
-    :             `-- generated: ARG IMAGE_VERSION=dev
- 25 | 
-    `----
+  x `generated/plan.json` is not what this repository generates
+   ,-[generated/plan.json:2:1]
+ 1 | {
+ 2 |   "schema_version": 0,
+   : ^^^^^^^^^^^|^^^^^^^^^^
+   :            `-- generated:   "schema_version": 1,
+ 3 |   "default_image": "example",
+   `----
   help: run `tect generate` and commit what it writes
 
 ==== gone, and one nobody claims
-  x `generated/example` is not there
+  x `generated/plan.json` is not there
   help: run `tect generate` and commit what it writes
 
   x nothing generates `generated/leftover`

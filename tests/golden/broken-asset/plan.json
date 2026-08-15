@@ -68,7 +68,8 @@
               "variant": null,
               "remote": null,
               "description": "Asset pins that say nothing usable about what they fetch",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [],

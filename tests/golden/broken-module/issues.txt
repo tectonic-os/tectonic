@@ -38,8 +38,37 @@
  3 | drives "a truck"
    : ^^^|^^
    :    `-- not part of the schema
+ 4 | satisfies {
    `----
   help: docs/schema.md documents every node a manifest may hold
+
+  x `cis-fedora` has no rules listed
+   ,-[./modules/core/nameless/module.kdl:5:5]
+ 4 | satisfies {
+ 5 |     cis-fedora
+   :     ^^^^^|^^^^
+   :          `-- nothing to cover
+ 6 |     "" "1.1.1.1"
+   `----
+
+  x benchmark `stig` is declared twice
+   ,-[./modules/core/nameless/module.kdl:8:5]
+ 7 |     stig "R1"
+ 8 |     stig "R2"
+   :     ^^|^
+   :       `-- already declared above
+ 9 | }
+   `----
+
+  x a benchmark name is required inside `satisfies`
+   ,-[./modules/core/nameless/module.kdl:6:5]
+ 5 |     cis-fedora
+ 6 |     "" "1.1.1.1"
+   :     ^|
+   :      `-- empty name
+ 7 |     stig "R1"
+   `----
+  help: `satisfies { cis-fedora "1.1.1.1" }`
 
   x `core/nameless` declares no description
   help: one line, present tense, no trailing period; it names the module in

@@ -274,6 +274,9 @@ fn walk(children: &[KdlNode], schema: &Node, here: Span, src: &Source, issues: &
             true => Some(name),
             false => match sub.unique.silent() {
                 true => None,
+                // An author-named child is keyed by its own name, since its
+                // arguments are the payload rather than the identity.
+                false if sub.name.is_empty() => (!string_args(child).is_empty()).then_some(name),
                 false => string_arg(child),
             },
         };

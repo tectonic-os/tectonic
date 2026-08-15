@@ -49,7 +49,8 @@
               "variant": null,
               "remote": null,
               "description": "A module both images in this repository enable",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [],
@@ -123,7 +124,8 @@
               "variant": null,
               "remote": null,
               "description": "A module both images in this repository enable",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [],
@@ -165,7 +167,8 @@
               "variant": null,
               "remote": null,
               "description": "A module both images in this repository enable",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [],
@@ -207,7 +210,8 @@
               "variant": null,
               "remote": null,
               "description": "A module both images in this repository enable",
-              "options": {}
+              "options": {},
+              "satisfies": []
             },
             {
               "path": "core/dev-tools",
@@ -216,7 +220,8 @@
               "variant": null,
               "remote": null,
               "description": "Compilers and language servers, behind the dev flavour",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [],

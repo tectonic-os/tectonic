@@ -1,3 +1,9 @@
 provides "shell-tools"
 
 drives "a truck"
+satisfies {
+    cis-fedora
+    "" "1.1.1.1"
+    stig "R1"
+    stig "R2"
+}

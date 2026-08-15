@@ -52,7 +52,8 @@
               "variant": null,
               "remote": null,
               "description": "A flatpak application, which the base satisfies the runtime for",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [
@@ -66,7 +67,8 @@
               "options": {
                 "OPT_REMOTES": "flathub flathub-beta",
                 "OPT_SYSTEM_WIDE": "0"
-              }
+              },
+              "satisfies": []
             }
           ],
           "secrets": [],

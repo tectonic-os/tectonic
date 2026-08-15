@@ -59,7 +59,8 @@
               "variant": null,
               "remote": "",
               "description": "",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [],

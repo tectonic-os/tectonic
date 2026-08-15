@@ -65,7 +65,8 @@
               "variant": null,
               "remote": null,
               "description": "A module in a repository whose flavours are wrong",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [],
@@ -103,7 +104,8 @@
               "variant": null,
               "remote": null,
               "description": "A module in a repository whose flavours are wrong",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [],
@@ -137,7 +139,8 @@
               "variant": null,
               "remote": null,
               "description": "A module in a repository whose flavours are wrong",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [],

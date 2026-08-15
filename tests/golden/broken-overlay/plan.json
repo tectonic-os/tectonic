@@ -49,7 +49,8 @@
               "variant": null,
               "remote": null,
               "description": "Ships a file a later module ships too",
-              "options": {}
+              "options": {},
+              "satisfies": []
             },
             {
               "path": "core/second",
@@ -58,7 +59,8 @@
               "variant": null,
               "remote": null,
               "description": "Ships the same path without saying so",
-              "options": {}
+              "options": {},
+              "satisfies": []
             },
             {
               "path": "core/third",
@@ -67,7 +69,8 @@
               "variant": null,
               "remote": null,
               "description": "Overrides a path no earlier module ships",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [],

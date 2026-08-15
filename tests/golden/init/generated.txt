@@ -37,6 +37,8 @@ RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
 
 # ---- END GENERATED ----
 
+COPY --from=ctx /generated/plan.json /usr/share/tectonic/manifest.json
+
 ARG CONTRACT_FILES=""
 ARG VERIFY_EXCEPTIONS=""
 ARG MODULE_PRESETS=""
@@ -98,3 +100,4 @@ graph LR
   "overrides": [],
   "suppressed": []
 }
+==== generated/plan.json

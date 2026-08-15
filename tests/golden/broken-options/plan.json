@@ -52,7 +52,8 @@
               "options": {
                 "OPT_FONTS": "JetBrainsMono",
                 "OPT_STARSHIP": "1"
-              }
+              },
+              "satisfies": []
             }
           ],
           "suppressed": [],

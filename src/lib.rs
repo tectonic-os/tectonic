@@ -290,6 +290,10 @@ pub fn run(command: Command, arg: Option<&str>, root: &Path) -> Run {
             files.extend(emit::graph::files(image));
         }
         files.extend(emit::seed::file(&list));
+        files.push((
+            PathBuf::from("generated").join("plan.json"),
+            emit::plan::build(&list, &resolved, &workflows).render(),
+        ));
     }
 
     if command == Command::Verify {

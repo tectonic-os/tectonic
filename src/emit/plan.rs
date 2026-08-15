@@ -289,6 +289,21 @@ fn module(entry: &Entry) -> Json {
                     .map(|(name, value)| (name.clone(), Json::string(value))),
             ),
         ),
+        (
+            "satisfies",
+            Json::array(
+                module
+                    .map(|m| m.satisfies.as_slice())
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|coverage| {
+                        Json::object([
+                            ("benchmark", Json::string(&coverage.benchmark)),
+                            ("rules", Json::strings(&coverage.rules)),
+                        ])
+                    }),
+            ),
+        ),
     ])
 }
 

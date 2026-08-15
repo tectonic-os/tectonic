@@ -1,5 +1,5 @@
 1 modules, the ungated set.
 
-| Module | Description | Options |
-| --- | --- | --- |
-| `loose` `remote=main` |  |  |
+| Module | Description | Options | Satisfies |
+| --- | --- | --- | --- |
+| `loose` `remote=main` |  |  |  |

@@ -15,3 +15,8 @@ requires "initramfs-generation"
 
 arg "KERNEL"
 secret "mok_privkey"
+
+satisfies {
+    cis-fedora "1.1.1.1" "5.2.20"
+    stig "RHEL-09-232010"
+}

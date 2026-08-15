@@ -50,7 +50,12 @@ fn capture(name: &str, root: &Path) {
     // `generate` writes nothing here: what it produced is on the run.
     let mut generated = String::new();
     for (path, body) in &tect::run(Command::Generate, None, here).files {
-        generated.push_str(&format!("==== {}\n{body}", path.display()));
+        // plan.json's body is already golden-covered on its own.
+        if path == std::path::Path::new("generated/plan.json") {
+            generated.push_str(&format!("==== {}\n", path.display()));
+        } else {
+            generated.push_str(&format!("==== {}\n{body}", path.display()));
+        }
     }
     compare(name, "generated.txt", &generated);
 }
@@ -93,14 +98,14 @@ fn verify(name: &str, root: &Path) {
 
     let mut out = format!("==== as generated\n{}", issues());
 
-    let containerfile = &run.files[0].0;
-    let edited = std::fs::read_to_string(containerfile)
+    let manifest = Path::new("generated/plan.json");
+    let edited = std::fs::read_to_string(manifest)
         .unwrap()
-        .replace("ARG IMAGE_VERSION=dev", "ARG IMAGE_VERSION=by-hand");
-    std::fs::write(containerfile, edited).unwrap();
+        .replace("\"schema_version\": 1", "\"schema_version\": 0");
+    std::fs::write(manifest, edited).unwrap();
     out.push_str(&format!("==== edited by hand\n{}", issues()));
 
-    std::fs::remove_file(containerfile).unwrap();
+    std::fs::remove_file(manifest).unwrap();
     std::fs::write("generated/leftover", "").unwrap();
     out.push_str(&format!("==== gone, and one nobody claims\n{}", issues()));
 

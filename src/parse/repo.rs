@@ -5,7 +5,7 @@ use crate::model::image::{List, Seed, WorkflowToggle, REPO_FILE, SCHEMA_VERSION,
 use crate::parse::image::IMAGE;
 use crate::parse::remote::{parse_collection, COLLECTION};
 use crate::parse::schema::{check_doc, Arg, Kind, Node, Prop, Say};
-use crate::parse::{boolean, int_arg, kids, prop, string_arg, syntax_issue};
+use crate::parse::{bool_arg, boolean, child, int_arg, kids, prop, string_arg, syntax_issue};
 use kdl::{KdlDocument, KdlNode};
 use std::path::Path;
 
@@ -80,10 +80,25 @@ pub const REPO: Node = Node::new("repo",
             .empty(Say::new("`sources` has no collections in it", "empty block",
                 "omit the block entirely; a repository with nothing here imports from nothing"))
             .children(&[COLLECTION], Say::NONE),
+        Node::new("manifest",
+            "Whether a build stamps the generated manifest onto the image as an OCI label.")
+            .once("a second block would split one setting in two")
+            .empty(Say::new("`manifest` has no `label` in it", "empty block",
+                "omit the block entirely; a build with nothing here stamps no label"))
+            .children(&[
+                Node::new("label",
+                    "Whether the build stamps `org.tectonic.manifest` with the path to the \
+                     baked manifest file.")
+                    .arg(Arg::Bool, Say::new("`label` needs #true or #false", "not a boolean",
+                        "`label #true` stamps the built image with an `org.tectonic.manifest` \
+                         label"))
+                    .once(""),
+            ], Say::new("unknown node `{}` in manifest", "not part of the schema",
+                "a manifest block holds `label`")),
     ], Say::new("unknown node `{}` in repo.kdl", "not part of the schema",
         "repo.kdl holds `schema-version`, `tect-version`, `default-image`, `pr-image`, `seed`, a \
-         `workflows` block and a `sources` block: what is true of the repository rather than of \
-         any image in it. An image goes in a file of its own"));
+         `workflows` block, a `sources` block and a `manifest` block: what is true of the \
+         repository rather than of any image in it. An image goes in a file of its own"));
 
 /// Every other root `.kdl`, which is one image and nothing else.
 #[rustfmt::skip]
@@ -193,6 +208,7 @@ impl List {
             default_image_id: None,
             pr_image_id: None,
             seed: None,
+            manifest_label: false,
             schema_version: None,
             schema_version_seen: false,
             repo_src: Source::new(root.join(REPO_FILE).display().to_string(), ""),
@@ -285,6 +301,9 @@ impl List {
                 (true, "schema-version") => {
                     self.schema_version_seen = true;
                     self.schema_version = int_arg(node).map(|_| SCHEMA_VERSION);
+                }
+                (true, "manifest") => {
+                    self.manifest_label = child(node, "label").and_then(bool_arg).unwrap_or(false);
                 }
                 _ => {}
             }
@@ -565,6 +584,18 @@ colour "blue"
     fn an_empty_workflows_block_is_a_block_with_nothing_in_it() {
         let found = messages("schema-version 1\nworkflows { }\n");
         assert_eq!(found, ["`workflows` has no workflows in it"]);
+    }
+
+    #[test]
+    fn manifest_label_is_off_unless_declared() {
+        let read = |text: &str| {
+            let mut list = List::empty(Path::new("."));
+            let mut issues = Issues::default();
+            list.parse_file(&Source::new(REPO_FILE, text), text, true, &mut issues);
+            list.manifest_label
+        };
+        assert!(!read("schema-version 1\n"));
+        assert!(read("schema-version 1\nmanifest {\n    label #true\n}\n"));
     }
 
     /// The collection table, which the broken fixture reaches the meaning of

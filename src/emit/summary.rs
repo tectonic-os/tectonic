@@ -16,7 +16,7 @@ pub fn render(list: &List, target: &str) -> Option<String> {
             entries.iter().filter(|e| e.flavour.is_some()).count()
         ),
     };
-    out.push_str("\n| Module | Description | Options |\n| --- | --- | --- |\n");
+    out.push_str("\n| Module | Description | Options | Satisfies |\n| --- | --- | --- | --- |\n");
 
     for entry in entries {
         let module = entry.module.as_ref();
@@ -41,7 +41,24 @@ pub fn render(list: &List, target: &str) -> Option<String> {
             .iter()
             .map(|(name, value)| format!("`{name}=\"{}\"`", cell(value)))
             .collect();
-        let _ = writeln!(out, " | {} |", options.join(" "));
+        let satisfies: Vec<String> = module
+            .map(|m| m.satisfies.as_slice())
+            .unwrap_or_default()
+            .iter()
+            .map(|coverage| {
+                format!(
+                    "`{}: {}`",
+                    cell(&coverage.benchmark),
+                    coverage
+                        .rules
+                        .iter()
+                        .map(|rule| cell(rule))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            })
+            .collect();
+        let _ = writeln!(out, " | {} | {} |", options.join(" "), satisfies.join(" "));
     }
     Some(out)
 }

@@ -15,9 +15,9 @@
    :    `-- not part of the schema
    `----
   help: repo.kdl holds `schema-version`, `tect-version`, `default-image`, `pr-
-        image`, `seed`, a `workflows` block and a `sources` block: what is
-        true of the repository rather than of any image in it. An image goes
-        in a file of its own
+        image`, `seed`, a `workflows` block, a `sources` block and a
+        `manifest` block: what is true of the repository rather than of any
+        image in it. An image goes in a file of its own
 
   x unknown top-level node `palette`
    ,-[./second.kdl:1:1]

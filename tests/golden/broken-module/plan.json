@@ -49,7 +49,25 @@
               "variant": null,
               "remote": null,
               "description": "",
-              "options": {}
+              "options": {},
+              "satisfies": [
+                {
+                  "benchmark": "cis-fedora",
+                  "rules": []
+                },
+                {
+                  "benchmark": "stig",
+                  "rules": [
+                    "R1"
+                  ]
+                },
+                {
+                  "benchmark": "stig",
+                  "rules": [
+                    "R2"
+                  ]
+                }
+              ]
             },
             {
               "path": "core/missing",
@@ -58,7 +76,8 @@
               "variant": null,
               "remote": null,
               "description": "",
-              "options": {}
+              "options": {},
+              "satisfies": []
             }
           ],
           "suppressed": [],

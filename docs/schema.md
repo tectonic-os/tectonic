@@ -177,6 +177,16 @@ Also holds [`renovate`](#renovate) and [`manual`](#manual).
 | `sha256` | a string, at most one | What the fetched archive is verified against. |
 | `path` | a string, at most one | The directory inside the archive the modules sit in, when they are not at its root. |
 
+### `manifest`
+
+Whether a build stamps the generated manifest onto the image as an OCI label.
+
+*at most one, never empty*
+
+| Node | Takes | Meaning |
+| --- | --- | --- |
+| `label` | `#true` or `#false`, at most one | Whether the build stamps `org.tectonic.manifest` with the path to the baked manifest file. |
+
 <!-- /schema: repo -->
 
 ## Image files
@@ -548,6 +558,16 @@ One base family, and the packages to install on it.
 | Property | Value | Meaning |
 | --- | --- | --- |
 | `enablerepo=` | a string | A repository enabled for this install and disabled otherwise. |
+
+### `satisfies`
+
+The benchmarks and rules this module claims to harden, as an audit declaration the tool records rather than certifies.
+
+*at most one*
+
+| Node | Takes | Meaning |
+| --- | --- | --- |
+| `<name>` | one or more strings, one per name | One benchmark, and the rule IDs it covers. |
 
 <!-- /schema: module -->
 
