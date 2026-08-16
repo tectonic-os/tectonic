@@ -107,6 +107,7 @@
           "assets": [],
           "provides_files": {},
           "overlay_files": {},
+          "overlay_overridden": [],
           "collected_files": {
             "core/power": [
               {

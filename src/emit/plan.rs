@@ -247,6 +247,10 @@ fn target(list: &List, image: &Image, resolved: &Resolved, target: &Target) -> J
             overlay_files(image, &resolved.shipped, flavour),
         ),
         (
+            "overlay_overridden",
+            overridden(image, &resolved.shipped, flavour),
+        ),
+        (
             "collected_files",
             Json::map(entries.iter().filter_map(|entry| {
                 resolved.collected.by_module.get(&entry.path).map(|staged| {
@@ -402,6 +406,32 @@ fn overlay_files(image: &Image, shipped: &overlay::Index, flavour: Option<&str>)
             .find(|owner| in_target(owner, flavour))
             .map(|owner| (path.clone(), Json::string(&owner.path)))
     }))
+}
+
+/// Every path a module ships that another module's overlay replaced, to the
+/// module whose copy the image actually carries. A claim about a file its
+/// claimant no longer owns is a composition failure rather than a false claim,
+/// and this is what tells the two apart.
+fn overridden(image: &Image, shipped: &overlay::Index, flavour: Option<&str>) -> Json {
+    let mut out: Vec<Json> = Vec::new();
+    for (path, owners) in shipped {
+        let here: Vec<usize> = owners
+            .iter()
+            .copied()
+            .filter(|&owner| in_target(&image.entries[owner], flavour))
+            .collect();
+        let Some((&winner, losers)) = here.split_last() else {
+            continue;
+        };
+        for &loser in losers {
+            out.push(Json::object([
+                ("path", Json::string(path)),
+                ("module", Json::string(&image.entries[loser].path)),
+                ("by", Json::string(&image.entries[winner].path)),
+            ]));
+        }
+    }
+    Json::Array(out)
 }
 
 /// The preset files the target's overlays put in the image, which is what the

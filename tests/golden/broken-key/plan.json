@@ -75,6 +75,7 @@
             "/usr/share/secureboot/sb_cert.der": "core/keys"
           },
           "overlay_files": {},
+          "overlay_overridden": [],
           "collected_files": {},
           "collect_destinations": []
         }

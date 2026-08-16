@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<asset-report-collection xmlns="http://scap.nist.gov/schema/asset-reporting-format/1.1">
+  <TestResult xmlns="http://checklists.nist.gov/xccdf/1.2" id="xccdf_org.open-scap_testresult_default">
+    <rule-result idref="xccdf_org.ssgproject.content_rule_package_aide_installed">
+      <result>pass</result>
+    </rule-result>
+    <rule-result idref="xccdf_org.ssgproject.content_rule_sshd_disable_root_login">
+      <result>fail</result>
+    </rule-result>
+  </TestResult>
+</asset-report-collection>

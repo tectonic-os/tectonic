@@ -465,6 +465,34 @@ this module ships one. Each contribution is staged as
 order, so what the assembled file looks like does not depend on when its
 contributors built.
 
+`satisfies` is a claim, not a measurement. A module knows what it hardens, so
+the claim belongs at the module that makes it true; the scan can only confirm
+it after the fact.
+
+```kdl
+satisfies {
+    cis-fedora "1.1.1.1" "5.2.20"
+    stig "RHEL-09-232010"
+}
+```
+
+The node name is the benchmark and the strings are its rule numbers. The
+benchmark set is open, because CIS, STIG and whatever a downstream standard is
+called are not a set this tool can close.
+
+`generate` writes every claim into `generated/plan.json`, and the compliance
+job in `.github/workflows/build.yml` reads it back, resolves each number to an
+XCCDF rule id through the SSG datastream, scans the pushed image and compares.
+Three things it distinguishes: a number that maps to no rule is a failure of
+the **declaration**; a rule the image fails is a **false claim**; and a rule
+the image fails where another module's overlay owns the final copy of a file
+this one ships is a **composition** that defeats a claim that was honest. The
+last is why `plan.json` carries `overlay_overridden`.
+
+A target whose modules declare nothing is not scanned and says so. Only
+`.modules[]` is read, never `.suppressed[]`: a module the base displaced
+contributes no layer, so its claims are about an image this is not.
+
 <!-- schema: module -->
 
 Also holds [`option`](#option), [`variant`](#variant) and [`asset`](#asset).

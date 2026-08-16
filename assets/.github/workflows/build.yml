@@ -190,6 +190,9 @@ jobs:
         with:
           ref: ${{ needs.checksums.outputs.ref }}
 
+      - name: Run the scan logic tests
+        run: ./tests/scan-test.sh
+
       - name: Discover and run kernel-freshness tests
         run: |
           mapfile -t dirs < <(find modules -name test_kernel_freshness.py -type f -exec dirname {} \; | sort -u)
@@ -580,6 +583,21 @@ jobs:
           COSIGN_EXPERIMENTAL: false
           COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
 
+      - name: Record the digest for the scan
+        if: env.PUBLISH == 'true'
+        run: |
+          set -euo pipefail
+          echo "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}" \
+            > "${RUNNER_TEMP}/digest.txt"
+
+      - name: Upload the digest
+        if: env.PUBLISH == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: digest-${{ matrix.target }}
+          path: ${{ runner.temp }}/digest.txt
+          retention-days: 1
+
       - name: Verify signature and attestation
         if: env.PUBLISH == 'true'
         run: |
@@ -592,3 +610,199 @@ jobs:
           cosign verify-attestation --key "$key" --type spdxjson \
             --insecure-ignore-tlog=true "${IMAGE_DIGEST}" > /dev/null
 
+
+  scan:
+    needs: [checksums, compute-matrix, build_push]
+    name: Scan the claims (${{ matrix.target }})
+    runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request'
+
+    strategy:
+      matrix:
+        target: ${{ fromJson(needs.compute-matrix.outputs.targets) }}
+      fail-fast: false
+
+    permissions:
+      contents: read
+      packages: read
+      id-token: write
+      attestations: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.checksums.outputs.ref }}
+
+      - name: What this target claims
+        id: claims
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          plan=generated/plan.json
+          ./scripts/scan.sh claims "$plan" "$TARGET" > "${RUNNER_TEMP}/claims.txt"
+          count="$(wc -l < "${RUNNER_TEMP}/claims.txt")"
+          {
+            echo "count=${count}"
+            echo "enforce=$(./scripts/scan.sh enforced "$plan")"
+          } >> "$GITHUB_OUTPUT"
+          if [ "$count" -eq 0 ]; then
+            echo "No module in ${TARGET} declares \`satisfies\`, so there is nothing to scan." \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Download the digest
+        if: steps.claims.outputs.count != '0'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: digest-${{ matrix.target }}
+          path: ${{ runner.temp }}
+
+      - name: Split the digest
+        if: steps.claims.outputs.count != '0'
+        run: |
+          set -euo pipefail
+          ref="$(cat "${RUNNER_TEMP}/digest.txt")"
+          {
+            echo "IMAGE_REF=${ref}"
+            echo "SUBJECT_NAME=${ref%@*}"
+            echo "SUBJECT_DIGEST=${ref##*@}"
+          } >> "$GITHUB_ENV"
+
+      - name: Install openscap and the SSG content
+        if: steps.claims.outputs.count != '0'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            openscap-utils ssg-base ssg-debian ssg-nondebian
+
+      - name: Scan the image
+        if: steps.claims.outputs.count != '0'
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          # The content is per family, and picking the first file on disk would
+          # scan a Fedora image against Debian rules and call every claim false.
+          family="$(jq -r --arg t "$TARGET" '
+            .images[] | select([.targets[].name] | index($t)) | .base.family
+          ' generated/plan.json)"
+          case "$family" in
+            fedora) content=ssg-fedora-ds.xml ;;
+            debian) content=ssg-debian12-ds.xml ;;
+            ubuntu) content=ssg-ubuntu2404-ds.xml ;;
+            *) echo "::error::no SSG content is known for the ${family} family"; exit 1 ;;
+          esac
+          datastream="/usr/share/xml/scap/ssg/content/${content}"
+          [ -s "$datastream" ] || { echo "::error::${datastream} is not installed"; exit 1; }
+          echo "DATASTREAM=${datastream}" >> "$GITHUB_ENV"
+
+          sudo podman pull "$IMAGE_REF"
+          # No profile: the declared rules are what is being checked, so every
+          # rule is evaluated and the claims are compared against the results.
+          # oscap exits non-zero whenever any rule fails, which is expected.
+          sudo oscap-podman "$IMAGE_REF" xccdf eval \
+            --profile '(all)' \
+            --results-arf "${RUNNER_TEMP}/arf.xml" \
+            "$datastream" || true
+          [ -s "${RUNNER_TEMP}/arf.xml" ] || { echo "::error::the scan wrote no report"; exit 1; }
+
+      - name: Compare the claims to the results
+        if: steps.claims.outputs.count != '0'
+        env:
+          TARGET: ${{ matrix.target }}
+          ENFORCE: ${{ steps.claims.outputs.enforce }}
+        run: |
+          set -euo pipefail
+          plan=generated/plan.json
+          arf="${RUNNER_TEMP}/arf.xml"
+          bad=0
+          {
+            echo "## Declared coverage, measured"
+            echo
+            echo "| Module | Benchmark | Rule | Result |"
+            echo "| --- | --- | --- | --- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          while IFS='|' read -r module benchmark rule; do
+            [ -n "$rule" ] || continue
+            if ! id="$(./scripts/scan.sh rule-id "$DATASTREAM" "$rule" 2>/dev/null)"; then
+              echo "| ${module} | ${benchmark} | ${rule} | **maps to nothing** |" \
+                >> "$GITHUB_STEP_SUMMARY"
+              echo "::error file=modules/${module}/module.kdl::${benchmark} ${rule} maps to no rule in the datastream. The declaration is wrong, not the image."
+              bad=1
+              continue
+            fi
+            outcome="$(./scripts/scan.sh result "$arf" "$id")"
+            echo "| ${module} | ${benchmark} | ${rule} | ${outcome} |" >> "$GITHUB_STEP_SUMMARY"
+            [ "$outcome" = "fail" ] || continue
+
+            # A claim whose files another module replaced is a composition
+            # failure. The claimant is honest and the image is not compliant.
+            lost="$(./scripts/scan.sh blame "$plan" "$TARGET" "$module")"
+            if [ -n "$lost" ]; then
+              while IFS='|' read -r path by; do
+                [ -n "$path" ] || continue
+                echo "::error::${module} claims ${benchmark} ${rule} and the image fails it, but ${by} owns the final ${path}. The claim is not contradicted; this composition defeats it."
+              done <<< "$lost"
+            else
+              echo "::error file=modules/${module}/module.kdl::${module} claims ${benchmark} ${rule} and the image fails it."
+            fi
+            bad=1
+          done < "${RUNNER_TEMP}/claims.txt"
+
+          if [ "$bad" -eq 0 ]; then
+            echo "Every declared rule passed." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "$ENFORCE" = "true" ]; then
+            echo "::error::audit { enforce #true } makes this fatal."
+            exit 1
+          fi
+          echo "::warning::the repository does not enforce, so this is reported rather than fatal"
+
+      - name: Install Cosign
+        if: steps.claims.outputs.count != '0'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: 'v2.6.3'
+
+      - name: Attest the scan report
+        if: steps.claims.outputs.count != '0'
+        run: |
+          set -euo pipefail
+          cosign attest --key env://COSIGN_PRIVATE_KEY \
+            --tlog-upload=false --timeout=10m \
+            --type https://tectonic-os.github.io/attestations/arf/v1 \
+            --predicate "${RUNNER_TEMP}/arf.xml" \
+            "$IMAGE_REF"
+        env:
+          COSIGN_EXPERIMENTAL: false
+          COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
+
+      - name: Attest the commit that built it
+        if: steps.claims.outputs.count != '0'
+        uses: actions/attest-build-provenance@bd77c077858b8d561b7a36cbe48ef4cc642ca39d # v2.2.2
+        with:
+          subject-name: ${{ env.SUBJECT_NAME }}
+          subject-digest: ${{ env.SUBJECT_DIGEST }}
+          push-to-registry: true
+
+      - name: Verify both predicates are on the digest
+        if: steps.claims.outputs.count != '0'
+        run: |
+          set -euo pipefail
+          plan=generated/plan.json
+          module="$(jq -r --arg t "$TARGET" '
+            .images[].targets[] | select(.name == $t)
+            | .provides_files["/etc/pki/containers/cosign.pub"] // ""' "$plan")"
+          key="modules/${module}/files/etc/pki/containers/cosign.pub"
+          [ -s "$key" ] || { echo "::error::no module provides a cosign key" >&2; exit 1; }
+          cosign verify-attestation --key "$key" --insecure-ignore-tlog=true \
+            --type https://tectonic-os.github.io/attestations/arf/v1 "$IMAGE_REF" > /dev/null
+          cosign verify-attestation --key "$key" --insecure-ignore-tlog=true \
+            --type spdxjson "$IMAGE_REF" > /dev/null
+        env:
+          TARGET: ${{ matrix.target }}

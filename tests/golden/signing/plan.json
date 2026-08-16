@@ -117,6 +117,7 @@
             "/usr/share/secureboot/sb_cert.der": "kernel/signed-kernel"
           },
           "overlay_files": {},
+          "overlay_overridden": [],
           "collected_files": {},
           "collect_destinations": []
         }

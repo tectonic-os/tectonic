@@ -112,6 +112,7 @@
           "assets": [],
           "provides_files": {},
           "overlay_files": {},
+          "overlay_overridden": [],
           "collected_files": {},
           "collect_destinations": []
         }

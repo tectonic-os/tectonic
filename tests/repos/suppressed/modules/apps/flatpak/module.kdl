@@ -23,3 +23,7 @@ variant "beta" {
 packages {
     fedora "flatpak"
 }
+
+satisfies {
+    cis-fedora "9.9.9.9"
+}
