@@ -777,10 +777,15 @@ jobs:
         if: steps.claims.outputs.count != '0'
         run: |
           set -euo pipefail
+          # cosign takes a JSON predicate and the report is XML, so it travels
+          # gzipped and base64 encoded inside one.
+          gzip -9 -c "${RUNNER_TEMP}/arf.xml" | base64 -w0 > "${RUNNER_TEMP}/arf.b64"
+          jq -n --rawfile arf "${RUNNER_TEMP}/arf.b64" \
+            '{encoding: "gzip+base64", arf: $arf}' > "${RUNNER_TEMP}/arf.json"
           cosign attest --key env://COSIGN_PRIVATE_KEY \
             --tlog-upload=false --timeout=10m \
             --type https://tectonic-os.github.io/attestations/arf/v1 \
-            --predicate "${RUNNER_TEMP}/arf.xml" \
+            --predicate "${RUNNER_TEMP}/arf.json" \
             "$IMAGE_REF"
         env:
           COSIGN_EXPERIMENTAL: false
