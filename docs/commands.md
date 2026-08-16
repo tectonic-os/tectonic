@@ -205,6 +205,11 @@ Writes the build files under `generated/` and lists what it wrote:
 - The Containerfile bakes `plan.json` into the image at
   `/usr/share/tectonic/manifest.json`, so a built image can answer what it is
   made of.
+- The base tag is resolved to a manifest digest once and passed down as the
+  `BASE` build argument, which the generated `FROM` reads. `$BASE` in the
+  environment is taken as already resolved, so CI that stamped
+  `org.opencontainers.image.base.digest` and the build record agree rather than
+  resolving a moving tag twice.
 
 ### `build [target]`
 
@@ -303,6 +308,20 @@ binary is mounted into a build.
 ### `os-release`
 
 Writes the image identity the build ARGs carry into `/usr/lib/os-release`.
+
+### `build-record`
+
+Writes `/usr/share/tectonic/build.json`, the record of what the build
+**resolved**, where the baked `manifest.json` beside it is what the repository
+**declared**. It carries the digest the base tag resolved to, the commit each
+cloned asset's selector named, the source commit, the tect release, the target,
+the module content hashes, whether enforcement was on, and `verified: null`
+until something has checked the claims.
+
+Nothing under `generated/` holds it, so `verify` never sees it: a daily
+changing resolution in a committed file would fail the drift gate every
+morning, which is why the resolution is a second document rather than a field
+of the first.
 
 ### `fetch <what> <url> <sha256> [target] [extra...]`
 

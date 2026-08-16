@@ -383,6 +383,9 @@ jobs:
       - name: Build image
         env:
           TARGET: ${{ matrix.target }}
+          # The digest the label was stamped with, so the build record and the
+          # label are one resolution of a moving tag rather than two.
+          BASE: ${{ steps.base.outputs.name }}@${{ steps.base.outputs.digest }}
           EVENT: ${{ github.event_name }}
           ON_DEFAULT_BRANCH: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
           IMAGE_VERSION: ${{ steps.date.outputs.version }}

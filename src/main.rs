@@ -399,6 +399,7 @@ fn run() -> Result<ExitCode, Error> {
     // The build-layer commands read the image around them, not a repository.
     let in_layer = match words.as_slice() {
         ["os-release"] => Some(tect::runtime::os_release()),
+        ["build-record"] => Some(tect::provenance::build::write()),
         ["validate-image"] => Some(tect::runtime::validate_image()),
         ["fetch", rest @ ..] => Some(tect::runtime::fetch(rest)),
         _ => None,

@@ -7,6 +7,7 @@
 //! hold the one `pin` table; the base carries its locator and selector joined
 //! in the image reference, and `signed` as its verifier.
 
+pub mod build;
 pub mod evidence;
 pub mod record;
 
@@ -79,7 +80,6 @@ impl Tracker {
             _ => None,
         }
     }
-
 }
 
 /// One pin, filled the same way whatever declared it.

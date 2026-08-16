@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1.25.0@sha256:0adf442eae370b6087e08edc7c50b552d80ddf261576f4ebd6421006b2461f12
+ARG BASE
 FROM scratch AS ctx
 COPY lib/ /lib/
 COPY modules/ /modules/
@@ -11,6 +12,19 @@ COPY out/tect /tect
 # ---- END GENERATED ----
 
 COPY --from=ctx /generated/plan.json /usr/share/tectonic/manifest.json
+
+ARG BASE
+ARG BASE_DECLARED=""
+ARG TARGET=""
+ARG SOURCE_COMMIT=""
+ARG MODULE_HASHES=""
+ARG ASSET_RESOLUTIONS=""
+ARG AUDIT_ENFORCE=""
+RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    BASE="${BASE}" BASE_DECLARED="${BASE_DECLARED}" TARGET="${TARGET}" \
+    SOURCE_COMMIT="${SOURCE_COMMIT}" MODULE_HASHES="${MODULE_HASHES}" \
+    ASSET_RESOLUTIONS="${ASSET_RESOLUTIONS}" AUDIT_ENFORCE="${AUDIT_ENFORCE}" \
+    IMAGE_ID="${IMAGE_ID}" IMAGE_VERSION="${IMAGE_VERSION}" /ctx/tect build-record
 
 ARG CONTRACT_FILES=""
 ARG VERIFY_EXCEPTIONS=""

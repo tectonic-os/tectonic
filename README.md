@@ -56,8 +56,8 @@ This is the whole surface today. The rest of it is not built yet.
                           diagram, or as JSON
 
 `tect plan --json`, `verify`, `summary`, `sbom`, `fetch modules` and
-`registry` are the build's, and `os-release`, `fetch` and `validate-image` run
-only inside a build layer. See
+`registry` are the build's, and `os-release`, `build-record`, `fetch` and
+`validate-image` run only inside a build layer. See
 [the commands](docs/commands.md), which documents all of them, and how every
 command takes a flag for everything it needs.
 

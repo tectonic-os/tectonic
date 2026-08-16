@@ -1,5 +1,5 @@
 ### Base Image
-FROM ghcr.io/bootcrew/debian-bootc:latest
+FROM ${BASE}
 
 ## Module layers
 

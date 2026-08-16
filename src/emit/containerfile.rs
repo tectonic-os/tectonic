@@ -86,13 +86,10 @@ pub fn section(image: &Image, collection: &Collection, root: &Path) -> String {
     let mut out = String::new();
     let mut flavour_arg_emitted = false;
 
-    if let Some(base) = &image.base {
-        let _ = write!(
-            out,
-            "### Base Image\n\
-             FROM {}\n\n",
-            base.image
-        );
+    // The declared tag is in plan.json; what the build actually resolved it to
+    // is what `tect build` passes down, and what the build record keeps.
+    if image.base.is_some() {
+        let _ = write!(out, "### Base Image\nFROM ${{BASE}}\n\n");
     }
 
     let _ = write!(out, "## Module layers\n\n");
