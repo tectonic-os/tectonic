@@ -88,8 +88,10 @@ pub fn write(root: &Path, name: &str, assets: &Path) -> Result<(), String> {
         block if block.is_empty() => block,
         block => format!("\n{block}"),
     };
-    if scaffold.is_file() {
-        fs::remove_file(&scaffold).map_err(|err| format!("{}: {err}", scaffold.display()))?;
+    for control in [scaffold.as_path(), &root.join(crate::base::BASES_FILE)] {
+        if control.is_file() {
+            fs::remove_file(control).map_err(|err| format!("{}: {err}", control.display()))?;
+        }
     }
     put(
         &root.join(REPO_FILE),

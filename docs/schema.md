@@ -366,9 +366,13 @@ Also holds [`renovate`](#renovate) and [`manual`](#manual).
 
 `tect create image` offers the bases it knows: what family each belongs to and
 what it already ships, so an image scaffolded on one lists no module the base
-already carries. The tool ships a seed of them, which is what a repository with
-nothing fetched still has, and a collection extends it with a `bases.kdl` at
-its root, beside the modules.
+already carries. The tool compiles one `bases.kdl` into the binary as a
+fallback, and the release ships that same file for runtime replacement: a
+runtime `bases.kdl` beside the binary, when present, replaces the compiled-in
+catalog entirely rather than merging with it; a present but unreadable or
+malformed runtime file is diagnosed by its exact path instead of silently
+falling back to the compiled-in one. A collection then extends the selected
+catalog with a `bases.kdl` at its root, beside the modules.
 
 ```kdl
 base "ghcr.io/ublue-os/bazzite:stable" {
@@ -380,12 +384,12 @@ base "ghcr.io/ublue-os/bazzite:stable" {
 }
 ```
 
-An entry wins over the seeded one of the same reference, which is how a stale
-one is corrected without a tool release, and `check` names the collection
-wherever the two differ. A base two collections describe is an error, the way a
-collection declared twice is. Nothing is fetched to read one: a collection that
-is not on this machine already extends nothing, and the seed is what the picker
-offers.
+A collection entry wins over the selected catalog's entry of the same
+reference, which is how a stale one is corrected without a tool release, and
+`check` names the collection wherever the two differ. A base two collections
+describe is an error, the way a collection declared twice is. Nothing is
+fetched to read one: a collection that is not on this machine already extends
+nothing, and the selected catalog is what the picker offers.
 
 <!-- schema: bases -->
 
@@ -557,7 +561,7 @@ One base family, and the packages to install on it.
 
 | Property | Value | Meaning |
 | --- | --- | --- |
-| `enablerepo=` | a string | A repository enabled for this install and disabled otherwise. |
+| `enablerepo=` | a string | A repository enabled for this install and disabled otherwise. Fedora only. |
 
 ### `satisfies`
 

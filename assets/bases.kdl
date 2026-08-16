@@ -1,0 +1,49 @@
+base "quay.io/fedora/fedora-bootc:44" {
+    about "Fedora 44, nothing above the base system"
+    family "fedora"
+    provides "rechunking" "initramfs-generation" "mac-policy"
+}
+
+// Universal Blue Images
+base "ghcr.io/ublue-os/bazzite:stable" {
+    about "KDE, gaming and hardware support over kinoite-main"
+    family "fedora"
+    provides "rechunking" "flatpak"
+    provides-file "/usr/bin/flatpak"
+}
+
+base "ghcr.io/ublue-os/aurora:stable" {
+    about "KDE developer workstation over kinoite-main"
+    family "fedora"
+    provides "rechunking" "flatpak"
+    provides-file "/usr/bin/flatpak"
+}
+
+base "ghcr.io/ublue-os/bluefin:stable" {
+    about "GNOME developer workstation over silverblue-main"
+    family "fedora"
+    provides "rechunking" "flatpak"
+    provides-file "/usr/bin/flatpak"
+}
+
+base "ghcr.io/ublue-os/kinoite-main:44" {
+    about "Fedora Kinoite with the ublue additions, what bazzite builds on"
+    family "fedora"
+    provides "rechunking" "flatpak"
+    provides-file "/usr/bin/flatpak"
+}
+
+// Bootcrew images - bootc implemented for non-RHEL based images
+base "ghcr.io/bootcrew/debian-bootc:latest" {
+    about "Experimental Debian bootc base from Bootcrew"
+    family "debian"
+    provides "rechunking" "initramfs-generation"
+    signed #true
+}
+
+base "ghcr.io/bootcrew/ubuntu-bootc:latest" {
+    about "Experimental Ubuntu bootc base from Bootcrew"
+    family "ubuntu"
+    provides "rechunking" "initramfs-generation"
+    signed #true
+}

@@ -90,15 +90,26 @@ fn script(
     }
 
     for group in module.packages.iter().filter(|g| g.family == base_family) {
-        let repo = match &group.enablerepo {
-            Some(repo) => format!(" --enablerepo='{repo}'"),
-            None => String::new(),
-        };
-        let _ = write!(
-            out,
-            "\ndnf5 install -y{repo} {}\n",
-            group.packages.join(" ")
-        );
+        let packages = group.packages.join(" ");
+        match base_family {
+            "fedora" => {
+                let repo = match &group.enablerepo {
+                    Some(repo) => format!(" --enablerepo='{repo}'"),
+                    None => String::new(),
+                };
+                let _ = write!(out, "\ndnf5 install -y{repo} {packages}\n");
+            }
+            "debian" | "ubuntu" => {
+                let _ = write!(
+                    out,
+                    "\napt-get update\n\
+                     DEBIAN_FRONTEND=noninteractive apt-get install -y {packages}\n\
+                     apt-get clean\n\
+                     rm -rf /var/lib/apt/lists/*\n"
+                );
+            }
+            _ => {}
+        }
     }
 
     let on_disk = root.join("modules").join(entry.dir());

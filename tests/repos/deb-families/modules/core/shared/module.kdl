@@ -1,0 +1,8 @@
+description "A module both the Debian and Ubuntu images enable"
+
+supports "debian" "ubuntu"
+
+packages {
+    debian "curl" "git"
+    ubuntu "curl" "vim"
+}

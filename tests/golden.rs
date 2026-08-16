@@ -543,6 +543,10 @@ fn golden() {
     assert!(!names.is_empty());
 
     let init = init_repo("init");
+    assert!(
+        !init.join("bases.kdl").exists(),
+        "bases.kdl is a control asset; it must not land at a scaffolded repository root"
+    );
     for name in names {
         capture(&name, &dir.join(&name));
     }

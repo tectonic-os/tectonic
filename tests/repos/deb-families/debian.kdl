@@ -1,0 +1,13 @@
+image {
+    name "Debian"
+
+    base "ghcr.io/bootcrew/debian-bootc:latest" {
+        family "debian"
+        provides "rechunking" "initramfs-generation"
+        signed #true
+    }
+
+    modules {
+        module "core/shared"
+    }
+}

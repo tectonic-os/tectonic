@@ -3,9 +3,9 @@
 //! error; it is a base nothing can describe, so `check` reports what is
 //! unsatisfied.
 //!
-//! The seed is compiled in, so a repository with no collection fetched and no
-//! network still has one. A collection extends it with a `bases.kdl` at its
-//! root, which wins on a base both of them describe.
+//! The shipped catalog is compiled in as a fallback for the runtime asset. A
+//! collection extends the selected catalog with a `bases.kdl` at its root,
+//! which wins on a base both of them describe.
 
 use crate::diag::{Issue, Issues, Span};
 use crate::model::remote::Collection;
@@ -14,7 +14,8 @@ use std::path::Path;
 /// What a collection extends the catalog with, at its root.
 pub const BASES_FILE: &str = "bases.kdl";
 
-/// One known base.
+const BUILT_IN: &str = include_str!("../assets/bases.kdl");
+
 pub struct Base {
     /// The full image reference, written verbatim into `base`.
     pub image: String,
@@ -42,80 +43,16 @@ impl Base {
     }
 }
 
-/// One base the tool ships with, which is the same thing written where no file
-/// has to be read to have it.
-pub struct Seed {
-    pub image: &'static str,
-    pub family: &'static str,
-    pub provides: &'static [&'static str],
-    pub provides_files: &'static [&'static str],
-    pub about: &'static str,
-}
-
-impl Seed {
-    fn base(&self) -> Base {
-        Base {
-            image: self.image.to_string(),
-            family: self.family.to_string(),
-            provides: self.provides.iter().map(|n| n.to_string()).collect(),
-            provides_files: self.provides_files.iter().map(|n| n.to_string()).collect(),
-            about: self.about.to_string(),
-            signed: false,
-            span: Span::default(),
-        }
-    }
-}
-
-pub const SEED: &[Seed] = &[
-    Seed {
-        image: "quay.io/fedora/fedora-bootc:44",
-        family: "fedora",
-        provides: &["rechunking", "initramfs-generation", "mac-policy"],
-        provides_files: &[],
-        about: "Fedora 44, nothing above the base system",
-    },
-    Seed {
-        image: "ghcr.io/ublue-os/bazzite:stable",
-        family: "fedora",
-        provides: &["rechunking", "flatpak"],
-        provides_files: &["/usr/bin/flatpak"],
-        about: "KDE, gaming and hardware support over kinoite-main",
-    },
-    Seed {
-        image: "ghcr.io/ublue-os/aurora:stable",
-        family: "fedora",
-        provides: &["rechunking", "flatpak"],
-        provides_files: &["/usr/bin/flatpak"],
-        about: "KDE developer workstation over kinoite-main",
-    },
-    Seed {
-        image: "ghcr.io/ublue-os/bluefin:stable",
-        family: "fedora",
-        provides: &["rechunking", "flatpak"],
-        provides_files: &["/usr/bin/flatpak"],
-        about: "GNOME developer workstation over silverblue-main",
-    },
-    Seed {
-        image: "ghcr.io/ublue-os/kinoite-main:44",
-        family: "fedora",
-        provides: &["rechunking", "flatpak"],
-        provides_files: &["/usr/bin/flatpak"],
-        about: "Fedora Kinoite with the ublue additions, what bazzite builds on",
-    },
-];
-
-/// What an image that has chosen nothing builds on.
-pub const DEFAULT: &Seed = &SEED[0];
-
-/// A seeded base a collection describes differently, which is how a stale entry
-/// is corrected without a tool release. One that repeats the seed corrects
-/// nothing and is not reported.
+/// A tool-owned base a collection describes differently, which is how a stale
+/// entry is corrected without a tool release. One that repeats the tool entry
+/// corrects nothing and is not reported.
 pub struct Shadow {
     pub image: String,
     pub collection: String,
 }
 
-/// The seed, and then what every collection already on this machine adds to it.
+/// The runtime catalog when present, otherwise its embedded snapshot, and then
+/// what every collection already on this machine adds to it.
 /// A collection that is not there is not read: the catalog costs no network, so
 /// a base picker works in a repository nothing has been fetched into.
 pub fn catalog(
@@ -123,7 +60,16 @@ pub fn catalog(
     sources: &[Collection],
     issues: &mut Issues,
 ) -> (Vec<Base>, Vec<Shadow>) {
-    let mut bases: Vec<Base> = SEED.iter().map(Seed::base).collect();
+    let runtime = crate::init::assets()
+        .ok()
+        .map(|assets| assets.join(BASES_FILE));
+    let mut bases = match runtime
+        .as_deref()
+        .and_then(|path| crate::parse::bases::read(path, issues))
+    {
+        Some((bases, _)) => bases,
+        None => crate::parse::bases::parse("built-in bases.kdl", BUILT_IN, issues).0,
+    };
     let mut shadows: Vec<Shadow> = Vec::new();
     let mut declared: Vec<(String, String)> = Vec::new();
 

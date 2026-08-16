@@ -1,5 +1,5 @@
 description "Provides the same capability as another enabled module"
 
-supports "debian"
+supports "arch"
 
 provides "shell-tools"

@@ -9,15 +9,15 @@
   help: the name is written into the generated graph as a mermaid label and a
         markdown table cell, neither of which quotes anything
 
-  x unknown base family `debian`
+  x unknown base family `arch`
    ,-[./modules/core/three/module.kdl:3:1]
  2 | 
- 3 | supports "debian"
+ 3 | supports "arch"
    : ^^^^|^^^
    :     `-- not a family this repository builds on
  4 | 
    `----
-  help: known families: fedora
+  help: known families: fedora, debian, ubuntu
 
   x `core/two` provides `rechunking`, which the base image already provides
    ,-[./modules/core/two/module.kdl:5:1]
@@ -32,7 +32,7 @@
         `rechunking` a second time: split it, or drop the declaration
 
   x `core/three` does not support the `fedora` base family
-  help: it declares support for: debian
+  help: it declares support for: arch
 
   x `shell-tools` is provided by more than one enabled module
    ,-[./modules/core/two/module.kdl:6:1]

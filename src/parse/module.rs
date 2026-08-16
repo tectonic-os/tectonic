@@ -17,8 +17,8 @@ use kdl::{KdlDocument, KdlNode};
 use std::collections::BTreeSet;
 use std::path::Path;
 
-/// The only base family today.
-const FAMILIES: [&str; 1] = ["fedora"];
+/// The base families this repository knows how to build on.
+const FAMILIES: [&str; 3] = ["fedora", "debian", "ubuntu"];
 
 const TOKEN_HELP: &str = "package names and repo IDs are emitted straight into the RUN line, so they are limited to letters, digits and . _ + : -; anything else belongs in module.sh, where it can be quoted deliberately";
 
@@ -210,7 +210,8 @@ pub const MODULE: Node = Node::new("module",
                     .arg(Arg::Strs, Say::NONE)
                     .props(&[
                         Prop { name: "enablerepo", kind: Kind::Str,
-                            desc: "A repository enabled for this install and disabled otherwise.",
+                            desc: "A repository enabled for this install and disabled otherwise. \
+                                   Fedora only.",
                             say: Say::NONE,
                             missing: Say::NONE },
                     ], Say::new("unknown property `{}` in packages block", "not part of the schema",
@@ -491,7 +492,7 @@ impl Module {
                         src,
                     )
                     .at(group.span, "installed before the repo file is sourced")
-                    .help("the generated build script sources `repo` after installing these, so call `dnf5 install -y` in module.sh instead"),
+                    .help("the generated build script sources `repo` after installing these, so call the family's package manager in module.sh instead"),
                 );
             }
         }
@@ -777,19 +778,26 @@ impl Module {
             }
             let mut enablerepo: Option<String> = None;
             if let Some(span) = prop_span(child, "enablerepo") {
-                match prop(child, "enablerepo").filter(|v| !v.is_empty()) {
-                    Some(repo) => match bad_token(repo) {
+                if family != "fedora" {
+                    issues.push(
+                        Issue::new(format!("`enablerepo` is Fedora-only, not `{family}`"), src)
+                            .at(span, "no repo to enable on this family")
+                            .help("only Fedora groups take `enablerepo`; a Debian or Ubuntu group installs from the base image's configured sources"),
+                    );
+                } else if let Some(repo) = prop(child, "enablerepo").filter(|v| !v.is_empty()) {
+                    match bad_token(repo) {
                         Some(problem) => issues.push(
                             Issue::new(format!("repo ID `{repo}` {problem}"), src)
                                 .at(span, "would not survive the RUN line")
                                 .help(TOKEN_HELP),
                         ),
                         None => enablerepo = Some(repo.to_string()),
-                    },
-                    None => issues.push(
+                    }
+                } else {
+                    issues.push(
                         Issue::new("`enablerepo` needs a repo ID string", src)
                             .at(span, "not a string"),
-                    ),
+                    );
                 }
             }
             self.packages.push(PackageGroup {
@@ -991,6 +999,40 @@ satisfies
                 "`cis-fedora` has no rules listed",
                 "benchmark `cis-fedora` is declared twice",
                 "`satisfies` is declared twice",
+            ]
+        );
+    }
+
+    /// `supports` and `packages` walk every family the tool recognises, and
+    /// `enablerepo` stays Fedora-only across all three.
+    #[test]
+    fn debian_and_ubuntu_are_known_families_and_enablerepo_stays_fedora_only() {
+        let mut issues = Issues::default();
+        Module::parse(
+            "known",
+            "known",
+            Path::new("."),
+            r#"
+description "known families and packages"
+supports "fedora" "debian" "ubuntu"
+packages {
+    fedora "curl" enablerepo="rpmfusion"
+    debian "curl" enablerepo="backports"
+    ubuntu "curl" enablerepo="backports"
+}
+"#
+            .to_string(),
+            &mut issues,
+        );
+        assert_eq!(
+            issues
+                .plain()
+                .lines()
+                .filter_map(|line| line.strip_prefix("  x "))
+                .collect::<Vec<_>>(),
+            [
+                "`enablerepo` is Fedora-only, not `debian`",
+                "`enablerepo` is Fedora-only, not `ubuntu`",
             ]
         );
     }
