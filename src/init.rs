@@ -1,6 +1,7 @@
 //! The tree a new repository starts as.
 
-use crate::model::image::{is_name, REPO_FILE, SCHEMA_VERSION, TECT_VERSION};
+use crate::layout;
+use crate::model::image::{is_name, SCHEMA_VERSION, TECT_VERSION};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -78,7 +79,7 @@ pub fn id(name: &str) -> Result<String, String> {
 /// everything under `assets`, which is an image repository's root. The images
 /// are `create image`'s.
 pub fn write(root: &Path, name: &str, assets: &Path) -> Result<(), String> {
-    if root.join(REPO_FILE).exists() {
+    if root.join(layout::REPO_FILE).exists() {
         return Err(format!("{} is already a repository", root.display()));
     }
 
@@ -94,7 +95,7 @@ pub fn write(root: &Path, name: &str, assets: &Path) -> Result<(), String> {
         }
     }
     put(
-        &root.join(REPO_FILE),
+        &root.join(layout::REPO_FILE),
         &format!(
             "schema-version {SCHEMA_VERSION}\n\n\
              // renovate: datasource=github-releases depName=tectonic-os/tectonic\n\

@@ -3,6 +3,7 @@
 //! plan put them in.
 
 use crate::emit::module_build;
+use crate::layout;
 use crate::model::image::{Entry, Image};
 use crate::resolve::collect::Collection;
 use std::fmt::Write as _;
@@ -27,7 +28,7 @@ pub fn hooks<'a>(image: &'a Image, root: &Path) -> Vec<&'a Entry> {
         .iter()
         .filter(|entry| entry.module.is_some())
         .filter(|entry| {
-            root.join("modules")
+            layout::modules(root)
                 .join(entry.dir())
                 .join("finalize.sh")
                 .is_file()

@@ -7,6 +7,7 @@
 //! and where every byte of it came from.
 
 use crate::emit::json::Json;
+use crate::layout;
 use crate::model::image::{Image, List};
 use crate::model::module::Module;
 use crate::provenance::Evidence;
@@ -151,7 +152,7 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
 /// is shell calling the family's config manager, so this reads what a person
 /// would look for rather than claiming to understand it.
 fn repo_urls(root: &std::path::Path, dir: &str) -> Vec<String> {
-    let Ok(text) = std::fs::read_to_string(root.join("modules").join(dir).join("repo")) else {
+    let Ok(text) = std::fs::read_to_string(layout::module(root, dir).join("repo")) else {
         return Vec::new();
     };
     let mut out: Vec<String> = Vec::new();

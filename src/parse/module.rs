@@ -1,6 +1,7 @@
 //! module.kdl: the module author's file.
 
 use crate::diag::{Issue, Issues, Source, Span};
+use crate::layout;
 use crate::model::image::{Entry, Image, List};
 use crate::model::module::{
     Collect, Contribution, Coverage, Decl, Key, Module, PackageGroup, VerifyException,
@@ -241,7 +242,7 @@ fn bad_priority(node: &KdlNode) -> bool {
 
 impl Module {
     pub fn load(entry: &Entry, image: &Image, root: &Path, issues: &mut Issues) -> Option<Self> {
-        if entry.remote.is_some() && root.join("modules").join(&entry.path).is_dir() {
+        if entry.remote.is_some() && layout::module(root, &entry.path).is_dir() {
             issues.push(
                 Issue::new(
                     format!("`{}` is pinned but also exists in tree", entry.path),
@@ -257,9 +258,9 @@ impl Module {
 
         let dir_rel = entry.dir();
         let file = root
-            .join("modules")
+            .join(layout::MODULES)
             .join(&dir_rel)
-            .join("module.kdl")
+            .join(layout::MODULE_FILE)
             .display()
             .to_string();
 
@@ -298,8 +299,8 @@ impl Module {
         text: String,
         issues: &mut Issues,
     ) -> Option<Self> {
-        let dir = root.join("modules").join(dir_rel);
-        let file = dir.join("module.kdl").display().to_string();
+        let dir = layout::module(root, dir_rel);
+        let file = dir.join(layout::MODULE_FILE).display().to_string();
 
         let src = &Source::new(&file, text.clone());
         let doc: KdlDocument = match text.parse() {
@@ -926,7 +927,7 @@ pub fn check_unlisted(list: &List, root: &Path, disk: &Disk, issues: &mut Issues
         if listed.contains(dir) || dir.starts_with(REMOTE_DIR) {
             continue;
         }
-        let file = root.join("modules").join(dir).join("module.kdl");
+        let file = layout::manifest(root, dir);
         if let Ok(text) = std::fs::read_to_string(&file) {
             Module::parse(dir, dir, root, text, issues);
         }

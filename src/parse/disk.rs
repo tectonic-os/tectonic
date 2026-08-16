@@ -2,6 +2,7 @@
 //! disk rather than what an image enables.
 
 use crate::diag::{Issues, Source};
+use crate::layout;
 use crate::model::module::Key;
 use kdl::KdlDocument;
 use std::collections::BTreeMap;
@@ -31,7 +32,7 @@ impl Disk {
     pub fn scan(root: &Path) -> Self {
         let mut out = Disk::default();
 
-        let modules = root.join("modules");
+        let modules = layout::modules(root);
         let mut dirs = vec![modules.clone()];
         while let Some(dir) = dirs.pop() {
             let Ok(entries) = std::fs::read_dir(&dir) else {
@@ -42,7 +43,7 @@ impl Disk {
                 if !path.is_dir() || path.file_name().is_some_and(|n| n == "_template") {
                     continue;
                 }
-                let manifest = path.join("module.kdl");
+                let manifest = path.join(layout::MODULE_FILE);
                 if !manifest.is_file() {
                     dirs.push(path);
                     continue;
@@ -53,7 +54,7 @@ impl Disk {
                     .display()
                     .to_string();
                 out.overlays
-                    .insert(name.clone(), overlay_paths(&path.join("files")));
+                    .insert(name.clone(), overlay_paths(&path.join(layout::OVERLAY)));
 
                 let Ok(text) = std::fs::read_to_string(&manifest) else {
                     continue;

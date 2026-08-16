@@ -1,6 +1,7 @@
 //! What a repository publishes for a new one to start from: one image's
 //! declarations, and nothing that says whose they are.
 
+use crate::layout;
 use crate::model::image::{Entry, List, SCHEMA_VERSION};
 use crate::model::remote::{At, Collection};
 use crate::provenance::Tracker;
@@ -57,7 +58,7 @@ pub fn file(list: &List) -> Option<(PathBuf, String)> {
         out.push('\n');
     }
 
-    Some((PathBuf::from("generated").join("seed.kdl"), out))
+    Some((PathBuf::from(layout::GENERATED).join("seed.kdl"), out))
 }
 
 /// One collection the seeded repository fetches its modules through. How the

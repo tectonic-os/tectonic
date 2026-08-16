@@ -7,6 +7,7 @@
 //! break the very comparison the hash exists to make.
 
 use crate::diag::{Issues, Source};
+use crate::layout;
 use crate::parse::schema::{check_doc, Arg, Node, Say, NEEDS_VALUE};
 use crate::parse::{kids, string_arg, syntax_issue, text};
 use crate::provenance::evidence::{self, Role, PIN};
@@ -149,7 +150,7 @@ pub fn hash(dir: &Path) -> Option<String> {
 /// diagnostic; what it buys is that the fork is visible.
 pub fn modified(root: &Path) -> Vec<String> {
     let mut out = Vec::new();
-    for dir in dirs(&root.join("modules")) {
+    for dir in dirs(&layout::modules(root)) {
         let Ok(raw) = std::fs::read_to_string(dir.join(RECORD)) else {
             continue;
         };
@@ -178,7 +179,7 @@ fn dirs(from: &Path) -> Vec<std::path::PathBuf> {
     };
     let mut out = Vec::new();
     for path in entries.flatten().map(|e| e.path()).filter(|p| p.is_dir()) {
-        match path.join("module.kdl").is_file() {
+        match path.join(layout::MODULE_FILE).is_file() {
             true => out.push(path),
             false => out.extend(dirs(&path)),
         }

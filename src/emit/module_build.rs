@@ -1,6 +1,7 @@
 //! The build script one module's layer runs: every value the host resolved,
 //! written out, then the steps that use them.
 
+use crate::layout;
 use crate::model::image::{Entry, Image};
 use crate::model::module::Module;
 use crate::model::options::{env_name, OptType};
@@ -16,7 +17,7 @@ set -euxo pipefail
 
 /// Where the scripts for one image live, beside the Containerfile named for it.
 pub fn dir(image: &Image) -> PathBuf {
-    PathBuf::from("generated").join(format!("{}.d", image.id))
+    PathBuf::from(layout::GENERATED).join(format!("{}.d", image.id))
 }
 
 /// The script for one entry, as the path it is written at. A module listed
@@ -118,7 +119,7 @@ fn script(
     // The guard is `dnf5 config-manager`'s layout. A deb family writes its
     // repo somewhere else, so the module's own `repo` file runs unguarded
     // there and is what has to be idempotent.
-    let on_disk = root.join("modules").join(entry.dir());
+    let on_disk = layout::module(root, entry.dir());
     if on_disk.join("repo").is_file() {
         match repo_id(&on_disk.join("repo")) {
             Some(id) => {
@@ -155,7 +156,7 @@ fn script(
         }
     }
 
-    if on_disk.join("files").is_dir() {
+    if on_disk.join(layout::OVERLAY).is_dir() {
         let _ = write!(out, "\ncp -rT {dir}/files /\n");
     }
 

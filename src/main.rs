@@ -244,7 +244,8 @@ fn why_on_host(command: Command, arg: Option<&str>) -> Result<ExitCode, Error> {
 /// where it loads it.
 fn open(given: Option<PathBuf>) -> Result<Option<PathBuf>, Error> {
     let root = repo_root(given)?;
-    let refused = tect::compatible(&root).report(&root.join("repo.kdl").display().to_string());
+    let refused =
+        tect::compatible(&root).report(&root.join(tect::layout::REPO_FILE).display().to_string());
     Ok((!refused).then_some(root))
 }
 
@@ -319,7 +320,7 @@ impl Import {
 /// a module that is gone leaves with its files. Everything under `generated/`
 /// is written from here, which is what `verify` holds it to.
 fn write_generated(root: &Path, files: &[(PathBuf, String)]) -> Result<(), String> {
-    let dir = root.join("generated");
+    let dir = tect::layout::generated(root);
     if dir.is_dir() {
         std::fs::remove_dir_all(&dir).map_err(|err| format!("{}: {err}", dir.display()))?;
     }

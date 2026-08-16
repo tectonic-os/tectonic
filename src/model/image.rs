@@ -16,9 +16,6 @@ pub const TECT_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// unsuffixed.
 pub const NO_FLAVOUR: &str = "none";
 
-/// Repo context, not an image: the file every image file is not.
-pub const REPO_FILE: &str = "repo.kdl";
-
 /// Lowercase letters, digits and dashes, starting with a letter: image ids,
 /// flavour names and capabilities.
 pub fn is_name(name: &str) -> bool {
@@ -245,8 +242,9 @@ impl List {
             .help(format!(
                 "the default image is what a command given no image answers about, and what a \
                  bare `tect build` builds; a repository with one image falls back to that one, \
-                 and a repository with more says which: `default-image \"{}\"` in {REPO_FILE}",
-                first.id
+                 and a repository with more says which: `default-image \"{}\"` in {}",
+                first.id,
+                crate::layout::REPO_FILE
             ))
         })
     }

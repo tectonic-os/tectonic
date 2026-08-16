@@ -2,6 +2,7 @@
 //! module layers and the finalize layer spliced between its markers.
 
 use crate::emit::{finalize, module_build};
+use crate::layout;
 use crate::model::image::{Entry, Image};
 use crate::model::module::Module;
 use crate::resolve::collect::Collection;
@@ -15,7 +16,7 @@ pub const END: &str = "# ---- END GENERATED ----";
 
 /// Where the assembled Containerfile for one image is written.
 pub fn path(image: &Image) -> PathBuf {
-    PathBuf::from("generated").join(&image.id)
+    PathBuf::from(layout::GENERATED).join(&image.id)
 }
 
 /// The skeleton with `section` between its markers, the syntax directive kept

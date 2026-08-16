@@ -2,15 +2,12 @@
 //! tree. Nothing here writes an image file: what a repository holds and what an
 //! image is made of are different questions.
 
+use crate::layout;
 use crate::model::remote::{At, Collection};
 use crate::prompt::Prompt;
 use crate::provenance::record;
 use crate::ui::Choice;
 use std::path::{Path, PathBuf};
-
-/// Where a fetched collection is unpacked. Under `out/`, which is ignored: the
-/// copy that gets committed is the one under `modules/`.
-const CACHE: &str = "out/sources";
 
 /// One collection that has the module, and where its directory is on disk.
 pub struct Found {
@@ -82,7 +79,7 @@ pub fn find(
         let dir = tree(root, collection)?
             .join(collection.subtree().unwrap_or(""))
             .join(module);
-        if dir.join("module.kdl").is_file() {
+        if dir.join(layout::MODULE_FILE).is_file() {
             found.push(Found {
                 owner: collection.name.clone(),
                 dir,
@@ -141,12 +138,12 @@ pub fn catalog(root: &Path, sources: &[Collection]) -> Result<Vec<Listed>, Strin
         let dirs = std::fs::read_dir(&tree)
             .map_err(|err| format!("`{}`: {}: {err}", collection.name, tree.display()))?;
         for dir in dirs.flatten().map(|entry| entry.path()) {
-            if !dir.join("module.kdl").is_file() {
+            if !dir.join(layout::MODULE_FILE).is_file() {
                 continue;
             }
             let name = dir.file_name().unwrap_or_default().to_string_lossy();
             let (description, requires, keys) =
-                crate::parse::module::summary(&dir.join("module.kdl"));
+                crate::parse::module::summary(&dir.join(layout::MODULE_FILE));
             listed.push(Listed {
                 qualified: format!("{}/{name}", collection.name),
                 name: name.into_owned(),
@@ -184,11 +181,15 @@ pub fn choose(root: &Path, sources: &[Collection], prompt: &Prompt) -> Result<St
 pub fn cached(root: &Path, collection: &Collection) -> Option<PathBuf> {
     let dir = match &collection.at {
         At::Dir(dir) => root.join(dir),
-        At::Archive(pin) if pin.unpinned() => root.join(CACHE).join(&collection.name),
+        At::Archive(pin) if pin.unpinned() => {
+            root.join(layout::SOURCES_CACHE).join(&collection.name)
+        }
         At::Archive(pin) => {
-            let stamp = root.join(CACHE).join(format!("{}.pin", collection.name));
+            let stamp = root
+                .join(layout::SOURCES_CACHE)
+                .join(format!("{}.pin", collection.name));
             match std::fs::read_to_string(&stamp).ok().as_deref() == pin.sha256.as_deref() {
-                true => root.join(CACHE).join(&collection.name),
+                true => root.join(layout::SOURCES_CACHE).join(&collection.name),
                 false => return None,
             }
         }
@@ -218,8 +219,10 @@ fn tree(root: &Path, collection: &Collection) -> Result<PathBuf, String> {
         At::Archive(remote) => remote,
     };
 
-    let dir = root.join(CACHE).join(&collection.name);
-    let pin = root.join(CACHE).join(format!("{}.pin", collection.name));
+    let dir = root.join(layout::SOURCES_CACHE).join(&collection.name);
+    let pin = root
+        .join(layout::SOURCES_CACHE)
+        .join(format!("{}.pin", collection.name));
     let _ = std::fs::remove_dir_all(&dir);
     let url = remote.url_resolved().unwrap_or_default();
     let sha256 = (!remote.unpinned())
@@ -239,7 +242,9 @@ fn tree(root: &Path, collection: &Collection) -> Result<PathBuf, String> {
 /// Where the module goes, at the path its owner qualifies, refused when
 /// something is already there.
 pub fn destination(root: &Path, found: &Found, module: &str) -> Result<PathBuf, String> {
-    let dest = PathBuf::from("modules").join(&found.owner).join(module);
+    let dest = PathBuf::from(layout::MODULES)
+        .join(&found.owner)
+        .join(module);
     match root.join(&dest).exists() {
         true => Err(format!(
             "{} is already there; delete it to import over it",

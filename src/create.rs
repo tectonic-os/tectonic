@@ -6,7 +6,7 @@
 //! no `apply` takes a `Prompt`.
 
 use crate::diag::Issues;
-use crate::model::image::REPO_FILE;
+use crate::layout;
 use crate::prompt::Prompt;
 use crate::ui::Choice;
 use std::path::{Path, PathBuf};
@@ -299,7 +299,7 @@ impl Image {
         println!("wrote {}", self.file.display());
         if let Some(was) = &self.names_default {
             append_default_image(root, was)?;
-            println!("named \"{was}\" the default image in {REPO_FILE}");
+            println!("named \"{was}\" the default image in {}", layout::REPO_FILE);
         }
         Ok(())
     }
@@ -317,7 +317,7 @@ fn implicit_default(list: &crate::model::image::List) -> Option<String> {
 /// One `default-image` line at the end of repo.kdl, which does not carry the
 /// node: an append, never a rewrite.
 fn append_default_image(root: &Path, id: &str) -> Result<(), String> {
-    let file = root.join(REPO_FILE);
+    let file = root.join(layout::REPO_FILE);
     let mut text =
         std::fs::read_to_string(&file).map_err(|err| format!("{}: {err}", file.display()))?;
     if !text.ends_with('\n') {
@@ -369,7 +369,7 @@ impl Module {
             .map(crate::init::id)
             .collect::<Result<Vec<_>, _>>()?
             .join("/");
-        let file = root.join("modules").join(&path).join("module.kdl");
+        let file = layout::manifest(root, &path);
         if file.exists() {
             return Err(format!("modules/{path} is already there"));
         }

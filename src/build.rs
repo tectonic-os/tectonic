@@ -2,6 +2,7 @@
 //! the backend that runs it.
 
 use crate::emit::plan::{contract_files, of_target, pinned, preset_files, unique_pairs};
+use crate::layout;
 use crate::model::image::{List, Target};
 use crate::model::module::Module;
 use crate::provenance::build as record;
@@ -10,10 +11,6 @@ use std::os::unix::fs::PermissionsExt;
 use std::os::unix::process::CommandExt as _;
 use std::path::Path;
 use std::process::Command;
-
-/// Where the `tect` build stage copies the binary from, so every layer mounts
-/// the release the repository is pinned to.
-const MOUNTED: &str = "out/tect";
 
 #[derive(Default)]
 pub struct Options {
@@ -384,11 +381,11 @@ fn cache(
 /// release the repository is pinned to, not whatever is on the machine.
 fn install(root: &Path) -> Result<(), String> {
     let from = std::env::current_exe().map_err(|err| format!("this binary: {err}"))?;
-    let to = root.join(MOUNTED);
+    let to = root.join(layout::MOUNTED);
     if from.canonicalize().ok() == to.canonicalize().ok() {
         return Ok(());
     }
-    let dir = to.parent().unwrap_or(Path::new("out"));
+    let dir = to.parent().unwrap_or(Path::new(layout::OUT));
     fs::create_dir_all(dir).map_err(|err| format!("{}: {err}", dir.display()))?;
     fs::copy(&from, &to).map_err(|err| format!("{}: {err}", to.display()))?;
     fs::set_permissions(&to, fs::Permissions::from_mode(0o755))
