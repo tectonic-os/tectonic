@@ -1,4 +1,4 @@
-Tectonic v0.1.0
+Tectonic v{version}
 
   1) secureboot
   0) none

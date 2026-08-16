@@ -11,6 +11,7 @@ fn crate_dir() -> PathBuf {
 }
 
 fn compare(name: &str, file: &str, actual: &str) {
+    let actual = actual.replace(env!("CARGO_PKG_VERSION"), "{version}");
     let path = crate_dir().join("tests/golden").join(name).join(file);
     if std::env::var_os("UPDATE_GOLDEN").is_some() {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();

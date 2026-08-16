@@ -1,4 +1,4 @@
-Tectonic v0.1.0
+Tectonic v{version}
 
 What will the repo be called?
 Example

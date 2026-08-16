@@ -1,4 +1,4 @@
-Tectonic v0.1.0
+Tectonic v{version}
 
 tect: one/bases.kdl replaces the tool's own entry for quay.io/fedora/fedora-bootc:44
 tect: 1 images, 0 modules, 0 flavours

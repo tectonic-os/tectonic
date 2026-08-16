@@ -3,7 +3,7 @@
  2 | 
  3 | tect-version "0.0.1"
    : ^^^^^^|^^^^^
-   :       `-- this is tect 0.1.0
+   :       `-- this is tect {version}
    `----
   help: run the pinned release, which `scripts/tect.sh` fetches, or `tect
         update-repo` to move the pin to this one

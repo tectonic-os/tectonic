@@ -1,4 +1,4 @@
-Tectonic v0.1.0
+Tectonic v{version}
 
 tect: `tectonic-os` is unpinned, so an import of it takes whatever its ref holds then, unverified
 tect: 1 images, 0 modules, 0 flavours
