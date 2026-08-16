@@ -11,6 +11,9 @@
   "ungated_published": "signing",
   "cache_image": "signing-cache",
   "workflows": [],
+  "audit": {
+    "enforce": false
+  },
   "remotes": [],
   "assets": [],
   "images": [

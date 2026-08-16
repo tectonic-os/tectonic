@@ -11,6 +11,9 @@
   "ungated_published": "broken-key",
   "cache_image": "broken-key-cache",
   "workflows": [],
+  "audit": {
+    "enforce": false
+  },
   "remotes": [],
   "assets": [],
   "images": [

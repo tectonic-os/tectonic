@@ -11,6 +11,9 @@
   "ungated_published": "broken-overlay",
   "cache_image": "broken-overlay-cache",
   "workflows": [],
+  "audit": {
+    "enforce": false
+  },
   "remotes": [],
   "assets": [],
   "images": [

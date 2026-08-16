@@ -179,6 +179,9 @@ pub struct List {
     pub seed: Option<Seed>,
     /// Whether a build stamps the generated manifest onto the image as an OCI label.
     pub manifest_label: bool,
+    /// Whether a provenance fact that is missing or does not match is an error
+    /// rather than a read-out. Every fact is recorded either way.
+    pub audit_enforce: bool,
     /// What repo.kdl declares, which is `SCHEMA_VERSION` or the load failed.
     pub schema_version: Option<u32>,
     /// Whether the node was there at all, so a malformed one is reported once

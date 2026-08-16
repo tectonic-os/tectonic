@@ -80,6 +80,10 @@ pub fn build(list: &List, resolved: &[Resolved], workflows: &[(String, bool)]) -
                 ])
             })),
         ),
+        (
+            "audit",
+            Json::object([("enforce", Json::Bool(list.audit_enforce))]),
+        ),
         ("remotes", remotes(list)),
         ("assets", every_asset(list)),
         (

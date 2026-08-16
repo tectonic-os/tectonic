@@ -37,7 +37,16 @@ fn names(sources: &[Collection]) -> String {
 /// Every collection that has `name`. Never the first of them: which one an
 /// ambiguous name comes from is the caller's to settle, and `<owner>/<name>` is
 /// what settles it without asking.
-pub fn find(root: &Path, sources: &[Collection], name: &str) -> Result<Vec<Found>, String> {
+///
+/// `enforce` refuses an unpinned collection here rather than at build time: the
+/// import is the moment a module carries its own hash, and hashing afterwards
+/// pins what you got rather than what you should have got.
+pub fn find(
+    root: &Path,
+    sources: &[Collection],
+    name: &str,
+    enforce: bool,
+) -> Result<Vec<Found>, String> {
     let (owner, module) = split(name);
     if module.is_empty() || module.contains('/') || module.starts_with('.') {
         return Err(format!(
@@ -60,6 +69,14 @@ pub fn find(root: &Path, sources: &[Collection], name: &str) -> Result<Vec<Found
     for collection in sources {
         if owner.is_some_and(|owner| owner != collection.name) {
             continue;
+        }
+        if enforce && collection.unpinned() {
+            return Err(format!(
+                "`{}` follows a moving ref with no `sha256`, so an import of it is verified \
+                 against nothing; `audit {{ enforce #true }}` makes that an error. Pin the \
+                 collection to a tag and its hash, or drop the enforcement",
+                collection.name
+            ));
         }
         searched.push(&collection.name);
         let dir = tree(root, collection)?

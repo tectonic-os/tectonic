@@ -11,6 +11,9 @@
   "ungated_published": "collecting",
   "cache_image": "collecting-cache",
   "workflows": [],
+  "audit": {
+    "enforce": false
+  },
   "remotes": [],
   "assets": [],
   "images": [

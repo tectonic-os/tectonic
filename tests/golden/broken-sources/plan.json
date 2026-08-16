@@ -11,6 +11,9 @@
   "ungated_published": "broken-sources",
   "cache_image": "broken-sources-cache",
   "workflows": [],
+  "audit": {
+    "enforce": false
+  },
   "remotes": [],
   "assets": [],
   "images": [

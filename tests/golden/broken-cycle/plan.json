@@ -11,6 +11,9 @@
   "ungated_published": "broken-cycle",
   "cache_image": "broken-cycle-cache",
   "workflows": [],
+  "audit": {
+    "enforce": false
+  },
   "remotes": [],
   "assets": [],
   "images": [

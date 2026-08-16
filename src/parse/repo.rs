@@ -95,9 +95,29 @@ pub const REPO: Node = Node::new("repo",
                     .once(""),
             ], Say::new("unknown node `{}` in manifest", "not part of the schema",
                 "a manifest block holds `label`")),
+
+        Node::new("audit",
+            "How strictly the provenance facts are held. Every one of them is recorded either \
+             way; this decides only which of them is fatal.")
+            .once("a second block would split one posture in two")
+            .empty(Say::new("`audit` has no `enforce` in it", "empty block",
+                "omit the block entirely; a repository with nothing here records every \
+                 provenance fact and fails on none of them"))
+            .children(&[
+                Node::new("enforce",
+                    "Whether a provenance fact that is missing or does not match stops the run \
+                     rather than being reported.")
+                    .arg(Arg::Bool, Say::new("`enforce` needs #true or #false", "not a boolean",
+                        "`enforce #true` makes an unverified import, a module edited since \
+                         import, a base that will not resolve and an unstamped build into \
+                         errors"))
+                    .once(""),
+            ], Say::new("unknown node `{}` in audit", "not part of the schema",
+                "an audit block holds `enforce`")),
     ], Say::new("unknown node `{}` in repo.kdl", "not part of the schema",
         "repo.kdl holds `schema-version`, `tect-version`, `default-image`, `pr-image`, `seed`, a \
-         `workflows` block, a `sources` block and a `manifest` block: what is true of the \
+         `workflows` block, a `sources` block, a `manifest` block and an `audit` block: what is \
+         true of the \
          repository rather than of any image in it. An image goes in a file of its own"));
 
 /// Every other root `.kdl`, which is one image and nothing else.
@@ -209,6 +229,7 @@ impl List {
             pr_image_id: None,
             seed: None,
             manifest_label: false,
+            audit_enforce: false,
             schema_version: None,
             schema_version_seen: false,
             repo_src: Source::new(root.join(REPO_FILE).display().to_string(), ""),
@@ -301,6 +322,9 @@ impl List {
                 (true, "schema-version") => {
                     self.schema_version_seen = true;
                     self.schema_version = int_arg(node).map(|_| SCHEMA_VERSION);
+                }
+                (true, "audit") => {
+                    self.audit_enforce = child(node, "enforce").and_then(bool_arg).unwrap_or(false)
                 }
                 (true, "manifest") => {
                     self.manifest_label = child(node, "label").and_then(bool_arg).unwrap_or(false);

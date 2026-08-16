@@ -11,6 +11,9 @@
   "ungated_published": "example",
   "cache_image": "example-cache",
   "workflows": [],
+  "audit": {
+    "enforce": false
+  },
   "remotes": [],
   "assets": [],
   "images": [

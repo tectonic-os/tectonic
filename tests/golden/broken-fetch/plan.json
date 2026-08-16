@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "default_image": "broken-fetch",
+  "default_image_name": "Broken Fetch",
+  "pr_image": "broken-fetch",
+  "default_target": "broken-fetch/none",
+  "default_published": "broken-fetch",
+  "pr_target": "broken-fetch/none",
+  "pr_published": "broken-fetch",
+  "ungated_target": "broken-fetch/none",
+  "ungated_published": "broken-fetch",
+  "cache_image": "broken-fetch-cache",
+  "workflows": [],
+  "audit": {
+    "enforce": false
+  },
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "broken-fetch",
+      "name": "Broken Fetch",
+      "pretty_name": "",
+      "file": "./example.kdl",
+      "url": "",
+      "issues_url": "",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "provides_files": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "broken-fetch/none",
+          "image": "broken-fetch",
+          "flavour": null,
+          "published": "broken-fetch",
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "core/grabber",
+              "dir": "core/grabber",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Reaches the network with nothing declaring what it pulls",
+              "options": {},
+              "provenance": {
+                "content": "109f3b67c690e3c8be825a12157152da82d71512d6d5087792c264880cd26bbc",
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": []
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

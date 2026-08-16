@@ -11,6 +11,9 @@
   "ungated_published": "broken-collect",
   "cache_image": "broken-collect-cache",
   "workflows": [],
+  "audit": {
+    "enforce": false
+  },
   "remotes": [],
   "assets": [],
   "images": [

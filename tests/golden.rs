@@ -214,7 +214,7 @@ fn import(name: &str, root: &Path) {
     ] {
         out.push_str(&format!("==== import {wanted}\n"));
         let module = tect::import::split(wanted).1;
-        match tect::import::find(here, &sources, wanted) {
+        match tect::import::find(here, &sources, wanted, false) {
             Err(message) => out.push_str(&format!("{message}\n")),
             Ok(found) if found.len() > 1 => {
                 let owners: Vec<&str> = found.iter().map(|f| f.owner.as_str()).collect();
@@ -284,6 +284,56 @@ fn edited_module(root: &Path) {
         dirty.contains("generated/plan.json"),
         "an edited module left plan.json current: {dirty}"
     );
+}
+
+/// The same repository, both ways. `audit { enforce }` is a lever over a
+/// record that always exists, so what it changes is which facts are fatal and
+/// nothing about which facts are kept.
+fn unenforced(root: &Path) {
+    let temp = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("unenforced");
+    let _ = std::fs::remove_dir_all(&temp);
+    copy(root, &temp);
+    let repo = temp.join("repo.kdl");
+    let text = std::fs::read_to_string(&repo).unwrap();
+    let (before, rest) = text.split_once("audit {").expect("the fixture enforces");
+    let after = rest.split_once('}').expect("a closed block").1;
+    std::fs::write(&repo, format!("{before}{after}")).unwrap();
+
+    std::env::set_current_dir(&temp).expect("the copied repository exists");
+    let issues = tect::run(Command::Check, None, Path::new("."))
+        .issues
+        .plain();
+    assert!(
+        issues.is_empty(),
+        "the same repository has to check clean unenforced: {issues}"
+    );
+}
+
+/// An unpinned collection is verified against nothing, so enforcement refuses
+/// the import rather than the build: hashing afterwards pins what you got, not
+/// what you should have got. The refusal lands before anything is fetched.
+fn unpinned_import(root: &Path) {
+    std::env::set_current_dir(root).expect("fixture root exists");
+    let (list, _, _) = tect::declarations(Path::new("."));
+    assert!(
+        list.sources.iter().any(|c| c.unpinned()),
+        "the fixture has to declare an unpinned collection"
+    );
+    let refused = tect::import::find(Path::new("."), &list.sources, "anything", true)
+        .err()
+        .expect("enforcement refuses an unpinned collection");
+    assert!(refused.contains("follows a moving ref"), "{refused}");
+}
+
+fn copy(from: &Path, to: &Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for entry in std::fs::read_dir(from).unwrap().flatten() {
+        let (src, dest) = (entry.path(), to.join(entry.file_name()));
+        match src.is_dir() {
+            true => copy(&src, &dest),
+            false => drop(std::fs::copy(&src, &dest).unwrap()),
+        }
+    }
 }
 
 /// Every file under `dir`, which is what an import wrote.
@@ -593,6 +643,8 @@ fn golden() {
         capture(&name, &dir.join(&name));
     }
     no_default(&dir.join("no-default"));
+    unenforced(&dir.join("enforced"));
+    unpinned_import(&dir.join("unpinned-source"));
     capture("init", &init);
     verify("init", &init);
     let created = init_repo("create");

@@ -1,0 +1,11 @@
+  x `core/grabber` fetches in module.sh with nothing declaring what
+   ,-[./modules/core/grabber/module.kdl:1:1]
+ 1 | description "Reaches the network with nothing declaring what it pulls"
+   : ^
+   : `-- `curl` reaches the network
+ 2 | 
+   `----
+  help: declare an `asset` with the url, the version and the sha256, and let
+        the layer read it out of ASSET_*; an undeclared fetch is the one build
+        input no record can describe after the fact
+

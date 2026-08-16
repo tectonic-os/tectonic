@@ -11,6 +11,9 @@
   "ungated_published": "pinned",
   "cache_image": "pinned-cache",
   "workflows": [],
+  "audit": {
+    "enforce": false
+  },
   "remotes": [
     {
       "name": "steam-tweaks",

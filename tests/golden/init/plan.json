@@ -40,6 +40,9 @@
       "enabled": true
     }
   ],
+  "audit": {
+    "enforce": false
+  },
   "remotes": [],
   "assets": [],
   "images": [

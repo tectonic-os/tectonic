@@ -11,6 +11,9 @@
   "ungated_published": "minimal",
   "cache_image": "minimal-cache",
   "workflows": [],
+  "audit": {
+    "enforce": false
+  },
   "remotes": [],
   "assets": [],
   "images": [

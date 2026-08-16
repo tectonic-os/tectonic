@@ -11,6 +11,9 @@
   "ungated_published": "broken-unpinned",
   "cache_image": "broken-unpinned-cache",
   "workflows": [],
+  "audit": {
+    "enforce": false
+  },
   "remotes": [
     {
       "name": "loose",

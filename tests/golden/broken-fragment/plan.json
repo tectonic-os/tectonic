@@ -11,6 +11,9 @@
   "ungated_published": "broken-fragment",
   "cache_image": "broken-fragment-cache",
   "workflows": [],
+  "audit": {
+    "enforce": false
+  },
   "remotes": [],
   "assets": [],
   "images": [

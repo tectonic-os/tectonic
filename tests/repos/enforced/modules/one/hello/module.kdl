@@ -1,0 +1,7 @@
+description "An imported module edited since it was imported"
+
+supports "fedora"
+
+packages {
+    fedora "hello"
+}

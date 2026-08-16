@@ -11,6 +11,9 @@
   "ungated_published": "Not An Id",
   "cache_image": "Not An Id-cache",
   "workflows": [],
+  "audit": {
+    "enforce": false
+  },
   "remotes": [],
   "assets": [],
   "images": [

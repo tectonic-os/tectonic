@@ -11,6 +11,9 @@
   "ungated_published": "broken-flavours",
   "cache_image": "broken-flavours-cache",
   "workflows": [],
+  "audit": {
+    "enforce": false
+  },
   "remotes": [],
   "assets": [],
   "images": [

@@ -11,6 +11,9 @@
   "ungated_published": "broken-options",
   "cache_image": "broken-options-cache",
   "workflows": [],
+  "audit": {
+    "enforce": false
+  },
   "remotes": [],
   "assets": [],
   "images": [

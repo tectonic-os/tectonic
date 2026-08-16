@@ -11,6 +11,9 @@
   "ungated_published": "suppressed",
   "cache_image": "suppressed-cache",
   "workflows": [],
+  "audit": {
+    "enforce": false
+  },
   "remotes": [],
   "assets": [],
   "images": [

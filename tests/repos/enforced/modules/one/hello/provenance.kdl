@@ -1,0 +1,9 @@
+imported "one" {
+    content "0000000000000000000000000000000000000000000000000000000000000000"
+    pin {
+        renovate datasource="github-tags" depName="owner/modules"
+        version "v1.0.0"
+        url "https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz"
+        sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+    }
+}

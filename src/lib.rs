@@ -233,6 +233,20 @@ pub fn run(command: Command, arg: Option<&str>, root: &Path) -> Run {
         ),
         _ => (Vec::new(), Vec::new(), Vec::new()),
     };
+    if list.audit_enforce {
+        for name in &modified {
+            issues.push(
+                Issue::new(
+                    format!("`{name}` no longer matches the record it was imported with"),
+                    &list.repo_src,
+                )
+                .help(
+                    "`audit { enforce #true }` makes a fork an error; re-import it, or drop the \
+                     `provenance.kdl` beside its manifest to own the module outright",
+                ),
+            );
+        }
+    }
 
     if let Some(unknown) = image_arg.filter(|id| !list.images.iter().any(|i| i.id == *id)) {
         let known: Vec<&str> = list.images.iter().map(|i| i.id.as_str()).collect();

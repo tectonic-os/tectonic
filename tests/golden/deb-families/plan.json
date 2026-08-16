@@ -11,6 +11,9 @@
   "ungated_published": "debian",
   "cache_image": "debian-cache",
   "workflows": [],
+  "audit": {
+    "enforce": false
+  },
   "remotes": [],
   "assets": [],
   "images": [

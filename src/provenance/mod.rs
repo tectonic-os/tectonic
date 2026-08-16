@@ -146,3 +146,114 @@ impl Evidence {
         ])
     }
 }
+
+// ---- policy --------------------------------------------------------------
+
+/// The network verbs a build layer reaches the outside world with. Closed, and
+/// data rather than a regex, so what counts as a fetch is one list to read.
+const FETCHES: [&str; 8] = [
+    "curl ",
+    "wget ",
+    "git clone",
+    "pip install",
+    "pip3 install",
+    "npm install",
+    "cargo install",
+    "go install",
+];
+
+/// The scripts a module runs, which are the two places it can fetch from.
+const SCRIPTS: [&str; 2] = ["module.sh", "finalize.sh"];
+
+/// A module that reaches the network with nothing declaring what it pulls.
+/// Always on, whatever the posture: an undeclared fetch is the one thing no
+/// record can describe after the fact, because nothing says what it should
+/// have been.
+pub fn check_fetch(
+    module: &crate::model::module::Module,
+    dir: &std::path::Path,
+    issues: &mut crate::diag::Issues,
+) {
+    if !module.assets.is_empty() {
+        return;
+    }
+    for script in SCRIPTS {
+        let Ok(text) = std::fs::read_to_string(dir.join(script)) else {
+            continue;
+        };
+        let Some(verb) = FETCHES.into_iter().find(|verb| {
+            text.lines()
+                .map(str::trim_start)
+                .any(|line| !line.starts_with('#') && line.contains(verb))
+        }) else {
+            continue;
+        };
+        issues.push(
+            crate::diag::Issue::new(
+                format!(
+                    "`{}` fetches in {script} with nothing declaring what",
+                    module.path
+                ),
+                &module.src,
+            )
+            .at(
+                Span::default(),
+                format!("`{}` reaches the network", verb.trim()),
+            )
+            .help(
+                "declare an `asset` with the url, the version and the sha256, and let the layer \
+                 read it out of ASSET_*; an undeclared fetch is the one build input no record \
+                 can describe after the fact",
+            ),
+        );
+        return;
+    }
+}
+
+/// What `audit { enforce }` refuses at build time: a record that would not name
+/// the digest it built on, or would not bind the image to a tree anyone can
+/// read. Kept apart from the build so the posture is checkable without running
+/// one.
+pub fn enforce_build(
+    enforce: bool,
+    resolved_base: Option<&str>,
+    source_commit: Option<&str>,
+) -> Result<(), String> {
+    if !enforce {
+        return Ok(());
+    }
+    if resolved_base.is_none() {
+        return Err(
+            "the base did not resolve to a manifest digest, so the build record would \
+                    not name what it built on; `audit { enforce #true }` makes that an error"
+                .into(),
+        );
+    }
+    if source_commit.is_none() {
+        return Err(
+            "the repository is at no commit, so the build record would not bind this \
+                    image to a tree anyone can read; `audit { enforce #true }` makes that an \
+                    error"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Unenforced records whatever it has; enforced refuses what it cannot
+    /// record. Same facts, one lever.
+    #[test]
+    fn enforcement_is_a_lever_over_a_record_that_always_exists() {
+        assert!(enforce_build(false, None, None).is_ok());
+        assert!(enforce_build(true, Some("repo@sha256:abc"), Some("deadbeef")).is_ok());
+
+        let no_base = enforce_build(true, None, Some("deadbeef")).unwrap_err();
+        assert!(no_base.contains("did not resolve"), "{no_base}");
+        let no_commit = enforce_build(true, Some("repo@sha256:abc"), None).unwrap_err();
+        assert!(no_commit.contains("no commit"), "{no_commit}");
+    }
+}

@@ -1,0 +1,4 @@
+  x `modules/one/hello` no longer matches the record it was imported with
+  help: `audit { enforce #true }` makes a fork an error; re-import it, or drop
+        the `provenance.kdl` beside its manifest to own the module outright
+

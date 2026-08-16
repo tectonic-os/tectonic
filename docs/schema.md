@@ -113,6 +113,30 @@ answers the URL.
 error; it is the one thing that stops the repository being reproducible, and
 it is worth being reminded of.
 
+`audit` is the posture, and only the posture. Every provenance fact is recorded
+whether or not it is declared: what a module hashed to, where it was imported
+from, what the base tag resolved to, what commit a cloned asset was taken at.
+`enforce #true` decides which of those being missing or not matching stops the
+run.
+
+```kdl
+audit {
+    enforce #true
+}
+```
+
+Under enforcement these are errors rather than read-outs: importing from a
+collection that follows a moving ref with no `sha256`, a module whose content no
+longer matches the record it was imported with, a base tag that will not resolve
+to a manifest digest, and a repository at no commit. Without it the same
+repository checks and builds clean and the same facts are written down, which is
+what stops a built artifact ever implying an audit it did not get.
+
+One diagnostic is on either way: a module whose `module.sh` or `finalize.sh`
+reaches the network with no `asset` declaring what it pulls. An undeclared fetch
+is the one build input no record can describe after the fact, because nothing
+says what it should have been.
+
 `seed` nominates the image a new repository may start from, and `generate`
 writes it to `generated/seed.kdl`.
 
@@ -184,6 +208,16 @@ Whether a build stamps the generated manifest onto the image as an OCI label.
 | Node | Takes | Meaning |
 | --- | --- | --- |
 | `label` | `#true` or `#false`, at most one | Whether the build stamps `org.tectonic.manifest` with the path to the baked manifest file. |
+
+### `audit`
+
+How strictly the provenance facts are held. Every one of them is recorded either way; this decides only which of them is fatal.
+
+*at most one, never empty*
+
+| Node | Takes | Meaning |
+| --- | --- | --- |
+| `enforce` | `#true` or `#false`, at most one | Whether a provenance fact that is missing or does not match stops the run rather than being reported. |
 
 <!-- /schema: repo -->
 
