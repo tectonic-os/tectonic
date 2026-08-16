@@ -695,9 +695,18 @@ jobs:
             .images[] | select([.targets[].name] | index($t)) | .base.family
           ' generated/plan.json)"
           case "$family" in
-            fedora) content=ssg-fedora-ds.xml ;;
-            debian) content=ssg-debian12-ds.xml ;;
-            ubuntu) content=ssg-ubuntu2404-ds.xml ;;
+            fedora)
+              content=ssg-fedora-ds.xml
+              installer="dnf -y install openscap-scanner"
+              ;;
+            debian)
+              content=ssg-debian12-ds.xml
+              installer="apt-get update && apt-get install -y openscap-scanner"
+              ;;
+            ubuntu)
+              content=ssg-ubuntu2404-ds.xml
+              installer="apt-get update && apt-get install -y openscap-scanner"
+              ;;
             *) echo "::error::no SSG content is known for the ${family} family"; exit 1 ;;
           esac
           datastream="/usr/share/xml/scap/ssg/content/${content}"
@@ -705,14 +714,23 @@ jobs:
           echo "DATASTREAM=${datastream}" >> "$GITHUB_ENV"
 
           sudo podman pull "$IMAGE_REF"
+          # The scanner runs inside the image, not over its mounted rootfs: a
+          # chroot scan reads the runner's rpm database path, a bootc image
+          # keeps an empty /var and its database under /usr, and the content
+          # then decides the target is not Fedora and skips every rule. What
+          # the scanner installs is in the container it measures, never in the
+          # published image.
+          #
           # No profile: the declared rules are what is being checked, so every
           # rule is evaluated and the claims are compared against the results.
           # oscap exits non-zero whenever any rule fails, which is expected.
-          sudo oscap-podman "$IMAGE_REF" xccdf eval \
-            --profile '(all)' \
-            --results-arf "${RUNNER_TEMP}/arf.xml" \
-            "$datastream" || true
+          cp "$datastream" "${RUNNER_TEMP}/ds.xml"
+          sudo podman run --rm --entrypoint "" \
+            -v "${RUNNER_TEMP}:/scan:z" "$IMAGE_REF" \
+            sh -c "${installer} > /dev/null && oscap xccdf eval \
+              --profile '(all)' --results-arf /scan/arf.xml /scan/ds.xml" || true
           [ -s "${RUNNER_TEMP}/arf.xml" ] || { echo "::error::the scan wrote no report"; exit 1; }
+          sudo chown "$(id -u):$(id -g)" "${RUNNER_TEMP}/arf.xml"
 
       - name: Compare the claims to the results
         if: steps.claims.outputs.count != '0'
