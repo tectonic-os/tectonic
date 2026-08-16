@@ -1,0 +1,25 @@
+image {
+    name "Alpha"
+
+    base "quay.io/fedora/fedora-bootc:44" {
+        family "fedora"
+        provides "rechunking"
+    }
+
+    modules {
+        module "core/hello"
+    }
+}
+
+image {
+    name "Beta"
+
+    base "quay.io/fedora/fedora-bootc:44" {
+        family "fedora"
+        provides "rechunking"
+    }
+
+    modules {
+        module "core/hello"
+    }
+}

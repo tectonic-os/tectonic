@@ -12,5 +12,5 @@ which module [0-4]: 1
 list it in images [0-1, several]: 1
 
 imported modules/one/browser
-listed "one/browser" in ./example.kdl
+listed "one/browser" in ./example.image.kdl
 ==== exit 0

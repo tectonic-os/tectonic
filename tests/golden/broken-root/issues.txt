@@ -1,0 +1,14 @@
+  x nothing reads `notes.kdl`
+  help: an image file is `image.kdl` or `<name>.image.kdl`; rename it to
+        `notes.image.kdl`, or move it out of the repository root
+
+  x `same` is declared twice
+    ,-[./image.kdl:14:1]
+ 13 | 
+ 14 | image {
+    : ^^|^^
+    :   `-- also declared above
+ 15 |     name "Same"
+    `----
+  help: two images cannot publish under one name; declare `id` on one of them
+

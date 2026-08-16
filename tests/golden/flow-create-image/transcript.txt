@@ -14,6 +14,6 @@ Beta
   0) none
 What is the base image for this image? [0-8]: 8
 
-wrote ./beta.kdl
+wrote ./beta.image.kdl
 named "example" the default image in repo.kdl
 ==== exit 0

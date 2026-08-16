@@ -13,7 +13,8 @@ does, once, and the shell that runs inside a layer is handed the result.
 
     repo.kdl              the repository: schema version, tool pin, default
                           image, workflows
-    workstation.kdl       one image, and every root .kdl but repo.kdl is one
+    workstation.image.kdl one image; a root .kdl is an image only if it is
+                          named image.kdl or ends .image.kdl
     modules/<path>/       one module apiece, each with a module.kdl
 
 `tect create repo` writes that tree, along with the build scripts, the shell

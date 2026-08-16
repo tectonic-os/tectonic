@@ -13,6 +13,6 @@ package names, separated by spaces []: nano vim
 list it in images [0-2, several]: 1 2
 
 wrote modules/my-editor/module.kdl
-listed "my-editor" in ./example.kdl
-listed "my-editor" in ./server.kdl
+listed "my-editor" in ./example.image.kdl
+listed "my-editor" in ./server.image.kdl
 ==== exit 0

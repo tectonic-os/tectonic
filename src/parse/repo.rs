@@ -121,12 +121,15 @@ pub const REPO: Node = Node::new("repo",
          true of the \
          repository rather than of any image in it. An image goes in a file of its own"));
 
-/// Every other root `.kdl`, which is one image and nothing else.
+/// `image.kdl` or `<name>.image.kdl` at the root, holding whatever images it
+/// likes.
 #[rustfmt::skip]
-const IMAGE_FILE: Node = Node::new("image file", "One image, in a file of its own.")
+const IMAGE_FILE: Node = Node::new("image file",
+    "Images, in a file named `image.kdl` or `<name>.image.kdl`. The name in front is decorative: \
+     an image is called what it declares, so one file may hold as many as suit the repository.")
     .children(&[IMAGE], Say::new("unknown top-level node `{}`", "not part of the schema",
-        "every root .kdl but repo.kdl is one `image` node; `base`, `flavours` and `modules` are \
-         declared inside it, because they are what the image is rather than what the repository \
+        "an image file holds `image` nodes and nothing else; `base`, `flavours` and `modules` are \
+         declared inside one, because they are what the image is rather than what the repository \
          is"));
 
 /// What repo.kdl declares about which tool reads it.
@@ -238,8 +241,8 @@ impl List {
         }
     }
 
-    /// Every `*.kdl` at the repository root: one image apiece, plus repo.kdl,
-    /// which is repo context and declares no image.
+    /// repo.kdl, which is repo context, and every image file beside it. A root
+    /// `.kdl` that is neither is nobody's, and is reported rather than read.
     fn read(root: &Path) -> (Self, Issues) {
         let mut issues = Issues::default();
         let mut list = List::empty(root);
@@ -269,6 +272,20 @@ impl List {
 
         for name in &names {
             let path = root.join(name).display().to_string();
+            if name != layout::REPO_FILE && !layout::is_image_file(name) {
+                issues.push(
+                    Issue::new(format!("nothing reads `{name}`"), &Source::new(&path, "")).help(
+                        format!(
+                            "an image file is `{}` or `<name>{}`; rename it to `{}`, or move it \
+                             out of the repository root",
+                            layout::IMAGE_FILE,
+                            layout::IMAGE_SUFFIX,
+                            layout::as_image_file(name)
+                        ),
+                    ),
+                );
+                continue;
+            }
             let text = match std::fs::read_to_string(root.join(name)) {
                 Ok(text) => text,
                 Err(err) => {
@@ -336,12 +353,11 @@ impl List {
 
         if !is_repo && !doc.nodes().iter().any(|n| n.name().value() == "image") {
             issues.push(
-                Issue::new(format!("{} declares no image", src.name()), src).help(format!(
-                    "every root .kdl but {} holds one `image` node: \
-                     `image {{ name \"Name\" }}`, what the image calls itself in os-release \
+                Issue::new(format!("{} declares no image", src.name()), src).help(
+                    "an image file holds at least one `image` node: \
+                     `image { name \"Name\" }`, what the image calls itself in os-release \
                      and what it publishes as",
-                    layout::REPO_FILE
-                )),
+                ),
             );
         }
     }
@@ -353,12 +369,22 @@ impl List {
             }
             for other in &self.images[..index] {
                 if other.id == image.id {
+                    let same = other.src.name() == image.src.name();
                     issues.push(
                         Issue::new(
-                            format!("`{}` is declared by two files", image.id),
+                            match same {
+                                true => format!("`{}` is declared twice", image.id),
+                                false => format!("`{}` is declared by two files", image.id),
+                            },
                             &image.src,
                         )
-                        .at(image.span, format!("also declared in {}", other.src.name()))
+                        .at(
+                            image.span,
+                            match same {
+                                true => "also declared above".to_string(),
+                                false => format!("also declared in {}", other.src.name()),
+                            },
+                        )
                         .help(
                             "two images cannot publish under one name; declare `id` on one of them",
                         ),
@@ -377,9 +403,12 @@ impl List {
                             .at(flavour.span, "this flavour")
                             .at(image.span, "of this image")
                             .help(format!(
-                                "the image declared in {} publishes under that name too; \
+                                "the image declared {} publishes under that name too; \
                                  rename one of them",
-                                other.src.name()
+                                match other.src.name() == image.src.name() {
+                                    true => "in this file".to_string(),
+                                    false => format!("in {}", other.src.name()),
+                                }
                             )),
                         );
                     }

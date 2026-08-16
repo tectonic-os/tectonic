@@ -71,9 +71,10 @@ location is defined in the command:
 
 ### `create image [name]`
 
-Writes one image file, `<image-id>.kdl`, at the repository root. The id is the
-machine name your name derives, so "My Desktop" writes `my-desktop.kdl`. Every
-root `.kdl` but `repo.kdl` is one image.
+Writes one image file, `<image-id>.image.kdl`, at the repository root. The id
+is the machine name your name derives, so "My Desktop" writes
+`my-desktop.image.kdl`. A root `.kdl` is an image only when it is named
+`image.kdl` or ends in `.image.kdl`; anything else is reported rather than read.
 
 Asks you for:
 - The image name, which defaults to what the repository is called

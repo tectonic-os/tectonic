@@ -219,7 +219,7 @@ fn username(host: &str) -> String {
     }
 }
 
-/// One image, in `<image-id>.kdl` at the repository root.
+/// One image, in `<image-id>.image.kdl` at the repository root.
 pub struct Image {
     file: PathBuf,
     text: String,
@@ -249,7 +249,7 @@ impl Image {
             crate::init::id(repo).is_ok().then_some(repo),
         )?;
         let id = crate::init::id(&name)?;
-        let file = root.join(format!("{id}.kdl"));
+        let file = root.join(format!("{id}{}", layout::IMAGE_SUFFIX));
         if file.exists() {
             return Err(format!("{} is already there", file.display()));
         }

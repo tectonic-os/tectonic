@@ -30,7 +30,7 @@ What is the base image for this image? [0-7]: 1
 
 wrote Example into example
 initialised a git repository in example
-wrote example/example.kdl
+wrote example/example.image.kdl
 
 next, in example:
   git add -A && git commit

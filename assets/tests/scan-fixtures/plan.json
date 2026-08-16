@@ -37,7 +37,7 @@
       "id": "enforced",
       "name": "Enforced",
       "pretty_name": "",
-      "file": "./example.kdl",
+      "file": "./example.image.kdl",
       "url": "",
       "issues_url": "",
       "base": {

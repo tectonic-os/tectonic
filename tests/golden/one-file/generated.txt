@@ -1,0 +1,91 @@
+==== generated/alpha.d/core/hello.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/hello
+export MODDIR
+
+dnf5 install -y fastfetch
+==== generated/alpha.graph.md
+# Alpha capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["quay.io/fedora/fedora-bootc:44"]
+    m0["core/hello"]
+```
+
+## Capabilities
+
+| Name | Kind | Provided by | Required by | After |
+|---|---|---|---|---|
+| `rechunking` | capability | `base` |  |  |
+==== generated/alpha.graph.json
+{
+  "image": "alpha",
+  "capabilities": [
+    {
+      "name": "rechunking",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    }
+  ],
+  "overrides": [],
+  "suppressed": []
+}
+==== generated/beta.d/core/hello.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/hello
+export MODDIR
+
+dnf5 install -y fastfetch
+==== generated/beta.graph.md
+# Beta capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["quay.io/fedora/fedora-bootc:44"]
+    m0["core/hello"]
+```
+
+## Capabilities
+
+| Name | Kind | Provided by | Required by | After |
+|---|---|---|---|---|
+| `rechunking` | capability | `base` |  |  |
+==== generated/beta.graph.json
+{
+  "image": "beta",
+  "capabilities": [
+    {
+      "name": "rechunking",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    }
+  ],
+  "overrides": [],
+  "suppressed": []
+}
+==== generated/plan.json

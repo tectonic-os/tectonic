@@ -12,5 +12,5 @@ package names, separated by spaces []: nano vim
 list it in images [0-1, several]: 1
 
 wrote modules/my-editor/module.kdl
-listed "my-editor" in ./example.kdl
+listed "my-editor" in ./example.image.kdl
 ==== exit 0

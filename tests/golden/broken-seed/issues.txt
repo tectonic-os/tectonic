@@ -4,7 +4,7 @@
         imported as: that is what a seeded repository fetches them through
 
   x `core/hello` is in no collection the seed can name
-    ,-[./example.kdl:9:9]
+    ,-[./example.image.kdl:9:9]
   8 |     modules {
   9 |         module "core/hello"
     :         ^^^|^^
@@ -15,7 +15,7 @@
         import leaves a seeded repository unbuildable
 
   x `steam-tweaks` is in no collection the seed can name
-    ,-[./example.kdl:10:9]
+    ,-[./example.image.kdl:10:9]
   9 |         module "core/hello"
  10 |         module "steam-tweaks" {
     :         ^^^|^^

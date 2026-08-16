@@ -21,7 +21,7 @@
       "id": "broken-fetch",
       "name": "Broken Fetch",
       "pretty_name": "",
-      "file": "./example.kdl",
+      "file": "./example.image.kdl",
       "url": "",
       "issues_url": "",
       "base": {

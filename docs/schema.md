@@ -5,7 +5,7 @@ Three kinds of file, all KDL, all read by `tect`.
 | File | Declares |
 | --- | --- |
 | `repo.kdl` | the repository: the schema it is written against, the tool release it pins, which image a bare build builds, which shipped workflows run |
-| `<name>.kdl` at the root | one image: what it calls itself, what it builds on, and the modules in it |
+| `image.kdl` or `<name>.image.kdl` at the root | one image file, holding what each image calls itself, what it builds on, and the modules in it |
 | `modules/<path>/module.kdl` | one module: what it needs, what it offers, and what an image author may set |
 
 `tect check` reads all three and reports every problem at the line that caused
@@ -223,8 +223,9 @@ How strictly the provenance facts are held. Every one of them is recorded either
 
 ## Image files
 
-Every root `.kdl` but `repo.kdl` is one image. The file name is yours and
-reaches nothing.
+A root `.kdl` is an image only when it is named `image.kdl` or ends in
+`.image.kdl`. Any other root `.kdl` is reported with a diagnostic rather than
+read. One image file may hold more than one `image` node.
 
 | | Where it comes from | Where it goes |
 | --- | --- | --- |

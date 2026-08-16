@@ -18,7 +18,7 @@
     {
       "name": "steam-tweaks",
       "dir": "modules/.remote/steam-tweaks",
-      "file": "./example.kdl",
+      "file": "./example.image.kdl",
       "pin": {
         "locator": "https://github.com/owner/bootc-modules/archive/refs/tags/{version}.tar.gz",
         "selector": "steam-tweaks/v1.2.0",
@@ -37,7 +37,7 @@
       "id": "example",
       "name": "Example",
       "pretty_name": "",
-      "file": "./example.kdl",
+      "file": "./example.image.kdl",
       "url": "",
       "issues_url": "",
       "base": {

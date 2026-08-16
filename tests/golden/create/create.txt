@@ -11,7 +11,7 @@ packages {
 description "plain"
 
 supports "fedora"
-==== example.kdl
+==== example.image.kdl
 image {
     name "Example"
     url "https://github.com/someone/example"
@@ -26,7 +26,7 @@ image {
         module "my-editor"
     }
 }
-==== server.kdl
+==== server.image.kdl
 image {
     name "Server"
     url "https://github.com/someone/example"

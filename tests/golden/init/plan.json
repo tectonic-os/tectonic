@@ -50,7 +50,7 @@
       "id": "example",
       "name": "Example",
       "pretty_name": "",
-      "file": "./example.kdl",
+      "file": "./example.image.kdl",
       "url": "https://github.com/someone/example",
       "issues_url": "https://github.com/someone/example/issues",
       "base": {

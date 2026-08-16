@@ -20,18 +20,17 @@
         of any image in it. An image goes in a file of its own
 
   x unknown top-level node `palette`
-   ,-[./second.kdl:1:1]
+   ,-[./second.image.kdl:1:1]
  1 | palette {
    : ^^^|^^^
    :    `-- not part of the schema
  2 |     accent "red"
    `----
-  help: every root .kdl but repo.kdl is one `image` node; `base`, `flavours`
-        and `modules` are declared inside it, because they are what the image
+  help: an image file holds `image` nodes and nothing else; `base`, `flavours`
+        and `modules` are declared inside one, because they are what the image
         is rather than what the repository is
 
-  x ./second.kdl declares no image
-  help: every root .kdl but repo.kdl holds one `image` node: `image { name
-        "Name" }`, what the image calls itself in os-release and what it
-        publishes as
+  x ./second.image.kdl declares no image
+  help: an image file holds at least one `image` node: `image { name "Name" }
+        `, what the image calls itself in os-release and what it publishes as
 

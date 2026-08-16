@@ -1,0 +1,219 @@
+{
+  "schema_version": 1,
+  "default_image": null,
+  "default_image_name": null,
+  "pr_image": null,
+  "default_target": null,
+  "default_published": null,
+  "pr_target": null,
+  "pr_published": null,
+  "ungated_target": null,
+  "ungated_published": null,
+  "cache_image": null,
+  "workflows": [],
+  "audit": {
+    "enforce": false
+  },
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "same",
+      "name": "Same",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "provides_files": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "same/none",
+          "image": "same",
+          "flavour": null,
+          "published": "same",
+          "default": false,
+          "pr": false,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "core/hello",
+              "dir": "core/hello",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "The smallest module a repository can hold",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "provenance": {
+                "content": "28e4cbeb5e5d7883cd17f228e9259c8bfc14bc0f6184aee913ede1048a2ae2d3",
+                "repo": false,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": []
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "overlay_overridden": [],
+          "collected_files": {},
+          "collect_destinations": []
+        },
+        {
+          "name": "same/none",
+          "image": "same",
+          "flavour": null,
+          "published": "same",
+          "default": false,
+          "pr": false,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "core/hello",
+              "dir": "core/hello",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "The smallest module a repository can hold",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "provenance": {
+                "content": "28e4cbeb5e5d7883cd17f228e9259c8bfc14bc0f6184aee913ede1048a2ae2d3",
+                "repo": false,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": []
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "overlay_overridden": [],
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    },
+    {
+      "id": "same",
+      "name": "Same",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "provides_files": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "same/none",
+          "image": "same",
+          "flavour": null,
+          "published": "same",
+          "default": false,
+          "pr": false,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "core/hello",
+              "dir": "core/hello",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "The smallest module a repository can hold",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "provenance": {
+                "content": "28e4cbeb5e5d7883cd17f228e9259c8bfc14bc0f6184aee913ede1048a2ae2d3",
+                "repo": false,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": []
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "overlay_overridden": [],
+          "collected_files": {},
+          "collect_destinations": []
+        },
+        {
+          "name": "same/none",
+          "image": "same",
+          "flavour": null,
+          "published": "same",
+          "default": false,
+          "pr": false,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "core/hello",
+              "dir": "core/hello",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "The smallest module a repository can hold",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "provenance": {
+                "content": "28e4cbeb5e5d7883cd17f228e9259c8bfc14bc0f6184aee913ede1048a2ae2d3",
+                "repo": false,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": []
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "overlay_overridden": [],
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

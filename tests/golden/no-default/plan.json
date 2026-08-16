@@ -21,7 +21,7 @@
       "id": "server",
       "name": "Server",
       "pretty_name": "",
-      "file": "./server.kdl",
+      "file": "./server.image.kdl",
       "url": "",
       "issues_url": "",
       "base": {
@@ -87,7 +87,7 @@
       "id": "workstation",
       "name": "Workstation",
       "pretty_name": "",
-      "file": "./workstation.kdl",
+      "file": "./workstation.image.kdl",
       "url": "",
       "issues_url": "",
       "base": {

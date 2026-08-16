@@ -160,8 +160,8 @@ fn create(name: &str, root: &Path) {
     for file in [
         "modules/my-editor/module.kdl",
         "modules/plain/module.kdl",
-        "example.kdl",
-        "server.kdl",
+        "example.image.kdl",
+        "server.image.kdl",
     ] {
         out.push_str(&format!(
             "==== {file}\n{}",

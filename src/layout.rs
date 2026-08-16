@@ -15,9 +15,14 @@ pub const OUT: &str = "out";
 /// A module's overlay tree, staged into the image by the collector.
 pub const OVERLAY: &str = "files";
 
-/// Repo context, not an image: the file every image file is not, and the one
-/// whose presence marks a root.
+/// Repo context, not an image, and the file whose presence marks a root.
 pub const REPO_FILE: &str = "repo.kdl";
+/// An image file with no name in front of it, which is what a repository
+/// holding one image wants to call it.
+pub const IMAGE_FILE: &str = "image.kdl";
+/// What names the rest. The name in front is decorative: an image is called
+/// what it declares, and a file may hold as many as it likes.
+pub const IMAGE_SUFFIX: &str = ".image.kdl";
 /// What a module declares about itself.
 pub const MODULE_FILE: &str = "module.kdl";
 /// What `import module` writes beside a vendored module.kdl, never into it.
@@ -32,6 +37,18 @@ pub const SOURCES_CACHE: &str = "out/sources";
 /// What a fetched tree hashed to, kept out of the tree it describes so nothing
 /// under `modules/` is tool-written state.
 pub const STAMPS: &str = "out/remote-modules";
+
+/// Whether a root file holds images. An allowlist rather than "everything but
+/// repo.kdl", so a root `.kdl` that is neither is reported instead of parsed.
+pub fn is_image_file(name: &str) -> bool {
+    name == IMAGE_FILE || name.ends_with(IMAGE_SUFFIX)
+}
+
+/// What a misnamed root `.kdl` would have to be called, for the diagnostic that
+/// reports one.
+pub fn as_image_file(name: &str) -> String {
+    format!("{}{IMAGE_SUFFIX}", name.trim_end_matches(".kdl"))
+}
 
 pub fn modules(root: &Path) -> PathBuf {
     root.join(MODULES)

@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
-  "default_image": "debian",
-  "default_image_name": "Debian",
-  "pr_image": "debian",
-  "default_target": "debian/none",
-  "default_published": "debian",
-  "pr_target": "debian/none",
-  "pr_published": "debian",
-  "ungated_target": "debian/none",
-  "ungated_published": "debian",
-  "cache_image": "debian-cache",
+  "default_image": "alpha",
+  "default_image_name": "Alpha",
+  "pr_image": "alpha",
+  "default_target": "alpha/none",
+  "default_published": "alpha",
+  "pr_target": "alpha/none",
+  "pr_published": "alpha",
+  "ungated_target": "alpha/none",
+  "ungated_published": "alpha",
+  "cache_image": "alpha-cache",
   "workflows": [],
   "audit": {
     "enforce": false
@@ -18,19 +18,18 @@
   "assets": [],
   "images": [
     {
-      "id": "debian",
-      "name": "Debian",
+      "id": "alpha",
+      "name": "Alpha",
       "pretty_name": "",
-      "file": "./debian.image.kdl",
+      "file": "./image.kdl",
       "url": "",
       "issues_url": "",
       "base": {
-        "image": "ghcr.io/bootcrew/debian-bootc:latest",
-        "family": "debian",
-        "signed": true,
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
         "provides": [
-          "rechunking",
-          "initramfs-generation"
+          "rechunking"
         ],
         "provides_files": []
       },
@@ -38,26 +37,26 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "debian/none",
-          "image": "debian",
+          "name": "alpha/none",
+          "image": "alpha",
           "flavour": null,
-          "published": "debian",
+          "published": "alpha",
           "default": true,
           "pr": true,
           "siblings": [],
           "modules": [
             {
-              "path": "core/shared",
-              "dir": "core/shared",
+              "path": "core/hello",
+              "dir": "core/hello",
               "flavour": null,
               "variant": null,
               "remote": null,
-              "description": "A module both the Debian and Ubuntu images enable",
+              "description": "The smallest module a repository can hold",
               "options": {},
               "provides": [],
               "requires": [],
               "provenance": {
-                "content": "bc71ee256b11752cba5dec1bd1034ccae9850624f24370f1ac8509b2aa3bbc1f",
+                "content": "28e4cbeb5e5d7883cd17f228e9259c8bfc14bc0f6184aee913ede1048a2ae2d3",
                 "repo": false,
                 "pin": null,
                 "imported": null
@@ -79,19 +78,18 @@
       ]
     },
     {
-      "id": "ubuntu",
-      "name": "Ubuntu",
+      "id": "beta",
+      "name": "Beta",
       "pretty_name": "",
-      "file": "./ubuntu.image.kdl",
+      "file": "./image.kdl",
       "url": "",
       "issues_url": "",
       "base": {
-        "image": "ghcr.io/bootcrew/ubuntu-bootc:latest",
-        "family": "ubuntu",
-        "signed": true,
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
         "provides": [
-          "rechunking",
-          "initramfs-generation"
+          "rechunking"
         ],
         "provides_files": []
       },
@@ -99,26 +97,26 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "ubuntu/none",
-          "image": "ubuntu",
+          "name": "beta/none",
+          "image": "beta",
           "flavour": null,
-          "published": "ubuntu",
+          "published": "beta",
           "default": false,
           "pr": false,
           "siblings": [],
           "modules": [
             {
-              "path": "core/shared",
-              "dir": "core/shared",
+              "path": "core/hello",
+              "dir": "core/hello",
               "flavour": null,
               "variant": null,
               "remote": null,
-              "description": "A module both the Debian and Ubuntu images enable",
+              "description": "The smallest module a repository can hold",
               "options": {},
               "provides": [],
               "requires": [],
               "provenance": {
-                "content": "bc71ee256b11752cba5dec1bd1034ccae9850624f24370f1ac8509b2aa3bbc1f",
+                "content": "28e4cbeb5e5d7883cd17f228e9259c8bfc14bc0f6184aee913ede1048a2ae2d3",
                 "repo": false,
                 "pin": null,
                 "imported": null
