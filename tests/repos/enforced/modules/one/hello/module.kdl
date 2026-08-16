@@ -2,6 +2,18 @@ description "An imported module edited since it was imported"
 
 supports "fedora"
 
-packages {
-    fedora "hello"
+provides "hello"
+
+satisfies {
+    cis-fedora "1.1.1.1" "5.2.20"
+    stig "RHEL-09-232010"
+}
+
+asset "hello" {
+    pin {
+        renovate datasource="github-releases" depName="owner/hello"
+        version "1.4.0"
+        url "https://github.com/owner/hello/releases/download/v{version}/hello.tar.gz"
+        sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+    }
 }

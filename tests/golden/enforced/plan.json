@@ -15,7 +15,23 @@
     "enforce": true
   },
   "remotes": [],
-  "assets": [],
+  "assets": [
+    {
+      "module": "one/hello",
+      "name": "hello",
+      "manifest": "modules/one/hello/module.kdl",
+      "pin": {
+        "locator": "https://github.com/owner/hello/releases/download/v{version}/hello.tar.gz",
+        "selector": "1.4.0",
+        "verifier": "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3",
+        "tracker": "renovate",
+        "reason": null,
+        "from": "asset",
+        "path": null,
+        "resolved": "https://github.com/owner/hello/releases/download/v1.4.0/hello.tar.gz"
+      }
+    }
+  ],
   "images": [
     {
       "id": "enforced",
@@ -53,8 +69,13 @@
               "remote": null,
               "description": "An imported module edited since it was imported",
               "options": {},
+              "provides": [
+                "hello"
+              ],
+              "requires": [],
               "provenance": {
-                "content": "d1c4d2e2a9daba2a276cecd62d8c7f3495c62f9fca7e215d6917f6b193173c1c",
+                "content": "8007859e1ea33d1c1b07b7191fa1913f655965e124727f5d01d688b23549d085",
+                "repo": true,
                 "pin": null,
                 "imported": {
                   "collection": "one",
@@ -71,6 +92,40 @@
                   }
                 }
               },
+              "satisfies": [
+                {
+                  "benchmark": "cis-fedora",
+                  "rules": [
+                    "1.1.1.1",
+                    "5.2.20"
+                  ]
+                },
+                {
+                  "benchmark": "stig",
+                  "rules": [
+                    "RHEL-09-232010"
+                  ]
+                }
+              ]
+            },
+            {
+              "path": "core/consumer",
+              "dir": "core/consumer",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Requires what the imported module provides",
+              "options": {},
+              "provides": [],
+              "requires": [
+                "hello"
+              ],
+              "provenance": {
+                "content": "dee9185a44234404aca6a47d6ff19a59fba26569fd92dff259b8dd9749422b9a",
+                "repo": false,
+                "pin": null,
+                "imported": null
+              },
               "satisfies": []
             }
           ],
@@ -78,7 +133,23 @@
           "secrets": [],
           "contract_files": [],
           "verify_exceptions": [],
-          "assets": [],
+          "assets": [
+            {
+              "module": "one/hello",
+              "name": "hello",
+              "manifest": "modules/one/hello/module.kdl",
+              "pin": {
+                "locator": "https://github.com/owner/hello/releases/download/v{version}/hello.tar.gz",
+                "selector": "1.4.0",
+                "verifier": "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3",
+                "tracker": "renovate",
+                "reason": null,
+                "from": "asset",
+                "path": null,
+                "resolved": "https://github.com/owner/hello/releases/download/v1.4.0/hello.tar.gz"
+              }
+            }
+          ],
           "provides_files": {},
           "overlay_files": {},
           "collected_files": {},

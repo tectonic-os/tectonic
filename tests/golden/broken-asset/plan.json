@@ -84,8 +84,11 @@
               "remote": null,
               "description": "Asset pins that say nothing usable about what they fetch",
               "options": {},
+              "provides": [],
+              "requires": [],
               "provenance": {
                 "content": "6587157530452cc66327a4790eb532848dd61ce24d92dd95ec87dc7d7ef70db9",
+                "repo": false,
                 "pin": null,
                 "imported": null
               },

@@ -69,8 +69,11 @@
               "remote": null,
               "description": "",
               "options": {},
+              "provides": [],
+              "requires": [],
               "provenance": {
                 "content": null,
+                "repo": false,
                 "pin": {
                   "locator": "http://example.com/modules.zip",
                   "selector": null,

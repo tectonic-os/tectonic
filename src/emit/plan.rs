@@ -294,6 +294,8 @@ fn module(entry: &Entry) -> Json {
                     .map(|(name, value)| (name.clone(), Json::string(value))),
             ),
         ),
+        ("provides", Json::strings(decls(module, |m| &m.provides))),
+        ("requires", Json::strings(decls(module, |m| &m.requires))),
         ("provenance", provenance(entry)),
         (
             "satisfies",
@@ -313,6 +315,17 @@ fn module(entry: &Entry) -> Json {
     ])
 }
 
+/// One list of capability names off a module, empty where the manifest did not
+/// load.
+fn decls(
+    module: Option<&Module>,
+    of: impl Fn(&Module) -> &Vec<crate::model::module::Decl>,
+) -> Vec<String> {
+    module
+        .map(|m| of(m).iter().map(|d| d.name.clone()).collect())
+        .unwrap_or_default()
+}
+
 /// Where this module came from: the content hash `verify` covers, the pin an
 /// out-of-tree module is fetched at, and the record an import left inside it.
 fn provenance(entry: &Entry) -> Json {
@@ -322,6 +335,7 @@ fn provenance(entry: &Entry) -> Json {
             "content",
             Json::optional(module.and_then(|m| m.content.clone())),
         ),
+        ("repo", Json::Bool(module.is_some_and(|m| m.repo))),
         (
             "pin",
             entry.remote.as_ref().map_or(Json::Null, Evidence::json),

@@ -20,6 +20,10 @@ use std::process::Command;
 /// Where the record lands in the image, beside the baked manifest.
 pub const RECORD: &str = "/usr/share/tectonic/build.json";
 
+/// Where the generated plan is baked, which is what the image declares it is
+/// made of.
+pub const MANIFEST: &str = "/usr/share/tectonic/manifest.json";
+
 /// One field of the record that arrives as a build argument. Kept as data so
 /// the host that passes them and the layer that reads them cannot drift.
 pub const ARGS: [&str; 9] = [

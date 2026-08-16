@@ -286,6 +286,57 @@ fn edited_module(root: &Path) {
     );
 }
 
+/// `why`, both renderings and both readings. The repository answer comes off
+/// the resolved plan; the host answer comes off the two documents a built image
+/// carries, with no repo.kdl anywhere. One renderer, so the same module has to
+/// come out the same way.
+fn why(name: &str, root: &Path, module: &str) {
+    std::env::set_current_dir(root).expect("fixture root exists");
+    let here = Path::new(".");
+    let mut out = String::new();
+
+    for (command, heading) in [(Command::Why, "markdown"), (Command::WhyJson, "json")] {
+        out.push_str(&format!("==== {heading}\n"));
+        out.push_str(&tect::run(command, Some(module), here).stdout);
+    }
+
+    out.push_str("==== unknown\n");
+    out.push_str(&tect::run(Command::Why, Some("nosuch"), here).issues.plain());
+
+    // The same answer with no repository at all, off what a build bakes.
+    let manifest = tect::emit::json::Json::parse(&tect::run(Command::Plan, None, here).stdout)
+        .expect("the plan is a document");
+    let host = tect::emit::why::on_host(&manifest, None, module).expect("the manifest names it");
+    out.push_str("==== from the baked manifest, with no repository\n");
+    out.push_str(&host.markdown());
+    out.push_str(&format!(
+        "==== the names it knows\n{}\n",
+        tect::emit::why::known_on_host(&manifest).join(", ")
+    ));
+
+    // The build record is what was observed. Two documents out of one build
+    // cannot disagree, so a disagreement is worth saying out loud.
+    let record = tect::emit::json::Json::parse(&format!(
+        "{{\"modules\": [{{\"path\": {module:?}, \"content\": \"not what was declared\"}}]}}"
+    ))
+    .expect("the record is a document");
+    let observed =
+        tect::emit::why::on_host(&manifest, Some(&record), module).expect("the manifest names it");
+    out.push_str("==== against a build record that disagrees\n");
+    out.push_str(
+        observed
+            .markdown()
+            .split("## Where it came from")
+            .nth(1)
+            .unwrap_or_default()
+            .split("## What it pulls in")
+            .next()
+            .unwrap_or_default(),
+    );
+
+    compare(name, "why.txt", &out);
+}
+
 /// The same repository, both ways. `audit { enforce }` is a lever over a
 /// record that always exists, so what it changes is which facts are fatal and
 /// nothing about which facts are kept.
@@ -645,10 +696,43 @@ fn golden() {
     no_default(&dir.join("no-default"));
     unenforced(&dir.join("enforced"));
     unpinned_import(&dir.join("unpinned-source"));
+    why("enforced", &dir.join("enforced"), "one/hello");
     capture("init", &init);
     verify("init", &init);
     let created = init_repo("create");
     create("create", &created);
     edited_module(&created);
     import("import", &init_repo("import"));
+}
+
+/// Every document the tool writes has to read back as what was written. The
+/// corpus is the oracle, so the whole of it is the round trip.
+#[test]
+fn every_written_document_reads_back() {
+    // The corpus is being rewritten in another thread on a regeneration run,
+    // so what is on disk is not a document until it settles.
+    if std::env::var_os("UPDATE_GOLDEN").is_some() {
+        return;
+    }
+    let dir = crate_dir().join("tests/golden");
+    let mut read = 0;
+    for path in walk(&dir) {
+        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        let text = std::fs::read_to_string(&path).unwrap();
+        // A command with nothing to say writes nothing, which is not a document.
+        if text.trim().is_empty() {
+            continue;
+        }
+        let parsed = tect::emit::json::Json::parse(&text)
+            .unwrap_or_else(|err| panic!("{}: {err}", path.display()));
+        assert!(
+            parsed.render() == text,
+            "{} did not read back as what was written",
+            path.display()
+        );
+        read += 1;
+    }
+    assert!(read >= 20, "only {read} documents were read");
 }

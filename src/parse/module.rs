@@ -340,6 +340,7 @@ impl Module {
             standard_layer: true,
             content: crate::provenance::record::hash(&dir),
             imported: crate::provenance::record::read(&dir, issues),
+            repo: dir.join("repo").is_file(),
             src: src.clone(),
         };
 

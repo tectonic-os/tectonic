@@ -54,8 +54,15 @@
               "remote": null,
               "description": "A kernel that signs its own modules against a Secure Boot key",
               "options": {},
+              "provides": [
+                "kernel-devel"
+              ],
+              "requires": [
+                "initramfs-generation"
+              ],
               "provenance": {
                 "content": "4b33131019d71fdded2b8e45c186cd290fc20e9b2e208bfd39f8034f35be6a7f",
+                "repo": false,
                 "pin": null,
                 "imported": null
               },
@@ -83,8 +90,13 @@
               "remote": null,
               "description": "A DKMS module built and signed against the kernel above",
               "options": {},
+              "provides": [],
+              "requires": [
+                "kernel-devel"
+              ],
               "provenance": {
                 "content": "9180d9d668bc79d3f81dab617c5f63c0bd44690b8af34243c1f4b452b86fde89",
+                "repo": false,
                 "pin": null,
                 "imported": null
               },

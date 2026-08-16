@@ -53,8 +53,13 @@
               "remote": null,
               "description": "",
               "options": {},
+              "provides": [
+                "shell-tools"
+              ],
+              "requires": [],
               "provenance": {
                 "content": "9b8cc5684a0c80375dffe8212b3f7690fa2955864b23754e76eaacd27aa73b5f",
+                "repo": false,
                 "pin": null,
                 "imported": null
               },
@@ -85,8 +90,11 @@
               "remote": null,
               "description": "",
               "options": {},
+              "provides": [],
+              "requires": [],
               "provenance": {
                 "content": null,
+                "repo": false,
                 "pin": null,
                 "imported": null
               },

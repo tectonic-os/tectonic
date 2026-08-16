@@ -6,7 +6,24 @@ set -euxo pipefail
 MODDIR=/ctx/modules/one/hello
 export MODDIR
 
-dnf5 install -y hello
+export ASSET_HELLO_VERSION="1.4.0"
+export ASSET_HELLO_URL="https://github.com/owner/hello/releases/download/v1.4.0/hello.tar.gz"
+export ASSET_HELLO_SHA256="b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+
+if [ -f /etc/yum.repos.d/hello.repo ]; then
+    echo "repo hello is already configured"
+else
+    source /ctx/modules/one/hello/repo
+fi
+
+source /ctx/modules/one/hello/module.sh
+==== generated/enforced.d/core/consumer.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/consumer
+export MODDIR
 ==== generated/enforced.graph.md
 # Enforced capability graph
 
@@ -20,17 +37,30 @@ right.
 graph LR
     base["quay.io/fedora/fedora-bootc:44"]
     m0["one/hello"]
+    m1["core/consumer"]
+    m0 -->|"hello"| m1
 ```
 
 ## Capabilities
 
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
+| `hello` | capability | `one/hello` | `core/consumer` |  |
 | `rechunking` | capability | `base` |  |  |
 ==== generated/enforced.graph.json
 {
   "image": "enforced",
   "capabilities": [
+    {
+      "name": "hello",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "one/hello",
+      "required_by": [
+        "core/consumer"
+      ],
+      "after": []
+    },
     {
       "name": "rechunking",
       "kind": "capability",

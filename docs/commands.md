@@ -300,6 +300,30 @@ the target's name and tag. The ungated target when none is named.
     --target <t>          the target, else the ungated one
     --tag <x>             the tag, else $DEFAULT_TAG, else latest
 
+### `why <module> [--format md|json]`
+
+One module's trust read-out: which targets build it, what it provides and who
+requires that, what it requires and what provides it, what it claims to
+harden, and where every byte of it came from — the collection it was imported
+from and at what pin, whether it has been edited since, what it fetches, and
+whether it enables a third-party package repository.
+
+#### Flags:
+    --format <md|json>    markdown, the default, or JSON
+
+#### Notes:
+- It answers two ways from one renderer. In a repository it reads the resolved
+  plan. With no `repo.kdl` anywhere above it, it reads
+  `/usr/share/tectonic/manifest.json` and `/usr/share/tectonic/build.json`
+  instead, which every built image carries, so a live host can ask what it is
+  running and where that came from.
+- A module edited since it was imported is said so plainly and is not an error.
+  Forking one is legitimate; what the record buys is that the fork is visible
+  rather than silent. `audit { enforce #true }` is what makes it fail.
+- A name nothing declares lists the ones that are declared.
+- There is no grammar for a `repo` file, so this points at it and prints the
+  URLs it found rather than claiming to have understood it.
+
 ## Inside a build layer
 
 These read the image around them rather than a repository, and run where the

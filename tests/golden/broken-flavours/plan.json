@@ -69,8 +69,11 @@
               "remote": null,
               "description": "A module in a repository whose flavours are wrong",
               "options": {},
+              "provides": [],
+              "requires": [],
               "provenance": {
                 "content": "e7892e5d7d8f23934e8a79ed01fee104398df20bf04401b1f505e1daca998a89",
+                "repo": false,
                 "pin": null,
                 "imported": null
               },
@@ -113,8 +116,11 @@
               "remote": null,
               "description": "A module in a repository whose flavours are wrong",
               "options": {},
+              "provides": [],
+              "requires": [],
               "provenance": {
                 "content": "e7892e5d7d8f23934e8a79ed01fee104398df20bf04401b1f505e1daca998a89",
+                "repo": false,
                 "pin": null,
                 "imported": null
               },
@@ -153,8 +159,11 @@
               "remote": null,
               "description": "A module in a repository whose flavours are wrong",
               "options": {},
+              "provides": [],
+              "requires": [],
               "provenance": {
                 "content": "e7892e5d7d8f23934e8a79ed01fee104398df20bf04401b1f505e1daca998a89",
+                "repo": false,
                 "pin": null,
                 "imported": null
               },

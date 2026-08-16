@@ -54,8 +54,13 @@
               "remote": null,
               "description": "Requires a capability nothing in this image provides",
               "options": {},
+              "provides": [],
+              "requires": [
+                "package-manager"
+              ],
               "provenance": {
                 "content": "9bd8a11d8d253879ace9233413b5e364e5871c2e1cf94941706d06af77f8b2a1",
+                "repo": false,
                 "pin": null,
                 "imported": null
               },
@@ -69,8 +74,14 @@
               "remote": null,
               "description": "Provides what the base already provides",
               "options": {},
+              "provides": [
+                "rechunking",
+                "shell-tools"
+              ],
+              "requires": [],
               "provenance": {
                 "content": "68d732dc606702e2a5c8eb3a40dd65ba88726aac5235eda837f84763ec3c5891",
+                "repo": false,
                 "pin": null,
                 "imported": null
               },
@@ -84,8 +95,13 @@
               "remote": null,
               "description": "Provides the same capability as another enabled module",
               "options": {},
+              "provides": [
+                "shell-tools"
+              ],
+              "requires": [],
               "provenance": {
                 "content": "d7ef24cdb7af81e387e3ce6a1e452aa7339f04da38b34409749b79bb34fae00c",
+                "repo": false,
                 "pin": null,
                 "imported": null
               },

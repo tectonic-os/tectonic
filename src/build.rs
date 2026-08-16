@@ -214,7 +214,7 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
     if list.manifest_label {
         args.extend([
             "--label".to_string(),
-            "org.tectonic.manifest=/usr/share/tectonic/manifest.json".to_string(),
+            format!("org.tectonic.manifest={}", record::MANIFEST),
         ]);
     }
     if backend == "buildx" {

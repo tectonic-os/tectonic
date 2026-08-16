@@ -56,8 +56,13 @@
               "remote": null,
               "description": "A flatpak application, which the base satisfies the runtime for",
               "options": {},
+              "provides": [],
+              "requires": [
+                "flatpak"
+              ],
               "provenance": {
                 "content": "6b5011cea8d1b0778c71ed6de4797852d7ab9cb42da35597dc41a0411318d43d",
+                "repo": false,
                 "pin": null,
                 "imported": null
               },
@@ -76,8 +81,13 @@
                 "OPT_REMOTES": "flathub flathub-beta",
                 "OPT_SYSTEM_WIDE": "0"
               },
+              "provides": [
+                "flatpak"
+              ],
+              "requires": [],
               "provenance": {
                 "content": "dd4717baec43f11289b370706231538b9ce3bea6c5d9abe394844909e7b97ccd",
+                "repo": false,
                 "pin": null,
                 "imported": null
               },

@@ -8,5 +8,6 @@ image {
 
     modules {
         module "one/hello"
+        module "core/consumer"
     }
 }

@@ -69,8 +69,11 @@
               "remote": "main",
               "description": "",
               "options": {},
+              "provides": [],
+              "requires": [],
               "provenance": {
                 "content": null,
+                "repo": false,
                 "pin": {
                   "locator": "https://github.com/owner/modules/archive/refs/heads/{version}.tar.gz",
                   "selector": "main",

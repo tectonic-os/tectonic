@@ -67,8 +67,11 @@
               "remote": null,
               "description": "A module no declared collection provides",
               "options": {},
+              "provides": [],
+              "requires": [],
               "provenance": {
                 "content": "23c660d4b7f0ebd664ab2c3d6571db7946eb1298d7e879e7e45b4ca5ae02de98",
+                "repo": false,
                 "pin": null,
                 "imported": null
               },
@@ -82,8 +85,11 @@
               "remote": "steam-tweaks/v1.2.0",
               "description": "A module pinned to a source of its own",
               "options": {},
+              "provides": [],
+              "requires": [],
               "provenance": {
                 "content": "892be2a37e9809e4ddd11f8a3a112be4c7af0d39756e7a32576cea9acaa9a30b",
+                "repo": false,
                 "pin": {
                   "locator": "https://github.com/owner/bootc-modules/archive/refs/tags/{version}.tar.gz",
                   "selector": "steam-tweaks/v1.2.0",

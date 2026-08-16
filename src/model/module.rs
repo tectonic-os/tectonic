@@ -131,4 +131,9 @@ pub struct Module {
     /// The record `import module` left inside it, for a module that was
     /// imported rather than written here.
     pub imported: Option<Record>,
+    /// Whether it ships a `repo` file, which enables a third-party package
+    /// repository inside the layer. There is no grammar for one: it is shell
+    /// calling the family's config manager, and a node restating it would be a
+    /// second source of truth that drifts.
+    pub repo: bool,
 }
