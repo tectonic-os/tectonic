@@ -450,14 +450,27 @@ jobs:
         env:
           SYFT_CMD: ${{ steps.setup-syft.outputs.cmd }}
         run: |
+          # The cataloger is per family: the rpm one finds nothing on a deb
+          # image. `dpkg` is the tag for the installed-package cataloger, where
+          # `deb` selects the one that looks for .deb files on disk.
+          case "$(jq -r '.base.family' "$IMAGE_PLAN")" in
+            debian | ubuntu) cataloger=dpkg ;;
+            *) cataloger=rpm ;;
+          esac
           mnt="$(sudo podman image mount "localhost/${IMAGE_NAME}:raw")"
           sudo "$SYFT_CMD" scan "dir:${mnt}" \
             --source-name "${IMAGE_NAME}" \
-            --select-catalogers 'rpm' \
+            --select-catalogers "$cataloger" \
             -o "spdx-json=${RUNNER_TEMP}/sbom.spdx.json"
           sudo podman image umount "localhost/${IMAGE_NAME}:raw"
           sudo chown "$(id -u):$(id -g)" "${RUNNER_TEMP}/sbom.spdx.json"
           du -sh "${RUNNER_TEMP}/sbom.spdx.json"
+          # The image itself is one package, so anything at or below that is a
+          # cataloger that matched nothing: an SBOM attesting to nothing.
+          if [ "$(jq '.packages | length' "${RUNNER_TEMP}/sbom.spdx.json")" -le 1 ]; then
+            echo "::error::the ${cataloger} cataloger found no packages in this image"
+            exit 1
+          fi
 
       - name: Reduce the SBOM and add the pinned payloads
         if: env.PUBLISH == 'true'
