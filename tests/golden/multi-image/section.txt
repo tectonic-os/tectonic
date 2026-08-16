@@ -30,6 +30,9 @@ RUN --mount=type=bind,from=ctx,source=/modules/core/dev-tools,target=/ctx/module
 # ---- image version ----
 ARG IMAGE_VERSION=dev
 
+# ---- base family ----
+ARG FAMILY
+
 # ---- image identity ----
 ARG IMAGE_ID="workstation"
 ARG IMAGE_NAME="Workstation"

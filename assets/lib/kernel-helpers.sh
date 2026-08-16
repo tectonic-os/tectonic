@@ -1,4 +1,6 @@
 #!/bin/bash
+# rpm families only: `kver` asks rpm, and the DKMS build below it assumes
+# the kernel-devel layout that goes with it.
 
 kver() {
     local pkg

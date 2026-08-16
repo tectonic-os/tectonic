@@ -354,7 +354,8 @@ is:
 - `file` keeps it
 - `tree` unpacks it
 - `bin` installs one executable
-- `rpm` installs the package
+- `rpm` installs the package, on an rpm family
+- `deb` installs the package, on a deb family
 
 ### `validate-image`
 

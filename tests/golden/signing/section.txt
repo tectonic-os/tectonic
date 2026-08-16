@@ -31,6 +31,9 @@ ARG FLAVOUR
 # ---- image version ----
 ARG IMAGE_VERSION=dev
 
+# ---- base family ----
+ARG FAMILY
+
 # ---- image identity ----
 ARG IMAGE_ID="signing"
 ARG IMAGE_NAME="Signing"

@@ -6,6 +6,7 @@ set -euxo pipefail
 MODDIR=/ctx/modules/core/shared
 export MODDIR
 
+mkdir -p /var/lib/apt/lists/partial /var/lib/dpkg /var/cache/apt/archives/partial
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get install -y curl git
 apt-get clean
@@ -63,6 +64,7 @@ set -euxo pipefail
 MODDIR=/ctx/modules/core/shared
 export MODDIR
 
+mkdir -p /var/lib/apt/lists/partial /var/lib/dpkg /var/cache/apt/archives/partial
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get install -y curl vim
 apt-get clean

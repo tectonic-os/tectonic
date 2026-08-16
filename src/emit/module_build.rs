@@ -100,9 +100,12 @@ fn script(
                 let _ = write!(out, "\ndnf5 install -y{repo} {packages}\n");
             }
             "debian" | "ubuntu" => {
+                // A bootc image ships an empty /var, so apt's state directories
+                // are not there to be written to until they are made.
                 let _ = write!(
                     out,
-                    "\napt-get update\n\
+                    "\nmkdir -p /var/lib/apt/lists/partial /var/lib/dpkg /var/cache/apt/archives/partial\n\
+                     apt-get update\n\
                      DEBIAN_FRONTEND=noninteractive apt-get install -y {packages}\n\
                      apt-get clean\n\
                      rm -rf /var/lib/apt/lists/*\n"
@@ -112,6 +115,9 @@ fn script(
         }
     }
 
+    // The guard is `dnf5 config-manager`'s layout. A deb family writes its
+    // repo somewhere else, so the module's own `repo` file runs unguarded
+    // there and is what has to be idempotent.
     let on_disk = root.join("modules").join(entry.dir());
     if on_disk.join("repo").is_file() {
         match repo_id(&on_disk.join("repo")) {

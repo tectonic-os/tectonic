@@ -124,7 +124,8 @@ usage: tect fetch <what> <url> <sha256> [target] [extra...]
   file    <url> <sha256> <path>          verify and keep the download
   tree    <url> <sha256> <dir> [args..]  unpack it, extra args reaching tar
   bin     <url> <sha256> <name> [inner]  install one executable to /usr/bin
-  rpm     <url> <sha256>                 install the package";
+  rpm     <url> <sha256>                 install the package, on a rpm family
+  deb     <url> <sha256>                 install the package, on a deb family";
 
 pub fn fetch(args: &[&str]) -> Result<(), String> {
     let (what, url, sha256, rest) = match args {
@@ -142,6 +143,23 @@ pub fn fetch(args: &[&str]) -> Result<(), String> {
             verified(url, Some(sha256), &rpm)?;
             let status = run("dnf5", &["install", "-y", &rpm.to_string_lossy()])?;
             let _ = fs::remove_file(&rpm);
+            status
+        }
+        ("deb", []) => {
+            let deb = scratch(url);
+            verified(url, Some(sha256), &deb)?;
+            // apt over dpkg, so the package's dependencies are resolved rather
+            // than left half-configured.
+            let status = run(
+                "apt-get",
+                &[
+                    "install",
+                    "-y",
+                    "--no-install-recommends",
+                    &deb.to_string_lossy(),
+                ],
+            )?;
+            let _ = fs::remove_file(&deb);
             status
         }
         _ => Err(FETCH_USAGE.to_string()),
@@ -318,6 +336,44 @@ fn sha256_file(path: &Path) -> Result<String, String> {
 
 // ---- validate-image ------------------------------------------------------
 
+/// The kernel the image ships, which is what names the initramfs beside it.
+/// Asking the package manager is per family, so the family is passed down
+/// rather than guessed: nothing in a built filesystem says which one built it.
+fn kernel_version() -> Option<String> {
+    match env("FAMILY").as_deref() {
+        Some("debian" | "ubuntu") => modules_dir(),
+        _ => {
+            let package = fs::read_to_string("/usr/lib/kernel-build/kernel-package")
+                .map(|text| text.trim().to_string())
+                .unwrap_or_else(|_| "kernel-core".to_string());
+            match output(
+                "rpm",
+                &["-q", "--qf", "%{VERSION}-%{RELEASE}.%{ARCH}", &package],
+            ) {
+                Ok((true, version)) if !version.trim().is_empty() => Some(version.trim().into()),
+                _ => modules_dir(),
+            }
+        }
+    }
+}
+
+/// The one directory under /usr/lib/modules, which bootc requires an image to
+/// have exactly one of. Family-independent, and the fallback wherever asking
+/// the package manager did not answer.
+fn modules_dir() -> Option<String> {
+    let mut found: Vec<String> = fs::read_dir("/usr/lib/modules")
+        .ok()?
+        .flatten()
+        .filter(|entry| entry.path().is_dir())
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect();
+    found.sort();
+    match found.as_slice() {
+        [one] => Some(one.clone()),
+        _ => None,
+    }
+}
+
 /// Presets a module ships, which is the only enablement this checks.
 pub(crate) const MODULE_PRESET: &str = "45-module-";
 
@@ -355,24 +411,16 @@ pub fn validate_image() -> Result<(), String> {
     }
 
     println!("==> initramfs");
-    let package = fs::read_to_string("/usr/lib/kernel-build/kernel-package")
-        .map(|text| text.trim().to_string())
-        .unwrap_or_else(|_| "kernel-core".to_string());
-    match output(
-        "rpm",
-        &["-q", "--qf", "%{VERSION}-%{RELEASE}.%{ARCH}", &package],
-    ) {
-        Ok((true, version)) if !version.trim().is_empty() => {
-            let initramfs = format!("/usr/lib/modules/{}/initramfs.img", version.trim());
+    match kernel_version() {
+        Some(version) => {
+            let initramfs = format!("/usr/lib/modules/{version}/initramfs.img");
             if Path::new(&initramfs).is_file() {
                 println!("    {initramfs} present");
             } else {
                 report.fail(format!("initramfs missing at {initramfs}"));
             }
         }
-        _ => report.fail(format!(
-            "cannot determine kernel version from package {package}"
-        )),
+        None => report.fail("cannot determine the kernel version"),
     }
 
     println!("==> /usr/lib/opt symlinks");

@@ -55,6 +55,13 @@ const FLAVOUR_ARG: &str = "\
 # ---- flavour gate ----
 ARG FLAVOUR";
 
+/// The base's family, for the layers that cannot derive it from the filesystem:
+/// what a package is queried with differs per family and nothing in the image
+/// says which one built it.
+const FAMILY_ARG: &str = "\
+# ---- base family ----
+ARG FAMILY";
+
 /// The binary, so anything running in the image can call the tool.
 const TECT_MOUNT: &str = "--mount=type=bind,from=tect,source=/tect,target=/ctx/tect \\\n    ";
 
@@ -129,6 +136,7 @@ pub fn section(image: &Image, collection: &Collection, root: &Path) -> String {
     }
 
     let _ = write!(out, "{IMAGE_VERSION_ARG}\n\n");
+    let _ = write!(out, "{FAMILY_ARG}\n\n");
 
     let identity = identity(image);
     let _ = writeln!(out, "# ---- image identity ----");

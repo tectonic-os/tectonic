@@ -6,6 +6,9 @@ ARG FLAVOUR
 # ---- image version ----
 ARG IMAGE_VERSION=dev
 
+# ---- base family ----
+ARG FAMILY
+
 # ---- image identity ----
 ARG IMAGE_ID="Not An Id"
 ARG IMAGE_REGISTRY=""

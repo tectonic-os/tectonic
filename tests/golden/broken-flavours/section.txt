@@ -30,6 +30,9 @@ RUN --mount=type=bind,from=ctx,source=/modules/core/hello,target=/ctx/modules/co
 # ---- image version ----
 ARG IMAGE_VERSION=dev
 
+# ---- base family ----
+ARG FAMILY
+
 # ---- image identity ----
 ARG IMAGE_ID="broken-flavours"
 ARG IMAGE_NAME="Broken Flavours"

@@ -144,6 +144,14 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
             .join(" ")
         ),
         format!("MODULE_PRESETS={}", presets.join(" ")),
+        format!(
+            "FAMILY={}",
+            image
+                .base
+                .as_ref()
+                .map(|b| b.family.as_str())
+                .unwrap_or_default()
+        ),
         format!("TARGET={target}"),
         format!(
             "MODULE_HASHES={}",
