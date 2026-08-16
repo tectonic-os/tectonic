@@ -615,7 +615,8 @@ fn refuse_nesting(root: &Path) -> Result<(), String> {
 /// The repository the rest of the tree is committed into. Its own output is
 /// dropped: what a run prints is the one line every other step prints.
 fn git_init(root: &Path) -> Result<(), String> {
-    match quietly(Command::new("git").arg("init").arg(root)).status() {
+    // `main`, because the push line, the remote and every workflow name it.
+    match quietly(Command::new("git").args(["init", "-b", "main"]).arg(root)).status() {
         Ok(status) if status.success() => Ok(()),
         Ok(status) => Err(format!(
             "`git init` exited {}",
