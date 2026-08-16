@@ -626,7 +626,8 @@ jobs:
 
     permissions:
       contents: read
-      packages: read
+      # The attestations this job writes are pushed beside the image.
+      packages: write
       id-token: write
       attestations: write
 
@@ -772,6 +773,14 @@ jobs:
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         with:
           cosign-release: 'v2.6.3'
+
+      - name: Login to GitHub Container Registry
+        if: steps.claims.outputs.count != '0'
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Attest the scan report
         if: steps.claims.outputs.count != '0'
