@@ -800,13 +800,17 @@ jobs:
           COSIGN_EXPERIMENTAL: false
           COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
 
+      # It stays in GitHub's attestation store, where `gh attestation verify`
+      # reads it. Pushed to the registry it lands on the referrers fallback
+      # tag, which `cosign verify-attestation --key` also reads, and a keyless
+      # signature there makes every key verification on the digest fail.
       - name: Attest the commit that built it
         if: steps.claims.outputs.count != '0'
         uses: actions/attest-build-provenance@bd77c077858b8d561b7a36cbe48ef4cc642ca39d # v2.2.2
         with:
           subject-name: ${{ env.SUBJECT_NAME }}
           subject-digest: ${{ env.SUBJECT_DIGEST }}
-          push-to-registry: true
+          push-to-registry: false
 
       - name: Verify both predicates are on the digest
         if: steps.claims.outputs.count != '0'
