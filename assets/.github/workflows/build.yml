@@ -71,7 +71,7 @@ jobs:
           if grep -qE '^[^/]+\.kdl$' <<< "$changed"; then
             while IFS='|' read -r name _ ref pinned url _ file; do
               if ! curl -fsSL --retry 3 "$url" -o "${RUNNER_TEMP}/module"; then
-                echo "::error file=${file}::${name} ${ref}: ${url} did not download. A ref whose archive URL does not follow from it needs the source template in ${file} updated by hand."
+                echo "::error file=${file}::${name} ${ref}: ${url} did not download. A version whose archive URL does not follow from it needs the pin url in ${file} updated by hand."
                 exit 1
               fi
               actual="$(sha256sum "${RUNNER_TEMP}/module" | cut -d' ' -f1)"
@@ -85,7 +85,8 @@ jobs:
               fixed+=("${name} ${ref}")
               echo "${name} ${ref}: hash updated."
             done < <(./scripts/tect.sh plan --json | jq -r '.remotes[]
-              | [.name, .dir, .ref, .sha256, .url, (.path // ""), .file] | join("|")')
+              | [.name, .dir, .pin.selector, .pin.verifier, .pin.resolved,
+                 (.pin.path // ""), .file] | join("|")')
           fi
 
           ./scripts/tect.sh fetch modules
@@ -118,8 +119,8 @@ jobs:
             fixed+=("${name} ${version}")
             echo "${module} ${name} ${version}: hash updated."
           done < <(./scripts/tect.sh plan --json | jq -r '.assets[]
-            | [.module, .name, .manifest, (.version // ""), (.sha256 // ""), .from,
-               (.url // "")] | join("|")')
+            | [.module, .name, .manifest, (.pin.selector // ""), (.pin.verifier // ""),
+               .pin.from, (.pin.resolved // "")] | join("|")')
 
           ./scripts/tect.sh generate
 

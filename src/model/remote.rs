@@ -1,30 +1,11 @@
-//! Out-of-tree modules: an exact pin, fetched at generate time.
+//! Out-of-tree modules and the collections an import resolves against. Both are
+//! one `Evidence`, the pin being the whole of what either declares.
 
 use crate::diag::Span;
+use crate::provenance::Evidence;
 
 /// Where fetched module trees land, relative to `modules/`.
 pub const REMOTE_DIR: &str = ".remote";
-
-pub struct Remote {
-    /// Unexpanded, `{ref}` included, because this is what a reviewer reads and
-    /// what the checksum workflow rewrites around.
-    pub url: String,
-    pub git_ref: String,
-    pub sha256: String,
-    /// Why this follows a moving ref with no hash, where it declared one.
-    pub unpinned: Option<String>,
-    /// The module's directory inside the archive, relative to its root once
-    /// the leading directory is stripped.
-    pub path: Option<String>,
-    pub span: Span,
-}
-
-impl Remote {
-    /// The URL the fetch actually requests.
-    pub fn url_resolved(&self) -> String {
-        self.url.replace("{ref}", &self.git_ref)
-    }
-}
 
 /// One module collection an import resolves against, named by the owner its
 /// modules land under in `modules/`.
@@ -40,7 +21,7 @@ pub enum At {
     /// there is nothing to hash.
     Dir(String),
     /// A pinned archive, fetched and verified like any other pin.
-    Archive(Remote),
+    Archive(Evidence),
 }
 
 impl Collection {
@@ -49,16 +30,21 @@ impl Collection {
     pub fn subtree(&self) -> Option<&str> {
         match &self.at {
             At::Dir(_) => None,
-            At::Archive(remote) => remote.path.as_deref(),
+            At::Archive(pin) => pin.path.as_deref(),
+        }
+    }
+
+    /// The pin, for a collection that has one to record.
+    pub fn pin(&self) -> Option<&Evidence> {
+        match &self.at {
+            At::Dir(_) => None,
+            At::Archive(pin) => Some(pin),
         }
     }
 
     /// Whether it follows a moving ref, which is what makes every fetch of it
     /// a different tree with nothing to verify it against.
     pub fn unpinned(&self) -> bool {
-        match &self.at {
-            At::Dir(_) => false,
-            At::Archive(remote) => remote.unpinned.is_some(),
-        }
+        self.pin().is_some_and(Evidence::unpinned)
     }
 }

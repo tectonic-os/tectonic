@@ -50,6 +50,11 @@
               "remote": null,
               "description": "A module imported out of the unpinned collection",
               "options": {},
+              "provenance": {
+                "content": "5e07652a052642f48a2ed4254583c3d2a255a61307560603b8da6bfbec66d840",
+                "pin": null,
+                "imported": null
+              },
               "satisfies": []
             }
           ],

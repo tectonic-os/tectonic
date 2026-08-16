@@ -4,6 +4,7 @@
 
 use crate::model::remote::{At, Collection};
 use crate::prompt::Prompt;
+use crate::provenance::record;
 use crate::ui::Choice;
 use std::path::{Path, PathBuf};
 
@@ -166,10 +167,10 @@ pub fn choose(root: &Path, sources: &[Collection], prompt: &Prompt) -> Result<St
 pub fn cached(root: &Path, collection: &Collection) -> Option<PathBuf> {
     let dir = match &collection.at {
         At::Dir(dir) => root.join(dir),
-        At::Archive(remote) if remote.unpinned.is_some() => root.join(CACHE).join(&collection.name),
-        At::Archive(remote) => {
-            let pin = root.join(CACHE).join(format!("{}.pin", collection.name));
-            match std::fs::read_to_string(&pin).ok().as_deref() == Some(remote.sha256.as_str()) {
+        At::Archive(pin) if pin.unpinned() => root.join(CACHE).join(&collection.name),
+        At::Archive(pin) => {
+            let stamp = root.join(CACHE).join(format!("{}.pin", collection.name));
+            match std::fs::read_to_string(&stamp).ok().as_deref() == pin.sha256.as_deref() {
                 true => root.join(CACHE).join(&collection.name),
                 false => return None,
             }
@@ -203,8 +204,10 @@ fn tree(root: &Path, collection: &Collection) -> Result<PathBuf, String> {
     let dir = root.join(CACHE).join(&collection.name);
     let pin = root.join(CACHE).join(format!("{}.pin", collection.name));
     let _ = std::fs::remove_dir_all(&dir);
-    let url = remote.url_resolved();
-    let sha256 = remote.unpinned.is_none().then_some(remote.sha256.as_str());
+    let url = remote.url_resolved().unwrap_or_default();
+    let sha256 = (!remote.unpinned())
+        .then(|| remote.sha256.as_deref())
+        .flatten();
     crate::runtime::extract(&url, sha256, &dir, &["--strip-components=1"])
         .map_err(|err| format!("`{}`: {err}", collection.name))?;
     match sha256 {
@@ -229,8 +232,24 @@ pub fn destination(root: &Path, found: &Found, module: &str) -> Result<PathBuf, 
     }
 }
 
-/// Copies the module in. The repository is a working tree, so committing what
-/// this wrote is the user's.
-pub fn vendor(root: &Path, found: &Found, dest: &Path) -> Result<(), String> {
-    crate::init::copy_tree(&found.dir, &root.join(dest))
+/// Copies the module in and leaves the record of where it came from beside its
+/// manifest. The repository is a working tree, so committing what this wrote is
+/// the user's.
+pub fn vendor(
+    root: &Path,
+    sources: &[Collection],
+    found: &Found,
+    dest: &Path,
+) -> Result<(), String> {
+    let dir = root.join(dest);
+    crate::init::copy_tree(&found.dir, &dir)?;
+    let pin = sources
+        .iter()
+        .find(|c| c.name == found.owner)
+        .and_then(Collection::pin);
+    let content = record::hash(&dir).unwrap_or_default();
+    crate::init::put(
+        &dir.join(record::RECORD),
+        &record::write(&found.owner, pin, &content),
+    )
 }

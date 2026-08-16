@@ -17,19 +17,31 @@
       "module": "core/pins",
       "name": "tracked-and-manual",
       "manifest": "modules/core/pins/module.kdl",
-      "version": "1.0.0",
-      "sha256": "NOTHEX",
-      "from": "sidecar",
-      "url": "https://example.com/download/v1.0.0/tool.tar.gz"
+      "pin": {
+        "locator": "https://example.com/download/v{version}/tool.tar.gz",
+        "selector": "1.0.0",
+        "verifier": "NOTHEX",
+        "tracker": "manual",
+        "reason": "someone watches the release feed",
+        "from": "sidecar",
+        "path": null,
+        "resolved": "https://example.com/download/v1.0.0/tool.tar.gz"
+      }
     },
     {
       "module": "core/pins",
       "name": "no-tracking",
       "manifest": "modules/core/pins/module.kdl",
-      "version": "1.0.0",
-      "sha256": null,
-      "from": "asset",
-      "url": "https://example.com/download/v{tag}/tool.tar.gz; rm -rf /"
+      "pin": {
+        "locator": "https://example.com/download/v{tag}/tool.tar.gz; rm -rf /",
+        "selector": "1.0.0",
+        "verifier": null,
+        "tracker": "none",
+        "reason": null,
+        "from": "asset",
+        "path": null,
+        "resolved": "https://example.com/download/v{tag}/tool.tar.gz; rm -rf /"
+      }
     }
   ],
   "images": [
@@ -69,6 +81,11 @@
               "remote": null,
               "description": "Asset pins that say nothing usable about what they fetch",
               "options": {},
+              "provenance": {
+                "content": "6587157530452cc66327a4790eb532848dd61ce24d92dd95ec87dc7d7ef70db9",
+                "pin": null,
+                "imported": null
+              },
               "satisfies": []
             }
           ],
@@ -81,19 +98,31 @@
               "module": "core/pins",
               "name": "tracked-and-manual",
               "manifest": "modules/core/pins/module.kdl",
-              "version": "1.0.0",
-              "sha256": "NOTHEX",
-              "from": "sidecar",
-              "url": "https://example.com/download/v1.0.0/tool.tar.gz"
+              "pin": {
+                "locator": "https://example.com/download/v{version}/tool.tar.gz",
+                "selector": "1.0.0",
+                "verifier": "NOTHEX",
+                "tracker": "manual",
+                "reason": "someone watches the release feed",
+                "from": "sidecar",
+                "path": null,
+                "resolved": "https://example.com/download/v1.0.0/tool.tar.gz"
+              }
             },
             {
               "module": "core/pins",
               "name": "no-tracking",
               "manifest": "modules/core/pins/module.kdl",
-              "version": "1.0.0",
-              "sha256": null,
-              "from": "asset",
-              "url": "https://example.com/download/v{tag}/tool.tar.gz; rm -rf /"
+              "pin": {
+                "locator": "https://example.com/download/v{tag}/tool.tar.gz; rm -rf /",
+                "selector": "1.0.0",
+                "verifier": null,
+                "tracker": "none",
+                "reason": null,
+                "from": "asset",
+                "path": null,
+                "resolved": "https://example.com/download/v{tag}/tool.tar.gz; rm -rf /"
+              }
             }
           ],
           "provides_files": {},

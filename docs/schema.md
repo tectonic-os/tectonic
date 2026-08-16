@@ -53,21 +53,23 @@ collection is named by the owner its modules land under, so
 
 ```kdl
 sources {
-    tectonic-os "https://github.com/tectonic-os/modules/archive/refs/tags/{ref}.tar.gz" {
-        renovate datasource="github-tags" depName="tectonic-os/modules"
-        ref "v1.0.0"
-        sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+    tectonic-os {
+        pin {
+            renovate datasource="github-tags" depName="tectonic-os/modules"
+            version "v1.0.0"
+            url "https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz"
+            sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+        }
     }
     scratch "../modules"
 }
 ```
 
-A collection whose location is an `https` or `file` URL is a pinned archive,
-fetched and verified exactly like an out-of-tree module. Anything else is a
-directory on this machine, relative to the repository root, which is read
-where it is: nothing is downloaded, so there is nothing to pin or hash. That
-is what makes iterating on a collection possible without re-tarring it on
-every edit.
+A collection carrying a `pin` is an archive, fetched and verified exactly like
+an out-of-tree module. One carrying a location instead is a directory on this
+machine, relative to the repository root, which is read where it is: nothing is
+downloaded, so there is nothing to pin or hash. That is what makes iterating on
+a collection possible without re-tarring it on every edit.
 
 A name here is checked when it is imported from, not when the repository is
 checked: a directory that exists on one machine and not another is not a
@@ -80,9 +82,12 @@ is what `create repo` scaffolds, and it buys convenience with verification:
 
 ```kdl
 sources {
-    tectonic-os "https://github.com/tectonic-os/modules/archive/refs/heads/{ref}.tar.gz" {
-        unpinned "the collection this tool is published alongside, followed at its branch head"
-        ref "main"
+    tectonic-os {
+        pin {
+            unpinned "the collection this tool is published alongside, followed at its branch head"
+            version "main"
+            url "https://github.com/tectonic-os/modules/archive/refs/heads/{version}.tar.gz"
+        }
     }
 }
 ```
@@ -97,12 +102,12 @@ verify every fetch, at the cost of versioning every module in it together.
 
 `unpinned` is the third answer beside `renovate` and `manual` and excludes
 both: it says the ref moves on its own. It cannot be combined with a `sha256`,
-which a moving ref would break the moment it moved, and a module's own
-`source` cannot carry it at all — the build fetches those and runs them as
-root without anyone reading them first, so their hash is not optional. A
-collection or a `source` with neither a `sha256` nor `unpinned` is still an
-error, so a hash that is dropped or mistyped is reported rather than quietly
-becoming trust in whatever answers the URL.
+which a moving ref would break the moment it moved, and no other holder of a
+pin may carry it at all — the build fetches an out-of-tree module and runs it
+as root without anyone reading it first, so its hash is not optional. A pin
+with neither a `sha256` nor `unpinned` is still an error, so a hash that is
+dropped or mistyped is reported rather than quietly becoming trust in whatever
+answers the URL.
 
 `tect check` names every unpinned collection above its counts. It is not an
 error; it is the one thing that stops the repository being reproducible, and
@@ -168,14 +173,7 @@ One module collection, named by the owner its modules land under in modules/.
 
 *a string*
 
-Also holds [`renovate`](#renovate) and [`manual`](#manual).
-
-| Node | Takes | Meaning |
-| --- | --- | --- |
-| `unpinned` | a string, at most one | Why this follows a moving ref with no `sha256`, so every fetch takes whatever the ref holds then and nothing checks what arrived. |
-| `ref` | a string, at most one | The tag or commit the archive is fetched at. |
-| `sha256` | a string, at most one | What the fetched archive is verified against. |
-| `path` | a string, at most one | The directory inside the archive the modules sit in, when they are not at its root. |
+Also holds [`pin`](#pin).
 
 ### `manifest`
 
@@ -306,7 +304,7 @@ One module the image is made of, named by its path under `modules/`.
 | --- | --- | --- |
 | `variant=` | a string | Which of the module's declared variants this image builds. |
 
-Also holds [`source`](#source).
+Also holds [`pin`](#pin).
 
 | Node | Takes | Meaning |
 | --- | --- | --- |
@@ -330,37 +328,20 @@ its name is one path segment rather than a path.
 
 ```kdl
 module "steam-tweaks" {
-    source "https://github.com/owner/bootc-modules/archive/refs/tags/{ref}.tar.gz" {
+    pin {
         renovate datasource="github-tags" depName="owner/bootc-modules"
-        ref "steam-tweaks/v1.2.0"
+        version "steam-tweaks/v1.2.0"
+        url "https://github.com/owner/bootc-modules/archive/refs/tags/{version}.tar.gz"
         sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
         path "modules/steam-tweaks"
     }
 }
 ```
 
-The URL is `https` or `file`, points at a tar archive, and expands `{ref}` and
-nothing else. A fetched module ships the same `module.kdl` as any other and is
+The URL is `https` or `file`, points at a tar archive, and expands `{version}`
+and nothing else. A fetched module ships the same `module.kdl` as any other and is
 held to the same schema. Nothing it requires is fetched with it: an
 out-of-tree module that needs another one needs that one listed too.
-
-<!-- schema: source -->
-
-### `source`
-
-Where a module that lives outside this repository is fetched from, and what pins it.
-
-*a string*
-
-Also holds [`renovate`](#renovate) and [`manual`](#manual).
-
-| Node | Takes | Meaning |
-| --- | --- | --- |
-| `ref` | a string, at most one | The tag or commit the archive is fetched at. |
-| `sha256` | a string, at most one | What the fetched archive is verified against. |
-| `path` | a string, at most one | The module's directory inside the archive. |
-
-<!-- /schema: source -->
 
 ## The base catalog
 
@@ -661,10 +642,12 @@ expanded, so nothing in shell derives a URL.
 
 ```kdl
 asset "starship" {
-    renovate datasource="github-releases" depName="starship/starship"
-    version "1.26.0"
-    url "https://github.com/starship/starship/releases/download/v{version}/starship-x86_64-unknown-linux-musl.tar.gz"
-    sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3" from="sidecar"
+    pin {
+        renovate datasource="github-releases" depName="starship/starship"
+        version "1.26.0"
+        url "https://github.com/starship/starship/releases/download/v{version}/starship-x86_64-unknown-linux-musl.tar.gz"
+        sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3" from="sidecar"
+    }
 }
 ```
 
@@ -674,42 +657,48 @@ asset "starship" {
 
 A pinned upstream payload the module fetches, reaching the build as ASSET_*.
 
-*a string, one per name*
+*a string, one per name, never empty*
 
-Also holds [`renovate`](#renovate) and [`manual`](#manual).
-
-| Node | Takes | Meaning |
-| --- | --- | --- |
-| `version` | a string, at most one | The pinned version, which the URL expands and Renovate rewrites. |
-| `url` | a string, at most one | Where the payload is fetched from. |
-
-#### `sha256`
-
-What the fetched payload is verified against.
-
-*a string, at most one*
-
-| Property | Value | Meaning |
-| --- | --- | --- |
-| `from=` | `asset`, `sidecar`, `manual` | Where the hash is refreshed from. |
+Also holds [`pin`](#pin).
 
 <!-- /schema: asset -->
 
-## Keeping a pin current
+## Where something comes from
 
-An asset and an out-of-tree module are pinned the same way, and both have to
-say how the pin is kept current: `renovate` for one a bot bumps, `manual` for
-one nothing tracks, and why. Exactly one of the two, because a pin that says
-neither goes stale in silence.
+Four slots answer it, and every pin in the tree fills the same four: the
+locator says where it comes from, the selector which version of it, the
+verifier what proves you got that one, and the tracker who keeps the selector
+current. One `pin` block carries them, and `asset`, an out-of-tree module and a
+collection each hold it. A base carries its locator and selector joined in the
+image reference, and `signed` as its verifier.
+
+Every pin has to say how it is kept current: `renovate` for one a bot bumps,
+`manual` for one nothing tracks, and why. Exactly one of them, because a pin
+that says neither goes stale in silence. A collection has a third answer,
+`unpinned`, which is the only one that leaves the content unverified.
 
 Renovate matches `renovate` together with the line directly below it, so the
-`version` or `ref` it rewrites has to sit there with nothing in between.
+`version` it rewrites has to sit there with nothing in between.
 
-<!-- schema: renovate -->
+<!-- schema: pin -->
 
-### `renovate`
+### `pin`
 
-The custom manager Renovate matches to keep the pin current.
+Where this comes from, which version of it, what proves you got that one, and what keeps the selector current.
+
+*at most one*
+
+| Node | Takes | Meaning |
+| --- | --- | --- |
+| `manual` | a string, at most one | Why nothing tracks this pin. |
+| `unpinned` | a string, at most one | Why this follows a moving ref with no `sha256`, so every fetch takes whatever the ref holds then and nothing checks what arrived. |
+| `version` | a string, at most one | The selector: the version, tag or commit this is taken at, which the URL expands and Renovate rewrites. |
+| `url` | a string, at most one | The locator: where the content comes from. |
+| `path` | a string, at most one | The directory inside the archive the content sits in. |
+
+#### `renovate`
+
+The custom manager Renovate matches to keep the selector current.
 
 *at most one*
 
@@ -719,14 +708,57 @@ The custom manager Renovate matches to keep the pin current.
 | `depName=` | a string, required | What that datasource calls the thing being tracked. |
 | `extractVersion=` | a string | The pattern Renovate pulls the version out of the tag with. |
 
-<!-- /schema: renovate -->
+#### `sha256`
 
-<!-- schema: manual -->
-
-### `manual`
-
-Why nothing tracks this pin.
+The verifier: what the fetched content is held to.
 
 *a string, at most one*
 
-<!-- /schema: manual -->
+| Property | Value | Meaning |
+| --- | --- | --- |
+| `from=` | `asset`, `sidecar`, `manual` | Where the hash is refreshed from. |
+
+<!-- /schema: pin -->
+
+## The import record
+
+`tect import module` copies a module in and writes a `provenance.kdl` beside
+its `module.kdl`, recording which collection it came from, what pinned that
+collection, and what the directory hashed to. It is a sibling file and never
+part of `module.kdl`: that is the author's file, and rewriting it on import
+would fork it from upstream and break the very comparison the hash exists to
+make. The record excludes itself from its own hash, so what `content` names is
+the directory except this one file.
+
+```kdl
+imported "tectonic-os" {
+    content "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+    pin {
+        unpinned "the collection this tool is published alongside, followed at its branch head"
+        version "main"
+        url "https://github.com/tectonic-os/modules/archive/refs/heads/{version}.tar.gz"
+    }
+}
+```
+
+`plan.json` carries the same hash per module, so `verify` fails on a module
+edited without regenerating. `tect check` names a module whose content no
+longer matches its record. That is not an error: forking an imported module is
+legitimate, and what the record buys is that the fork is visible rather than
+silent.
+
+<!-- schema: imported -->
+
+### `imported`
+
+Where this module was copied from, and what its content hashed to then. Written by `tect import module`; the module's author does not maintain it.
+
+*a string, exactly one*
+
+Also holds [`pin`](#pin).
+
+| Node | Takes | Meaning |
+| --- | --- | --- |
+| `content` | a string, exactly one | What the module directory hashed to when it was imported, every file in it except this one. |
+
+<!-- /schema: imported -->

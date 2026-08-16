@@ -12,6 +12,7 @@ pub mod key;
 pub mod model;
 pub mod parse;
 pub mod prompt;
+pub mod provenance;
 pub mod registry;
 pub mod resolve;
 pub mod runtime;
@@ -124,6 +125,10 @@ pub struct Run {
     /// Collections following a moving ref, which is what makes the repository
     /// build a different tree tomorrow. `check`'s alone, like `shadowed`.
     pub unpinned: Vec<String>,
+    /// Imported modules whose content no longer matches the record beside them.
+    /// Forking one is legitimate, so this is a read-out rather than a
+    /// diagnostic; `check`'s alone.
+    pub modified: Vec<String>,
     /// The reading this ran against, so a caller that needs one after a command
     /// acts on what the command saw rather than reading the tree again.
     pub(crate) list: List,
@@ -216,7 +221,7 @@ pub fn run(command: Command, arg: Option<&str>, root: &Path) -> Run {
         context,
     } = load(root);
 
-    let (shadowed, unpinned) = match command {
+    let (shadowed, unpinned, modified) = match command {
         Command::Check => (
             base::catalog(root, &list.sources, &mut issues).1,
             list.sources
@@ -224,8 +229,9 @@ pub fn run(command: Command, arg: Option<&str>, root: &Path) -> Run {
                 .filter(|c| c.unpinned())
                 .map(|c| c.name.clone())
                 .collect(),
+            provenance::record::modified(root),
         ),
-        _ => (Vec::new(), Vec::new()),
+        _ => (Vec::new(), Vec::new(), Vec::new()),
     };
 
     if let Some(unknown) = image_arg.filter(|id| !list.images.iter().any(|i| i.id == *id)) {
@@ -341,6 +347,7 @@ pub fn run(command: Command, arg: Option<&str>, root: &Path) -> Run {
         flavours: list.images.iter().map(|i| i.flavours.len()).sum(),
         shadowed,
         unpinned,
+        modified,
         list,
         resolved,
     }
@@ -417,7 +424,7 @@ fn difference(found: &str, generated: &str) -> (diag::Span, String) {
 
 /// Every file under `dir`, deepest last and sorted, so a run reports them in
 /// the same order twice.
-fn tracked(dir: &Path) -> Vec<PathBuf> {
+pub(crate) fn tracked(dir: &Path) -> Vec<PathBuf> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
     };

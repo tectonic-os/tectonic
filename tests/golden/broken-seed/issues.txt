@@ -20,7 +20,7 @@
  10 |         module "steam-tweaks" {
     :         ^^^|^^
     :            `-- pinned to a source of its own
- 11 |             source "https://github.com/owner/bootc-modules/archive/refs/tags/{ref}.tar.gz" {
+ 11 |             pin {
     `----
   help: a seed lists a module by name and nothing else, so one nothing can
         import leaves a seeded repository unbuildable

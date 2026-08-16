@@ -50,6 +50,11 @@
               "remote": null,
               "description": "A module both images in this repository enable",
               "options": {},
+              "provenance": {
+                "content": "bec73c76ad6068c194f25bc3bd9428868304bbd5e6665067a7df1aa27a6ae66a",
+                "pin": null,
+                "imported": null
+              },
               "satisfies": []
             }
           ],
@@ -125,6 +130,11 @@
               "remote": null,
               "description": "A module both images in this repository enable",
               "options": {},
+              "provenance": {
+                "content": "bec73c76ad6068c194f25bc3bd9428868304bbd5e6665067a7df1aa27a6ae66a",
+                "pin": null,
+                "imported": null
+              },
               "satisfies": []
             }
           ],
@@ -168,6 +178,11 @@
               "remote": null,
               "description": "A module both images in this repository enable",
               "options": {},
+              "provenance": {
+                "content": "bec73c76ad6068c194f25bc3bd9428868304bbd5e6665067a7df1aa27a6ae66a",
+                "pin": null,
+                "imported": null
+              },
               "satisfies": []
             }
           ],
@@ -211,6 +226,11 @@
               "remote": null,
               "description": "A module both images in this repository enable",
               "options": {},
+              "provenance": {
+                "content": "bec73c76ad6068c194f25bc3bd9428868304bbd5e6665067a7df1aa27a6ae66a",
+                "pin": null,
+                "imported": null
+              },
               "satisfies": []
             },
             {
@@ -221,6 +241,11 @@
               "remote": null,
               "description": "Compilers and language servers, behind the dev flavour",
               "options": {},
+              "provenance": {
+                "content": "ca999c1eb46cf76622b1fc110d13bda609da600b09410b281614daccf774250e",
+                "pin": null,
+                "imported": null
+              },
               "satisfies": []
             }
           ],

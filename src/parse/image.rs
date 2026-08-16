@@ -2,11 +2,13 @@
 
 use crate::diag::{Issue, Issues, Source, Span};
 use crate::model::image::{is_name, Base, Decl, Entry, Flavour, Image, List, NO_FLAVOUR};
-use crate::model::remote::{Remote, REMOTE_DIR};
+use crate::model::remote::REMOTE_DIR;
+use crate::parse::prop;
 use crate::parse::schema::{Arg, Kind, Node, Prop, Say, NEEDS_VALUE};
 use crate::parse::{bool_arg, check_capability, check_path, child, flag, kids, options};
-use crate::parse::{prop, remote};
 use crate::parse::{string_arg, string_args, text};
+use crate::provenance::evidence::{self, Role, PIN};
+use crate::provenance::Evidence;
 use kdl::{KdlDocument, KdlNode};
 
 /// A list entry, which is the same node ungated and inside a flavour block.
@@ -22,7 +24,7 @@ const ENTRY: Node = Node::new("module", "One module the image is made of, named 
     ], Say::new("unknown module property `{}`", "not part of the schema",
         "a list entry accepts `variant`; options are set as child nodes"))
     .children(&[
-        remote::SOURCE,
+        PIN,
         Node::new("",
             "An option the module declares, set for this image by the node's name."),
     ], Say::NONE);
@@ -336,16 +338,16 @@ impl Image {
         }
 
         let mut options = Vec::new();
-        let mut pin: Option<Remote> = None;
+        let mut pin: Option<Evidence> = None;
         for child in kids(node) {
-            if child.name().value() == "source" {
+            if child.name().value() == "pin" {
                 match pin.as_ref().map(|p| p.span) {
                     Some(first) => issues.push(
                         Issue::new(format!("`{path}` is pinned twice"), src)
                             .at(first, "first here")
                             .at(child.name().span(), "and again here"),
                     ),
-                    None => pin = remote::parse(child, src, false, issues),
+                    None => pin = Some(evidence::read(child, Role::Module, src, issues)),
                 }
                 continue;
             }

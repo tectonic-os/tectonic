@@ -64,10 +64,15 @@
     },
     {
       "customType": "regex",
-      // RE2 has no negative lookahead, so the leading-lowercase rule is how
-      // an underscore-prefixed module directory is excluded.
-      "description": "Version-tagged asset pins in module.kdl",
-      "managerFilePatterns": ["/^modules/([a-z][^/]*/)?[a-z][^/]*/module\\.kdl$/"],
+      // One spelling for every pin, so one manager covers an asset, an
+      // out-of-tree module and a collection. RE2 has no negative lookahead, so
+      // the leading-lowercase rule is how an underscore-prefixed module
+      // directory is excluded.
+      "description": "Version-tagged pins",
+      "managerFilePatterns": [
+        "/^modules/([a-z][^/]*/)?[a-z][^/]*/module\\.kdl$/",
+        "/^[^/]+\\.kdl$/",
+      ],
       "matchStrings": [
         "renovate datasource=\"(?<datasource>github-releases|github-tags)\" depName=\"(?<depName>[^\"]+)\"(?: extractVersion=\"(?<extractVersion>[^\"]+)\")?\\s*\\n\\s*version \"(?<currentValue>[^\"]+)\"",
       ],
@@ -81,16 +86,6 @@
       ],
       // The regex manager requires a currentValue even for a digest-only pin.
       "currentValueTemplate": "master",
-    },
-    {
-      "customType": "regex",
-      // Tags only: a module is published as a per-module tag, and the parser
-      // rejects git-refs here.
-      "description": "Out-of-tree module pins in an image file",
-      "managerFilePatterns": ["/^[^/]+\\.kdl$/"],
-      "matchStrings": [
-        "renovate datasource=\"(?<datasource>github-releases|github-tags)\" depName=\"(?<depName>[^\"]+)\"(?: extractVersion=\"(?<extractVersion>[^\"]+)\")?\\s*\\n\\s*ref \"(?<currentValue>[^\"]+)\"",
-      ],
     },
   ],
 }

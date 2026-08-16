@@ -3,6 +3,7 @@
 use crate::diag::{Source, Span};
 use crate::model::asset::Asset;
 use crate::model::options::{Opt, Variant};
+use crate::provenance::record::Record;
 
 /// A batch of packages keyed to a base family, with an optional repo to enable
 /// for just this install.
@@ -123,4 +124,11 @@ pub struct Module {
     /// that block is emitted at all.
     pub fragment_after: bool,
     pub standard_layer: bool,
+    /// What the module directory hashes to, every file in it except the import
+    /// record. `plan.json` carries it, so `verify` fails on an edit that was
+    /// never regenerated.
+    pub content: Option<String>,
+    /// The record `import module` left inside it, for a module that was
+    /// imported rather than written here.
+    pub imported: Option<Record>,
 }

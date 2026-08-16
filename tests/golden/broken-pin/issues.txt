@@ -1,21 +1,21 @@
   x the pin says nothing about how it is kept current
     ,-[./image.kdl:11:13]
  10 |         module "loose" {
- 11 |             source "http://example.com/modules.zip" {
-    :             ^^^|^^
-    :                `-- needs `renovate` or `manual`
- 12 |                 path "/etc/passwd"
+ 11 |             pin {
+    :             ^|^
+    :              `-- needs `renovate` or `manual`
+ 12 |                 url "http://example.com/modules.zip"
     `----
   help: `renovate datasource="github-tags" depName="owner/repo"`, or `manual
         "why nothing tracks it"`
 
-  x the pin declares no `ref`
+  x the pin declares no `version`
     ,-[./image.kdl:11:13]
  10 |         module "loose" {
- 11 |             source "http://example.com/modules.zip" {
-    :             ^^^|^^
-    :                `-- nothing pinned
- 12 |                 path "/etc/passwd"
+ 11 |             pin {
+    :             ^|^
+    :              `-- nothing pinned
+ 12 |                 url "http://example.com/modules.zip"
     `----
   help: an exact tag or commit; a moving ref would make the build depend on
         when it ran
@@ -23,31 +23,31 @@
   x the pin declares no `sha256`
     ,-[./image.kdl:11:13]
  10 |         module "loose" {
- 11 |             source "http://example.com/modules.zip" {
-    :             ^^^|^^
-    :                `-- nothing to verify the archive against
- 12 |                 path "/etc/passwd"
+ 11 |             pin {
+    :             ^|^
+    :              `-- nothing to verify what arrived
+ 12 |                 url "http://example.com/modules.zip"
     `----
   help: a remote module is arbitrary shell running as root in the build, so
         the content hash is required, not optional
 
-  x the source URL is not https
+  x the URL is not https
     ,-[./image.kdl:11:13]
  10 |         module "loose" {
- 11 |             source "http://example.com/modules.zip" {
-    :             ^^^|^^
-    :                `-- unencrypted or unsupported scheme
- 12 |                 path "/etc/passwd"
+ 11 |             pin {
+    :             ^|^
+    :              `-- unencrypted or unsupported scheme
+ 12 |                 url "http://example.com/modules.zip"
     `----
   help: https://, or file:// for a local archive
 
-  x the source is not a tar archive
+  x the pin is not a tar archive
     ,-[./image.kdl:11:13]
  10 |         module "loose" {
- 11 |             source "http://example.com/modules.zip" {
-    :             ^^^|^^
-    :                `-- cannot be extracted
- 12 |                 path "/etc/passwd"
+ 11 |             pin {
+    :             ^|^
+    :              `-- cannot be extracted
+ 12 |                 url "http://example.com/modules.zip"
     `----
   help: one of .tar.gz, .tgz, .tar.xz, .tar.zst, .tar.bz2; the fetch strips
         the archive's leading directory, which is a tar option
@@ -55,10 +55,10 @@
   x invalid subtree path `/etc/passwd`
     ,-[./image.kdl:11:13]
  10 |         module "loose" {
- 11 |             source "http://example.com/modules.zip" {
-    :             ^^^|^^
-    :                `-- relative to the archive root, so it cannot start with /
- 12 |                 path "/etc/passwd"
+ 11 |             pin {
+    :             ^|^
+    :              `-- relative to the archive root, so it cannot start with /
+ 12 |                 url "http://example.com/modules.zip"
     `----
   help: `path "modules/module-name"`, the module's directory inside the
         repository
@@ -69,7 +69,7 @@
  10 |         module "loose" {
     :         ^^^|^^
     :            `-- every module needs a manifest
- 11 |             source "http://example.com/modules.zip" {
+ 11 |             pin {
     `----
   help: run ./scripts/tect.sh fetch modules to fetch what the image pins
 

@@ -246,6 +246,53 @@ fn install(from: &Path, to: &Path) -> Result<(), String> {
 
 // ---- sha256 --------------------------------------------------------------
 
+/// What a set of files under `dir` hashes to, as one value: coreutils over each
+/// of them, then over its own output, so both the content and the name of every
+/// file are in the result. `files` is relative to `dir` and already sorted,
+/// which is what makes the value the same on two machines.
+pub fn sha256_tree(dir: &Path, files: &[String]) -> Result<String, String> {
+    let out = Command::new("sha256sum")
+        .args(files)
+        .current_dir(dir)
+        .output()
+        .map_err(|err| format!("sha256sum: {err}"))?;
+    if !out.status.success() {
+        return Err(format!(
+            "sha256sum in {}: {}{}",
+            dir.display(),
+            out.status,
+            String::from_utf8_lossy(&out.stderr)
+        ));
+    }
+    sha256_stdin(&out.stdout)
+}
+
+/// What `bytes` hashes to, read on stdin so nothing is written to disk.
+fn sha256_stdin(bytes: &[u8]) -> Result<String, String> {
+    use std::io::Write as _;
+
+    let mut child = Command::new("sha256sum")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|err| format!("sha256sum: {err}"))?;
+    child
+        .stdin
+        .take()
+        .ok_or("sha256sum: no stdin")?
+        .write_all(bytes)
+        .map_err(|err| format!("sha256sum: {err}"))?;
+    let out = child
+        .wait_with_output()
+        .map_err(|err| format!("sha256sum: {err}"))?;
+    String::from_utf8_lossy(&out.stdout)
+        .split_whitespace()
+        .next()
+        .filter(|hex| hex.len() == 64 && hex.chars().all(|c| c.is_ascii_hexdigit()))
+        .map(str::to_lowercase)
+        .ok_or_else(|| "sha256sum: no hash in its output".to_string())
+}
+
 /// What `path` hashes to, by coreutils, which every build layer and every host
 /// running this already has.
 fn sha256_file(path: &Path) -> Result<String, String> {

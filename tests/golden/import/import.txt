@@ -21,6 +21,16 @@ modules/one/flatpak is already there; delete it to import over it
 ==== the tree
 modules/.gitkeep
 modules/one/browser/module.kdl
+modules/one/browser/provenance.kdl
 modules/one/flatpak/files/usr/share/example/remotes.list
 modules/one/flatpak/module.kdl
+modules/one/flatpak/provenance.kdl
+==== the record
+imported "one" {
+    content "b1d3c80ac19b0db6acf256c6e50b59e60aca7be95e6ada7a0d048ea2cb4385a7"
+}
 ==== check
+==== modified
+[]
+==== modified after an edit
+["modules/one/flatpak"]

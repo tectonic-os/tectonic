@@ -50,6 +50,11 @@
               "remote": null,
               "description": "Ships a file a later module ships too",
               "options": {},
+              "provenance": {
+                "content": "6cc757a4eb3ca7bdab86bb771c3055d7986dd220b8529908a6942dd0f7a95a09",
+                "pin": null,
+                "imported": null
+              },
               "satisfies": []
             },
             {
@@ -60,6 +65,11 @@
               "remote": null,
               "description": "Ships the same path without saying so",
               "options": {},
+              "provenance": {
+                "content": "7d290b773836957433e05dc3c4ed42d01c2a8a9566a01a94aa8207b728cee3c2",
+                "pin": null,
+                "imported": null
+              },
               "satisfies": []
             },
             {
@@ -70,6 +80,11 @@
               "remote": null,
               "description": "Overrides a path no earlier module ships",
               "options": {},
+              "provenance": {
+                "content": "78a0d5a326bef4dfb71fa2583b90570213f7e62d392bf55e4145d2eed7453c87",
+                "pin": null,
+                "imported": null
+              },
               "satisfies": []
             }
           ],

@@ -265,8 +265,12 @@ impl Import {
         })
     }
 
-    fn apply(&self, root: &Path) -> Result<(), String> {
-        tect::import::vendor(root, &self.from, &self.dest)?;
+    fn apply(
+        &self,
+        root: &Path,
+        sources: &[tect::model::remote::Collection],
+    ) -> Result<(), String> {
+        tect::import::vendor(root, sources, &self.from, &self.dest)?;
         println!("imported {}", self.dest.display());
         self.listing.apply(&self.path)
     }
@@ -458,7 +462,8 @@ fn run() -> Result<ExitCode, Error> {
             if issues.report(&context) {
                 return Ok(ExitCode::from(REPO_ERROR));
             }
-            Import::collect(name, &root, &list.sources, images, &prompt)?.apply(&root)?;
+            Import::collect(name, &root, &list.sources, images, &prompt)?
+                .apply(&root, &list.sources)?;
             return Ok(ExitCode::SUCCESS);
         }
         ["build", rest @ ..] => {
@@ -581,6 +586,9 @@ fn run() -> Result<ExitCode, Error> {
                 "tect: `{name}` is unpinned, so an import of it takes whatever its ref holds \
                  then, unverified"
             );
+        }
+        for name in &run.modified {
+            eprintln!("tect: `{name}` has been edited since it was imported");
         }
         match run.images {
             0 => eprintln!("tect: no image yet; `tect create image <name>` writes one"),

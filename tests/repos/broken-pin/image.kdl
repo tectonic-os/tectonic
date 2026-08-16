@@ -8,7 +8,8 @@ image {
 
     modules {
         module "loose" {
-            source "http://example.com/modules.zip" {
+            pin {
+                url "http://example.com/modules.zip"
                 path "/etc/passwd"
             }
         }

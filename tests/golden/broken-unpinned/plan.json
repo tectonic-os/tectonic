@@ -15,11 +15,17 @@
     {
       "name": "loose",
       "dir": "modules/.remote/loose",
-      "ref": "main",
-      "sha256": "",
-      "url": "https://github.com/owner/modules/archive/refs/heads/main.tar.gz",
-      "path": null,
-      "file": "./image.kdl"
+      "file": "./image.kdl",
+      "pin": {
+        "locator": "https://github.com/owner/modules/archive/refs/heads/{version}.tar.gz",
+        "selector": "main",
+        "verifier": null,
+        "tracker": "unpinned",
+        "reason": "trusted",
+        "from": "asset",
+        "path": null,
+        "resolved": "https://github.com/owner/modules/archive/refs/heads/main.tar.gz"
+      }
     }
   ],
   "assets": [],
@@ -60,6 +66,20 @@
               "remote": "main",
               "description": "",
               "options": {},
+              "provenance": {
+                "content": null,
+                "pin": {
+                  "locator": "https://github.com/owner/modules/archive/refs/heads/{version}.tar.gz",
+                  "selector": "main",
+                  "verifier": null,
+                  "tracker": "unpinned",
+                  "reason": "trusted",
+                  "from": "asset",
+                  "path": null,
+                  "resolved": "https://github.com/owner/modules/archive/refs/heads/main.tar.gz"
+                },
+                "imported": null
+              },
               "satisfies": []
             }
           ],

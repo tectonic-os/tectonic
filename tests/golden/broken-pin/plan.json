@@ -15,11 +15,17 @@
     {
       "name": "loose",
       "dir": "modules/.remote/loose",
-      "ref": "",
-      "sha256": "",
-      "url": "http://example.com/modules.zip",
-      "path": "/etc/passwd",
-      "file": "./image.kdl"
+      "file": "./image.kdl",
+      "pin": {
+        "locator": "http://example.com/modules.zip",
+        "selector": null,
+        "verifier": null,
+        "tracker": "none",
+        "reason": null,
+        "from": "asset",
+        "path": "/etc/passwd",
+        "resolved": "http://example.com/modules.zip"
+      }
     }
   ],
   "assets": [],
@@ -57,9 +63,23 @@
               "dir": ".remote/loose",
               "flavour": null,
               "variant": null,
-              "remote": "",
+              "remote": null,
               "description": "",
               "options": {},
+              "provenance": {
+                "content": null,
+                "pin": {
+                  "locator": "http://example.com/modules.zip",
+                  "selector": null,
+                  "verifier": null,
+                  "tracker": "none",
+                  "reason": null,
+                  "from": "asset",
+                  "path": "/etc/passwd",
+                  "resolved": "http://example.com/modules.zip"
+                },
+                "imported": null
+              },
               "satisfies": []
             }
           ],

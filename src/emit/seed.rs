@@ -3,6 +3,7 @@
 
 use crate::model::image::{Entry, List, SCHEMA_VERSION};
 use crate::model::remote::{At, Collection};
+use crate::provenance::Tracker;
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
@@ -69,18 +70,29 @@ fn source(collection: &Collection, out: &mut String) {
         At::Dir(path) => {
             let _ = writeln!(out, "\x20   {name} {path:?}");
         }
-        At::Archive(remote) => {
-            let _ = writeln!(out, "\x20   {name} {:?} {{", remote.url);
-            if let Some(why) = &remote.unpinned {
-                let _ = writeln!(out, "\x20       unpinned {why:?}");
+        At::Archive(pin) => {
+            let _ = writeln!(out, "\x20   {name} {{");
+            out.push_str("\x20       pin {\n");
+            if let Tracker::Unpinned(why) = &pin.tracker {
+                let _ = writeln!(out, "\x20           unpinned {why:?}");
             }
-            let _ = writeln!(out, "\x20       ref {:?}", remote.git_ref);
-            if remote.unpinned.is_none() {
-                let _ = writeln!(out, "\x20       sha256 {:?}", remote.sha256);
+            let _ = writeln!(
+                out,
+                "\x20           version {:?}",
+                pin.version.clone().unwrap_or_default()
+            );
+            let _ = writeln!(
+                out,
+                "\x20           url {:?}",
+                pin.url.clone().unwrap_or_default()
+            );
+            if let Some(sha256) = &pin.sha256 {
+                let _ = writeln!(out, "\x20           sha256 {sha256:?}");
             }
-            if let Some(path) = &remote.path {
-                let _ = writeln!(out, "\x20       path {path:?}");
+            if let Some(path) = &pin.path {
+                let _ = writeln!(out, "\x20           path {path:?}");
             }
+            out.push_str("\x20       }\n");
             out.push_str("\x20   }\n");
         }
     }

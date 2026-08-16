@@ -606,10 +606,12 @@ colour "blue"
             r#"
 schema-version 1
 sources {
-    owner "https://host/owner/modules/{ref}.tar.gz" branch="main" {
-        unpinned
-        ref "v1"
-        ref "v2"
+    owner branch="main" {
+        pin {
+            unpinned
+            version "v1"
+            version "v2"
+        }
         subtree "modules"
     }
 }
@@ -620,7 +622,7 @@ sources {
             [
                 "unknown collection property `branch`",
                 "`unpinned` needs a reason",
-                "`ref` is declared twice",
+                "`version` is declared twice",
                 "unknown node `subtree` in a collection",
             ]
         );

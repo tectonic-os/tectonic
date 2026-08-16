@@ -8,9 +8,10 @@ image {
 
     modules {
         module "loose" {
-            source "https://github.com/owner/modules/archive/refs/heads/{ref}.tar.gz" {
+            pin {
                 unpinned "trusted"
-                ref "main"
+                version "main"
+                url "https://github.com/owner/modules/archive/refs/heads/{version}.tar.gz"
             }
         }
     }

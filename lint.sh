@@ -24,8 +24,14 @@ unformatted() {
     exit 1
 }
 
-if grep -rnE 'kdl::|Kdl[A-Z]' src --exclude-dir=parse; then
-    echo "lint: a KDL type outside src/parse/, which is the only place one may appear" >&2
+if grep -rnE 'kdl::|Kdl[A-Z]' src --exclude-dir=parse --exclude-dir=provenance; then
+    echo "lint: a KDL type outside the two places that read a document, src/parse/ and the \
+readers in src/provenance/" >&2
+    exit 1
+fi
+
+if grep -nE 'kdl::|Kdl[A-Z]' src/provenance/mod.rs; then
+    echo "lint: a KDL type in src/provenance/mod.rs, which holds the model half" >&2
     exit 1
 fi
 

@@ -1,78 +1,56 @@
-  x unknown node `unpinned` in a source
+  x a module pin cannot be `unpinned`
     ,-[./image.kdl:12:17]
- 11 |             source "https://github.com/owner/modules/archive/refs/heads/{ref}.tar.gz" {
+ 11 |             pin {
  12 |                 unpinned "trusted"
     :                 ^^^^|^^^
-    :                     `-- not part of the schema
- 13 |                 ref "main"
+    :                     `-- nothing would verify what arrived
+ 13 |                 version "main"
     `----
-  help: a source holds `renovate` or `manual`, `ref`, `sha256` and `path`;
-        there is no unpinned module, because the build fetches one and runs it
-        as root without a reader
-
-  x the pin says nothing about how it is kept current
-    ,-[./image.kdl:11:13]
- 10 |         module "loose" {
- 11 |             source "https://github.com/owner/modules/archive/refs/heads/{ref}.tar.gz" {
-    :             ^^^|^^
-    :                `-- needs `renovate` or `manual`
- 12 |                 unpinned "trusted"
-    `----
-  help: `renovate datasource="github-tags" depName="owner/repo"`, or `manual
-        "why nothing tracks it"`
+  help: only a module collection follows a moving ref: a fetched module is
+        arbitrary shell running as root in the build, and an asset lands in
+        the image
 
   x the pin declares no `sha256`
-    ,-[./image.kdl:11:13]
- 10 |         module "loose" {
- 11 |             source "https://github.com/owner/modules/archive/refs/heads/{ref}.tar.gz" {
-    :             ^^^|^^
-    :                `-- nothing to verify the archive against
- 12 |                 unpinned "trusted"
-    `----
-  help: a remote module is arbitrary shell running as root in the build, so
-        the content hash is required, not optional
-
-  x the pin declares no `sha256`
-   ,-[./repo.kdl:4:5]
- 3 | sources {
- 4 |     unmarked "https://github.com/owner/modules/archive/refs/heads/{ref}.tar.gz" {
-   :     ^^^^|^^^
-   :         `-- nothing to verify the archive against
- 5 |         manual "nothing bumps it"
+   ,-[./repo.kdl:5:9]
+ 4 |     unmarked {
+ 5 |         pin {
+   :         ^|^
+   :          `-- nothing to verify what arrived
+ 6 |             manual "nothing bumps it"
    `----
   help: the content hash is what says the archive is the one that was
         reviewed; `unpinned "why it is trusted"` is how a collection following
         a moving ref says it has none on purpose
 
   x the pin is declared `unpinned` but pins a `sha256`
-    ,-[./repo.kdl:9:9]
-  8 |     hashed "https://github.com/owner/modules/archive/refs/heads/{ref}.tar.gz" {
-  9 |         unpinned "trusted"
-    :         ^^^^|^^^
-    :             `-- one of the two is not true
- 10 |         ref "main"
+    ,-[./repo.kdl:13:13]
+ 12 |         pin {
+ 13 |             unpinned "trusted"
+    :             ^^^^|^^^
+    :                 `-- one of the two is not true
+ 14 |             version "main"
     `----
   help: a moving ref does not hash the same twice, so the fetch would fail as
         soon as it moved; drop whichever of them is wrong
 
   x the pin is declared `manual` and `unpinned`
-    ,-[./repo.kdl:15:9]
- 14 |         manual "nothing bumps it"
- 15 |         unpinned "trusted"
-    :         ^^^^|^^^
-    :             `-- pick one
- 16 |         ref "main"
+    ,-[./repo.kdl:22:13]
+ 21 |             manual "nothing bumps it"
+ 22 |             unpinned "trusted"
+    :             ^^^^|^^^
+    :                 `-- pick one
+ 23 |             version "main"
     `----
   help: `renovate datasource="github-tags" depName="owner/repo"`, `manual "why
         nothing tracks it"`, or `unpinned "why a moving ref is trusted here"`
 
-  x `here` is a directory, so `unpinned` says nothing
-    ,-[./repo.kdl:19:9]
- 18 |     here "../modules" {
- 19 |         unpinned "trusted"
-    :         ^^^^|^^^
-    :             `-- nothing is fetched
- 20 |     }
+  x `here` is a directory, so its `pin` says nothing
+    ,-[./repo.kdl:28:9]
+ 27 |     here "../modules" {
+ 28 |         pin {
+    :         ^|^
+    :          `-- nothing is fetched
+ 29 |             unpinned "trusted"
     `----
   help: a collection on this machine is read where it is; a pin belongs on one
         that is downloaded
@@ -83,7 +61,7 @@
  10 |         module "loose" {
     :         ^^^|^^
     :            `-- every module needs a manifest
- 11 |             source "https://github.com/owner/modules/archive/refs/heads/{ref}.tar.gz" {
+ 11 |             pin {
     `----
   help: run ./scripts/tect.sh fetch modules to fetch what the image pins
 

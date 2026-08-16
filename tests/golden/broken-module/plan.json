@@ -50,6 +50,11 @@
               "remote": null,
               "description": "",
               "options": {},
+              "provenance": {
+                "content": "9b8cc5684a0c80375dffe8212b3f7690fa2955864b23754e76eaacd27aa73b5f",
+                "pin": null,
+                "imported": null
+              },
               "satisfies": [
                 {
                   "benchmark": "cis-fedora",
@@ -77,6 +82,11 @@
               "remote": null,
               "description": "",
               "options": {},
+              "provenance": {
+                "content": null,
+                "pin": null,
+                "imported": null
+              },
               "satisfies": []
             }
           ],

@@ -1,62 +1,51 @@
-  x `bare` says nothing about where the collection is
-    ,-[./repo.kdl:15:5]
- 14 |     }
- 15 |     bare
-    :     ^^|^
-    :       `-- no location given
- 16 | }
-    `----
-  help: a directory on this machine, `bare "../modules"`, or a pinned archive,
-        `bare "https://host/owner/repo/archive/{ref}.tar.gz" { ... }`
-
   x collection `tectonic-os` is declared twice
-    ,-[./repo.kdl:4:5]
-  3 | sources {
-  4 |     tectonic-os "https://github.com/tectonic-os/modules/archive/refs/tags/{ref}.tar.gz" {
-    :     ^^^^^|^^^^^
-    :          `-- first here
-  5 |         renovate datasource="github-tags" depName="tectonic-os/modules"
-  6 |         ref "v1.0.0"
-  7 |         sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
-  8 |     }
-  9 |     tectonic-os "../modules"
+   ,-[./repo.kdl:4:5]
+ 3 | sources {
+ 4 |     tectonic-os {
+   :     ^^^^^|^^^^^
+   :          `-- first here
+ 5 |         pin {
+   `----
+    ,-[./repo.kdl:12:5]
+ 11 |     }
+ 12 |     tectonic-os "../modules"
     :     ^^^^^|^^^^^
     :          `-- and again here
- 10 |     Scratch "../modules"
+ 13 |     Scratch "../modules"
     `----
   help: both would import into the same directory, so one of them would be
         shadowed silently
 
   x invalid collection name `Scratch`
-    ,-[./repo.kdl:10:5]
-  9 |     tectonic-os "../modules"
- 10 |     Scratch "../modules"
+    ,-[./repo.kdl:13:5]
+ 12 |     tectonic-os "../modules"
+ 13 |     Scratch "../modules"
     :     ^^^|^^^
     :        `-- lowercase, digits and dashes, starting with a letter
- 11 |     local "../modules" {
+ 14 |     local "../modules" {
     `----
   help: the name is the directory imports land in, `modules/<name>/<module>`,
         and reaches every image that lists one of them
 
-  x `local` is a directory, so `ref` says nothing
-    ,-[./repo.kdl:12:9]
- 11 |     local "../modules" {
- 12 |         ref "v1.0.0"
+  x `local` is a directory, so its `pin` says nothing
+    ,-[./repo.kdl:15:9]
+ 14 |     local "../modules" {
+ 15 |         pin {
     :         ^|^
     :          `-- nothing is fetched
- 13 |         sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+ 16 |             version "v1.0.0"
     `----
   help: a collection on this machine is read where it is; a pin belongs on one
         that is downloaded
 
-  x `local` is a directory, so `sha256` says nothing
-    ,-[./repo.kdl:13:9]
- 12 |         ref "v1.0.0"
- 13 |         sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
-    :         ^^^|^^
-    :            `-- nothing is fetched
- 14 |     }
+  x `bare` says nothing about where the collection is
+    ,-[./repo.kdl:20:5]
+ 19 |     }
+ 20 |     bare
+    :     ^^|^
+    :       `-- no location given
+ 21 | }
     `----
-  help: a collection on this machine is read where it is; a pin belongs on one
-        that is downloaded
+  help: a directory on this machine, `bare "../modules"`, or a pinned archive,
+        `bare { pin { url "https://host/{version}.tar.gz" } }`
 

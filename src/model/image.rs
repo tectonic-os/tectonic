@@ -3,7 +3,8 @@
 use crate::diag::{Issue, Source, Span};
 use crate::model::module::Module;
 use crate::model::options::Value;
-use crate::model::remote::{Collection, Remote, REMOTE_DIR};
+use crate::model::remote::{Collection, REMOTE_DIR};
+use crate::provenance::Evidence;
 
 /// The schema every file in the repository is written against.
 pub const SCHEMA_VERSION: u32 = 1;
@@ -123,7 +124,7 @@ pub struct Entry {
     /// Option name to the values set on it.
     pub options: Vec<(String, Vec<Value>, Span)>,
     /// The pin, for a module that lives outside this repository.
-    pub remote: Option<Remote>,
+    pub remote: Option<Evidence>,
     pub span: Span,
     /// The manifest this entry names, loaded during resolution. None when it
     /// could not be read, which is already an issue.

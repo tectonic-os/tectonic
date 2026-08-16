@@ -338,6 +338,8 @@ impl Module {
             fragment: std::fs::read_to_string(dir.join("Containerfile.inc")).ok(),
             fragment_after: false,
             standard_layer: true,
+            content: crate::provenance::record::hash(&dir),
+            imported: crate::provenance::record::read(&dir, issues),
             src: src.clone(),
         };
 
@@ -1053,8 +1055,10 @@ variant "lean" scope="image" {
 }
 variant "lean"
 asset "starship" tracked=#true {
-    version
-    sha256 "abc" from="upstream" algorithm="sha512"
+    pin {
+        version
+        sha256 "abc" from="upstream" algorithm="sha512"
+    }
     checksum "abc"
 }
 asset "starship"

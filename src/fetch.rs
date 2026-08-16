@@ -92,9 +92,9 @@ fn pins(list: &List) -> Vec<Pin> {
             }
             out.push(Pin {
                 name: entry.path.clone(),
-                git_ref: remote.git_ref.clone(),
-                url: remote.url_resolved(),
-                sha256: remote.sha256.clone(),
+                git_ref: remote.version.clone().unwrap_or_default(),
+                url: remote.url_resolved().unwrap_or_default(),
+                sha256: remote.sha256.clone().unwrap_or_default(),
                 path: remote.path.clone().unwrap_or_default(),
             });
         }

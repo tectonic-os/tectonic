@@ -50,6 +50,11 @@
               "remote": null,
               "description": "The smallest module a repository can hold",
               "options": {},
+              "provenance": {
+                "content": "28e4cbeb5e5d7883cd17f228e9259c8bfc14bc0f6184aee913ede1048a2ae2d3",
+                "pin": null,
+                "imported": null
+              },
               "satisfies": []
             }
           ],

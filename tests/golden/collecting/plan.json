@@ -50,6 +50,11 @@
               "remote": null,
               "description": "Assembles every contributed justfile fragment into one file",
               "options": {},
+              "provenance": {
+                "content": "87cc75aaae54baea9b1f2bcfa9006777b55d45de9641ae36528622407935c9a1",
+                "pin": null,
+                "imported": null
+              },
               "satisfies": []
             },
             {
@@ -60,6 +65,11 @@
               "remote": null,
               "description": "Power recipes, contributed to the menu after the defaults",
               "options": {},
+              "provenance": {
+                "content": "afd5aa2beb5484d15d04f19b5d17a5eac32dfdfed7a09bce899609eddc045db2",
+                "pin": null,
+                "imported": null
+              },
               "satisfies": []
             },
             {
@@ -70,6 +80,11 @@
               "remote": null,
               "description": "Network recipes, contributed to the menu before the defaults",
               "options": {},
+              "provenance": {
+                "content": "5e4fdc3afd3eb3ee3338ead5c5c7960506258f15725a546a8dbddd6c589bacb3",
+                "pin": null,
+                "imported": null
+              },
               "satisfies": []
             }
           ],

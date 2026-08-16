@@ -220,9 +220,9 @@ fn import(name: &str, root: &Path) {
                 let owners: Vec<&str> = found.iter().map(|f| f.owner.as_str()).collect();
                 out.push_str(&format!("ambiguous: {}\n", owners.join(", ")));
             }
-            Ok(found) => match tect::import::destination(here, &found[0], module)
-                .and_then(|dest| tect::import::vendor(here, &found[0], &dest).map(|()| dest))
-            {
+            Ok(found) => match tect::import::destination(here, &found[0], module).and_then(|dest| {
+                tect::import::vendor(here, &sources, &found[0], &dest).map(|()| dest)
+            }) {
                 Ok(dest) => out.push_str(&format!("imported {}\n", dest.display())),
                 Err(message) => out.push_str(&format!("{message}\n")),
             },
@@ -238,10 +238,52 @@ fn import(name: &str, root: &Path) {
     out.extend(written);
 
     out.push_str(&format!(
+        "==== the record\n{}",
+        std::fs::read_to_string("modules/one/flatpak/provenance.kdl").unwrap()
+    ));
+    out.push_str(&format!(
         "==== check\n{}",
         tect::run(Command::Check, None, here).issues.plain()
     ));
+    out.push_str(&format!(
+        "==== modified\n{:?}\n",
+        tect::provenance::record::modified(here)
+    ));
+
+    // Forking an imported module is legitimate, so the edit is reported rather
+    // than diagnosed.
+    std::fs::write("modules/one/flatpak/module.sh", "echo forked\n").unwrap();
+    out.push_str(&format!(
+        "==== modified after an edit\n{:?}\n{}",
+        tect::provenance::record::modified(here),
+        tect::run(Command::Check, None, here).issues.plain()
+    ));
     compare(name, "import.txt", &out);
+}
+
+/// A module edited without regenerating is a `verify` failure, the per-module
+/// content hash being one of the facts `generated/plan.json` carries.
+fn edited_module(root: &Path) {
+    std::env::set_current_dir(root).expect("the created-into repository exists");
+    let here = Path::new(".");
+    for (path, body) in &tect::run(Command::Generate, None, here).files {
+        std::fs::create_dir_all(path.parent().expect("a file under generated/")).unwrap();
+        std::fs::write(path, body).unwrap();
+    }
+    let issues = || tect::run(Command::Verify, None, here).issues.plain();
+    let clean = issues();
+    assert!(
+        clean.is_empty(),
+        "verify was not green to begin with: {clean}"
+    );
+
+    let module = Path::new("modules/my-editor/module.sh");
+    std::fs::write(module, "echo edited\n").unwrap();
+    let dirty = issues();
+    assert!(
+        dirty.contains("generated/plan.json"),
+        "an edited module left plan.json current: {dirty}"
+    );
 }
 
 /// Every file under `dir`, which is what an import wrote.
@@ -553,6 +595,8 @@ fn golden() {
     no_default(&dir.join("no-default"));
     capture("init", &init);
     verify("init", &init);
-    create("create", &init_repo("create"));
+    let created = init_repo("create");
+    create("create", &created);
+    edited_module(&created);
     import("import", &init_repo("import"));
 }

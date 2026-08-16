@@ -28,7 +28,11 @@ pub fn render(list: &List, target: &str) -> Option<String> {
             let _ = write!(out, " `variant={variant}`");
         }
         if let Some(remote) = &entry.remote {
-            let _ = write!(out, " `remote={}`", remote.git_ref);
+            let _ = write!(
+                out,
+                " `remote={}`",
+                remote.version.clone().unwrap_or_default()
+            );
         }
         let _ = write!(
             out,

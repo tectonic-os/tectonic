@@ -14,7 +14,7 @@ pub fn build(list: &List, target: &str) -> Option<Json> {
     let assets: Vec<(String, &Module, &Asset, String)> = pinned(&modules)
         .into_iter()
         .filter_map(|(module, asset)| {
-            let url = asset.url_resolved()?;
+            let url = asset.pin.url_resolved()?;
             let id = format!(
                 "SPDXRef-Package-asset-{}-{}",
                 module.path.replace('/', "-"),
@@ -58,7 +58,7 @@ fn package(id: &str, module: &Module, asset: &Asset, url: &str) -> Json {
                 ("algorithm", Json::string("SHA256")),
                 (
                     "checksumValue",
-                    Json::string(asset.sha256.clone().unwrap_or_default()),
+                    Json::string(asset.pin.sha256.clone().unwrap_or_default()),
                 ),
             ])]),
         ),
@@ -74,7 +74,7 @@ fn package(id: &str, module: &Module, asset: &Asset, url: &str) -> Json {
             )),
         ),
     ];
-    if let Some(version) = &asset.version {
+    if let Some(version) = &asset.pin.version {
         fields.push(("versionInfo", Json::string(version)));
     }
     Json::object(fields)

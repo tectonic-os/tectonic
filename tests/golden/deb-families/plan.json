@@ -51,6 +51,11 @@
               "remote": null,
               "description": "A module both the Debian and Ubuntu images enable",
               "options": {},
+              "provenance": {
+                "content": "bc71ee256b11752cba5dec1bd1034ccae9850624f24370f1ac8509b2aa3bbc1f",
+                "pin": null,
+                "imported": null
+              },
               "satisfies": []
             }
           ],
@@ -103,6 +108,11 @@
               "remote": null,
               "description": "A module both the Debian and Ubuntu images enable",
               "options": {},
+              "provenance": {
+                "content": "bc71ee256b11752cba5dec1bd1034ccae9850624f24370f1ac8509b2aa3bbc1f",
+                "pin": null,
+                "imported": null
+              },
               "satisfies": []
             }
           ],

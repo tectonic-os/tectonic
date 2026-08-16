@@ -100,9 +100,12 @@ base "quay.io/fedora/fedora-bootc:44" {
 }
 
 sources {
-    tectonic-os "https://github.com/tectonic-os/modules/archive/refs/tags/{ref}.tar.gz" {
-        ref "v1.0.0"
-        sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+    tectonic-os {
+        pin {
+            version "v1.0.0"
+            url "https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz"
+            sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+        }
     }
 }
 
