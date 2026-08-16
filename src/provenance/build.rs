@@ -24,20 +24,6 @@ pub const RECORD: &str = "/usr/share/tectonic/build.json";
 /// made of.
 pub const MANIFEST: &str = "/usr/share/tectonic/manifest.json";
 
-/// One field of the record that arrives as a build argument. Kept as data so
-/// the host that passes them and the layer that reads them cannot drift.
-pub const ARGS: [&str; 9] = [
-    "BASE",
-    "BASE_DECLARED",
-    "TARGET",
-    "SOURCE_COMMIT",
-    "MODULE_HASHES",
-    "ASSET_RESOLUTIONS",
-    "AUDIT_ENFORCE",
-    "IMAGE_ID",
-    "IMAGE_VERSION",
-];
-
 fn env(name: &str) -> Option<String> {
     std::env::var(name).ok().filter(|v| !v.is_empty())
 }

@@ -7,7 +7,7 @@
 //! and where every byte of it came from.
 
 use crate::emit::json::Json;
-use crate::model::image::{Image, List, NO_FLAVOUR};
+use crate::model::image::{Image, List};
 use crate::model::module::Module;
 use crate::provenance::Evidence;
 use std::fmt::Write as _;
@@ -395,14 +395,6 @@ fn slots(pin: &Fetch) -> String {
         say(&pin.verifier),
         pin.tracker
     )
-}
-
-/// The flavour half of a target name, where a target carries one.
-pub fn target_flavour(name: &str, image: &str) -> Option<String> {
-    name.strip_prefix(image)
-        .and_then(|rest| rest.strip_prefix('-'))
-        .filter(|flavour| *flavour != NO_FLAVOUR)
-        .map(str::to_string)
 }
 
 // ---- on a live host ------------------------------------------------------
