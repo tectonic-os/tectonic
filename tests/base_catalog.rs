@@ -6,6 +6,29 @@ use tect::model::remote::{At, Collection};
 
 static ENV: Mutex<()> = Mutex::new(());
 
+/// Diagnostics wrap at 80 columns, so a phrase breaks wherever the absolute
+/// temp path pushes it. Flatten the gutter away before matching one.
+fn flat(text: &str) -> String {
+    text.split_whitespace()
+        .filter(|word| !matches!(*word, "x" | "|"))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+#[test]
+fn flattening_survives_a_wrap_mid_phrase() {
+    // Given: the rendering a longer path produced, broken between "be" and "read".
+    let wrapped = "  x /home/runner/work/tectonic/tectonic/target/tmp/io/bases.kdl could not be\n  | read: Is a directory (os error 21)\n";
+
+    // Then: the phrase and the path both match again.
+    let flat = flat(wrapped);
+    assert!(flat.contains("could not be read"), "{flat}");
+    assert!(
+        flat.contains("/home/runner/work/tectonic/tectonic/target/tmp/io/bases.kdl"),
+        "{flat}"
+    );
+}
+
 struct Assets {
     _lock: MutexGuard<'static, ()>,
     old: Option<std::ffi::OsString>,
@@ -131,9 +154,7 @@ fn malformed_runtime_file_does_not_substitute_embedded_catalog() {
     // Then: its diagnostic is retained and no embedded row is substituted.
     assert!(bases.is_empty());
     assert!(shadows.is_empty());
-    assert!(issues
-        .plain()
-        .contains(&assets.path.join(BASES_FILE).display().to_string()));
+    assert!(flat(&issues.plain()).contains(&assets.path.join(BASES_FILE).display().to_string()));
 }
 
 #[test]
@@ -150,15 +171,12 @@ fn present_unreadable_runtime_file_is_diagnosed_without_fallback() {
     // Then: the read failure names the exact path and embedded rows stay absent.
     assert!(bases.is_empty());
     assert!(shadows.is_empty());
-    let diagnostic = issues.plain();
+    let diagnostic = flat(&issues.plain());
     assert!(
         diagnostic.contains(&path.display().to_string()),
         "{diagnostic}"
     );
-    assert!(
-        diagnostic.contains("could") && diagnostic.contains("not be read"),
-        "{diagnostic}"
-    );
+    assert!(diagnostic.contains("could not be read"), "{diagnostic}");
 }
 
 #[test]
@@ -185,6 +203,7 @@ fn create_image_surfaces_an_unreadable_runtime_catalog() {
     .expect("the unreadable runtime catalog must stop image creation");
 
     // Then: the create error retains the exact source and read failure.
+    let error = flat(&error);
     assert!(error.contains(&path.display().to_string()), "{error}");
     assert!(error.contains("could not be read"), "{error}");
 }
