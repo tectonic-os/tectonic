@@ -31,21 +31,12 @@ graph LR
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
 | `initramfs-generation` | capability | `base` |  |  |
-| `rechunking` | capability | `base` |  |  |
 ==== generated/debian.graph.json
 {
   "image": "debian",
   "capabilities": [
     {
       "name": "initramfs-generation",
-      "kind": "capability",
-      "build_only": false,
-      "provider": "base",
-      "required_by": [],
-      "after": []
-    },
-    {
-      "name": "rechunking",
       "kind": "capability",
       "build_only": false,
       "provider": "base",
@@ -89,21 +80,12 @@ graph LR
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
 | `initramfs-generation` | capability | `base` |  |  |
-| `rechunking` | capability | `base` |  |  |
 ==== generated/ubuntu.graph.json
 {
   "image": "ubuntu",
   "capabilities": [
     {
       "name": "initramfs-generation",
-      "kind": "capability",
-      "build_only": false,
-      "provider": "base",
-      "required_by": [],
-      "after": []
-    },
-    {
-      "name": "rechunking",
       "kind": "capability",
       "build_only": false,
       "provider": "base",

@@ -3,7 +3,7 @@ image {
 
     base "ghcr.io/bootcrew/ubuntu-bootc:latest" {
         family "ubuntu"
-        provides "rechunking" "initramfs-generation"
+        provides "initramfs-generation"
         signed #true
     }
 

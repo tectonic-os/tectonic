@@ -134,7 +134,7 @@ fn missing_runtime_file_falls_back_to_embedded_catalog() {
     assert_eq!(bases.len(), 7);
     assert_eq!(bases[5].image, "ghcr.io/bootcrew/debian-bootc:latest");
     assert_eq!(bases[5].family, "debian");
-    assert_eq!(bases[5].provides, ["rechunking", "initramfs-generation"]);
+    assert_eq!(bases[5].provides, ["initramfs-generation"]);
     assert!(bases[5].signed);
     assert_eq!(bases[6].image, "ghcr.io/bootcrew/ubuntu-bootc:latest");
     assert_eq!(bases[6].family, "ubuntu");

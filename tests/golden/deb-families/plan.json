@@ -29,7 +29,6 @@
         "family": "debian",
         "signed": true,
         "provides": [
-          "rechunking",
           "initramfs-generation"
         ],
         "provides_files": []
@@ -90,7 +89,6 @@
         "family": "ubuntu",
         "signed": true,
         "provides": [
-          "rechunking",
           "initramfs-generation"
         ],
         "provides_files": []
