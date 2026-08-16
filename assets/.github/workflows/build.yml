@@ -590,11 +590,13 @@ jobs:
           echo "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}" \
             > "${RUNNER_TEMP}/digest.txt"
 
+      # Named for what it publishes as, not for the target: a target name holds
+      # the flavour after a slash, which is not a legal artifact name.
       - name: Upload the digest
         if: env.PUBLISH == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: digest-${{ matrix.target }}
+          name: digest-${{ env.IMAGE_NAME }}
           path: ${{ runner.temp }}/digest.txt
           retention-days: 1
 
@@ -646,6 +648,8 @@ jobs:
           {
             echo "count=${count}"
             echo "enforce=$(./scripts/scan.sh enforced "$plan")"
+            echo "published=$(jq -r --arg t "$TARGET" '
+              .images[].targets[] | select(.name == $t) | .published' "$plan")"
           } >> "$GITHUB_OUTPUT"
           if [ "$count" -eq 0 ]; then
             echo "No module in ${TARGET} declares \`satisfies\`, so there is nothing to scan." \
@@ -656,7 +660,7 @@ jobs:
         if: steps.claims.outputs.count != '0'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: digest-${{ matrix.target }}
+          name: digest-${{ steps.claims.outputs.published }}
           path: ${{ runner.temp }}
 
       - name: Split the digest
