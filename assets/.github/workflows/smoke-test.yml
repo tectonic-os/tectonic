@@ -16,13 +16,21 @@ jobs:
       packages: read
     steps:
       - name: Check /dev/kvm
-        run: test -e /dev/kvm
+        run: |
+          test -e /dev/kvm
+          # qemu runs as the runner user, which is in no group that owns it
+          sudo chmod 666 /dev/kvm
 
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Maximize build space
         uses: ublue-os/remove-unwanted-software@cc0becac701cf642c8f0a6613bbdaf5dc36b259e # v9
+
+      - name: Install qemu and UEFI firmware
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 ovmf
 
       - name: Resolve image name
         run: |
@@ -33,50 +41,46 @@ jobs:
         run: |
           sudo podman pull "${IMAGE_REGISTRY}/${IMAGE_NAME}:latest"
 
-      - name: Build qcow2 disk image
-        run: |
-          sudo podman run --rm --privileged \
-            --pull=newer \
-            --net=host \
-            --security-opt label=type:unconfined_t \
-            -v "${PWD}/disk_config/disk.toml":/config.toml:ro \
-            -v "${RUNNER_TEMP}":/output \
-            -v /var/lib/containers/storage:/var/lib/containers/storage \
-            quay.io/centos-bootc/bootc-image-builder:latest \
-            --type qcow2 \
-            --use-librepo=True \
-            --rootfs=btrfs \
-            "${IMAGE_REGISTRY}/${IMAGE_NAME}:latest"
-          ls -lh "${RUNNER_TEMP}/qcow2/"
-
       - name: Generate SSH key for VM access
         run: |
-          ssh-keygen -t ed25519 -f "${RUNNER_TEMP}/smoke-key" -N '' -C 'tectonic-smoke-test'
+          ssh-keygen -t ed25519 -f "${RUNNER_TEMP}/smoke-key" -N '' -C 'smoke-test'
           chmod 600 "${RUNNER_TEMP}/smoke-key"
 
-      - name: Inject SSH key into disk image
+      - name: Install the image to a disk
         run: |
-          sudo virt-customize -a "${RUNNER_TEMP}/qcow2/disk.qcow2" \
-            --ssh-inject "root:file:${RUNNER_TEMP}/smoke-key.pub" \
-            --selinux-relabel
+          truncate -s 20G "${RUNNER_TEMP}/disk.raw"
+          sudo podman run --rm --privileged --pid=host \
+            --security-opt label=type:unconfined_t \
+            -v /dev:/dev \
+            -v /var/lib/containers/storage:/var/lib/containers/storage \
+            -v "${RUNNER_TEMP}":/output \
+            "${IMAGE_REGISTRY}/${IMAGE_NAME}:latest" \
+            bootc install to-disk \
+            --via-loopback \
+            --generic-image \
+            --filesystem btrfs \
+            --karg console=ttyS0,115200n8 \
+            --root-ssh-authorized-keys /output/smoke-key.pub \
+            /output/disk.raw
+          ls -lh "${RUNNER_TEMP}/disk.raw"
 
       - name: Boot VM under qemu
         run: |
-          qemu-img create -f qcow2 \
-            -b "${RUNNER_TEMP}/qcow2/disk.qcow2" \
-            -F qcow2 \
-            "${RUNNER_TEMP}/overlay.qcow2"
+          cp /usr/share/OVMF/OVMF_VARS_4M.fd "${RUNNER_TEMP}/vars.fd"
 
           qemu-system-x86_64 \
+            -machine q35 \
             -m 4096 \
             -smp 2 \
             -cpu host \
             -enable-kvm \
             -display none \
+            -drive if=pflash,unit=0,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+            -drive if=pflash,unit=1,format=raw,file="${RUNNER_TEMP}/vars.fd" \
             -serial "file:${RUNNER_TEMP}/console.log" \
-            -drive file="${RUNNER_TEMP}/overlay.qcow2",if=virtio,format=qcow2 \
+            -drive file="${RUNNER_TEMP}/disk.raw",if=virtio,format=raw \
             -nic user,hostfwd=tcp::2222-:22 \
-            &
+            > "${RUNNER_TEMP}/qemu.log" 2>&1 &
           QEMU_PID=$!
           echo "qemu_pid=${QEMU_PID}" >> "$GITHUB_ENV"
 
@@ -130,6 +134,9 @@ jobs:
       - name: Serial console
         if: failure()
         run: |
+          echo "==> qemu"
+          cat "${RUNNER_TEMP}/qemu.log" 2>/dev/null || true
+          echo "==> serial"
           if [ -s "${RUNNER_TEMP}/console.log" ]; then
             cat "${RUNNER_TEMP}/console.log"
           else
