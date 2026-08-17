@@ -37,6 +37,12 @@ jobs:
           echo "IMAGE_NAME=$(./scripts/tect.sh plan --json | jq -r .ungated_published)" \
             >> "${GITHUB_ENV}"
 
+      # sudo podman carries root's credentials, and a package may be private.
+      - name: Login to GitHub Container Registry (root)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | sudo podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+
       - name: Pull published image
         run: |
           sudo podman pull "${IMAGE_REGISTRY}/${IMAGE_NAME}:latest"
