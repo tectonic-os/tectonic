@@ -20,6 +20,7 @@ image {
     base "quay.io/fedora/fedora-bootc:44" {
         family "fedora"
         provides "rechunking" "initramfs-generation" "mac-policy"
+        signed #false
     }
 
     modules {
@@ -35,6 +36,7 @@ image {
     base "quay.io/fedora/fedora-bootc:44" {
         family "fedora"
         provides "rechunking" "initramfs-generation" "mac-policy"
+        signed #false
     }
 
     modules {

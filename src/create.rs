@@ -575,9 +575,9 @@ fn image_kdl(
                 ships.push_str(&format!("\x20       {node} {}\n", listed.join(" ")));
             }
         }
-        if known.signed {
-            ships.push_str("\x20       signed #true\n");
-        }
+        // Always written: the signature probe corrects the line it finds, and
+        // an omitted one is a correction it cannot make.
+        ships.push_str(&format!("\x20       signed #{}\n", known.signed));
     }
     format!(
         "image {{\n\
