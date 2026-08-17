@@ -850,8 +850,13 @@ jobs:
       # reads it. Pushed to the registry it lands on the referrers fallback
       # tag, which `cosign verify-attestation --key` also reads, and a keyless
       # signature there makes every key verification on the digest fail.
+      #
+      # That store is a paid feature on a private repository, so this reports
+      # rather than fails: the two cosign predicates below are the ones a
+      # verifier reads with the image's own key.
       - name: Attest the commit that built it
         if: steps.claims.outputs.count != '0'
+        continue-on-error: true
         uses: actions/attest-build-provenance@bd77c077858b8d561b7a36cbe48ef4cc642ca39d # v2.2.2
         with:
           subject-name: ${{ env.SUBJECT_NAME }}
