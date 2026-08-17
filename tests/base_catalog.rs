@@ -92,6 +92,7 @@ fn public_catalog_lists_every_shipped_base_in_order() {
             "ghcr.io/ublue-os/kinoite-main:44",
             "ghcr.io/bootcrew/debian-bootc:latest",
             "ghcr.io/bootcrew/ubuntu-bootc:latest",
+            "ghcr.io/jmarrero/ubuntu-bootc:latest",
         ]
     );
 }
@@ -128,10 +129,10 @@ fn missing_runtime_file_falls_back_to_embedded_catalog() {
     let mut issues = Issues::default();
     let (bases, shadows) = tect::base::catalog(Path::new("."), &[], &mut issues);
 
-    // Then: the embedded seven rows are selected.
+    // Then: the embedded eight rows are selected.
     assert!(issues.is_empty(), "{}", issues.plain());
     assert!(shadows.is_empty());
-    assert_eq!(bases.len(), 7);
+    assert_eq!(bases.len(), 8);
     assert_eq!(bases[5].image, "ghcr.io/bootcrew/debian-bootc:latest");
     assert_eq!(bases[5].family, "debian");
     assert_eq!(bases[5].provides, ["initramfs-generation"]);
@@ -139,6 +140,10 @@ fn missing_runtime_file_falls_back_to_embedded_catalog() {
     assert_eq!(bases[6].image, "ghcr.io/bootcrew/ubuntu-bootc:latest");
     assert_eq!(bases[6].family, "ubuntu");
     assert!(bases[6].signed);
+    assert_eq!(bases[7].image, "ghcr.io/jmarrero/ubuntu-bootc:latest");
+    assert_eq!(bases[7].family, "ubuntu");
+    assert_eq!(bases[7].provides, ["initramfs-generation"]);
+    assert!(!bases[7].signed);
 }
 
 #[test]
@@ -237,7 +242,7 @@ fn collection_still_overrides_and_shadows_selected_catalog() {
 
     // Then: order is retained, the row is replaced, and the shadow is reported.
     assert!(issues.is_empty(), "{}", issues.plain());
-    assert_eq!(bases.len(), 7);
+    assert_eq!(bases.len(), 8);
     assert_eq!(bases[0].about, "collection replacement");
     assert!(bases[0].signed);
     assert_eq!(shadows.len(), 1);

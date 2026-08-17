@@ -48,3 +48,10 @@ base "ghcr.io/bootcrew/ubuntu-bootc:latest" {
     provides "initramfs-generation"
     signed #true
 }
+
+base "ghcr.io/jmarrero/ubuntu-bootc:latest" {
+    about "Experimental Ubuntu 26.04 bootc base with cloud-init"
+    family "ubuntu"
+    provides "initramfs-generation"
+    signed #false
+}
