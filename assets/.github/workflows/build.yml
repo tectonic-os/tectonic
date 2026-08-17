@@ -26,9 +26,6 @@ on:
 env:
   KERNEL: ${{ github.event.inputs.kernel || (github.event.schedule == '45 9 1 * *' && 'stock') || '' }}
   PROBE_IMAGE: "quay.io/podman/hello:latest"
-  IMAGE_DESC: "Custom Fedora bootc image"
-  IMAGE_KEYWORDS: "bootc,fedora"
-  IMAGE_LOGO_URL: "https://avatars.githubusercontent.com/u/99842644?v=4"
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"  # do not edit
 
 jobs:
@@ -268,6 +265,9 @@ jobs:
             echo "IMAGE_NAME=$(jq -r '.published' "$TARGET_PLAN")"
             echo "CONTAINERFILE=generated/$(jq -r '.image' "$TARGET_PLAN")"
             echo "RECHUNK=$(jq -r '.base.provides | index("rechunking") != null' "$IMAGE_PLAN")"
+            echo "IMAGE_DESC=$(jq -r '.description' "$IMAGE_PLAN")"
+            echo "IMAGE_KEYWORDS=$(jq -r '.keywords | join(",")' "$IMAGE_PLAN")"
+            echo "IMAGE_LOGO_URL=$(jq -r '.logo_url' "$IMAGE_PLAN")"
           } >> "${GITHUB_ENV}"
           if [ "${{ github.event_name }}" != "pull_request" ] \
              && [ "${{ github.ref }}" = "refs/heads/${{ github.event.repository.default_branch }}" ] \
