@@ -51,6 +51,12 @@ pub const IMAGE: Node = Node::new("image",
             .arg(Arg::Str, NEEDS_VALUE).once(""),
         Node::new("issues-url", "Where a user reports a problem with the image.")
             .arg(Arg::Str, NEEDS_VALUE).once(""),
+        Node::new("description", "A one-line summary of the image, in its OCI labels and not in os-release.")
+            .arg(Arg::Str, NEEDS_VALUE).once(""),
+        Node::new("keywords", "Keywords for the image's OCI labels, comma-joined into one label.")
+            .arg(Arg::Strs, Say::NONE),
+        Node::new("logo-url", "A URL to the image's logo, in its OCI labels.")
+            .arg(Arg::Str, NEEDS_VALUE).once(""),
 
         Node::new("base", "The image every layer builds on, and what building on it may assume.")
             .arg(Arg::Str, Say::new("`base` needs an image reference", "no image given",
@@ -125,8 +131,8 @@ pub const IMAGE: Node = Node::new("image",
             ], Say::new("unknown node `{}` in `modules`", "not part of the schema",
                 "`modules` holds `module` entries and `flavour` blocks")),
     ], Say::new("unknown image property `{}`", "not part of the schema",
-        "an image accepts `id`, `name`, `pretty-name`, `url` and `issues-url`, and the `base`, \
-         `flavours` and `modules` blocks"));
+        "an image accepts `id`, `name`, `pretty-name`, `url`, `issues-url`, `description`, \
+         `keywords` and `logo-url`, and the `base`, `flavours` and `modules` blocks"));
 
 /// Where a `module` line goes: the offset of the closing brace of the image's
 /// `modules` block. Appending is a text splice over this span, so nothing
@@ -162,6 +168,12 @@ impl List {
             pretty_name: text(node, "pretty-name"),
             url: text(node, "url"),
             issues_url: text(node, "issues-url"),
+            description: text(node, "description"),
+            keywords: decls(node, "keywords")
+                .into_iter()
+                .map(|d| d.name)
+                .collect(),
+            logo_url: text(node, "logo-url"),
             base: None,
             flavours: Vec::new(),
             entries: Vec::new(),

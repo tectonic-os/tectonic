@@ -24,6 +24,9 @@
       "file": "./image.kdl",
       "url": "",
       "issues_url": "",
+      "description": "",
+      "keywords": [],
+      "logo_url": "",
       "base": {
         "image": "ghcr.io/ublue-os/bazzite:stable",
         "family": "fedora",

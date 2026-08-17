@@ -106,6 +106,9 @@ fn image(list: &List, image: &Image, resolved: &Resolved) -> Json {
         ("file", Json::string(image.src.name())),
         ("url", Json::string(&image.url)),
         ("issues_url", Json::string(&image.issues_url)),
+        ("description", Json::string(&image.description)),
+        ("keywords", Json::strings(image.keywords.iter().cloned())),
+        ("logo_url", Json::string(&image.logo_url)),
         (
             "base",
             match &image.base {

@@ -55,6 +55,9 @@
       "file": "./image.kdl",
       "url": "",
       "issues_url": "",
+      "description": "",
+      "keywords": [],
+      "logo_url": "",
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",

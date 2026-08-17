@@ -24,6 +24,9 @@
       "file": "./debian.image.kdl",
       "url": "",
       "issues_url": "",
+      "description": "",
+      "keywords": [],
+      "logo_url": "",
       "base": {
         "image": "ghcr.io/bootcrew/debian-bootc:latest",
         "family": "debian",
@@ -84,6 +87,9 @@
       "file": "./ubuntu.image.kdl",
       "url": "",
       "issues_url": "",
+      "description": "",
+      "keywords": [],
+      "logo_url": "",
       "base": {
         "image": "ghcr.io/bootcrew/ubuntu-bootc:latest",
         "family": "ubuntu",

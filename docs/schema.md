@@ -294,6 +294,9 @@ One image: what it calls itself, what it builds on, and everything it is made of
 | `pretty-name` | a string, at most one | os-release PRETTY_NAME, the full name a user is shown. |
 | `url` | a string, at most one | The project's home page, in os-release and the image labels. |
 | `issues-url` | a string, at most one | Where a user reports a problem with the image. |
+| `description` | a string, at most one | A one-line summary of the image, in its OCI labels and not in os-release. |
+| `keywords` | one or more strings | Keywords for the image's OCI labels, comma-joined into one label. |
+| `logo-url` | a string, at most one | A URL to the image's logo, in its OCI labels. |
 
 #### `base`
 
