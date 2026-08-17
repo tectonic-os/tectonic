@@ -23,8 +23,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  family:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      family: ${{ steps.set.outputs.family }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - id: set
+        run: |
+          set -euo pipefail
+          plan="$(./scripts/tect.sh plan --json)"
+          family="$(jq -r --arg t "$(jq -r .ungated_target <<< "$plan")" \
+            '.images[] | select([.targets[].name] | index($t)) | .base.family' \
+            <<< "$plan")"
+          echo "family=${family}" >> "$GITHUB_OUTPUT"
+          [ "$family" = fedora ] || echo "::warning::the builder relabels its buildroot with SELinux and installs with Anaconda, so it builds no disk for the ${family} family"
+
   build:
     name: Build disk images
+    needs: family
+    if: needs.family.outputs.family == 'fedora'
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
