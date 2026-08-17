@@ -49,6 +49,7 @@ jobs:
       - name: Install the image to a disk
         run: |
           truncate -s 20G "${RUNNER_TEMP}/disk.raw"
+          # the assertions arrive over ssh, and an image may ship sshd disabled
           sudo podman run --rm --privileged --pid=host \
             --security-opt label=type:unconfined_t \
             -v /dev:/dev \
@@ -60,6 +61,7 @@ jobs:
             --generic-image \
             --filesystem btrfs \
             --karg console=ttyS0,115200n8 \
+            --karg systemd.wants=sshd.service \
             --root-ssh-authorized-keys /output/smoke-key.pub \
             /output/disk.raw
           ls -lh "${RUNNER_TEMP}/disk.raw"
