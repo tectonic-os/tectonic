@@ -108,6 +108,7 @@ jobs:
           exit 1
 
       - name: Assertions
+        timeout-minutes: 10
         run: |
           s() {
             ssh -o StrictHostKeyChecking=no \
@@ -119,7 +120,8 @@ jobs:
           s bootc status || { echo "FAIL: bootc status"; exit 1; }
 
           echo "==> systemctl is-system-running"
-          state="$(s systemctl is-system-running)" || true
+          # --wait, because ssh answers before the last unit has started
+          state="$(s systemctl is-system-running --wait)" || true
           case "$state" in
             running)
               echo "system state: ${state}"
