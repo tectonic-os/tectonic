@@ -19,7 +19,7 @@ pub(crate) fn of_target<'a>(
     let entries = image
         .entries
         .iter()
-        .filter(|entry| in_target(entry, Some(&target.flavour)))
+        .filter(|entry| in_target(entry, &target.flavour))
         .collect();
     let flavour = match target.flavour.as_str() {
         NO_FLAVOUR => None,
@@ -156,7 +156,7 @@ fn image(list: &List, image: &Image, resolved: &Resolved) -> Json {
 
 /// What one target is made of.
 fn target(list: &List, image: &Image, resolved: &Resolved, target: &Target) -> Json {
-    let flavour = Some(target.flavour.as_str());
+    let flavour = target.flavour.as_str();
     let entries: Vec<&Entry> = image
         .entries
         .iter()
@@ -400,7 +400,7 @@ fn provides_files(modules: &[&Module]) -> Json {
 
 /// Every path a files/ overlay puts in this target's image, to the module it
 /// comes from.
-fn overlay_files(image: &Image, shipped: &overlay::Index, flavour: Option<&str>) -> Json {
+fn overlay_files(image: &Image, shipped: &overlay::Index, flavour: &str) -> Json {
     Json::map(shipped.iter().filter_map(|(path, owners)| {
         owners
             .iter()
@@ -415,7 +415,7 @@ fn overlay_files(image: &Image, shipped: &overlay::Index, flavour: Option<&str>)
 /// module whose copy the image actually carries. A claim about a file its
 /// claimant no longer owns is a composition failure rather than a false claim,
 /// and this is what tells the two apart.
-fn overridden(image: &Image, shipped: &overlay::Index, flavour: Option<&str>) -> Json {
+fn overridden(image: &Image, shipped: &overlay::Index, flavour: &str) -> Json {
     let mut out: Vec<Json> = Vec::new();
     for (path, owners) in shipped {
         let here: Vec<usize> = owners
@@ -439,11 +439,7 @@ fn overridden(image: &Image, shipped: &overlay::Index, flavour: Option<&str>) ->
 
 /// The preset files the target's overlays put in the image, which is what the
 /// layer checks arrived.
-pub(crate) fn preset_files(
-    image: &Image,
-    shipped: &overlay::Index,
-    flavour: Option<&str>,
-) -> Vec<String> {
+pub(crate) fn preset_files(image: &Image, shipped: &overlay::Index, flavour: &str) -> Vec<String> {
     shipped
         .keys()
         .filter(|path| is_preset(path))
@@ -528,12 +524,13 @@ fn remotes(list: &List) -> Json {
     Json::Array(out)
 }
 
-/// Whether an entry lands in a target's image.
-pub(crate) fn in_target(entry: &Entry, target: Option<&str>) -> bool {
-    match (&entry.flavour, target) {
-        (None, _) => true,
-        (Some(_), None) => true,
-        (Some(gate), Some(target)) => gate == target,
+/// Whether an entry lands in a target's image. The ungated target is
+/// `NO_FLAVOUR`, never an absent one: a caller with nothing to compare against
+/// would silently take the gated entries too.
+pub(crate) fn in_target(entry: &Entry, target: &str) -> bool {
+    match &entry.flavour {
+        None => true,
+        Some(gate) => gate == target,
     }
 }
 
@@ -562,4 +559,33 @@ pub(crate) fn unique_pairs(
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::diag::Span;
+
+    fn entry(flavour: Option<&str>) -> Entry {
+        Entry {
+            path: "owner/module".into(),
+            flavour: flavour.map(str::to_string),
+            variant: None,
+            options: Vec::new(),
+            remote: None,
+            span: Span::default(),
+            module: None,
+        }
+    }
+
+    /// The ungated target is a flavour name like any other, and a gated entry
+    /// is not in it. Nothing golden covers this: the build args are the only
+    /// consumer, and they are handed to a backend rather than written.
+    #[test]
+    fn a_gated_entry_is_out_of_the_ungated_target() {
+        assert!(in_target(&entry(None), NO_FLAVOUR));
+        assert!(in_target(&entry(Some("dx")), "dx"));
+        assert!(!in_target(&entry(Some("dx")), NO_FLAVOUR));
+        assert!(!in_target(&entry(Some("dx")), "laptop"));
+    }
 }

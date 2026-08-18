@@ -3,7 +3,7 @@
 
 use crate::emit::plan::{contract_files, of_target, pinned, preset_files, unique_pairs};
 use crate::layout;
-use crate::model::image::{List, Target};
+use crate::model::image::{List, Target, NO_FLAVOUR};
 use crate::model::module::Module;
 use crate::provenance::build as record;
 use std::fs;
@@ -73,7 +73,13 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
         .images
         .iter()
         .position(|i| i.id == image.id)
-        .map(|i| preset_files(image, &resolved[i].shipped, flavour.as_deref()))
+        .map(|i| {
+            preset_files(
+                image,
+                &resolved[i].shipped,
+                flavour.as_deref().unwrap_or(NO_FLAVOUR),
+            )
+        })
         .unwrap_or_default();
     let published = published(&list, &target);
 
