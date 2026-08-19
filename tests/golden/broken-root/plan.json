@@ -41,7 +41,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "same/none",
+          "name": "same",
           "image": "same",
           "flavour": null,
           "published": "same",
@@ -80,7 +80,7 @@
           "collect_destinations": []
         },
         {
-          "name": "same/none",
+          "name": "same",
           "image": "same",
           "flavour": null,
           "published": "same",
@@ -144,7 +144,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "same/none",
+          "name": "same",
           "image": "same",
           "flavour": null,
           "published": "same",
@@ -183,7 +183,7 @@
           "collect_destinations": []
         },
         {
-          "name": "same/none",
+          "name": "same",
           "image": "same",
           "flavour": null,
           "published": "same",

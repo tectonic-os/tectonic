@@ -3,11 +3,11 @@
   "default_image": "minimal",
   "default_image_name": "Minimal",
   "pr_image": "minimal",
-  "default_target": "minimal/none",
+  "default_target": "minimal",
   "default_published": "minimal",
-  "pr_target": "minimal/none",
+  "pr_target": "minimal",
   "pr_published": "minimal",
-  "ungated_target": "minimal/none",
+  "ungated_target": "minimal",
   "ungated_published": "minimal",
   "cache_image": "minimal-cache",
   "workflows": [],
@@ -41,7 +41,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "minimal/none",
+          "name": "minimal",
           "image": "minimal",
           "flavour": null,
           "published": "minimal",

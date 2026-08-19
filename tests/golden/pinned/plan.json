@@ -3,11 +3,11 @@
   "default_image": "pinned",
   "default_image_name": "Pinned",
   "pr_image": "pinned",
-  "default_target": "pinned/none",
+  "default_target": "pinned",
   "default_published": "pinned",
-  "pr_target": "pinned/none",
+  "pr_target": "pinned",
   "pr_published": "pinned",
-  "ungated_target": "pinned/none",
+  "ungated_target": "pinned",
   "ungated_published": "pinned",
   "cache_image": "pinned-cache",
   "workflows": [],
@@ -57,7 +57,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "pinned/none",
+          "name": "pinned",
           "image": "pinned",
           "flavour": null,
           "published": "pinned",

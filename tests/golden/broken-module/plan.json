@@ -3,11 +3,11 @@
   "default_image": "broken-module",
   "default_image_name": "Broken Module",
   "pr_image": "broken-module",
-  "default_target": "broken-module/none",
+  "default_target": "broken-module",
   "default_published": "broken-module",
-  "pr_target": "broken-module/none",
+  "pr_target": "broken-module",
   "pr_published": "broken-module",
-  "ungated_target": "broken-module/none",
+  "ungated_target": "broken-module",
   "ungated_published": "broken-module",
   "cache_image": "broken-module-cache",
   "workflows": [],
@@ -41,7 +41,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "broken-module/none",
+          "name": "broken-module",
           "image": "broken-module",
           "flavour": null,
           "published": "broken-module",

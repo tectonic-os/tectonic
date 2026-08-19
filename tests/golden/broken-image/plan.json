@@ -3,11 +3,11 @@
   "default_image": "Not An Id",
   "default_image_name": "",
   "pr_image": "Not An Id",
-  "default_target": "Not An Id/none",
+  "default_target": "Not An Id",
   "default_published": "Not An Id",
-  "pr_target": "Not An Id/none",
+  "pr_target": "Not An Id",
   "pr_published": "Not An Id",
-  "ungated_target": "Not An Id/none",
+  "ungated_target": "Not An Id",
   "ungated_published": "Not An Id",
   "cache_image": "Not An Id-cache",
   "workflows": [],
@@ -33,7 +33,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "Not An Id/none",
+          "name": "Not An Id",
           "image": "Not An Id",
           "flavour": null,
           "published": "Not An Id",

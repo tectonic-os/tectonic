@@ -3,11 +3,11 @@
   "default_image": "broken-fragment",
   "default_image_name": "Broken Fragment",
   "pr_image": "broken-fragment",
-  "default_target": "broken-fragment/none",
+  "default_target": "broken-fragment",
   "default_published": "broken-fragment",
-  "pr_target": "broken-fragment/none",
+  "pr_target": "broken-fragment",
   "pr_published": "broken-fragment",
-  "ungated_target": "broken-fragment/none",
+  "ungated_target": "broken-fragment",
   "ungated_published": "broken-fragment",
   "cache_image": "broken-fragment-cache",
   "workflows": [],
@@ -47,7 +47,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "broken-fragment/none",
+          "name": "broken-fragment",
           "image": "broken-fragment",
           "flavour": null,
           "published": "broken-fragment",
@@ -99,7 +99,7 @@
           "pr": false,
           "siblings": [
             {
-              "name": "broken-fragment/none",
+              "name": "broken-fragment",
               "published": "broken-fragment"
             }
           ],

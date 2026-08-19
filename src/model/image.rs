@@ -47,7 +47,10 @@ impl Target {
 
 impl std::fmt::Display for Target {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}/{}", self.image, self.flavour)
+        match self.flavour.as_str() {
+            NO_FLAVOUR => write!(f, "{}", self.image),
+            flavour => write!(f, "{}/{flavour}", self.image),
+        }
     }
 }
 

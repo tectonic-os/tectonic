@@ -3,11 +3,11 @@
   "default_image": "suppressed",
   "default_image_name": "Suppressed",
   "pr_image": "suppressed",
-  "default_target": "suppressed/none",
+  "default_target": "suppressed",
   "default_published": "suppressed",
-  "pr_target": "suppressed/none",
+  "pr_target": "suppressed",
   "pr_published": "suppressed",
-  "ungated_target": "suppressed/none",
+  "ungated_target": "suppressed",
   "ungated_published": "suppressed",
   "cache_image": "suppressed-cache",
   "workflows": [],
@@ -44,7 +44,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "suppressed/none",
+          "name": "suppressed",
           "image": "suppressed",
           "flavour": null,
           "published": "suppressed",

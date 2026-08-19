@@ -3,11 +3,11 @@
   "default_image": "broken-graph",
   "default_image_name": "Broken Graph",
   "pr_image": "broken-graph",
-  "default_target": "broken-graph/none",
+  "default_target": "broken-graph",
   "default_published": "broken-graph",
-  "pr_target": "broken-graph/none",
+  "pr_target": "broken-graph",
   "pr_published": "broken-graph",
-  "ungated_target": "broken-graph/none",
+  "ungated_target": "broken-graph",
   "ungated_published": "broken-graph",
   "cache_image": "broken-graph-cache",
   "workflows": [],
@@ -42,7 +42,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "broken-graph/none",
+          "name": "broken-graph",
           "image": "broken-graph",
           "flavour": null,
           "published": "broken-graph",

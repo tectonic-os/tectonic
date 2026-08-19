@@ -3,11 +3,11 @@
   "default_image": "broken-asset",
   "default_image_name": "Broken Asset",
   "pr_image": "broken-asset",
-  "default_target": "broken-asset/none",
+  "default_target": "broken-asset",
   "default_published": "broken-asset",
-  "pr_target": "broken-asset/none",
+  "pr_target": "broken-asset",
   "pr_published": "broken-asset",
-  "ungated_target": "broken-asset/none",
+  "ungated_target": "broken-asset",
   "ungated_published": "broken-asset",
   "cache_image": "broken-asset-cache",
   "workflows": [],
@@ -72,7 +72,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "broken-asset/none",
+          "name": "broken-asset",
           "image": "broken-asset",
           "flavour": null,
           "published": "broken-asset",

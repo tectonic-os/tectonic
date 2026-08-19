@@ -3,11 +3,11 @@
   "default_image": "enforced",
   "default_image_name": "Enforced",
   "pr_image": "enforced",
-  "default_target": "enforced/none",
+  "default_target": "enforced",
   "default_published": "enforced",
-  "pr_target": "enforced/none",
+  "pr_target": "enforced",
   "pr_published": "enforced",
-  "ungated_target": "enforced/none",
+  "ungated_target": "enforced",
   "ungated_published": "enforced",
   "cache_image": "enforced-cache",
   "workflows": [],
@@ -57,7 +57,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "enforced/none",
+          "name": "enforced",
           "image": "enforced",
           "flavour": null,
           "published": "enforced",

@@ -3,11 +3,11 @@
   "default_image": "debian",
   "default_image_name": "Debian",
   "pr_image": "debian",
-  "default_target": "debian/none",
+  "default_target": "debian",
   "default_published": "debian",
-  "pr_target": "debian/none",
+  "pr_target": "debian",
   "pr_published": "debian",
-  "ungated_target": "debian/none",
+  "ungated_target": "debian",
   "ungated_published": "debian",
   "cache_image": "debian-cache",
   "workflows": [],
@@ -41,7 +41,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "debian/none",
+          "name": "debian",
           "image": "debian",
           "flavour": null,
           "published": "debian",
@@ -105,7 +105,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "ubuntu/none",
+          "name": "ubuntu",
           "image": "ubuntu",
           "flavour": null,
           "published": "ubuntu",

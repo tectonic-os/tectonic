@@ -215,8 +215,8 @@ Writes the build files under `generated/` and lists what it wrote:
 ### `build [target]`
 
 Builds one target: fetches the pinned modules, runs `verify` as the drift gate,
-then execs the container backend. A target is `<image>/<flavour>`, where the
-flavour half is `none` for the ungated set. The default target when none is
+then execs the container backend. A target is `<image>/<flavour>`, and the
+ungated set is named by the bare image id. The default target when none is
 named.
 
 #### Flags:

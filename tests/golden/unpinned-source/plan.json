@@ -3,11 +3,11 @@
   "default_image": "example",
   "default_image_name": "Example",
   "pr_image": "example",
-  "default_target": "example/none",
+  "default_target": "example",
   "default_published": "example",
-  "pr_target": "example/none",
+  "pr_target": "example",
   "pr_published": "example",
-  "ungated_target": "example/none",
+  "ungated_target": "example",
   "ungated_published": "example",
   "cache_image": "example-cache",
   "workflows": [],
@@ -41,7 +41,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "example/none",
+          "name": "example",
           "image": "example",
           "flavour": null,
           "published": "example",

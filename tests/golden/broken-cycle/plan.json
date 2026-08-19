@@ -3,11 +3,11 @@
   "default_image": "broken-cycle",
   "default_image_name": "Broken Cycle",
   "pr_image": "broken-cycle",
-  "default_target": "broken-cycle/none",
+  "default_target": "broken-cycle",
   "default_published": "broken-cycle",
-  "pr_target": "broken-cycle/none",
+  "pr_target": "broken-cycle",
   "pr_published": "broken-cycle",
-  "ungated_target": "broken-cycle/none",
+  "ungated_target": "broken-cycle",
   "ungated_published": "broken-cycle",
   "cache_image": "broken-cycle-cache",
   "workflows": [],
@@ -41,7 +41,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "broken-cycle/none",
+          "name": "broken-cycle",
           "image": "broken-cycle",
           "flavour": null,
           "published": "broken-cycle",

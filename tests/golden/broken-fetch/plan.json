@@ -3,11 +3,11 @@
   "default_image": "broken-fetch",
   "default_image_name": "Broken Fetch",
   "pr_image": "broken-fetch",
-  "default_target": "broken-fetch/none",
+  "default_target": "broken-fetch",
   "default_published": "broken-fetch",
-  "pr_target": "broken-fetch/none",
+  "pr_target": "broken-fetch",
   "pr_published": "broken-fetch",
-  "ungated_target": "broken-fetch/none",
+  "ungated_target": "broken-fetch",
   "ungated_published": "broken-fetch",
   "cache_image": "broken-fetch-cache",
   "workflows": [],
@@ -41,7 +41,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "broken-fetch/none",
+          "name": "broken-fetch",
           "image": "broken-fetch",
           "flavour": null,
           "published": "broken-fetch",

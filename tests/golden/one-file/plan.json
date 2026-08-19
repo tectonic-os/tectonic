@@ -3,11 +3,11 @@
   "default_image": "alpha",
   "default_image_name": "Alpha",
   "pr_image": "alpha",
-  "default_target": "alpha/none",
+  "default_target": "alpha",
   "default_published": "alpha",
-  "pr_target": "alpha/none",
+  "pr_target": "alpha",
   "pr_published": "alpha",
-  "ungated_target": "alpha/none",
+  "ungated_target": "alpha",
   "ungated_published": "alpha",
   "cache_image": "alpha-cache",
   "workflows": [],
@@ -41,7 +41,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "alpha/none",
+          "name": "alpha",
           "image": "alpha",
           "flavour": null,
           "published": "alpha",
@@ -105,7 +105,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "beta/none",
+          "name": "beta",
           "image": "beta",
           "flavour": null,
           "published": "beta",

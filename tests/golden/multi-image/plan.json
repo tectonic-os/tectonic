@@ -7,7 +7,7 @@
   "default_published": "workstation-base",
   "pr_target": "workstation/base",
   "pr_published": "workstation-base",
-  "ungated_target": "workstation/none",
+  "ungated_target": "workstation",
   "ungated_published": "workstation",
   "cache_image": "workstation-cache",
   "workflows": [],
@@ -41,7 +41,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "server/none",
+          "name": "server",
           "image": "server",
           "flavour": null,
           "published": "server",
@@ -122,7 +122,7 @@
       "default_flavour": "base",
       "targets": [
         {
-          "name": "workstation/none",
+          "name": "workstation",
           "image": "workstation",
           "flavour": null,
           "published": "workstation",
@@ -184,7 +184,7 @@
           "pr": true,
           "siblings": [
             {
-              "name": "workstation/none",
+              "name": "workstation",
               "published": "workstation"
             },
             {
@@ -238,7 +238,7 @@
           "pr": false,
           "siblings": [
             {
-              "name": "workstation/none",
+              "name": "workstation",
               "published": "workstation"
             },
             {

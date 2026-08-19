@@ -3,11 +3,11 @@
   "default_image": "broken-unpinned",
   "default_image_name": "Broken Unpinned",
   "pr_image": "broken-unpinned",
-  "default_target": "broken-unpinned/none",
+  "default_target": "broken-unpinned",
   "default_published": "broken-unpinned",
-  "pr_target": "broken-unpinned/none",
+  "pr_target": "broken-unpinned",
   "pr_published": "broken-unpinned",
-  "ungated_target": "broken-unpinned/none",
+  "ungated_target": "broken-unpinned",
   "ungated_published": "broken-unpinned",
   "cache_image": "broken-unpinned-cache",
   "workflows": [],
@@ -57,7 +57,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "broken-unpinned/none",
+          "name": "broken-unpinned",
           "image": "broken-unpinned",
           "flavour": null,
           "published": "broken-unpinned",

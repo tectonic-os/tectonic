@@ -3,11 +3,11 @@
   "default_image": "broken-collect",
   "default_image_name": "Broken Collect",
   "pr_image": "broken-collect",
-  "default_target": "broken-collect/none",
+  "default_target": "broken-collect",
   "default_published": "broken-collect",
-  "pr_target": "broken-collect/none",
+  "pr_target": "broken-collect",
   "pr_published": "broken-collect",
-  "ungated_target": "broken-collect/none",
+  "ungated_target": "broken-collect",
   "ungated_published": "broken-collect",
   "cache_image": "broken-collect-cache",
   "workflows": [],
@@ -41,7 +41,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "broken-collect/none",
+          "name": "broken-collect",
           "image": "broken-collect",
           "flavour": null,
           "published": "broken-collect",

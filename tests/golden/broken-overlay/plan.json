@@ -3,11 +3,11 @@
   "default_image": "broken-overlay",
   "default_image_name": "Broken Overlay",
   "pr_image": "broken-overlay",
-  "default_target": "broken-overlay/none",
+  "default_target": "broken-overlay",
   "default_published": "broken-overlay",
-  "pr_target": "broken-overlay/none",
+  "pr_target": "broken-overlay",
   "pr_published": "broken-overlay",
-  "ungated_target": "broken-overlay/none",
+  "ungated_target": "broken-overlay",
   "ungated_published": "broken-overlay",
   "cache_image": "broken-overlay-cache",
   "workflows": [],
@@ -41,7 +41,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "broken-overlay/none",
+          "name": "broken-overlay",
           "image": "broken-overlay",
           "flavour": null,
           "published": "broken-overlay",

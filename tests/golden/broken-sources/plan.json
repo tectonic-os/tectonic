@@ -3,11 +3,11 @@
   "default_image": "broken-sources",
   "default_image_name": "Broken Sources",
   "pr_image": "broken-sources",
-  "default_target": "broken-sources/none",
+  "default_target": "broken-sources",
   "default_published": "broken-sources",
-  "pr_target": "broken-sources/none",
+  "pr_target": "broken-sources",
   "pr_published": "broken-sources",
-  "ungated_target": "broken-sources/none",
+  "ungated_target": "broken-sources",
   "ungated_published": "broken-sources",
   "cache_image": "broken-sources-cache",
   "workflows": [],
@@ -41,7 +41,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "broken-sources/none",
+          "name": "broken-sources",
           "image": "broken-sources",
           "flavour": null,
           "published": "broken-sources",

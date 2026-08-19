@@ -3,11 +3,11 @@
   "default_image": "broken-flavours",
   "default_image_name": "Broken Flavours",
   "pr_image": "broken-flavours",
-  "default_target": "broken-flavours/none",
+  "default_target": "broken-flavours",
   "default_published": "broken-flavours",
-  "pr_target": "broken-flavours/none",
+  "pr_target": "broken-flavours",
   "pr_published": "broken-flavours",
-  "ungated_target": "broken-flavours/none",
+  "ungated_target": "broken-flavours",
   "ungated_published": "broken-flavours",
   "cache_image": "broken-flavours-cache",
   "workflows": [],
@@ -52,7 +52,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "broken-flavours/none",
+          "name": "broken-flavours",
           "image": "broken-flavours",
           "flavour": null,
           "published": "broken-flavours",
@@ -104,11 +104,11 @@
           "pr": false,
           "siblings": [
             {
-              "name": "broken-flavours/none",
+              "name": "broken-flavours",
               "published": "broken-flavours"
             },
             {
-              "name": "broken-flavours/none",
+              "name": "broken-flavours",
               "published": "broken-flavours"
             }
           ],
@@ -144,7 +144,7 @@
           "collect_destinations": []
         },
         {
-          "name": "broken-flavours/none",
+          "name": "broken-flavours",
           "image": "broken-flavours",
           "flavour": null,
           "published": "broken-flavours",

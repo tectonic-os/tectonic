@@ -3,11 +3,11 @@
   "default_image": "signing",
   "default_image_name": "Signing",
   "pr_image": "signing",
-  "default_target": "signing/none",
+  "default_target": "signing",
   "default_published": "signing",
-  "pr_target": "signing/none",
+  "pr_target": "signing",
   "pr_published": "signing",
-  "ungated_target": "signing/none",
+  "ungated_target": "signing",
   "ungated_published": "signing",
   "cache_image": "signing-cache",
   "workflows": [],
@@ -42,7 +42,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "signing/none",
+          "name": "signing",
           "image": "signing",
           "flavour": null,
           "published": "signing",

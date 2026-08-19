@@ -3,11 +3,11 @@
   "default_image": "broken-options",
   "default_image_name": "Broken Options",
   "pr_image": "broken-options",
-  "default_target": "broken-options/none",
+  "default_target": "broken-options",
   "default_published": "broken-options",
-  "pr_target": "broken-options/none",
+  "pr_target": "broken-options",
   "pr_published": "broken-options",
-  "ungated_target": "broken-options/none",
+  "ungated_target": "broken-options",
   "ungated_published": "broken-options",
   "cache_image": "broken-options-cache",
   "workflows": [],
@@ -41,7 +41,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "broken-options/none",
+          "name": "broken-options",
           "image": "broken-options",
           "flavour": null,
           "published": "broken-options",

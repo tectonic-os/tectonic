@@ -3,11 +3,11 @@
   "default_image": "collecting",
   "default_image_name": "Collecting",
   "pr_image": "collecting",
-  "default_target": "collecting/none",
+  "default_target": "collecting",
   "default_published": "collecting",
-  "pr_target": "collecting/none",
+  "pr_target": "collecting",
   "pr_published": "collecting",
-  "ungated_target": "collecting/none",
+  "ungated_target": "collecting",
   "ungated_published": "collecting",
   "cache_image": "collecting-cache",
   "workflows": [],
@@ -41,7 +41,7 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "collecting/none",
+          "name": "collecting",
           "image": "collecting",
           "flavour": null,
           "published": "collecting",
