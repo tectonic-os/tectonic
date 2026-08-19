@@ -72,7 +72,7 @@ fn place(source: &Path, dir: &Path, pin: &Pin) -> Result<(), String> {
         ));
     }
     let _ = fs::remove_dir_all(dir);
-    crate::init::copy_tree(source, dir)
+    crate::init::copy_tree(source, dir).map(drop)
 }
 
 /// Every pin, first declaration wins, so two images pinning one module agree by

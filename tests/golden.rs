@@ -142,7 +142,7 @@ fn create(name: &str, root: &Path) {
         &silent,
     )
     .unwrap()
-    .apply()
+    .apply(here)
     .unwrap();
     tect::create::Module::collect(
         here,
@@ -153,7 +153,7 @@ fn create(name: &str, root: &Path) {
         &silent,
     )
     .unwrap()
-    .apply()
+    .apply(here)
     .unwrap();
 
     let mut out = String::new();
@@ -222,7 +222,7 @@ fn import(name: &str, root: &Path) {
                 out.push_str(&format!("ambiguous: {}\n", owners.join(", ")));
             }
             Ok(found) => match tect::import::destination(here, &found[0], module).and_then(|dest| {
-                tect::import::vendor(here, &sources, &found[0], &dest).map(|()| dest)
+                tect::import::vendor(here, &sources, &found[0], &dest).map(|_| dest)
             }) {
                 Ok(dest) => out.push_str(&format!("imported {}\n", dest.display())),
                 Err(message) => out.push_str(&format!("{message}\n")),

@@ -262,9 +262,12 @@ pub fn vendor(
     sources: &[Collection],
     found: &Found,
     dest: &Path,
-) -> Result<(), String> {
+) -> Result<Vec<PathBuf>, String> {
     let dir = root.join(dest);
-    crate::init::copy_tree(&found.dir, &dir)?;
+    let mut wrote: Vec<PathBuf> = crate::init::copy_tree(&found.dir, &dir)?
+        .into_iter()
+        .map(|under| dest.join(under))
+        .collect();
     let pin = sources
         .iter()
         .find(|c| c.name == found.owner)
@@ -273,5 +276,7 @@ pub fn vendor(
     crate::init::put(
         &dir.join(record::RECORD),
         &record::write(&found.owner, pin, &content),
-    )
+    )?;
+    wrote.push(dest.join(record::RECORD));
+    Ok(wrote)
 }

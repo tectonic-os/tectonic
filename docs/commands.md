@@ -31,6 +31,11 @@ an image that is not declared is refused with nothing left behind. A step that
 fails stops the command: what earlier steps wrote stays, and each of those
 steps is a command of its own to finish the run with.
 
+`create repo`, `create image`, `create module` and `import module` end with a
+tree of the files they wrote, rooted at the repository, each leaf carrying a
+phrase saying what it is for. `create key` names its two halves instead: one of
+them is a private key outside the repository, which no tree rooted there holds.
+
 `--root <dir>` is accepted by every command below. A flag a command does not
 read is an error, not a silent no-op.
 

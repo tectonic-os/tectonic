@@ -39,9 +39,45 @@ Desktop
   8) ghcr.io/jmarrero/ubuntu-bootc:latest  Experimental Ubuntu 26.04 bootc base with cloud-init
 What is the base image for this image? [1-8, 0 for none]: 1
 
-wrote Example into example
 initialised a git repository in example
-wrote example/desktop.image.kdl
+
+example/
+├── .github/
+│   ├── workflows/      the CI: build, scan, sign and publish
+│   │   ├── base-sig-probe.yml
+│   │   ├── build-disk.yml
+│   │   ├── build.yml
+│   │   ├── cleanup-registry.yml
+│   │   ├── kernel-freshness.yml
+│   │   ├── reconcile-workflows.yml
+│   │   └── smoke-test.yml
+│   └── renovate.json5  keeps the pinned versions moving
+├── disk_config/        how a disk or installer image is shaped
+│   ├── disk.toml
+│   └── iso.template.toml
+├── lib/                shell a module's build layer sources
+│   ├── dkms-helpers.sh
+│   ├── fetch-helpers.sh
+│   ├── kernel-helpers.sh
+│   ├── repo-helpers.sh
+│   ├── selinux-helpers.sh
+│   ├── sign-helpers.sh
+│   └── wrap-helpers.sh
+├── modules/            every module this repo owns or imported
+│   └── .gitkeep
+├── scripts/            what CI runs, and what you run by hand
+│   ├── Containerfile.skeleton
+│   ├── lint.sh
+│   ├── render-iso-config.sh
+│   ├── tect.sh
+│   └── vm.sh
+├── .dockerignore
+├── .gitattributes
+├── .gitignore
+├── .shellcheckrc
+├── README.md           yours to write
+├── desktop.image.kdl   an image: its base, and the modules it lists
+└── repo.kdl            what the repo pins, and where modules come from
 
 next, in example:
   git add -A && git commit

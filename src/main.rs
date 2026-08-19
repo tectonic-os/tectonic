@@ -310,9 +310,11 @@ impl Import {
         root: &Path,
         sources: &[tect::model::remote::Collection],
     ) -> Result<(), String> {
-        tect::import::vendor(root, sources, &self.from, &self.dest)?;
+        let wrote = tect::import::vendor(root, sources, &self.from, &self.dest)?;
         println!("imported {}", self.dest.display());
-        self.listing.apply(&self.path)
+        self.listing.apply(&self.path)?;
+        tect::create::report(root, &wrote);
+        Ok(())
     }
 }
 
@@ -467,7 +469,7 @@ fn run() -> Result<ExitCode, Error> {
                     tect::create::origin(tect::create::HOST, &owner)
                 )
             });
-            tect::create::Image::collect(
+            let wrote = tect::create::Image::collect(
                 &root,
                 name,
                 base,
@@ -477,6 +479,7 @@ fn run() -> Result<ExitCode, Error> {
                 &prompt,
             )?
             .apply(&root)?;
+            tect::create::report(&root, &wrote);
             return Ok(ExitCode::SUCCESS);
         }
         ["create", "module", rest @ ..] => {
@@ -485,7 +488,9 @@ fn run() -> Result<ExitCode, Error> {
             let Some(root) = open(root_arg)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
-            tect::create::Module::collect(&root, name, pkgs, with, images, &prompt)?.apply()?;
+            let wrote = tect::create::Module::collect(&root, name, pkgs, with, images, &prompt)?
+                .apply(&root)?;
+            tect::create::report(&root, &wrote);
             return Ok(ExitCode::SUCCESS);
         }
         ["create", "key", rest @ ..] => {

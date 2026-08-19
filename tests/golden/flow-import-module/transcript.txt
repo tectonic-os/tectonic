@@ -11,4 +11,11 @@ list it in images [1, 0 for none]: 1
 
 imported modules/one/browser
 listed "one/browser" in ./example.image.kdl
+
+./
+└── modules/                    every module this repo owns or imported
+    └── one/
+        └── browser/
+            ├── module.kdl      what the module installs, places and provides
+            └── provenance.kdl  where it was imported from, and its hash
 ==== exit 0

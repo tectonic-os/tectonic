@@ -2,6 +2,8 @@
 //! normal scroll, never an alternate screen, and only where the caller has
 //! already found a terminal to draw on.
 
+pub mod tree;
+
 use ratatui::backend::Backend;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::crossterm::terminal;
@@ -51,7 +53,9 @@ pub fn confirm(question: &str, yes: &str, no: &str) -> Result<bool, String> {
 
 /// Any of `options`, in the order they were toggled on, or none.
 pub fn multi(question: &str, options: &[Choice]) -> Result<Vec<usize>, String> {
-    inline(options.len(), |terminal| toggle(terminal, question, options))
+    inline(options.len(), |terminal| {
+        toggle(terminal, question, options)
+    })
 }
 
 /// A bounded region of the normal scroll, cleared again before this returns, so

@@ -77,13 +77,13 @@ pub fn id(name: &str) -> Result<String, String> {
 
 /// Writes a repository into `root`: repo.kdl, the module directory, and
 /// everything under `assets`, which is an image repository's root. The images
-/// are `create image`'s.
-pub fn write(root: &Path, name: &str, assets: &Path) -> Result<(), String> {
+/// are `create image`'s. Answers every path it wrote, relative to `root`.
+pub fn write(root: &Path, name: &str, assets: &Path) -> Result<Vec<PathBuf>, String> {
     if root.join(layout::REPO_FILE).exists() {
         return Err(format!("{} is already a repository", root.display()));
     }
 
-    copy_tree(assets, root)?;
+    let mut wrote = copy_tree(assets, root)?;
     let scaffold = root.join(SOURCES_FILE);
     let sources = match sources(assets) {
         block if block.is_empty() => block,
@@ -93,6 +93,7 @@ pub fn write(root: &Path, name: &str, assets: &Path) -> Result<(), String> {
         if control.is_file() {
             fs::remove_file(control).map_err(|err| format!("{}: {err}", control.display()))?;
         }
+        wrote.retain(|path| root.join(path) != control);
     }
     put(
         &root.join(layout::REPO_FILE),
@@ -106,7 +107,8 @@ pub fn write(root: &Path, name: &str, assets: &Path) -> Result<(), String> {
     put(&root.join("README.md"), &format!("# {name}\n"))?;
     // A module directory that survives a commit: the build context mounts it.
     put(&root.join("modules/.gitkeep"), "")?;
-    Ok(())
+    wrote.extend([layout::REPO_FILE, "README.md", "modules/.gitkeep"].map(PathBuf::from));
+    Ok(wrote)
 }
 
 pub(crate) fn put(path: &Path, text: &str) -> Result<(), String> {
@@ -116,18 +118,26 @@ pub(crate) fn put(path: &Path, text: &str) -> Result<(), String> {
     fs::write(path, text).map_err(|err| format!("{}: {err}", path.display()))
 }
 
-pub(crate) fn copy_tree(from: &Path, to: &Path) -> Result<(), String> {
+/// Answers every file it copied, relative to `to`.
+pub(crate) fn copy_tree(from: &Path, to: &Path) -> Result<Vec<PathBuf>, String> {
     fs::create_dir_all(to).map_err(|err| format!("{}: {err}", to.display()))?;
     let entries = fs::read_dir(from).map_err(|err| format!("{}: {err}", from.display()))?;
+    let mut wrote = Vec::new();
     for entry in entries {
         let entry = entry.map_err(|err| format!("{}: {err}", from.display()))?;
         let source = entry.path();
-        let dest = to.join(entry.file_name());
+        let name = entry.file_name();
+        let dest = to.join(&name);
         if source.is_dir() {
-            copy_tree(&source, &dest)?;
+            wrote.extend(
+                copy_tree(&source, &dest)?
+                    .into_iter()
+                    .map(|under| Path::new(&name).join(under)),
+            );
         } else {
             fs::copy(&source, &dest).map_err(|err| format!("{}: {err}", dest.display()))?;
+            wrote.push(PathBuf::from(name));
         }
     }
-    Ok(())
+    Ok(wrote)
 }
