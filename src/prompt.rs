@@ -181,7 +181,7 @@ impl Prompt {
             return Ok(chosen);
         }
         self.numbered(options);
-        let question = format!("{question} [0-{}]", options.len());
+        let question = format!("{question} [{}, 0 for none]", range(options));
         let answer = self.read(&question, &format!("{question}: "))?;
         match answer.parse::<usize>() {
             Ok(0) => Ok(None),
@@ -202,7 +202,11 @@ impl Prompt {
             return Ok(Vec::new());
         }
         self.numbered(options);
-        let question = format!("{question} [0-{}, several]", options.len());
+        let several = match options.len() {
+            1 => "",
+            _ => ", several",
+        };
+        let question = format!("{question} [{}{several}, 0 for none]", range(options));
         let answer = self.read(&question, &format!("{question}: "))?;
 
         let mut chosen: Vec<usize> = Vec::new();
@@ -227,6 +231,14 @@ impl Prompt {
             let line = format!("{}  {}", option.label, option.detail);
             println!("  {}) {}", index + 1, line.trim_end());
         }
-        println!("  0) none");
+    }
+}
+
+/// What answers by number the question takes, which is one number when there is
+/// one option rather than a range of one.
+fn range(options: &[Choice]) -> String {
+    match options.len() {
+        1 => "1".to_string(),
+        n => format!("1-{n}"),
     }
 }

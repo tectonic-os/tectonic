@@ -12,8 +12,7 @@ Yes
 
   1) github.com  Github, and the workflows Tectonic ships
   2) forgejo  a Forgejo instance, whose address you give
-  0) none
-Where will the repo be hosted? [0-2]: 2
+Where will the repo be hosted? [1-2, 0 for none]: 2
 
 What is the address of the Forgejo instance?
 forge.example.org
@@ -39,8 +38,7 @@ Desktop
   6) ghcr.io/bootcrew/debian-bootc:latest  Experimental Debian bootc base from Bootcrew
   7) ghcr.io/bootcrew/ubuntu-bootc:latest  Experimental Ubuntu bootc base from Bootcrew
   8) ghcr.io/jmarrero/ubuntu-bootc:latest  Experimental Ubuntu 26.04 bootc base with cloud-init
-  0) none
-What is the base image for this image? [0-8]: 1
+What is the base image for this image? [1-8, 0 for none]: 1
 
 wrote Example into example
 initialised a git repository in example

@@ -12,8 +12,7 @@ Beta
   7) ghcr.io/bootcrew/ubuntu-bootc:latest  Experimental Ubuntu bootc base from Bootcrew
   8) ghcr.io/jmarrero/ubuntu-bootc:latest  Experimental Ubuntu 26.04 bootc base with cloud-init
   9) example.invalid/collected:1  A base only the collection knows about
-  0) none
-What is the base image for this image? [0-9]: 9
+What is the base image for this image? [1-9, 0 for none]: 9
 
 wrote ./beta.image.kdl
 named "example" the default image in repo.kdl

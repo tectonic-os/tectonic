@@ -4,12 +4,10 @@ Tectonic v{version}
   2) two/browser  A browser, from the second collection (requires flatpak)
   3) one/flatpak  Flatpak client and a daily update timer
   4) one/signature-policy  Sigstore signature verification for the image's own updates
-  0) none
-which module [0-4]: 1
+which module [1-4, 0 for none]: 1
 
   1) example  Example
-  0) none
-list it in images [0-1, several]: 1
+list it in images [1, 0 for none]: 1
 
 imported modules/one/browser
 listed "one/browser" in ./example.image.kdl

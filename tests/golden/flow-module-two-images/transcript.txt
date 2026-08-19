@@ -9,8 +9,7 @@ package names, separated by spaces []: nano vim
 
   1) example  Example
   2) server  Server
-  0) none
-list it in images [0-2, several]: 1 2
+list it in images [1-2, several, 0 for none]: 1 2
 
 wrote modules/my-editor/module.kdl
 listed "my-editor" in ./example.image.kdl
