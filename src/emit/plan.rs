@@ -429,7 +429,27 @@ fn overlay_files(image: &Image, shipped: &overlay::Index, flavour: &str) -> Json
 /// claimant no longer owns is a composition failure rather than a false claim,
 /// and this is what tells the two apart.
 fn overridden(image: &Image, shipped: &overlay::Index, flavour: &str) -> Json {
-    let mut out: Vec<Json> = Vec::new();
+    Json::array(
+        overrides(image, shipped, flavour)
+            .into_iter()
+            .map(|(path, module, by)| {
+                Json::object([
+                    ("path", Json::string(path)),
+                    ("module", Json::string(module)),
+                    ("by", Json::string(by)),
+                ])
+            }),
+    )
+}
+
+/// Every overlay path one target's modules ship twice, as the path, the module
+/// that lost it and the one that took it.
+pub(crate) fn overrides(
+    image: &Image,
+    shipped: &overlay::Index,
+    flavour: &str,
+) -> Vec<(String, String, String)> {
+    let mut out = Vec::new();
     for (path, owners) in shipped {
         let here: Vec<usize> = owners
             .iter()
@@ -440,14 +460,14 @@ fn overridden(image: &Image, shipped: &overlay::Index, flavour: &str) -> Json {
             continue;
         };
         for &loser in losers {
-            out.push(Json::object([
-                ("path", Json::string(path)),
-                ("module", Json::string(&image.entries[loser].path)),
-                ("by", Json::string(&image.entries[winner].path)),
-            ]));
+            out.push((
+                path.clone(),
+                image.entries[loser].path.clone(),
+                image.entries[winner].path.clone(),
+            ));
         }
     }
-    Json::Array(out)
+    out
 }
 
 /// The preset files the target's overlays put in the image, which is what the
@@ -608,6 +628,9 @@ mod tests {
     fn an_image_is_named_from_the_repository_root() {
         assert_eq!(declared_in("./image.kdl"), "./image.kdl");
         assert_eq!(declared_in("../server.image.kdl"), "./server.image.kdl");
-        assert_eq!(declared_in("/tmp/repo/server.image.kdl"), "./server.image.kdl");
+        assert_eq!(
+            declared_in("/tmp/repo/server.image.kdl"),
+            "./server.image.kdl"
+        );
     }
 }

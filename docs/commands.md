@@ -287,6 +287,45 @@ they pin it at, and puts it under `modules/.remote/`.
 - It reads the declarations rather than the resolved plan, so it runs before the
   modules it fetches can be read.
 
+### `scap <arf.xml>`
+
+Reads one scan's report against the datastream it was produced with, and prints
+what the two of them say about the target, as markdown: what the modules
+claimed and what was measured for each, what the image scores against every
+profile the datastream carries, and what stopped passing since the last scan.
+
+#### Flags:
+    --target <t>          the target, else the ungated one
+    --datastream <f>      the SSG content, else the one `scap content` names
+    --baseline <f>        the last scan's pass set, read then rewritten
+
+#### Notes:
+- The mapping from a benchmark number to a rule is the datastream's own, over
+  every `reference`, `ident` and `version` it carries, and the first rule in
+  document order wins. A number that maps to nothing is a failure of the
+  declaration rather than of the image.
+- A claimed rule the image fails names the module that claimed it, and, where
+  another module replaced a file the claimant ships, names that too: the claim
+  is not contradicted, the composition defeats it.
+- `image { conforms }` is measured and reported, never enforced. A profile
+  nothing in the datastream carries is a finding, and the ones it does carry
+  are listed.
+- `--baseline` is the ratchet. The file is read before it is written, so a rule
+  that passed the last scan and does not now is a finding, and every run leaves
+  the current pass set behind as the next floor. One deliberate regression is
+  one red run rather than a file somebody has to go and delete.
+- Findings are fatal only under `audit { enforce #true }`, like every other
+  audit fact, and the report goes to stdout either way.
+
+### `scap content`
+
+Prints the datastream the target is measured with, and nothing at all when it
+declares neither a `satisfies` nor a `conforms`, which is an image asking not
+to be scanned. This is what the scan job gates on.
+
+#### Flags:
+    --target <t>          the target, else the ungated one
+
 ### `registry namespace`
 
 Prints where images publish: `$IMAGE_REGISTRY`, else `ghcr.io/<owner>` read off

@@ -377,6 +377,8 @@ fn run() -> Result<ExitCode, Error> {
     let base = args.flag("base")?;
     let format = args.flag("format")?;
     let target = args.flag("target")?;
+    let datastream = args.flag("datastream")?;
+    let baseline = args.flag("baseline")?;
     let tags = args.flags("tag")?;
     let kernel = args.flag("kernel")?;
     let backend = args.flag("backend")?;
@@ -562,6 +564,34 @@ fn run() -> Result<ExitCode, Error> {
         ["registry", ..] => {
             return Err(Error::Invocation(
                 "`registry` takes `namespace` or `ref`".into(),
+            ))
+        }
+        ["scap", "content"] => {
+            args.only(&["root", "target"], "scap content")?;
+            return Ok(
+                match tect::scap::content(&repo_root(root_arg)?, target.as_deref())? {
+                    tect::scap::Verdict::Clean => ExitCode::SUCCESS,
+                    tect::scap::Verdict::Wrong => ExitCode::from(REPO_ERROR),
+                },
+            );
+        }
+        ["scap", arf] => {
+            args.only(&["root", "target", "datastream", "baseline"], "scap")?;
+            let opts = tect::scap::Options {
+                target,
+                datastream: datastream.map(PathBuf::from),
+                baseline: baseline.map(PathBuf::from),
+            };
+            return Ok(
+                match tect::scap::run(&repo_root(root_arg)?, Path::new(arf), &opts)? {
+                    tect::scap::Verdict::Clean => ExitCode::SUCCESS,
+                    tect::scap::Verdict::Wrong => ExitCode::from(REPO_ERROR),
+                },
+            );
+        }
+        ["scap", ..] => {
+            return Err(Error::Invocation(
+                "`scap` takes one report: `tect scap <arf.xml>`, or `scap content`".into(),
             ))
         }
         ["create", ..] => {

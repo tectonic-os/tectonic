@@ -17,14 +17,14 @@ enforced
 
 | Benchmark | Rules |
 | --- | --- |
-| `cis-fedora` | 1.1.1.1, 5.2.20 |
+| `cis-fedora` | 1.1.1.1, 5.2.20, 9.9.9.9 |
 | `stig` | RHEL-09-232010 |
 
 A claim the tool records rather than certifies. The scan is what confirms it.
 
 ## Where it came from
 
-Its content hashes to `8007859e1ea33d1c1b07b7191fa1913f655965e124727f5d01d688b23549d085`.
+Its content hashes to `143d40b94ab50b255daf037b1ffc7a31b7c7760e934213fe72cca5a5b1fa1670`.
 
 Imported from the `one` collection, at:
 
@@ -71,7 +71,8 @@ It enables one, in `modules/one/hello/repo`. There is no grammar for that file, 
       "benchmark": "cis-fedora",
       "rules": [
         "1.1.1.1",
-        "5.2.20"
+        "5.2.20",
+        "9.9.9.9"
       ]
     },
     {
@@ -81,7 +82,7 @@ It enables one, in `modules/one/hello/repo`. There is no grammar for that file, 
       ]
     }
   ],
-  "content": "8007859e1ea33d1c1b07b7191fa1913f655965e124727f5d01d688b23549d085",
+  "content": "143d40b94ab50b255daf037b1ffc7a31b7c7760e934213fe72cca5a5b1fa1670",
   "built": null,
   "imported": {
     "collection": "one",
@@ -130,14 +131,14 @@ enforced
 
 | Benchmark | Rules |
 | --- | --- |
-| `cis-fedora` | 1.1.1.1, 5.2.20 |
+| `cis-fedora` | 1.1.1.1, 5.2.20, 9.9.9.9 |
 | `stig` | RHEL-09-232010 |
 
 A claim the tool records rather than certifies. The scan is what confirms it.
 
 ## Where it came from
 
-Its content hashes to `8007859e1ea33d1c1b07b7191fa1913f655965e124727f5d01d688b23549d085`.
+Its content hashes to `143d40b94ab50b255daf037b1ffc7a31b7c7760e934213fe72cca5a5b1fa1670`.
 
 Imported from the `one` collection, at:
 
@@ -170,7 +171,7 @@ core/consumer, one/hello
 
 The build observed its content as `not what was declared`.
 
-**The manifest beside it declares `8007859e1ea33d1c1b07b7191fa1913f655965e124727f5d01d688b23549d085`.** The two documents disagree, which they cannot if both came from this build.
+**The manifest beside it declares `143d40b94ab50b255daf037b1ffc7a31b7c7760e934213fe72cca5a5b1fa1670`.** The two documents disagree, which they cannot if both came from this build.
 
 Imported from the `one` collection, at:
 

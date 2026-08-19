@@ -17,6 +17,7 @@ pub mod provenance;
 pub mod registry;
 pub mod resolve;
 pub mod runtime;
+pub mod scap;
 pub mod ui;
 
 use diag::Issue;

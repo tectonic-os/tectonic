@@ -5,7 +5,7 @@ supports "fedora"
 provides "hello"
 
 satisfies {
-    cis-fedora "1.1.1.1" "5.2.20"
+    cis-fedora "1.1.1.1" "5.2.20" "9.9.9.9"
     stig "RHEL-09-232010"
 }
 

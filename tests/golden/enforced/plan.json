@@ -78,7 +78,7 @@
               ],
               "requires": [],
               "provenance": {
-                "content": "8007859e1ea33d1c1b07b7191fa1913f655965e124727f5d01d688b23549d085",
+                "content": "143d40b94ab50b255daf037b1ffc7a31b7c7760e934213fe72cca5a5b1fa1670",
                 "repo": true,
                 "pin": null,
                 "imported": {
@@ -101,7 +101,8 @@
                   "benchmark": "cis-fedora",
                   "rules": [
                     "1.1.1.1",
-                    "5.2.20"
+                    "5.2.20",
+                    "9.9.9.9"
                   ]
                 },
                 {

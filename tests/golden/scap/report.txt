@@ -1,0 +1,98 @@
+==== the first scan, which is the baseline
+The scan measured 4 rules: 2 pass, 1 fail.
+
+## Declared coverage, measured
+
+| Module | Benchmark | Rule | Result |
+| --- | --- | --- | --- |
+| one/hello | cis-fedora | 1.1.1.1 | pass |
+| one/hello | cis-fedora | 5.2.20 | fail |
+| one/hello | cis-fedora | 9.9.9.9 | **maps to nothing** |
+| one/hello | stig | RHEL-09-232010 | fail |
+
+## Measured against every profile
+
+| Profile | Selected | Pass | Fail | Other |
+| --- | --- | --- | --- | --- |
+| `cis` (declared) | 3 | 1 | 1 | 1 |
+| `cis_server_l2` | 3 | 1 | 1 | 1 |
+
+## Since the last scan
+
+Nothing to compare against; this run is the baseline.
+
+tect: one/hello claims cis-fedora 5.2.20 and the image fails it
+tect: one/hello claims cis-fedora 9.9.9.9, which names no rule in the datastream
+tect: one/hello claims stig RHEL-09-232010 and the image fails it
+tect: 3 findings, and the repository does not enforce
+==== exit 0
+==== and one where a rule stopped passing
+The scan measured 4 rules: 1 pass, 2 fail.
+
+## Declared coverage, measured
+
+| Module | Benchmark | Rule | Result |
+| --- | --- | --- | --- |
+| one/hello | cis-fedora | 1.1.1.1 | pass |
+| one/hello | cis-fedora | 5.2.20 | fail |
+| one/hello | cis-fedora | 9.9.9.9 | **maps to nothing** |
+| one/hello | stig | RHEL-09-232010 | fail |
+
+## Measured against every profile
+
+| Profile | Selected | Pass | Fail | Other |
+| --- | --- | --- | --- | --- |
+| `cis` (declared) | 3 | 1 | 1 | 1 |
+| `cis_server_l2` | 3 | 0 | 2 | 1 |
+
+## Since the last scan
+
+| Rule | Now |
+| --- | --- |
+| xccdf_org.ssgproject.content_rule_no_empty_passwords | fail |
+
+tect: one/hello claims cis-fedora 5.2.20 and the image fails it
+tect: one/hello claims cis-fedora 9.9.9.9, which names no rule in the datastream
+tect: one/hello claims stig RHEL-09-232010 and the image fails it
+tect: one rule passed the last scan and does not now: xccdf_org.ssgproject.content_rule_no_empty_passwords
+tect: 4 findings, and the repository does not enforce
+==== exit 0
+==== conforming to a profile nothing carries
+ against every profile
+
+| Profile | Selected | Pass | Fail | Other |
+| --- | --- | --- | --- | --- |
+| `cis` | 3 | 1 | 1 | 1 |
+| `cis_server_l2` | 3 | 1 | 1 | 1 |
+
+tect: one/hello claims cis-fedora 5.2.20 and the image fails it
+tect: one/hello claims cis-fedora 9.9.9.9, which names no rule in the datastream
+tect: one/hello claims stig RHEL-09-232010 and the image fails it
+tect: this image conforms to `nosuch`, which is none of the profiles the datastream carries: cis, cis_server_l2
+tect: 4 findings, and the repository does not enforce
+==== exit 0
+==== enforced, and the report is the same
+The scan measured 4 rules: 2 pass, 1 fail.
+
+## Declared coverage, measured
+
+| Module | Benchmark | Rule | Result |
+| --- | --- | --- | --- |
+| one/hello | cis-fedora | 1.1.1.1 | pass |
+| one/hello | cis-fedora | 5.2.20 | fail |
+| one/hello | cis-fedora | 9.9.9.9 | **maps to nothing** |
+| one/hello | stig | RHEL-09-232010 | fail |
+
+## Measured against every profile
+
+| Profile | Selected | Pass | Fail | Other |
+| --- | --- | --- | --- | --- |
+| `cis` (declared) | 3 | 1 | 1 | 1 |
+| `cis_server_l2` | 3 | 1 | 1 | 1 |
+
+==== the content it is measured with
+/usr/share/xml/scap/ssg/content/ssg-fedora-ds.xml
+==== exit 0
+==== and for an image declaring neither a claim nor a profile
+
+==== exit 0
