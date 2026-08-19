@@ -57,6 +57,8 @@ pub const IMAGE: Node = Node::new("image",
             .arg(Arg::Strs, Say::NONE),
         Node::new("logo-url", "A URL to the image's logo, in its OCI labels.")
             .arg(Arg::Str, NEEDS_VALUE).once(""),
+        Node::new("conforms", "The benchmark profile a scan measures this image against, reported rather than enforced.")
+            .arg(Arg::Str, NEEDS_VALUE).once(""),
 
         Node::new("base", "The image every layer builds on, and what building on it may assume.")
             .arg(Arg::Str, Say::new("`base` needs an image reference", "no image given",
@@ -132,7 +134,7 @@ pub const IMAGE: Node = Node::new("image",
                 "`modules` holds `module` entries and `flavour` blocks")),
     ], Say::new("unknown image property `{}`", "not part of the schema",
         "an image accepts `id`, `name`, `pretty-name`, `url`, `issues-url`, `description`, \
-         `keywords` and `logo-url`, and the `base`, `flavours` and `modules` blocks"));
+         `keywords`, `logo-url` and `conforms`, and the `base`, `flavours` and `modules` blocks"));
 
 /// Where a `module` line goes: the offset of the closing brace of the image's
 /// `modules` block. Appending is a text splice over this span, so nothing
@@ -174,6 +176,7 @@ impl List {
                 .map(|d| d.name)
                 .collect(),
             logo_url: text(node, "logo-url"),
+            conforms: text(node, "conforms"),
             base: None,
             flavours: Vec::new(),
             entries: Vec::new(),

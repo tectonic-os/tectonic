@@ -67,6 +67,7 @@ pub struct Image {
     pub description: String,
     pub keywords: Vec<String>,
     pub logo_url: String,
+    pub conforms: String,
     /// None only when the `base` node is missing or malformed, which is
     /// already an issue: nothing downstream invents a default for it.
     pub base: Option<Base>,

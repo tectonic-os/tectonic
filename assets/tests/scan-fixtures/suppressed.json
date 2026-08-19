@@ -27,6 +27,7 @@
       "description": "",
       "keywords": [],
       "logo_url": "",
+      "conforms": "",
       "base": {
         "image": "ghcr.io/ublue-os/bazzite:stable",
         "family": "fedora",

@@ -297,6 +297,7 @@ One image: what it calls itself, what it builds on, and everything it is made of
 | `description` | a string, at most one | A one-line summary of the image, in its OCI labels and not in os-release. |
 | `keywords` | one or more strings | Keywords for the image's OCI labels, comma-joined into one label. |
 | `logo-url` | a string, at most one | A URL to the image's logo, in its OCI labels. |
+| `conforms` | a string, at most one | The benchmark profile a scan measures this image against, reported rather than enforced. |
 
 #### `base`
 

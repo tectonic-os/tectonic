@@ -56,6 +56,7 @@
       "description": "",
       "keywords": [],
       "logo_url": "",
+      "conforms": "",
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
