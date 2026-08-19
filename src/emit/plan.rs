@@ -98,12 +98,24 @@ pub fn build(list: &List, resolved: &[Resolved], workflows: &[(String, bool)]) -
     ])
 }
 
+/// The image file, named from the repository root. `plan.json` is baked into
+/// the image, so the path in it cannot depend on where `generate` was run.
+fn declared_in(src: &str) -> String {
+    format!(
+        "./{}",
+        std::path::Path::new(src)
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+    )
+}
+
 fn image(list: &List, image: &Image, resolved: &Resolved) -> Json {
     Json::object([
         ("id", Json::string(&image.id)),
         ("name", Json::string(&image.name)),
         ("pretty_name", Json::string(&image.pretty_name)),
-        ("file", Json::string(image.src.name())),
+        ("file", Json::string(declared_in(image.src.name()))),
         ("url", Json::string(&image.url)),
         ("issues_url", Json::string(&image.issues_url)),
         ("description", Json::string(&image.description)),
@@ -516,7 +528,7 @@ fn remotes(list: &List) -> Json {
             out.push(Json::object([
                 ("name", Json::string(&entry.path)),
                 ("dir", Json::string(format!("modules/{}", entry.dir()))),
-                ("file", Json::string(image.src.name())),
+                ("file", Json::string(declared_in(image.src.name()))),
                 ("pin", remote.json()),
             ]));
         }
@@ -587,5 +599,14 @@ mod tests {
         assert!(in_target(&entry(Some("dx")), "dx"));
         assert!(!in_target(&entry(Some("dx")), NO_FLAVOUR));
         assert!(!in_target(&entry(Some("dx")), "laptop"));
+    }
+
+    /// Every golden runs from the repository root, so nothing there sees a
+    /// path `--root` or a subdirectory would have produced.
+    #[test]
+    fn an_image_is_named_from_the_repository_root() {
+        assert_eq!(declared_in("./image.kdl"), "./image.kdl");
+        assert_eq!(declared_in("../server.image.kdl"), "./server.image.kdl");
+        assert_eq!(declared_in("/tmp/repo/server.image.kdl"), "./server.image.kdl");
     }
 }
