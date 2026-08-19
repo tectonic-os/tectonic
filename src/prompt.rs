@@ -158,6 +158,11 @@ impl Prompt {
         if !self.ask {
             return Ok(false);
         }
+        if self.draw {
+            let chosen = crate::ui::confirm(question, yes, no)?;
+            println!("{question}: {}\n", if chosen { yes } else { no });
+            return Ok(chosen);
+        }
         let question = format!("{question} ({yes}/{no})");
         let answer = self.read(&question, &format!("{question}\n"))?;
         let first = |word: &str| word.chars().next().map(|c| c.to_ascii_lowercase());
@@ -194,12 +199,25 @@ impl Prompt {
         }
     }
 
-    /// Any of a set, in the order they were answered, or none of them: the
-    /// numbered list again, taking several numbers or names on the one line.
-    /// No widget draws this, so a terminal and a script read the same thing.
+    /// Any of a set, in the order they were answered, or none of them: an
+    /// inline multi-select where the output is a terminal, the numbered list
+    /// taking several numbers or names on the one line where it is not.
     pub fn choose_many(&self, question: &str, options: &[Choice]) -> Result<Vec<usize>, String> {
         if !self.ask || options.is_empty() {
             return Ok(Vec::new());
+        }
+        if self.draw {
+            let chosen = crate::ui::multi(question, options)?;
+            let answer = match chosen.is_empty() {
+                true => "none".to_string(),
+                false => chosen
+                    .iter()
+                    .map(|at| options[*at].label.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            };
+            println!("{question}: {answer}\n");
+            return Ok(chosen);
         }
         self.numbered(options);
         let several = match options.len() {

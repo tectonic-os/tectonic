@@ -118,10 +118,11 @@ Asks you for:
 - `enablerepo=` is Fedora-only, and naming it on a Debian or Ubuntu group is a
   `check` diagnostic.
 - Anything `--with` writes is held to the schema like the rest of the manifest.
-- Every declared image is numbered when you are asked which list the module in.
-  Several are an answer on one line, as `1 3` or `1,3`, and so is none: having a
-  module and listing it in an image are different decisions. A name the
-  repository does not declare is refused before the module is written.
+- You are asked which of the declared images list the module, and several are an
+  answer: space toggles one on a terminal, and `1 3` or `1,3` answers the
+  numbered list where there is not one. So is none: having a module and listing
+  it in an image are different decisions. A name the repository does not declare
+  is refused before the module is written.
 
 ### `import module [name]`
 
