@@ -4,7 +4,7 @@ Three kinds of file, all KDL, all read by `tect`.
 
 | File | Declares |
 | --- | --- |
-| `repo.kdl` | the repository: the schema it is written against, the tool release it pins, which image a bare build builds, which shipped workflows run |
+| `repo.kdl` | the repository: the schema it is written against, the tool release it pins, which image a bare build builds, which CI it generates |
 | `image.kdl` or `<name>.image.kdl` at the root | one image file, holding what each image calls itself, what it builds on, and the modules in it |
 | `modules/<path>/module.kdl` | one module: what it needs, what it offers, and what an image author may set |
 
@@ -26,24 +26,29 @@ tect-version "0.0.0"
 default-image "workstation"
 pr-image "workstation"
 
-workflows {
-    smoke-test enabled=#false
+workflows at="12:30" {
+    build
+    smoke-test
 }
 ```
 
 `schema-version` picks the reader, so a repository written against an earlier
 release keeps building: a tool that does not know the version says so plainly
 instead of reporting every node it cannot place. A repository behind this
-release is moved forward by `tect update-repo`; one ahead of it is read by the
-release it pins.
+release behind this one is read by nothing here, and nothing here moves it
+forward; one ahead of it is read by the release it pins.
 
 `tect-version` is that release. `scripts/tect.sh` fetches it, so the build
 runs the tool the repository was written for whatever is installed on the
 machine, and every command refuses to run in a repository pinned to a release
 it is not. A repository that pins nothing is held to nothing.
 
-A workflow is named by its file stem under `.github/workflows/`, and one
-nobody names runs. The block is how a repository turns something off.
+A workflow is named by its file stem under `.github/workflows/`, and `tect
+generate` writes exactly the ones named here — so one nobody names is absent
+rather than present and switched off, and a tool upgrade re-syncs the rest by
+regenerating them. `tect set workflows` is the editor for the block. `at` is
+the one time the schedules hang off: the daily build runs then, and every other
+scheduled workflow at its own offset from it.
 
 `sources` is the registry `tect import module <name>` resolves against. Each
 collection is named by the owner its modules land under, so
@@ -174,17 +179,17 @@ The image this repository publishes a declaration of, for a new repository to st
 
 ### `workflows`
 
-The shipped workflows this repository turns off, named by file stem.
+The CI `tect generate` writes into .github/workflows/, named by file stem. One this does not name is not written.
 
 *at most one, never empty*
 
-#### `<name>`
-
-One workflow, named by the node, and whether it runs.
-
 | Property | Value | Meaning |
 | --- | --- | --- |
-| `enabled=` | `#true` or `#false`, required | Whether the workflow runs at all. |
+| `at=` | a string | The hour and minute the daily build runs, UTC. Every other schedule is an offset from it. |
+
+| Node | Takes | Meaning |
+| --- | --- | --- |
+| `<name>` |  | One workflow, named by the node. |
 
 ### `sources`
 

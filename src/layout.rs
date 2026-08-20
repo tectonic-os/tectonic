@@ -15,6 +15,10 @@ pub const OUT: &str = "out";
 /// A module's overlay tree, staged into the image by the collector.
 pub const OVERLAY: &str = "files";
 
+/// GitHub's path, not this repository's choice, which is why it is written
+/// here rather than declared anywhere.
+pub const WORKFLOW_DIR: &str = ".github/workflows";
+
 /// Repo context, not an image, and the file whose presence marks a root.
 pub const REPO_FILE: &str = "repo.kdl";
 /// An image file with no name in front of it, which is what a repository

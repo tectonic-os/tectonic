@@ -3,7 +3,7 @@ name: Kernel freshness
 
 on:
   schedule:
-    - cron: '15 9 * * *'
+    - cron: '30 9 * * *'  # tect:schedule
   workflow_dispatch:
 
 env:

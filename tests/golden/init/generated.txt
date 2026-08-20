@@ -119,3 +119,8 @@ graph LR
   "suppressed": []
 }
 ==== generated/plan.json
+==== .github/workflows/build.yml
+==== .github/workflows/build-disk.yml
+==== .github/workflows/base-sig-probe.yml
+==== .github/workflows/cleanup-registry.yml
+==== .github/workflows/smoke-test.yml

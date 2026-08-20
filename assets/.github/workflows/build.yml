@@ -5,8 +5,10 @@ on:
     branches:
       - main
   schedule:
-    - cron: '30 12 * * *'
+    - cron: '30 12 * * *'  # tect:schedule
+    # tect:only kernel
     - cron: '45 9 1 * *'  # monthly stock-kernel fallback validation build
+    # tect:end
   push:
     branches:
       - main
@@ -14,6 +16,7 @@ on:
       - '**/README.md'
       - '.github/workflows/cleanup-registry.yml'
   workflow_dispatch:
+    # tect:only kernel
     inputs:
       kernel:
         description: >-
@@ -22,6 +25,7 @@ on:
           kernel path and are never pushed, signed, or cached.
         type: string
         default: ''
+    # tect:end
 
 env:
   KERNEL: ${{ github.event.inputs.kernel || (github.event.schedule == '45 9 1 * *' && 'stock') || '' }}

@@ -12,32 +12,24 @@
   "cache_image": "example-cache",
   "workflows": [
     {
-      "file": "base-sig-probe.yml",
-      "enabled": true
+      "file": "build.yml",
+      "schedule": "30 12 * * *"
     },
     {
       "file": "build-disk.yml",
-      "enabled": true
+      "schedule": null
     },
     {
-      "file": "build.yml",
-      "enabled": true
+      "file": "base-sig-probe.yml",
+      "schedule": "30 6 * * *"
     },
     {
       "file": "cleanup-registry.yml",
-      "enabled": true
-    },
-    {
-      "file": "kernel-freshness.yml",
-      "enabled": true
-    },
-    {
-      "file": "reconcile-workflows.yml",
-      "enabled": true
+      "schedule": "30 14 * * *"
     },
     {
       "file": "smoke-test.yml",
-      "enabled": true
+      "schedule": "30 3 * * 1"
     }
   ],
   "audit": {

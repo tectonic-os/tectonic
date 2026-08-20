@@ -2,11 +2,11 @@
 
 use crate::diag::{Issue, Issues, Source, Span};
 use crate::layout;
-use crate::model::image::{List, Seed, WorkflowToggle, SCHEMA_VERSION, TECT_VERSION};
+use crate::model::image::{List, Seed, Workflow, SCHEMA_VERSION, TECT_VERSION};
 use crate::parse::image::IMAGE;
 use crate::parse::remote::{parse_collection, COLLECTION};
 use crate::parse::schema::{check_doc, Arg, Kind, Node, Prop, Say};
-use crate::parse::{bool_arg, boolean, child, int_arg, kids, prop, string_arg, syntax_issue};
+use crate::parse::{bool_arg, child, int_arg, kids, prop, prop_span, string_arg, syntax_issue};
 use kdl::{KdlDocument, KdlNode};
 use std::path::Path;
 
@@ -63,25 +63,26 @@ pub const REPO: Node = Node::new("repo",
             ], Say::new("unknown seed property `{}`", "not part of the schema",
                 "a seed accepts `collection`")),
         Node::new("workflows",
-            "The shipped workflows this repository turns off, named by file stem.")
-            .once("a second block would split one set of toggles in two")
+            "The CI `tect generate` writes into .github/workflows/, named by file stem. One \
+             this does not name is not written.")
+            .once("a second block would split one set of workflows in two")
             .empty(Say::new("`workflows` has no workflows in it", "empty block",
-                "omit the block entirely; every workflow in .github/workflows/ runs unless \
-                 something here says otherwise"))
+                "omit the block entirely; a repository with nothing here generates no CI"))
+            .props(&[
+                Prop { name: "at", kind: Kind::Str,
+                    desc: "The hour and minute the daily build runs, UTC. Every other schedule \
+                           is an offset from it.",
+                    say: Say::new("`{}` must be a time of day", "not a string", ""),
+                    missing: Say::NONE },
+            ], Say::new("unknown workflows property `{}`", "not part of the schema",
+                "a workflows block accepts `at`"))
             .children(&[
-                Node::new("", "One workflow, named by the node, and whether it runs.")
+                Node::new("", "One workflow, named by the node.")
                     .arg(Arg::None, Say::new("a workflow takes no arguments", "unexpected value",
-                        "the file stem is the node name: `smoke-test enabled=#false`"))
-                    .props(&[
-                        Prop { name: "enabled", kind: Kind::Bool,
-                            desc: "Whether the workflow runs at all.",
-                            say: Say::new("`{}` must be #true or #false", "not a boolean", ""),
-                            missing: Say::new("`{}` says nothing about whether it runs",
-                                "no `enabled`",
-                                "`{} enabled=#false` turns it off; a workflow nobody wants to \
-                                 change belongs outside this block") },
-                    ], Say::new("unknown workflow property `{}`", "not part of the schema",
-                        "a workflow accepts `enabled`")),
+                        "the file stem is the node name: `smoke-test`"))
+                    .props(&[], Say::new("unknown workflow property `{}`", "not part of the schema",
+                        "a workflow is named and nothing else; `at` on the block moves every \
+                         schedule at once")),
             ], Say::NONE),
         Node::new("sources",
             "The module collections `tect import module` resolves a name against.")
@@ -240,6 +241,7 @@ impl List {
             id: String::new(),
             images: Vec::new(),
             workflows: Vec::new(),
+            workflows_at: crate::resolve::workflow::DEFAULT_AT,
             sources: Vec::new(),
             default_image_id: None,
             pr_image_id: None,
@@ -545,9 +547,22 @@ impl List {
         }
     }
 
-    /// `workflows { smoke-test enabled=#false }` Each child names a workflow
-    /// by its file stem.
+    /// `workflows at="12:30" { build; smoke-test }` Each child names a
+    /// workflow by its file stem, and `at` is the one time the rest hang off.
     fn parse_workflows(&mut self, block: &KdlNode, src: &Source, issues: &mut Issues) {
+        if let Some(at) = prop(block, "at") {
+            match time(at) {
+                Some(at) => self.workflows_at = at,
+                None => issues.push(
+                    Issue::new(format!("`{at}` is not a time of day"), src)
+                        .at(prop_span(block, "at").unwrap_or_default(), "not `HH:MM`")
+                        .help(
+                            "`workflows at=\"12:30\"`, the hour and minute the daily build \
+                               runs, UTC",
+                        ),
+                ),
+            }
+        }
         for node in kids(block) {
             let name = node.name().value().to_string();
             let span: Span = node.name().span().into();
@@ -557,18 +572,12 @@ impl List {
                     Issue::new(format!("workflow `{name}` is declared twice"), src)
                         .at(dup.span, "first here")
                         .at(span, "and again here")
-                        .help("one workflow is either on or off; two answers means the file below wins silently"),
+                        .help("a workflow is either generated or absent, so naming it twice says nothing the once did not"),
                 );
                 continue;
             }
 
-            if let Some(enabled) = boolean(node, "enabled") {
-                self.workflows.push(WorkflowToggle {
-                    name,
-                    enabled,
-                    span,
-                });
-            }
+            self.workflows.push(Workflow { name, span });
         }
     }
 
@@ -594,6 +603,30 @@ impl List {
             self.sources.push(collection);
         }
     }
+}
+
+/// `HH:MM`, as cron's hour and minute.
+pub fn time(value: &str) -> Option<(u32, u32)> {
+    let (hour, minute) = value.split_once(':')?;
+    let (hour, minute) = (hour.parse().ok()?, minute.parse().ok()?);
+    (hour < 24 && minute < 60).then_some((hour, minute))
+}
+
+/// Where the `workflows` block sits, for the one command that rewrites a node
+/// it did not write.
+pub fn workflows_span(text: &str) -> Option<Span> {
+    let doc: KdlDocument = text.parse().ok()?;
+    let node = doc
+        .nodes()
+        .iter()
+        .find(|n| n.name().value() == "workflows")?;
+    Some(node.span().into())
+}
+
+/// The `at` a repository declaring the default writes, which is what `set
+/// workflows` puts back and what a hand-edit is compared against.
+pub fn at_text((hour, minute): (u32, u32)) -> String {
+    format!("{hour:02}:{minute:02}")
 }
 
 #[cfg(test)]
@@ -625,10 +658,9 @@ tect-version
 tect-version "0.0.0"
 default-image
 pr-image
-workflows {
+workflows every="day" {
     smoke-test "on" trigger="push"
-    build enabled="yes"
-    lint
+    build
 }
 colour "blue"
 "#,
@@ -642,11 +674,9 @@ colour "blue"
                 "`tect-version` is declared twice",
                 "`default-image` needs an image name",
                 "`pr-image` needs an image name",
+                "unknown workflows property `every`",
                 "a workflow takes no arguments",
                 "unknown workflow property `trigger`",
-                "`smoke-test` says nothing about whether it runs",
-                "`enabled` must be #true or #false",
-                "`lint` says nothing about whether it runs",
                 "unknown node `colour` in repo.kdl",
             ]
         );

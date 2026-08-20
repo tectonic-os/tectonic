@@ -59,10 +59,11 @@ pub fn confirm(question: &str, yes: &str, no: &str) -> Result<bool, String> {
     Ok(chosen == Some(0))
 }
 
-/// Any of `options`, in the order they were toggled on, or none.
-pub fn multi(question: &str, options: &[Choice]) -> Result<Answer, String> {
+/// Any of `options`, or none. `on` is what is already true, which a question
+/// editing a declaration opens with.
+pub fn multi(question: &str, options: &[Choice], on: &[usize]) -> Result<Answer, String> {
     inline(options.len(), |terminal| {
-        toggle(terminal, question, options)
+        toggle(terminal, question, options, on)
     })
 }
 
@@ -113,9 +114,10 @@ fn toggle<B: Backend>(
     terminal: &mut ratatui::Terminal<B>,
     question: &str,
     options: &[Choice],
+    held: &[usize],
 ) -> Result<Answer, String> {
     let mut state = ListState::default().with_selected(Some(0));
-    let mut on: Vec<usize> = Vec::new();
+    let mut on: Vec<usize> = held.to_vec();
     loop {
         terminal
             .draw(|frame| draw(frame, question, options, Some(&on), TOGGLE, &mut state))

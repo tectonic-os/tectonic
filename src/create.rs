@@ -59,6 +59,9 @@ pub struct Repo {
     owner: Option<String>,
     assets: PathBuf,
     image: Option<Image>,
+    /// The CI to generate, asked through the struct `set workflows` uses so the
+    /// two cannot drift. Absent where there is no origin to run it on.
+    workflows: Option<crate::set::Workflows>,
     remote: bool,
     install_gh: bool,
 }
@@ -146,6 +149,20 @@ impl Repo {
             )?),
             false => None,
         };
+        let workflows = match configure {
+            false => None,
+            true => {
+                let family = image.as_ref().map_or("", |image| image.family.as_str());
+                let basis = crate::resolve::workflow::Basis::scaffolding(family);
+                let every = crate::set::Workflows::every(&basis);
+                crate::set::Workflows::collect(
+                    &basis,
+                    &every,
+                    crate::resolve::workflow::DEFAULT_AT,
+                    prompt,
+                )?
+            }
+        };
         Ok(Self {
             name,
             id,
@@ -154,6 +171,7 @@ impl Repo {
             owner,
             assets,
             image,
+            workflows,
             remote,
             install_gh,
         })
@@ -170,6 +188,10 @@ impl Repo {
         if let Some(image) = &self.image {
             wrote.extend(image.apply(&self.root)?);
         }
+        if let Some(workflows) = &self.workflows {
+            // repo.kdl is already in `wrote`, as the file this run created.
+            workflows.apply(&self.root)?;
+        }
         if let (true, Some(owner)) = (self.remote, &self.owner) {
             create_remote(owner, &self.id)?;
             println!("created {}/{} on github", owner, self.id);
@@ -177,7 +199,10 @@ impl Repo {
         report(&self.root, &wrote);
 
         let Self { host, id, .. } = self;
-        let mut next = vec!["git add -A && git commit".to_string()];
+        let mut next = vec![
+            "tect generate".to_string(),
+            "git add -A && git commit".to_string(),
+        ];
         if self.install_gh {
             next.push(GH_INSTALL.to_string());
         }
@@ -226,7 +251,6 @@ fn describe(path: &Path) -> &'static str {
         "lib" => "shell a module's build layer sources",
         "scripts" => "what CI runs, and what you run by hand",
         "disk_config" => "how a disk or installer image is shaped",
-        ".github/workflows" => "the CI: build, scan, sign and publish",
         ".github/renovate.json5" => "keeps the pinned versions moving",
         _ => "",
     }
@@ -269,6 +293,8 @@ fn username(host: &str) -> String {
 pub struct Image {
     file: PathBuf,
     text: String,
+    /// What the chosen base belongs to, which decides what CI can run here.
+    pub family: String,
     /// The image a second one takes the fallback away from, named in repo.kdl
     /// so that a bare build still builds what it built before.
     names_default: Option<String>,
@@ -336,6 +362,7 @@ impl Image {
         Ok(Self {
             text,
             file,
+            family,
             names_default,
         })
     }
@@ -535,7 +562,12 @@ impl Listing {
             .collect();
 
         let chosen: Vec<usize> = match given.is_empty() {
-            true => prompt.choose_many("list it in images", &options)?,
+            // Leaving and choosing nothing mean the same thing here: the
+            // module is in the repository either way.
+            true => match prompt.choose_many("list it in images", &options, &[])? {
+                crate::ui::Answer::Cancelled => Vec::new(),
+                crate::ui::Answer::Chosen(chosen) => chosen,
+            },
             false => given
                 .iter()
                 .map(|id| {

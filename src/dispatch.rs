@@ -241,6 +241,38 @@ pub fn dispatch(
             .apply(&root, &list.sources)?;
             Ok(ExitCode::SUCCESS)
         }
+        Verb::SetWorkflows => {
+            if let [word, ..] = rest {
+                return Err(Error::Invocation(format!(
+                    "`{}` does not take {word}",
+                    spec.name()
+                )));
+            }
+            let Some(root) = open(root_arg)? else {
+                return Ok(ExitCode::from(REPO_ERROR));
+            };
+            if !prompt.asks() {
+                return Err(Error::Invocation(crate::set::BY_HAND.to_string()));
+            }
+            // The declaration this edits is readable whatever else is wrong
+            // with the repository, so the issues are `check`'s rather than
+            // this command's.
+            let list = crate::load(&root).list;
+            let on: Vec<&str> = list.workflows.iter().map(|w| w.name.as_str()).collect();
+            let Some(set) = crate::set::Workflows::collect(
+                &crate::resolve::workflow::Basis::of(&list),
+                &on,
+                list.workflows_at,
+                prompt,
+            )?
+            else {
+                return Ok(ExitCode::SUCCESS);
+            };
+            let wrote = set.apply(&root)?;
+            crate::create::report(&root, &wrote);
+            println!("\nnext, in {}:\n\x20 tect generate\n", root.display());
+            Ok(ExitCode::SUCCESS)
+        }
         Verb::FetchModules => {
             let root = repo_root(root_arg)?;
             let (list, issues, context) = crate::declarations(&root);

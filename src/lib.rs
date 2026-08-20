@@ -20,6 +20,7 @@ pub mod registry;
 pub mod resolve;
 pub mod runtime;
 pub mod scap;
+pub mod set;
 pub mod ui;
 
 pub use command::{Arg, Command};
@@ -114,7 +115,9 @@ fn skeleton(root: &Path, issues: &mut Issues) -> Option<String> {
 pub(crate) struct Loaded {
     list: List,
     resolved: Vec<Resolved>,
-    workflows: Vec<(String, bool)>,
+    workflows: Vec<resolve::workflow::Declared>,
+    /// What a workflow body's guarded regions are kept by.
+    facts: Vec<&'static str>,
     issues: Issues,
     context: String,
 }
@@ -123,7 +126,6 @@ pub(crate) fn load(root: &Path) -> Loaded {
     let (mut list, mut issues) = List::load(root);
     let context = context(&list, root);
 
-    let workflows = resolve::workflow::resolve(&list, root, &mut issues);
     let disk = parse::disk::Disk::scan(root);
     parse::module::check_unlisted(&list, root, &disk, &mut issues);
 
@@ -148,10 +150,16 @@ pub(crate) fn load(root: &Path) -> Loaded {
         resolved.push(Resolved { shipped, collected });
     }
 
+    // After the modules, since what a workflow needs is a fact about them.
+    let basis = resolve::workflow::Basis::of(&list);
+    let workflows = resolve::workflow::resolve(&list, &basis, &mut issues);
+    let facts = resolve::workflow::facts(&basis);
+
     Loaded {
         list,
         resolved,
         workflows,
+        facts,
         issues,
         context,
     }
@@ -170,6 +178,7 @@ pub fn run(command: Command, arg: Option<&str>, root: &Path) -> Run {
         list,
         resolved,
         workflows,
+        facts,
         mut issues,
         context,
     } = load(root);
@@ -268,6 +277,12 @@ pub fn run(command: Command, arg: Option<&str>, root: &Path) -> Run {
             PathBuf::from(layout::GENERATED).join("plan.json"),
             emit::plan::build(&list, &resolved, &workflows).render(),
         ));
+        files.extend(workflows.iter().map(|declared| {
+            (
+                PathBuf::from(layout::WORKFLOW_DIR).join(&declared.file),
+                emit::workflows::render(declared.body, declared.schedule.as_deref(), &facts),
+            )
+        }));
     }
 
     if command == Command::Verify {
@@ -377,13 +392,12 @@ fn verify(root: &Path, files: &[(PathBuf, String)], issues: &mut Issues) {
         );
     }
 
-    for path in tracked(&layout::generated(root)) {
-        let Ok(path) = path.strip_prefix(root).map(Path::to_path_buf) else {
-            continue;
-        };
-        if files.iter().any(|(emitted, _)| *emitted == path) {
-            continue;
-        }
+    let stale = tracked(&layout::generated(root))
+        .into_iter()
+        .filter_map(|path| path.strip_prefix(root).map(Path::to_path_buf).ok())
+        .filter(|path| !files.iter().any(|(emitted, _)| emitted == path))
+        .chain(resolve::workflow::orphans(root, files));
+    for path in stale {
         let name = path.display().to_string();
         issues.push(
             Issue::new(
@@ -397,11 +411,17 @@ fn verify(root: &Path, files: &[(PathBuf, String)], issues: &mut Issues) {
 
 /// Writes what `generate` produced, after clearing the directory so an image or
 /// a module that is gone leaves with its files. Everything under `generated/`
-/// is written from here, which is what `verify` holds it to.
+/// is written from here, and so is every workflow the repository declares,
+/// which is what `verify` holds both to. A workflow it no longer declares is
+/// removed by name: one the tool does not ship is the repository's own.
 pub fn write_generated(root: &Path, files: &[(PathBuf, String)]) -> Result<(), String> {
     let dir = layout::generated(root);
     if dir.is_dir() {
         std::fs::remove_dir_all(&dir).map_err(|err| format!("{}: {err}", dir.display()))?;
+    }
+    for path in resolve::workflow::orphans(root, files) {
+        let path = root.join(path);
+        std::fs::remove_file(&path).map_err(|err| format!("{}: {err}", path.display()))?;
     }
     for (path, text) in files {
         let path = root.join(path);

@@ -43,18 +43,20 @@ Desktop
   8) ghcr.io/jmarrero/ubuntu-bootc:latest  Experimental Ubuntu 26.04 bootc base with cloud-init
 What is the base image for this image? [1-8, 0 for none]: 1
 
+  1) [x] build  builds, scans, signs and publishes every image
+  2) [x] build-disk  builds a disk image and an installer iso
+  3) [x] base-sig-probe  checks each base for a signature and corrects it
+  4) [x] cleanup-registry  prunes old versions of the images off the registry
+  5) [ ] kernel-freshness  needs a module taking a KERNEL arg
+  6) [x] smoke-test  installs the image to a disk and boots it under qemu
+the CI to generate [1-6, several, 0 for none]: build
+
+what time the daily build runs, UTC [12:30]: 12:30
+
 initialised a git repository in example
 
 example/
 ├── .github/
-│   ├── workflows/        the CI: build, scan, sign and publish
-│   │   ├── + base-sig-probe.yml
-│   │   ├── + build-disk.yml
-│   │   ├── + build.yml
-│   │   ├── + cleanup-registry.yml
-│   │   ├── + kernel-freshness.yml
-│   │   ├── + reconcile-workflows.yml
-│   │   └── + smoke-test.yml
 │   └── + renovate.json5  keeps the pinned versions moving
 ├── disk_config/          how a disk or installer image is shaped
 │   ├── + disk.toml
@@ -84,6 +86,7 @@ example/
 └── + repo.kdl            what the repo pins, and where modules come from
 
 next, in example:
+  tect generate
   git add -A && git commit
   gh repo create someone/example --source=. --push
 

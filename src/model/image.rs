@@ -112,11 +112,10 @@ pub struct Flavour {
     pub span: Span,
 }
 
-/// One workflow the image author has decided about, named by its file stem
+/// One workflow the repository asks to be generated, named by its file stem
 /// under `.github/workflows/`.
-pub struct WorkflowToggle {
+pub struct Workflow {
     pub name: String,
-    pub enabled: bool,
     pub span: Span,
 }
 
@@ -176,8 +175,11 @@ pub struct List {
     /// matrix and every list this produces are the same on every machine
     /// whatever the files are called.
     pub images: Vec<Image>,
-    /// Only the workflows named in repo.kdl.
-    pub workflows: Vec<WorkflowToggle>,
+    /// The workflows repo.kdl asks for, which are the only ones written.
+    pub workflows: Vec<Workflow>,
+    /// The hour and minute the daily build runs, UTC, which every other
+    /// schedule is an offset from.
+    pub workflows_at: (u32, u32),
     /// The module collections an import resolves a name against.
     pub sources: Vec<Collection>,
     /// Which image a build with nothing named builds, and which one a pull

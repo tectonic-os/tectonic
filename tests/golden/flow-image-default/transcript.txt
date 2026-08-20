@@ -32,14 +32,6 @@ initialised a git repository in example
 
 example/
 ├── .github/
-│   ├── workflows/        the CI: build, scan, sign and publish
-│   │   ├── + base-sig-probe.yml
-│   │   ├── + build-disk.yml
-│   │   ├── + build.yml
-│   │   ├── + cleanup-registry.yml
-│   │   ├── + kernel-freshness.yml
-│   │   ├── + reconcile-workflows.yml
-│   │   └── + smoke-test.yml
 │   └── + renovate.json5  keeps the pinned versions moving
 ├── disk_config/          how a disk or installer image is shaped
 │   ├── + disk.toml
@@ -69,6 +61,7 @@ example/
 └── + repo.kdl            what the repo pins, and where modules come from
 
 next, in example:
+  tect generate
   git add -A && git commit
 
 ==== exit 0

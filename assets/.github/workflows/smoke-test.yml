@@ -2,7 +2,7 @@
 name: VM boot smoke test
 on:
   schedule:
-    - cron: '30 3 * * 1'
+    - cron: '30 3 * * 1'  # tect:schedule
   workflow_dispatch:
 
 env:

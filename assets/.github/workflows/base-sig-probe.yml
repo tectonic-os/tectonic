@@ -3,7 +3,7 @@ name: Base image signature probe
 
 on:
   schedule:
-    - cron: '30 6 * * *'  # after fedora-bootc composes, before our build
+    - cron: '30 6 * * *'  # tect:schedule
   workflow_dispatch:
 
 permissions:

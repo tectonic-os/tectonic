@@ -17,3 +17,15 @@
   x nothing generates `generated/leftover`
   help: delete it, or declare what it belongs to
 
+==== one workflow undeclared
+  x `generated/plan.json` is not there
+  help: run `tect generate` and commit what it writes
+
+  x nothing generates `generated/leftover`
+  help: delete it, or declare what it belongs to
+
+  x nothing generates `.github/workflows/smoke-test.yml`
+  help: delete it, or declare what it belongs to
+
+==== and generated again
+smoke-test.yml is gone

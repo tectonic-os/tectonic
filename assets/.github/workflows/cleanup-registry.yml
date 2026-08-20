@@ -3,7 +3,7 @@ name: Clean up registry
 
 on:
   schedule:
-    - cron: '30 14 * * *'  # ~2h after the 12:30 UTC image build so its pushes are settled
+    - cron: '30 14 * * *'  # tect:schedule
   workflow_dispatch:
     inputs:
       dry-run:

@@ -6,6 +6,7 @@ use crate::model::image::{Entry, Image, List, Target, NO_FLAVOUR, SCHEMA_VERSION
 use crate::model::module::Module;
 use crate::provenance::Evidence;
 use crate::resolve::overlay;
+use crate::resolve::workflow::Declared;
 use crate::resolve::Resolved;
 
 /// The image one target names, the flavour it gates on, and the entries that
@@ -28,7 +29,7 @@ pub(crate) fn of_target<'a>(
     Some((image, flavour, entries))
 }
 
-pub fn build(list: &List, resolved: &[Resolved], workflows: &[(String, bool)]) -> Json {
+pub fn build(list: &List, resolved: &[Resolved], workflows: &[Declared]) -> Json {
     Json::object([
         (
             "schema_version",
@@ -73,10 +74,10 @@ pub fn build(list: &List, resolved: &[Resolved], workflows: &[(String, bool)]) -
         ("cache_image", Json::optional(list.cache_image())),
         (
             "workflows",
-            Json::array(workflows.iter().map(|(file, enabled)| {
+            Json::array(workflows.iter().map(|declared| {
                 Json::object([
-                    ("file", Json::string(file)),
-                    ("enabled", Json::Bool(*enabled)),
+                    ("file", Json::string(&declared.file)),
+                    ("schedule", Json::optional(declared.schedule.clone())),
                 ])
             })),
         ),

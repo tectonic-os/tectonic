@@ -7,7 +7,8 @@ the help, and are not in that list.
 
 `tect` with nothing after it opens a picker of the same list where the output
 is a terminal, and prints the list where it is not. A verb with no noun —
-`tect create`, `tect import`, `tect registry` — opens a picker of its nouns.
+`tect create`, `tect import`, `tect registry`, `tect set` — opens a picker of
+its nouns.
 Leaving a picker is not an error: it exits 0 having done nothing.
 
 The repository is the nearest directory at or above the working directory
@@ -191,6 +192,33 @@ The generators are closed, and each is one of:
   it. Every machine enrols the certificate once with `mokutil --import`, and
   until it does the modules signed with it will not load.
 
+### `set workflows`
+
+Chooses the CI this repository generates, and writes the choice into the
+`workflows` block of `repo.kdl`. `tect generate` is what then writes the files.
+
+Asks you for:
+- Which of the shipped workflows to generate, opening with the ones already
+  declared, and drawing what each of them needs where the repository cannot run
+  it
+- What time the daily build runs, UTC, where any of the chosen ones has a
+  schedule
+
+#### Notes:
+- There are no toggle flags. The declaration file was always the interface, so
+  with nobody to ask this says to edit `repo.kdl` rather than naming a flag
+  that would be a second way to write the same line.
+- Leaving the picker changes nothing. Choosing nothing takes the block away,
+  and a repository declaring no block generates no CI.
+- `build-disk` and `smoke-test` need a fedora image, because the image builder
+  relabels its buildroot with SELinux and builds no disk otherwise.
+  `kernel-freshness` needs a module taking a `KERNEL` build arg. One whose
+  basis is absent is drawn with the reason and refused.
+- Every schedule is an offset from the daily build, so moving one value moves
+  all of them. A cron is the one value the emitter writes into a workflow file
+  rather than putting in `plan.json`, because the forge reads it out of the
+  file before any job exists.
+
 ### `check`
 
 Reads every manifest and reports every problem at the line that caused it, then
@@ -204,16 +232,22 @@ modules the base already provides.
 
 ### `generate`
 
-Writes the build files under `generated/` and lists what it wrote:
+Writes the build files and lists what it wrote:
 - The Containerfile for each image
 - The per-module build scripts
 - Both renderings of the capability graph
 - `plan.json`
 - `seed.kdl`, where `repo.kdl` nominates a seedable image
+- Every workflow the `workflows` block names, under `.github/workflows/`
 
 #### Notes:
-- The directory is cleared first, so an image or module that is gone leaves with
-  its files.
+- `generated/` is cleared first, so an image or module that is gone leaves with
+  its files. A workflow is removed by name instead: one the tool does not ship
+  is the repository's own and is left where it is.
+- The workflow bodies are shipped verbatim, with the declared schedules
+  substituted and the kernel build input kept only where a listed module takes
+  one. A tool upgrade re-syncs them by regeneration, so nothing is ever copied
+  by hand.
 - `generated/` is tracked; `out/` is scratch and ignored.
 - The Containerfile bakes `plan.json` into the image at
   `/usr/share/tectonic/manifest.json`, so a built image can answer what it is

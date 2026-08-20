@@ -12,6 +12,7 @@ pub enum Verb {
     CreateModule,
     CreateKey,
     ImportModule,
+    SetWorkflows,
     Check,
     Generate,
     Build,
@@ -41,6 +42,7 @@ pub const ALL: &[Verb] = &[
     Verb::CreateModule,
     Verb::CreateKey,
     Verb::ImportModule,
+    Verb::SetWorkflows,
     Verb::Check,
     Verb::Generate,
     Verb::Build,
@@ -169,6 +171,15 @@ pub const COMMANDS: &[Spec] = &[
         about: "generate a key one of this repository's modules declares",
         family: Family::Repo,
         takes: &["root", "module", "cn"],
+    },
+    Spec {
+        verb: Verb::SetWorkflows,
+        word: "set",
+        noun: "workflows",
+        arg: "",
+        about: "choose the CI this repository generates",
+        family: Family::Repo,
+        takes: ROOT,
     },
     Spec {
         verb: Verb::Check,
@@ -565,7 +576,7 @@ mod tests {
 
     #[test]
     fn only_a_verb_every_form_of_which_takes_a_noun_is_a_list() {
-        for word in ["create", "import", "registry"] {
+        for word in ["create", "import", "registry", "set"] {
             assert!(all_nouns(word), "{word}");
         }
         for word in ["scap", "fetch", "check", "build", "nonsense"] {
