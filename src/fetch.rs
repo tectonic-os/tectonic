@@ -213,7 +213,12 @@ fn pins(root: &Path, list: &List) -> Result<Vec<Pin>, String> {
 fn names(list: &List) -> Vec<String> {
     let mut names = Vec::new();
     for entry in list.images.iter().flat_map(|image| &image.entries) {
-        if (entry.source.is_some() || entry.remote.is_some()) && !names.contains(&entry.path) {
+        let declared = entry.source.as_ref().is_some_and(|name| {
+            list.sources
+                .iter()
+                .any(|collection| &collection.name == name)
+        });
+        if (declared || entry.remote.is_some()) && !names.contains(&entry.path) {
             names.push(entry.path.clone());
         }
     }
@@ -308,6 +313,15 @@ mod tests {
 
         crate::init::put(
             &root.join("image.kdl"),
+            "image {\n    name \"Example\"\n    base \"example.invalid/image\" { family \"fedora\" }\n    modules { source \"missing\" { module \"hello\" } }\n}\n",
+        )
+        .unwrap();
+        let (list, issues, _) = crate::declarations(&root);
+        assert!(!issues.is_empty());
+        assert!(super::names(&list).is_empty());
+
+        crate::init::put(
+            &root.join("image.kdl"),
             "image {\n    name \"Example\"\n    base \"example.invalid/image\" { family \"fedora\" }\n    modules { source \"one\" { module \"hello\" } }\n}\n",
         )
         .unwrap();
@@ -333,17 +347,59 @@ mod tests {
     }
 
     #[test]
-    fn a_pinned_collection_member_has_a_stamp() {
-        let pin = super::Pin {
-            name: "one/hello".into(),
-            git_ref: "v1".into(),
-            from: super::From::Collection {
-                dir: PathBuf::from("hello"),
-                verified: Some(true),
-                stamp: Some("hash url hello".into()),
-            },
-        };
-        assert_eq!(pin.stamped().as_deref(), Some("hash url hello"));
+    fn a_pinned_collection_member_is_current_the_second_time() {
+        let root = std::env::temp_dir().join(format!("tect-fetch-pinned.{}", std::process::id()));
+        let collection = root.join("collection");
+        let archive = root.join("collection.tar.gz");
+        let _ = std::fs::remove_dir_all(&root);
+        crate::init::put(
+            &collection.join("hello/module.kdl"),
+            "description \"Says hello\"\n\nsupports \"fedora\"\n",
+        )
+        .unwrap();
+        let packed = std::process::Command::new("tar")
+            .arg("-czf")
+            .arg(&archive)
+            .arg("-C")
+            .arg(&root)
+            .arg("collection")
+            .status()
+            .unwrap();
+        assert!(packed.success());
+        let output = std::process::Command::new("sha256sum")
+            .arg(&archive)
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        let sha256 = String::from_utf8_lossy(&output.stdout)
+            .split_whitespace()
+            .next()
+            .unwrap()
+            .to_string();
+        crate::init::put(
+            &root.join("repo.kdl"),
+            &format!(
+                "schema-version 1\nname \"Example\"\nsources {{\n    one {{\n        pin {{\n            manual \"test\"\n            version \"v1\"\n            url \"file://{}\"\n            sha256 \"{sha256}\"\n        }}\n    }}\n}}\n",
+                archive.display()
+            ),
+        )
+        .unwrap();
+        crate::init::put(
+            &root.join("image.kdl"),
+            "image {\n    name \"Example\"\n    base \"example.invalid/image\" { family \"fedora\" }\n    modules { source \"one\" { module \"hello\" } }\n}\n",
+        )
+        .unwrap();
+        let (list, issues, _) = crate::declarations(&root);
+        assert!(issues.is_empty(), "{}", issues.plain());
+        let first = super::modules(&root, &list).unwrap();
+        assert!(first
+            .iter()
+            .any(|line| line.contains("copied from its verified collection")));
+        assert_eq!(
+            super::modules(&root, &list).unwrap(),
+            ["one/hello v1 is current"]
+        );
+        let _ = std::fs::remove_dir_all(root);
     }
 
     /// A pin named `owner/module` is one tree at that depth, not two.

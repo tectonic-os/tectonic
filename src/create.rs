@@ -473,6 +473,9 @@ impl Module {
     }
 
     pub fn apply(&self, root: &Path) -> Result<Vec<(PathBuf, Change)>, String> {
+        if self.listing.cancelled() {
+            return Ok(Vec::new());
+        }
         crate::init::put(&self.file, &self.text)?;
         let mut wrote = vec![(under(root, &self.file), Change::Created)];
         wrote.extend(self.listing.apply(&self.path)?);
@@ -538,6 +541,8 @@ fn quotable(value: &str) -> Result<&str, String> {
 /// is one image, because having a module in the repository and listing it in an
 /// image are different decisions.
 pub enum Listing {
+    /// The picker was left, so the command writes nothing.
+    Cancelled,
     /// Nothing to list it in yet.
     NoImage,
     /// None of them, which is an answer.
@@ -562,10 +567,8 @@ impl Listing {
             .collect();
 
         let chosen: Vec<usize> = match given.is_empty() {
-            // Leaving and choosing nothing are the same answer. An authored
-            // or copied module still exists; an import rejects no reference.
             true => match prompt.choose_many("list it in images", &options, &[])? {
-                crate::ui::Answer::Cancelled => Vec::new(),
+                crate::ui::Answer::Cancelled => return Ok(Self::Cancelled),
                 crate::ui::Answer::Chosen(chosen) => chosen,
             },
             false => given
@@ -598,6 +601,10 @@ impl Listing {
         self.apply_declaration(&format!("module \"{path}\""), None)
     }
 
+    pub fn cancelled(&self) -> bool {
+        matches!(self, Self::Cancelled)
+    }
+
     pub fn apply_source(&self, source: &str, name: &str) -> Result<Vec<(PathBuf, Change)>, String> {
         self.apply_declaration(
             &format!("source \"{source}\" {{\n    module \"{name}\"\n}}"),
@@ -611,6 +618,7 @@ impl Listing {
         source: Option<(&str, &str)>,
     ) -> Result<Vec<(PathBuf, Change)>, String> {
         match self {
+            Self::Cancelled => Ok(Vec::new()),
             Self::NoImage => {
                 println!("no image lists it yet; `tect create image <name>` writes one");
                 Ok(Vec::new())
@@ -861,5 +869,19 @@ mod tests {
                 assert!(path.starts_with('/'), "{} provides {path}", base.image);
             }
         }
+    }
+
+    #[test]
+    fn a_cancelled_listing_does_not_create_a_module() {
+        let root = std::env::temp_dir().join(format!("tect-cancel-module-{}", std::process::id()));
+        let module = Module {
+            path: "hello".into(),
+            file: root.join("modules/hello/module.kdl"),
+            text: "description \"hello\"\n".into(),
+            listing: Listing::Cancelled,
+        };
+        assert!(module.apply(&root).unwrap().is_empty());
+        assert!(!module.file.exists());
+        let _ = std::fs::remove_dir_all(root);
     }
 }

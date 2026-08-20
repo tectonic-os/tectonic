@@ -346,6 +346,13 @@ impl Module {
         images: Vec<String>,
         prompt: &Prompt,
     ) -> Result<Self, Error> {
+        if crate::model::image::List::load(root).0.images.is_empty() {
+            return Err(
+                "`import module` needs an image; run `tect create image <name>` first"
+                    .to_string()
+                    .into(),
+            );
+        }
         let (from, name) = select(name, root, sources, enforce, "import", prompt)?;
         let listing = Listing::collect(root, images, prompt)?;
         Ok(Self {
@@ -357,6 +364,7 @@ impl Module {
 
     pub fn apply(&self, root: &Path) -> Result<(), String> {
         match self.listing {
+            Listing::Cancelled => return Ok(()),
             Listing::NoImage => {
                 return Err(
                     "`import module` needs an image; run `tect create image <name>` first".into(),
@@ -377,6 +385,69 @@ impl Module {
         let wrote = self.listing.apply_source(&self.from.owner, &self.name)?;
         report(root, &wrote);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_cancelled_listing_writes_nothing() {
+        let root = std::env::temp_dir().join(format!("tect-cancel-import-{}", std::process::id()));
+        let from = root.join("collection/module");
+        crate::init::put(&from.join(layout::MODULE_FILE), "description \"x\"\n").unwrap();
+
+        Module {
+            from: Found {
+                owner: "one".into(),
+                dir: from.clone(),
+            },
+            name: "module".into(),
+            listing: Listing::Cancelled,
+        }
+        .apply(&root)
+        .unwrap();
+        assert!(!root.join("modules/.remote/one/module").exists());
+
+        Copy {
+            from: Found {
+                owner: "one".into(),
+                dir: from,
+            },
+            dest: PathBuf::from("modules/module"),
+            name: "module".into(),
+            listing: Listing::Cancelled,
+        }
+        .apply(&root, &[])
+        .unwrap();
+        assert!(!root.join("modules/module").exists());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn no_image_is_refused_before_a_module_is_resolved() {
+        let root =
+            std::env::temp_dir().join(format!("tect-no-import-image-{}", std::process::id()));
+        crate::init::put(
+            &root.join(layout::REPO_FILE),
+            "schema-version 1\nname \"Example\"\n",
+        )
+        .unwrap();
+        let result = Module::collect(
+            Some("nosuch".into()),
+            &root,
+            &[],
+            false,
+            Vec::new(),
+            &Prompt::silent(),
+        );
+        let message = match result {
+            Err(err) => err.message().to_string(),
+            Ok(_) => panic!("an import with no image was accepted"),
+        };
+        assert!(message.contains("needs an image"), "{message}");
+        let _ = std::fs::remove_dir_all(root);
     }
 }
 
@@ -409,6 +480,9 @@ impl Copy {
     }
 
     pub fn apply(&self, root: &Path, sources: &[Collection]) -> Result<(), String> {
+        if self.listing.cancelled() {
+            return Ok(());
+        }
         let mut wrote: Vec<(PathBuf, Change)> = vendor(root, sources, &self.from, &self.dest)?
             .into_iter()
             .map(|path| (path, Change::Created))
