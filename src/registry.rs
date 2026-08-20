@@ -43,18 +43,12 @@ pub fn reference(
             .unwrap_or_else(|| "latest".to_string()),
     };
     let target = match target {
-        Some(name) => name.to_string(),
+        Some(name) => list.find_target(name)?,
         None => list
             .ungated_target()
-            .ok_or("no default image to take a target from")?
-            .to_string(),
+            .ok_or("no default image to take a target from")?,
     };
-    let published = list
-        .targets()
-        .iter()
-        .find(|have| have.to_string() == target)
-        .ok_or_else(|| format!("`{target}` is not a build target"))?
-        .published();
+    let published = target.published();
     Ok(format!("{}/{published}:{tag}", namespace(root)?))
 }
 

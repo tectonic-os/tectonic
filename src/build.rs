@@ -3,7 +3,7 @@
 
 use crate::emit::plan::{contract_files, of_target, pinned, preset_files, unique_pairs};
 use crate::layout;
-use crate::model::image::{List, Target, NO_FLAVOUR};
+use crate::model::image::{List, NO_FLAVOUR};
 use crate::model::module::Module;
 use crate::provenance::build as record;
 use std::fs;
@@ -81,7 +81,7 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
             )
         })
         .unwrap_or_default();
-    let published = published(&list, &target);
+    let published = list.find_target(&target)?.published();
 
     let version = match env("IMAGE_VERSION") {
         Some(named) => named,
@@ -290,29 +290,13 @@ fn lines(name: &str) -> Vec<String> {
 }
 
 fn target(list: &List, named: Option<&str>) -> Result<String, String> {
-    let known: Vec<String> = list.targets().iter().map(Target::to_string).collect();
-    let target = match named {
-        Some(name) => name.to_string(),
-        None => list
+    match named {
+        Some(name) => list.find_target(name).map(|target| target.to_string()),
+        None => Ok(list
             .default_target()
             .ok_or("no default image to build; name a target with `--target`")?
-            .to_string(),
-    };
-    match known.contains(&target) {
-        true => Ok(target),
-        false => Err(format!(
-            "`{target}` is not a build target (have: {})",
-            known.join(" ")
-        )),
+            .to_string()),
     }
-}
-
-fn published(list: &List, target: &str) -> String {
-    list.targets()
-        .iter()
-        .find(|have| have.to_string() == target)
-        .map(Target::published)
-        .unwrap_or_default()
 }
 
 /// `--secret <id>=<path>`, and `MOK_KEY_PATH` for the one a local build is

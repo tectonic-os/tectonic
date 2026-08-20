@@ -28,6 +28,7 @@ pub fn is_name(name: &str) -> bool {
 }
 
 /// A build target: which image, and which flavour of it.
+#[derive(Clone)]
 pub struct Target {
     pub image: String,
     /// A declared flavour, or `NO_FLAVOUR` for the ungated build.
@@ -283,6 +284,27 @@ impl List {
             }));
         }
         out
+    }
+
+    /// The one `name` names, refused naming what there is. Every caller that
+    /// takes a `--target` asks this, so an unknown one is the same answer
+    /// wherever it was typed.
+    pub fn find_target(&self, name: &str) -> Result<Target, String> {
+        let known = self.targets();
+        known
+            .iter()
+            .find(|have| have.to_string() == name)
+            .cloned()
+            .ok_or_else(|| {
+                format!(
+                    "`{name}` is not a build target (have: {})",
+                    known
+                        .iter()
+                        .map(Target::to_string)
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                )
+            })
     }
 
     /// What a build with nothing named builds: the default image, at its

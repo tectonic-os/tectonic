@@ -437,7 +437,7 @@ fn overridden(
 
 fn target(list: &List, named: Option<&str>) -> Result<String, String> {
     match named {
-        Some(name) => Ok(name.to_string()),
+        Some(name) => list.find_target(name).map(|target| target.to_string()),
         None => list
             .default_target()
             .map(|target| target.to_string())
