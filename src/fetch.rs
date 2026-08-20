@@ -15,7 +15,11 @@ struct Pin {
 }
 
 enum From {
-    Dir(PathBuf),
+    Collection {
+        dir: PathBuf,
+        /// None for a local directory, otherwise whether the archive had a hash.
+        verified: Option<bool>,
+    },
     Archive {
         url: String,
         sha256: Option<String>,
@@ -28,7 +32,7 @@ impl Pin {
     /// What the stamp has to say for the tree on disk to be the pinned one.
     fn stamped(&self) -> Option<String> {
         match &self.from {
-            From::Dir(_) => None,
+            From::Collection { .. } => None,
             From::Archive { url, sha256, path } => sha256
                 .as_ref()
                 .map(|sha256| format!("{sha256} {url} {path}")),
@@ -39,7 +43,7 @@ impl Pin {
 /// Fetches what is not already current and removes what is no longer pinned,
 /// reporting what it did.
 pub fn modules(root: &Path, list: &List) -> Result<Vec<String>, String> {
-    let pins = pins(root, list);
+    let pins = pins(root, list)?;
     let mut said = prune(root, &pins)?;
 
     for pin in &pins {
@@ -55,7 +59,7 @@ pub fn modules(root: &Path, list: &List) -> Result<Vec<String>, String> {
 
         let mut tmp = None;
         let source = match &pin.from {
-            From::Dir(source) => source.clone(),
+            From::Collection { dir, .. } => dir.clone(),
             From::Archive { url, sha256, path } => {
                 let work = layout::out(root).join(format!("fetch-module.{}", std::process::id()));
                 let _ = fs::remove_dir_all(&work);
@@ -80,7 +84,17 @@ pub fn modules(root: &Path, list: &List) -> Result<Vec<String>, String> {
             let _ = fs::remove_file(&stamp);
         }
         said.push(match &pin.from {
-            From::Dir(_) => format!("{} copied from its local collection", pin.name),
+            From::Collection { verified: None, .. } => {
+                format!("{} copied from its local collection", pin.name)
+            }
+            From::Collection {
+                verified: Some(true),
+                ..
+            } => format!("{} {} fetched and verified", pin.name, pin.git_ref),
+            From::Collection {
+                verified: Some(false),
+                ..
+            } => format!("{} {} fetched unverified", pin.name, pin.git_ref),
             From::Archive {
                 sha256: Some(_), ..
             } => format!("{} {} fetched and verified", pin.name, pin.git_ref),
@@ -98,11 +112,11 @@ fn place(source: &Path, dir: &Path, pin: &Pin) -> Result<(), String> {
             "{}: {} ships no module.kdl {}",
             pin.name,
             match &pin.from {
-                From::Dir(path) => path.display().to_string(),
+                From::Collection { dir, .. } => dir.display().to_string(),
                 From::Archive { url, .. } => url.clone(),
             },
             match &pin.from {
-                From::Dir(_) => "at that path".to_string(),
+                From::Collection { .. } => "at that path".to_string(),
                 From::Archive { path, .. } if path.is_empty() => "at its root".to_string(),
                 From::Archive { path, .. } => format!("under {path}"),
             }
@@ -114,8 +128,9 @@ fn place(source: &Path, dir: &Path, pin: &Pin) -> Result<(), String> {
 
 /// Every pin, first declaration wins, so two images pinning one module agree by
 /// construction rather than by fetch order.
-fn pins(root: &Path, list: &List) -> Vec<Pin> {
+fn pins(root: &Path, list: &List) -> Result<Vec<Pin>, String> {
     let mut out: Vec<Pin> = Vec::new();
+    let mut trees: Vec<(String, PathBuf)> = Vec::new();
     for image in &list.images {
         for entry in &image.entries {
             if out.iter().any(|pin| pin.name == entry.path) {
@@ -127,23 +142,29 @@ fn pins(root: &Path, list: &List) -> Vec<Pin> {
                     else {
                         continue;
                     };
-                    match &collection.at {
-                        At::Dir(path) => Pin {
-                            name: entry.path.clone(),
-                            git_ref: "local".into(),
-                            from: From::Dir(rooted(root, path).join(entry.name())),
-                        },
-                        At::Archive(remote) => Pin {
-                            name: entry.path.clone(),
-                            git_ref: remote.version.clone().unwrap_or_default(),
-                            from: From::Archive {
-                                url: remote.url_resolved().unwrap_or_default(),
-                                sha256: remote.sha256.clone(),
-                                path: PathBuf::from(remote.path.as_deref().unwrap_or(""))
-                                    .join(entry.name())
-                                    .display()
-                                    .to_string(),
-                            },
+                    let tree = match trees.iter().find(|(found, _)| found == name) {
+                        Some((_, tree)) => tree.clone(),
+                        None => {
+                            let tree = crate::import::tree(root, collection)?;
+                            trees.push((name.clone(), tree.clone()));
+                            tree
+                        }
+                    };
+                    let (git_ref, verified) = match &collection.at {
+                        At::Dir(_) => ("local".into(), None),
+                        At::Archive(remote) => (
+                            remote.version.clone().unwrap_or_default(),
+                            Some(!remote.unpinned()),
+                        ),
+                    };
+                    Pin {
+                        name: entry.path.clone(),
+                        git_ref,
+                        from: From::Collection {
+                            dir: tree
+                                .join(collection.subtree().unwrap_or(""))
+                                .join(entry.name()),
+                            verified,
                         },
                     }
                 }
@@ -165,14 +186,7 @@ fn pins(root: &Path, list: &List) -> Vec<Pin> {
             out.push(pin);
         }
     }
-    out
-}
-
-fn rooted(root: &Path, path: &str) -> PathBuf {
-    match Path::new(path).is_absolute() {
-        true => PathBuf::from(path),
-        false => root.join(path),
-    }
+    Ok(out)
 }
 
 /// Fetched trees no image references any more, and the empty directories they leave.
@@ -235,6 +249,11 @@ mod tests {
         )
         .unwrap();
         crate::init::put(
+            &collection.join("goodbye/module.kdl"),
+            "description \"Says goodbye\"\n\nsupports \"fedora\"\n",
+        )
+        .unwrap();
+        crate::init::put(
             &root.join("repo.kdl"),
             &format!(
                 "schema-version 1\nname \"Example\"\nsources {{\n    one {:?}\n}}\n",
@@ -244,7 +263,7 @@ mod tests {
         .unwrap();
         crate::init::put(
             &root.join("image.kdl"),
-            "image {\n    name \"Example\"\n    base \"example.invalid/image\" { family \"fedora\" }\n    modules {\n        source \"one\" { module \"hello\" }\n    }\n}\n",
+            "image {\n    name \"Example\"\n    base \"example.invalid/image\" { family \"fedora\" }\n    modules {\n        source \"one\" { module \"hello\"; module \"goodbye\" }\n    }\n}\n",
         )
         .unwrap();
 
@@ -252,6 +271,9 @@ mod tests {
         assert!(issues.is_empty(), "{}", issues.plain());
         super::modules(&root, &list).unwrap();
         assert!(root.join("modules/.remote/one/hello/module.kdl").is_file());
+        assert!(root
+            .join("modules/.remote/one/goodbye/module.kdl")
+            .is_file());
 
         crate::init::put(
             &root.join("repo.kdl"),

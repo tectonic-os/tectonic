@@ -207,7 +207,7 @@ pub fn cached(root: &Path, collection: &Collection) -> Option<PathBuf> {
 /// pinned archive, fetched and verified once and kept for the next lookup. An
 /// unpinned one is fetched again every time, since the ref it follows has
 /// moved by now for all anything here knows.
-fn tree(root: &Path, collection: &Collection) -> Result<PathBuf, String> {
+pub(crate) fn tree(root: &Path, collection: &Collection) -> Result<PathBuf, String> {
     if !collection.unpinned() {
         if let Some(dir) = cached(root, collection) {
             return Ok(dir);
