@@ -310,9 +310,12 @@ impl Import {
         root: &Path,
         sources: &[tect::model::remote::Collection],
     ) -> Result<(), String> {
-        let wrote = tect::import::vendor(root, sources, &self.from, &self.dest)?;
-        println!("imported {}", self.dest.display());
-        self.listing.apply(&self.path)?;
+        let mut wrote: Vec<(PathBuf, tect::create::Change)> =
+            tect::import::vendor(root, sources, &self.from, &self.dest)?
+                .into_iter()
+                .map(|path| (path, tect::create::Change::Created))
+                .collect();
+        wrote.extend(self.listing.apply(&self.path)?);
         tect::create::report(root, &wrote);
         Ok(())
     }

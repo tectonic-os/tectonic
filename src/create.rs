@@ -8,6 +8,7 @@
 use crate::diag::Issues;
 use crate::layout;
 use crate::prompt::Prompt;
+pub use crate::ui::tree::Change;
 use crate::ui::Choice;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -159,7 +160,11 @@ impl Repo {
     }
 
     pub fn apply(&self) -> Result<(), String> {
-        let mut wrote = crate::init::write(&self.root, &self.name, &self.assets)?;
+        let mut wrote: Vec<(PathBuf, Change)> =
+            crate::init::write(&self.root, &self.name, &self.assets)?
+                .into_iter()
+                .map(|path| (path, Change::Created))
+                .collect();
         git_init(&self.root)?;
         println!("initialised a git repository in {}", self.root.display());
         if let Some(image) = &self.image {
@@ -192,7 +197,7 @@ impl Repo {
 }
 
 /// The tree a create or an import wrote, rooted where it wrote it.
-pub fn report(root: &Path, wrote: &[PathBuf]) {
+pub fn report(root: &Path, wrote: &[(PathBuf, Change)]) {
     crate::ui::tree::print(root, wrote, describe);
 }
 
@@ -333,13 +338,14 @@ impl Image {
         })
     }
 
-    pub fn apply(&self, root: &Path) -> Result<Vec<PathBuf>, String> {
+    pub fn apply(&self, root: &Path) -> Result<Vec<(PathBuf, Change)>, String> {
         crate::init::put(&self.file, &self.text)?;
+        let mut wrote = vec![(under(root, &self.file), Change::Created)];
         if let Some(was) = &self.names_default {
             append_default_image(root, was)?;
-            println!("named \"{was}\" the default image in {}", layout::REPO_FILE);
+            wrote.push((under(root, Path::new(layout::REPO_FILE)), Change::Updated));
         }
-        Ok(vec![under(root, &self.file)])
+        Ok(wrote)
     }
 }
 
@@ -437,10 +443,11 @@ impl Module {
         })
     }
 
-    pub fn apply(&self, root: &Path) -> Result<Vec<PathBuf>, String> {
+    pub fn apply(&self, root: &Path) -> Result<Vec<(PathBuf, Change)>, String> {
         crate::init::put(&self.file, &self.text)?;
-        self.listing.apply(&self.path)?;
-        Ok(vec![under(root, &self.file)])
+        let mut wrote = vec![(under(root, &self.file), Change::Created)];
+        wrote.extend(self.listing.apply(&self.path)?);
+        Ok(wrote)
     }
 }
 
@@ -550,22 +557,29 @@ impl Listing {
         })
     }
 
-    pub fn apply(&self, path: &str) -> Result<(), String> {
+    /// The image files the module got a line in, which is nothing where no
+    /// image took it. Appending is the only thing this does, so every one of
+    /// them is an update.
+    pub fn apply(&self, path: &str) -> Result<Vec<(PathBuf, Change)>, String> {
         match self {
             Self::NoImage => {
-                println!("no image lists it yet; `tect create image <name>` writes one")
+                println!("no image lists it yet; `tect create image <name>` writes one");
+                Ok(Vec::new())
             }
             Self::Declined => {
-                println!("next, to build it, list it in an image:\n\x20 module \"{path}\"")
+                println!("next, to build it, list it in an image:\n\x20 module \"{path}\"");
+                Ok(Vec::new())
             }
             Self::In(files) => {
                 for file in files {
                     append_module(file, path)?;
-                    println!("listed \"{path}\" in {}", file.display());
                 }
+                Ok(files
+                    .iter()
+                    .map(|file| (file.clone(), Change::Updated))
+                    .collect())
             }
         }
-        Ok(())
     }
 }
 

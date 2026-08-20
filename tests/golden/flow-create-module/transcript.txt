@@ -10,10 +10,10 @@ package names, separated by spaces []: nano vim
   1) example  Example
 list it in images [1, 0 for none]: 1
 
-listed "my-editor" in ./example.image.kdl
 
 ./
-└── modules/            every module this repo owns or imported
-    └── my-editor/
-        └── module.kdl  what the module installs, places and provides
+├── modules/              every module this repo owns or imported
+│   └── my-editor/
+│       └── + module.kdl  what the module installs, places and provides
+└── ~ example.image.kdl   an image: its base, and the modules it lists
 ==== exit 0
