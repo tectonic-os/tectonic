@@ -1,3 +1,4 @@
 schema-version 1
+name "Broken Seed"
 
 seed "example" collection="tectonic-os"

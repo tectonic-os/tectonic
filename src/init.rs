@@ -98,7 +98,8 @@ pub fn write(root: &Path, name: &str, assets: &Path) -> Result<Vec<PathBuf>, Str
     put(
         &root.join(layout::REPO_FILE),
         &format!(
-            "schema-version {SCHEMA_VERSION}\n\n\
+            "schema-version {SCHEMA_VERSION}\n\
+             name \"{name}\"\n\n\
              // renovate: datasource=github-releases depName=tectonic-os/tectonic\n\
              tect-version \"{TECT_VERSION}\"\n\
              {sources}"

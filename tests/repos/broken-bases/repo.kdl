@@ -1,4 +1,5 @@
 schema-version 1
+name "Broken Bases"
 
 sources {
     one "collections/one"

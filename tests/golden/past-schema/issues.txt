@@ -3,6 +3,7 @@
  1 | schema-version 0
    : ^^^^^^^|^^^^^^
    :        `-- this tool knows 1
+ 2 | name "Past Schema"
    `----
   help: `tect update-repo` moves the repository to schema 1; nothing else is
         read until it does, because every diagnostic under a grammar this

@@ -196,9 +196,11 @@ impl Repo {
     }
 }
 
-/// The tree a create or an import wrote, rooted where it wrote it.
+/// The tree a create or an import wrote, hung off what the repository calls
+/// itself rather than off the directory it happens to sit in.
 pub fn report(root: &Path, wrote: &[(PathBuf, Change)]) {
-    crate::ui::tree::print(root, wrote, describe);
+    let id = crate::model::image::List::load(root).0.id;
+    crate::ui::tree::print(&id, wrote, describe);
 }
 
 /// What one short phrase per kind of file says it is for, empty for a file

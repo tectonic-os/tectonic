@@ -1,4 +1,5 @@
 schema-version 1
+name "Unpinned Source"
 
 seed "example" collection="tectonic-os"
 

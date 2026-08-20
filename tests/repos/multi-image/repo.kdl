@@ -1,4 +1,5 @@
 schema-version 1
+name "Multi Image"
 
 default-image "workstation"
 pr-image "workstation"

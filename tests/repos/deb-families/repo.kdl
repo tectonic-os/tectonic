@@ -1,3 +1,4 @@
 schema-version 1
+name "Deb Families"
 
 default-image "debian"

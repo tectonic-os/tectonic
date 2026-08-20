@@ -1,50 +1,50 @@
   x collection `tectonic-os` is declared twice
-   ,-[./repo.kdl:4:5]
- 3 | sources {
- 4 |     tectonic-os {
+   ,-[./repo.kdl:5:5]
+ 4 | sources {
+ 5 |     tectonic-os {
    :     ^^^^^|^^^^^
    :          `-- first here
- 5 |         pin {
+ 6 |         pin {
    `----
-    ,-[./repo.kdl:12:5]
- 11 |     }
- 12 |     tectonic-os "../modules"
+    ,-[./repo.kdl:13:5]
+ 12 |     }
+ 13 |     tectonic-os "../modules"
     :     ^^^^^|^^^^^
     :          `-- and again here
- 13 |     Scratch "../modules"
+ 14 |     Scratch "../modules"
     `----
   help: both would import into the same directory, so one of them would be
         shadowed silently
 
   x invalid collection name `Scratch`
-    ,-[./repo.kdl:13:5]
- 12 |     tectonic-os "../modules"
- 13 |     Scratch "../modules"
+    ,-[./repo.kdl:14:5]
+ 13 |     tectonic-os "../modules"
+ 14 |     Scratch "../modules"
     :     ^^^|^^^
     :        `-- lowercase, digits and dashes, starting with a letter
- 14 |     local "../modules" {
+ 15 |     local "../modules" {
     `----
   help: the name is the directory imports land in, `modules/<name>/<module>`,
         and reaches every image that lists one of them
 
   x `local` is a directory, so its `pin` says nothing
-    ,-[./repo.kdl:15:9]
- 14 |     local "../modules" {
- 15 |         pin {
+    ,-[./repo.kdl:16:9]
+ 15 |     local "../modules" {
+ 16 |         pin {
     :         ^|^
     :          `-- nothing is fetched
- 16 |             version "v1.0.0"
+ 17 |             version "v1.0.0"
     `----
   help: a collection on this machine is read where it is; a pin belongs on one
         that is downloaded
 
   x `bare` says nothing about where the collection is
-    ,-[./repo.kdl:20:5]
- 19 |     }
- 20 |     bare
+    ,-[./repo.kdl:21:5]
+ 20 |     }
+ 21 |     bare
     :     ^^|^
     :       `-- no location given
- 21 | }
+ 22 | }
     `----
   help: a directory on this machine, `bare "../modules"`, or a pinned archive,
         `bare { pin { url "https://host/{version}.tar.gz" } }`

@@ -11,46 +11,46 @@
         the image
 
   x the pin declares no `sha256`
-   ,-[./repo.kdl:5:9]
- 4 |     unmarked {
- 5 |         pin {
+   ,-[./repo.kdl:6:9]
+ 5 |     unmarked {
+ 6 |         pin {
    :         ^|^
    :          `-- nothing to verify what arrived
- 6 |             manual "nothing bumps it"
+ 7 |             manual "nothing bumps it"
    `----
   help: the content hash is what says the archive is the one that was
         reviewed; `unpinned "why it is trusted"` is how a collection following
         a moving ref says it has none on purpose
 
   x the pin is declared `unpinned` but pins a `sha256`
-    ,-[./repo.kdl:13:13]
- 12 |         pin {
- 13 |             unpinned "trusted"
+    ,-[./repo.kdl:14:13]
+ 13 |         pin {
+ 14 |             unpinned "trusted"
     :             ^^^^|^^^
     :                 `-- one of the two is not true
- 14 |             version "main"
+ 15 |             version "main"
     `----
   help: a moving ref does not hash the same twice, so the fetch would fail as
         soon as it moved; drop whichever of them is wrong
 
   x the pin is declared `manual` and `unpinned`
-    ,-[./repo.kdl:22:13]
- 21 |             manual "nothing bumps it"
- 22 |             unpinned "trusted"
+    ,-[./repo.kdl:23:13]
+ 22 |             manual "nothing bumps it"
+ 23 |             unpinned "trusted"
     :             ^^^^|^^^
     :                 `-- pick one
- 23 |             version "main"
+ 24 |             version "main"
     `----
   help: `renovate datasource="github-tags" depName="owner/repo"`, `manual "why
         nothing tracks it"`, or `unpinned "why a moving ref is trusted here"`
 
   x `here` is a directory, so its `pin` says nothing
-    ,-[./repo.kdl:28:9]
- 27 |     here "../modules" {
- 28 |         pin {
+    ,-[./repo.kdl:29:9]
+ 28 |     here "../modules" {
+ 29 |         pin {
     :         ^|^
     :          `-- nothing is fetched
- 29 |             unpinned "trusted"
+ 30 |             unpinned "trusted"
     `----
   help: a collection on this machine is read where it is; a pin belongs on one
         that is downloaded

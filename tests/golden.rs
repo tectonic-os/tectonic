@@ -184,7 +184,7 @@ fn import(name: &str, root: &Path) {
     std::fs::write(
         root.join("repo.kdl"),
         format!(
-            "schema-version 1\n\nsources {{\n    one {:?}\n    two {:?}\n}}\n",
+            "schema-version 1\nname \"Imported\"\nsources {{\n    one {:?}\n    two {:?}\n}}\n",
             collections.join("one").display(),
             collections.join("two").display()
         ),

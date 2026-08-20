@@ -3,6 +3,7 @@
  1 | schema-version 2
    : ^^^^^^^|^^^^^^
    :        `-- this tool knows 1
+ 2 | name "Future Schema"
    `----
   help: the repository is ahead of the tool; `tect-version` names the release
         that reads it, and `scripts/tect.sh` fetches that one

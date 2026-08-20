@@ -10,7 +10,7 @@ which module [1-4, 0 for none]: 1
 list it in images [1, 0 for none]: 1
 
 
-./
+example/
 ├── modules/                      every module this repo owns or imported
 │   └── one/
 │       └── browser/

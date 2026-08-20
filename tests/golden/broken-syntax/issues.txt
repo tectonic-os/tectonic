@@ -8,16 +8,16 @@
    `----
 
   x unknown node `colour` in repo.kdl
-   ,-[./repo.kdl:2:1]
- 1 | schema-version 1
- 2 | colour "blue"
+   ,-[./repo.kdl:3:1]
+ 2 | name "Broken Syntax"
+ 3 | colour "blue"
    : ^^^|^^
    :    `-- not part of the schema
    `----
-  help: repo.kdl holds `schema-version`, `tect-version`, `default-image`, `pr-
-        image`, `seed`, a `workflows` block, a `sources` block, a `manifest`
-        block and an `audit` block: what is true of the repository rather than
-        of any image in it. An image goes in a file of its own
+  help: repo.kdl holds `schema-version`, `tect-version`, `name`, `default-
+        image`, `pr-image`, `seed`, a `workflows` block, a `sources` block, a
+        `manifest` block and an `audit` block: what is true of the repository
+        rather than of any image in it. An image goes in a file of its own
 
   x unknown top-level node `palette`
    ,-[./second.image.kdl:1:1]

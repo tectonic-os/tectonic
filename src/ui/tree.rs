@@ -47,9 +47,10 @@ struct Node {
     change: Option<Change>,
 }
 
-/// `wrote` is every path a command wrote, relative to `root`, and `describe`
-/// names what one is for — empty for a file that speaks for itself.
-pub fn print(root: &Path, wrote: &[(PathBuf, Change)], describe: fn(&Path) -> &'static str) {
+/// The tree of what a command wrote, hung off its root: `label` is the name
+/// the repository reads from its own tree, and `describe` names what one of
+/// the files is for — empty for a file that speaks for itself.
+pub fn print(label: &str, wrote: &[(PathBuf, Change)], describe: fn(&Path) -> &'static str) {
     let mut lines = Vec::new();
     walk(&of(wrote), Path::new(""), "", describe, &mut lines);
 
@@ -61,7 +62,7 @@ pub fn print(root: &Path, wrote: &[(PathBuf, Change)], describe: fn(&Path) -> &'
         .unwrap_or(0);
     let room = width().saturating_sub(column);
 
-    println!("\n{}/", root.display());
+    println!("\n{label}/");
     for (plain, shown, desc) in &lines {
         match fit(desc, room) {
             "" => println!("{shown}"),

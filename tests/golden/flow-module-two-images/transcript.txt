@@ -12,7 +12,7 @@ package names, separated by spaces []: nano vim
 list it in images [1-2, several, 0 for none]: 1 2
 
 
-./
+example/
 ├── modules/              every module this repo owns or imported
 │   └── my-editor/
 │       └── + module.kdl  what the module installs, places and provides
