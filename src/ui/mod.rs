@@ -28,6 +28,14 @@ impl Choice {
     }
 }
 
+/// What a question taking several answers came back with. Leaving without
+/// answering and answering with nothing are different, and only the asker
+/// knows whether they mean the same thing.
+pub enum Answer {
+    Cancelled,
+    Chosen(Vec<usize>),
+}
+
 /// How many options are on screen at once; the rest scroll under them.
 const VISIBLE: usize = 8;
 
@@ -52,7 +60,7 @@ pub fn confirm(question: &str, yes: &str, no: &str) -> Result<bool, String> {
 }
 
 /// Any of `options`, in the order they were toggled on, or none.
-pub fn multi(question: &str, options: &[Choice]) -> Result<Vec<usize>, String> {
+pub fn multi(question: &str, options: &[Choice]) -> Result<Answer, String> {
     inline(options.len(), |terminal| {
         toggle(terminal, question, options)
     })
@@ -105,7 +113,7 @@ fn toggle<B: Backend>(
     terminal: &mut ratatui::Terminal<B>,
     question: &str,
     options: &[Choice],
-) -> Result<Vec<usize>, String> {
+) -> Result<Answer, String> {
     let mut state = ListState::default().with_selected(Some(0));
     let mut on: Vec<usize> = Vec::new();
     loop {
@@ -124,8 +132,8 @@ fn toggle<B: Backend>(
                     }
                 }
             }
-            KeyCode::Enter => return Ok(on),
-            KeyCode::Esc | KeyCode::Char('q') => return Ok(Vec::new()),
+            KeyCode::Enter => return Ok(Answer::Chosen(on)),
+            KeyCode::Esc | KeyCode::Char('q') => return Ok(Answer::Cancelled),
             code => move_by(code, &mut state),
         }
     }

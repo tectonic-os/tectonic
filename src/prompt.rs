@@ -207,7 +207,10 @@ impl Prompt {
             return Ok(Vec::new());
         }
         if self.draw {
-            let chosen = crate::ui::multi(question, options)?;
+            let chosen = match crate::ui::multi(question, options)? {
+                crate::ui::Answer::Cancelled => Vec::new(),
+                crate::ui::Answer::Chosen(chosen) => chosen,
+            };
             let answer = match chosen.is_empty() {
                 true => "none".to_string(),
                 false => chosen
