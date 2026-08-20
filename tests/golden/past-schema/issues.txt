@@ -5,7 +5,8 @@
    :        `-- this tool knows 1
  2 | name "Past Schema"
    `----
-  help: `tect update-repo` moves the repository to schema 1; nothing else is
-        read until it does, because every diagnostic under a grammar this
-        release does not have would be noise
+  help: nothing here moves a repository to schema 1, and nothing else in it is
+        read either, because every diagnostic under a grammar this release
+        does not have would be noise; run the release `tect-version` names,
+        which `scripts/tect.sh` fetches
 

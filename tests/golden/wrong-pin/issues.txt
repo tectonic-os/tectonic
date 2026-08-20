@@ -5,6 +5,6 @@
    : ^^^^^^|^^^^^
    :       `-- this is tect {version}
    `----
-  help: run the pinned release, which `scripts/tect.sh` fetches, or `tect
-        update-repo` to move the pin to this one
+  help: run the pinned release, which `scripts/tect.sh` fetches, or edit
+        `tect-version` to move the pin to this one
 

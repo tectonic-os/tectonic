@@ -197,9 +197,10 @@ pub fn compatible(root: &Path) -> Issues {
                          that reads it, and `scripts/tect.sh` fetches that one"
                     .to_string(),
                 false => format!(
-                    "`tect update-repo` moves the repository to schema {SCHEMA_VERSION}; nothing \
-                     else is read until it does, because every diagnostic under a grammar this \
-                     release does not have would be noise"
+                    "nothing here moves a repository to schema {SCHEMA_VERSION}, and nothing \
+                     else in it is read either, because every diagnostic under a grammar this \
+                     release does not have would be noise; run the release `tect-version` names, \
+                     which `scripts/tect.sh` fetches"
                 ),
             }),
         );
@@ -214,7 +215,7 @@ pub fn compatible(root: &Path) -> Issues {
             )
             .at(span, format!("this is tect {TECT_VERSION}"))
             .help(
-                "run the pinned release, which `scripts/tect.sh` fetches, or `tect update-repo` \
+                "run the pinned release, which `scripts/tect.sh` fetches, or edit `tect-version` \
                  to move the pin to this one",
             ),
         );
