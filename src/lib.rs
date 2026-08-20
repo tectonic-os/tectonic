@@ -2,6 +2,7 @@
 
 pub mod base;
 pub mod build;
+pub mod command;
 pub mod create;
 pub mod diag;
 pub mod emit;
@@ -20,6 +21,7 @@ pub mod runtime;
 pub mod scap;
 pub mod ui;
 
+pub use command::{Arg, Command};
 use diag::Issue;
 use diag::Issues;
 use diag::Source;
@@ -28,64 +30,6 @@ use model::module::Module;
 pub use parse::repo::compatible;
 use resolve::Resolved;
 use std::path::{Path, PathBuf};
-
-/// What `run` performs. The commands reached through the repository; the ones
-/// that write it, build it or read the layer around them never come here.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Command {
-    Plan,
-    Check,
-    Generate,
-    Verify,
-    Section,
-    Graph,
-    GraphJson,
-    Summary,
-    Sbom,
-    Why,
-    WhyJson,
-}
-
-/// What a command's one argument names.
-pub enum Arg {
-    Image,
-    Target,
-    Module,
-}
-
-impl Command {
-    /// The word that names it. `GraphJson` is the one `--format` picks rather
-    /// than a word.
-    pub fn parse(word: &str) -> Option<Self> {
-        Some(match word {
-            "plan" => Self::Plan,
-            "check" => Self::Check,
-            "generate" => Self::Generate,
-            "verify" => Self::Verify,
-            "section" => Self::Section,
-            "graph" => Self::Graph,
-            "summary" => Self::Summary,
-            "sbom" => Self::Sbom,
-            "why" => Self::Why,
-            _ => return None,
-        })
-    }
-
-    /// What it takes after the command word, for the ones that take anything.
-    pub fn arg(self) -> Option<Arg> {
-        match self {
-            Self::Plan
-            | Self::Check
-            | Self::Generate
-            | Self::Verify
-            | Self::Graph
-            | Self::GraphJson => None,
-            Self::Section => Some(Arg::Image),
-            Self::Summary | Self::Sbom => Some(Arg::Target),
-            Self::Why | Self::WhyJson => Some(Arg::Module),
-        }
-    }
-}
 
 /// The nearest directory at or above `from` holding a repo.kdl.
 pub fn find_root(from: &Path) -> Option<PathBuf> {
