@@ -635,9 +635,8 @@ jobs:
         if: env.PUBLISH == 'true'
         run: |
           IMAGE_DIGEST="${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}"
-          module="$(jq -r '.provides_files["/etc/pki/containers/cosign.pub"] // ""' "$TARGET_PLAN")"
-          key="modules/${module}/files/etc/pki/containers/cosign.pub"
-          [ -s "$key" ] || { echo "no module provides a cosign key" >&2; exit 1; }
+          key="keys/public/etc/pki/containers/cosign.pub"
+          [ -s "$key" ] || { echo "the repository has no cosign public key" >&2; exit 1; }
           cosign verify --key "$key" --insecure-ignore-tlog=true \
             "${IMAGE_DIGEST}" > /dev/null
           cosign verify-attestation --key "$key" --type spdxjson \
@@ -850,12 +849,8 @@ jobs:
         if: steps.content.outputs.datastream != ''
         run: |
           set -euo pipefail
-          plan=generated/plan.json
-          module="$(jq -r --arg t "$TARGET" '
-            .images[].targets[] | select(.name == $t)
-            | .provides_files["/etc/pki/containers/cosign.pub"] // ""' "$plan")"
-          key="modules/${module}/files/etc/pki/containers/cosign.pub"
-          [ -s "$key" ] || { echo "::error::no module provides a cosign key" >&2; exit 1; }
+          key="keys/public/etc/pki/containers/cosign.pub"
+          [ -s "$key" ] || { echo "::error::the repository has no cosign public key" >&2; exit 1; }
           cosign verify-attestation --key "$key" --insecure-ignore-tlog=true \
             --type https://tectonic-os.github.io/attestations/arf/v1 "$IMAGE_REF" > /dev/null
           cosign verify-attestation --key "$key" --insecure-ignore-tlog=true \

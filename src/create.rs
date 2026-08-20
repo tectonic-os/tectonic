@@ -562,8 +562,8 @@ impl Listing {
             .collect();
 
         let chosen: Vec<usize> = match given.is_empty() {
-            // Leaving and choosing nothing mean the same thing here: the
-            // module is in the repository either way.
+            // Leaving and choosing nothing are the same answer. An authored
+            // or copied module still exists; an import rejects no reference.
             true => match prompt.choose_many("list it in images", &options, &[])? {
                 crate::ui::Answer::Cancelled => Vec::new(),
                 crate::ui::Answer::Chosen(chosen) => chosen,
@@ -595,16 +595,21 @@ impl Listing {
     /// image took it. Appending is the only thing this does, so every one of
     /// them is an update.
     pub fn apply(&self, path: &str) -> Result<Vec<(PathBuf, Change)>, String> {
-        self.apply_declaration(&format!("module \"{path}\""))
+        self.apply_declaration(&format!("module \"{path}\""), None)
     }
 
     pub fn apply_source(&self, source: &str, name: &str) -> Result<Vec<(PathBuf, Change)>, String> {
-        self.apply_declaration(&format!(
-            "source \"{source}\" {{\n    module \"{name}\"\n}}"
-        ))
+        self.apply_declaration(
+            &format!("source \"{source}\" {{\n    module \"{name}\"\n}}"),
+            Some((source, name)),
+        )
     }
 
-    fn apply_declaration(&self, declaration: &str) -> Result<Vec<(PathBuf, Change)>, String> {
+    fn apply_declaration(
+        &self,
+        declaration: &str,
+        source: Option<(&str, &str)>,
+    ) -> Result<Vec<(PathBuf, Change)>, String> {
         match self {
             Self::NoImage => {
                 println!("no image lists it yet; `tect create image <name>` writes one");
@@ -619,7 +624,7 @@ impl Listing {
             }
             Self::In(files) => {
                 for file in files {
-                    append_declaration(file, declaration)?;
+                    append_declaration(file, declaration, source)?;
                 }
                 Ok(files
                     .iter()
@@ -630,14 +635,27 @@ impl Listing {
     }
 }
 
-/// One declaration before the closing brace of the image's `modules` block.
+/// One declaration before the closing brace of its source or `modules` block.
 /// Every other byte is left where it was: the tool creates whole files and
 /// appends module lines, and never rewrites a value.
-fn append_declaration(file: &Path, declaration: &str) -> Result<(), String> {
+fn append_declaration(
+    file: &Path,
+    declaration: &str,
+    source: Option<(&str, &str)>,
+) -> Result<(), String> {
     let mut text =
         std::fs::read_to_string(file).map_err(|err| format!("{}: {err}", file.display()))?;
-    let close = crate::parse::image::modules_close(&text)
-        .ok_or_else(|| format!("{} has no `modules` block to add to", file.display()))?;
+    let (close, declaration) = match source.and_then(|(source, name)| {
+        crate::parse::image::source_close(&text, source)
+            .map(|close| (close, format!("module \"{name}\"")))
+    }) {
+        Some(found) => found,
+        None => (
+            crate::parse::image::modules_close(&text)
+                .ok_or_else(|| format!("{} has no `modules` block to add to", file.display()))?,
+            declaration.to_string(),
+        ),
+    };
 
     let start = text[..close].rfind('\n').map_or(0, |at| at + 1);
     let indent = &text[start..close];

@@ -140,6 +140,14 @@ fn open(given: Option<PathBuf>) -> Result<Option<PathBuf>, Error> {
     Ok((!refused).then_some(root))
 }
 
+fn collection_repo(
+    given: Option<PathBuf>,
+) -> Result<Option<(PathBuf, crate::model::image::List)>, Error> {
+    let root = repo_root(given)?;
+    let (list, issues, context) = crate::declarations(&root);
+    Ok((!issues.report(&context)).then_some((root, list)))
+}
+
 /// One command, from the row that named it.
 pub fn dispatch(
     spec: &Spec,
@@ -225,11 +233,9 @@ pub fn dispatch(
         }
         Verb::ImportModule => {
             let name = one_name(rest, spec)?;
-            let root = repo_root(root_arg)?;
-            let (list, issues, context) = crate::declarations(&root);
-            if issues.report(&context) {
+            let Some((root, list)) = collection_repo(root_arg)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
-            }
+            };
             crate::import::Module::collect(
                 name,
                 &root,
@@ -243,11 +249,9 @@ pub fn dispatch(
         }
         Verb::CopyModule => {
             let name = one_name(rest, spec)?;
-            let root = repo_root(root_arg)?;
-            let (list, issues, context) = crate::declarations(&root);
-            if issues.report(&context) {
+            let Some((root, list)) = collection_repo(root_arg)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
-            }
+            };
             crate::import::Copy::collect(
                 name,
                 &root,

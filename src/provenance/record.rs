@@ -179,6 +179,12 @@ fn dirs(from: &Path) -> Vec<std::path::PathBuf> {
     };
     let mut out = Vec::new();
     for path in entries.flatten().map(|e| e.path()).filter(|p| p.is_dir()) {
+        if path
+            .file_name()
+            .is_some_and(|name| name == crate::model::remote::REMOTE_DIR)
+        {
+            continue;
+        }
         match path.join(layout::MODULE_FILE).is_file() {
             true => out.push(path),
             false => out.extend(dirs(&path)),
@@ -227,5 +233,15 @@ mod tests {
         assert_eq!(read.pin.path, written.path);
         assert_eq!(read.pin.tracker.as_str(), "renovate");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_collection_record_is_not_a_local_edit() {
+        let root = std::env::temp_dir().join(format!("tect-remote-record-{}", std::process::id()));
+        let dir = root.join("modules/.remote/one/hello");
+        crate::init::put(&dir.join(layout::MODULE_FILE), "description \"changed\"\n").unwrap();
+        crate::init::put(&dir.join(RECORD), &write("one", None, "different")).unwrap();
+        assert!(modified(&root).is_empty());
+        let _ = std::fs::remove_dir_all(root);
     }
 }

@@ -6,20 +6,20 @@ one/browser  A browser, from the first collection
 two/browser  A browser, from the second collection (requires flatpak)
 one/flatpak  Flatpak client and a daily update timer
 one/signature-policy  Sigstore signature verification for the image's own updates
-==== import flatpak
-imported modules/flatpak
-==== import browser
+==== copy flatpak
+copied modules/flatpak
+==== copy browser
 ambiguous: one, two
-==== import one/browser
-imported modules/browser
-==== import two/browser
+==== copy one/browser
+copied modules/browser
+==== copy two/browser
 `browser` was copied from `one`; refusing the namesake from `two`
-==== import nosuch
+==== copy nosuch
 no module called `nosuch` in one, two
-==== import one/nosuch
+==== copy one/nosuch
 no module called `nosuch` in one
-==== import flatpak
-`flatpak` was copied from `one`; refusing the namesake from `one`
+==== copy flatpak
+`flatpak` was already copied from `one`
 ==== the tree
 modules/.gitkeep
 modules/browser/module.kdl

@@ -195,10 +195,10 @@ fn create(name: &str, root: &Path) {
     compare(name, "create.txt", &out);
 }
 
-/// `module import`, against two collections on this machine: what one name
+/// `copy module`, against two collections on this machine: what one name
 /// resolves to, what a name both of them carry does, and that the tree it wrote
 /// checks like any other module.
-fn import(name: &str, root: &Path) {
+fn copied(name: &str, root: &Path) {
     let mut out = String::new();
     let collections = crate_dir().join("tests/collections");
     std::fs::write(
@@ -234,7 +234,7 @@ fn import(name: &str, root: &Path) {
         "one/nosuch",
         "flatpak",
     ] {
-        out.push_str(&format!("==== import {wanted}\n"));
+        out.push_str(&format!("==== copy {wanted}\n"));
         let module = tect::import::split(wanted).1;
         match tect::import::find(here, &sources, wanted, false) {
             Err(message) => out.push_str(&format!("{message}\n")),
@@ -245,7 +245,7 @@ fn import(name: &str, root: &Path) {
             Ok(found) => match tect::import::destination(here, &found[0], module).and_then(|dest| {
                 tect::import::vendor(here, &sources, &found[0], &dest).map(|_| dest)
             }) {
-                Ok(dest) => out.push_str(&format!("imported {}\n", dest.display())),
+                Ok(dest) => out.push_str(&format!("copied {}\n", dest.display())),
                 Err(message) => out.push_str(&format!("{message}\n")),
             },
         }
@@ -672,6 +672,36 @@ fn flows() {
         .is_file());
     assert!(!root.join("modules/browser").exists());
 
+    let (list, issues, _) = tect::declarations(&root);
+    assert!(issues.is_empty(), "{}", issues.plain());
+    let declined = tect::import::Module::collect(
+        Some("one/flatpak".into()),
+        &root,
+        &list.sources,
+        false,
+        Vec::new(),
+        &tect::prompt::Prompt::silent(),
+    )
+    .unwrap_or_else(|err| panic!("{}", err.message()))
+    .apply(&root)
+    .unwrap_err();
+    assert!(declined.contains("--image"), "{declined}");
+
+    tect::import::Module::collect(
+        Some("one/flatpak".into()),
+        &root,
+        &list.sources,
+        false,
+        vec!["example".into()],
+        &tect::prompt::Prompt::silent(),
+    )
+    .unwrap_or_else(|err| panic!("{}", err.message()))
+    .apply(&root)
+    .unwrap();
+    let image = std::fs::read_to_string(root.join("example.image.kdl")).unwrap();
+    assert_eq!(image.matches("source \"one\"").count(), 1);
+    assert!(image.contains("module \"browser\"\n            module \"flatpak\""));
+
     let root = flow_repo_sourced("flow-copy");
     flow(
         "flow-copy-module",
@@ -748,7 +778,7 @@ fn golden() {
     let created = init_repo("create");
     create("create", &created);
     edited_module(&created);
-    import("import", &init_repo("import"));
+    copied("copy", &init_repo("copy"));
 }
 
 /// Every document the tool writes has to read back as what was written. The

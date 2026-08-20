@@ -19,6 +19,7 @@ enum From {
         dir: PathBuf,
         /// None for a local directory, otherwise whether the archive had a hash.
         verified: Option<bool>,
+        stamp: Option<String>,
     },
     Archive {
         url: String,
@@ -32,7 +33,7 @@ impl Pin {
     /// What the stamp has to say for the tree on disk to be the pinned one.
     fn stamped(&self) -> Option<String> {
         match &self.from {
-            From::Collection { .. } => None,
+            From::Collection { stamp, .. } => stamp.clone(),
             From::Archive { url, sha256, path } => sha256
                 .as_ref()
                 .map(|sha256| format!("{sha256} {url} {path}")),
@@ -43,8 +44,9 @@ impl Pin {
 /// Fetches what is not already current and removes what is no longer pinned,
 /// reporting what it did.
 pub fn modules(root: &Path, list: &List) -> Result<Vec<String>, String> {
+    let wanted = names(list);
+    let mut said = prune(root, &wanted)?;
     let pins = pins(root, list)?;
-    let mut said = prune(root, &pins)?;
 
     for pin in &pins {
         let dir = layout::module(root, REMOTE_DIR).join(&pin.name);
@@ -90,11 +92,17 @@ pub fn modules(root: &Path, list: &List) -> Result<Vec<String>, String> {
             From::Collection {
                 verified: Some(true),
                 ..
-            } => format!("{} {} fetched and verified", pin.name, pin.git_ref),
+            } => format!(
+                "{} {} copied from its verified collection",
+                pin.name, pin.git_ref
+            ),
             From::Collection {
                 verified: Some(false),
                 ..
-            } => format!("{} {} fetched unverified", pin.name, pin.git_ref),
+            } => format!(
+                "{} {} copied from its unverified collection",
+                pin.name, pin.git_ref
+            ),
             From::Archive {
                 sha256: Some(_), ..
             } => format!("{} {} fetched and verified", pin.name, pin.git_ref),
@@ -157,6 +165,17 @@ fn pins(root: &Path, list: &List) -> Result<Vec<Pin>, String> {
                             Some(!remote.unpinned()),
                         ),
                     };
+                    let stamp = collection.pin().and_then(|remote| {
+                        remote.sha256.as_ref().map(|sha256| {
+                            let member =
+                                Path::new(collection.subtree().unwrap_or("")).join(entry.name());
+                            format!(
+                                "{sha256} {} {}",
+                                remote.url_resolved().unwrap_or_default(),
+                                member.display()
+                            )
+                        })
+                    });
                     Pin {
                         name: entry.path.clone(),
                         git_ref,
@@ -165,6 +184,7 @@ fn pins(root: &Path, list: &List) -> Result<Vec<Pin>, String> {
                                 .join(collection.subtree().unwrap_or(""))
                                 .join(entry.name()),
                             verified,
+                            stamp,
                         },
                     }
                 }
@@ -189,13 +209,24 @@ fn pins(root: &Path, list: &List) -> Result<Vec<Pin>, String> {
     Ok(out)
 }
 
+/// Names the remote trees the declarations still reference, without fetching them.
+fn names(list: &List) -> Vec<String> {
+    let mut names = Vec::new();
+    for entry in list.images.iter().flat_map(|image| &image.entries) {
+        if (entry.source.is_some() || entry.remote.is_some()) && !names.contains(&entry.path) {
+            names.push(entry.path.clone());
+        }
+    }
+    names
+}
+
 /// Fetched trees no image references any more, and the empty directories they leave.
-fn prune(root: &Path, pins: &[Pin]) -> Result<Vec<String>, String> {
+fn prune(root: &Path, names: &[String]) -> Result<Vec<String>, String> {
     let fetched = layout::module(root, REMOTE_DIR);
     let mut said = Vec::new();
     for dir in trees(&fetched, &PathBuf::new()) {
         let name = dir.display().to_string();
-        if pins.iter().any(|pin| pin.name == name) {
+        if names.contains(&name) {
             continue;
         }
         fs::remove_dir_all(fetched.join(&dir)).map_err(|err| format!("{name}: {err}"))?;
@@ -276,6 +307,22 @@ mod tests {
             .is_file());
 
         crate::init::put(
+            &root.join("image.kdl"),
+            "image {\n    name \"Example\"\n    base \"example.invalid/image\" { family \"fedora\" }\n    modules { source \"one\" { module \"hello\" } }\n}\n",
+        )
+        .unwrap();
+        crate::init::put(
+            &root.join("repo.kdl"),
+            "schema-version 1\nname \"Example\"\nsources { one \"missing\" }\n",
+        )
+        .unwrap();
+        let (list, issues, _) = crate::declarations(&root);
+        assert!(issues.is_empty(), "{}", issues.plain());
+        let failed = super::modules(&root, &list).unwrap_err();
+        assert!(failed.contains("not a directory"), "{failed}");
+        assert!(!root.join("modules/.remote/one/goodbye/module.kdl").exists());
+
+        crate::init::put(
             &root.join("repo.kdl"),
             "schema-version 1\nname \"Example\"\nsources {\n    one {\n        pin {\n            unpinned \"test\"\n            version \"main\"\n            url \"https://example.invalid/{version}\"\n        }\n    }\n}\naudit { enforce #true }\n",
         )
@@ -283,6 +330,20 @@ mod tests {
         let (_, issues, _) = crate::declarations(&root);
         assert!(issues.plain().contains("follows an unverified ref"));
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn a_pinned_collection_member_has_a_stamp() {
+        let pin = super::Pin {
+            name: "one/hello".into(),
+            git_ref: "v1".into(),
+            from: super::From::Collection {
+                dir: PathBuf::from("hello"),
+                verified: Some(true),
+                stamp: Some("hash url hello".into()),
+            },
+        };
+        assert_eq!(pin.stamped().as_deref(), Some("hash url hello"));
     }
 
     /// A pin named `owner/module` is one tree at that depth, not two.

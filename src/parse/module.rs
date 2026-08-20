@@ -446,7 +446,7 @@ impl Module {
 
         for key in &module.keys {
             let file = layout::public_key(root, &key.public);
-            if !std::fs::metadata(&file).is_ok_and(|meta| meta.len() > 0) {
+            if !layout::nonempty(&file) {
                 issues.push(
                     Issue::new(
                         format!("`{}` has no public half for its {} key", path, key.kind),

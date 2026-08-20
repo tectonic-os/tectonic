@@ -146,7 +146,8 @@ when the collection pin changes.
 Asks you for:
 - Which module, listing every one the collections hold with its description and
   what it requires, when no name is given
-- Which images the module is listed in, if any
+- Which images the module is listed in; an import with none has no repository
+  representation and is refused
 
 #### Flags:
     --image <name>    list the module in this image; repeatable

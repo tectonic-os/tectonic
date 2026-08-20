@@ -253,6 +253,10 @@ pub fn destination(root: &Path, found: &Found, module: &str) -> Result<PathBuf, 
     }
     let mut issues = crate::diag::Issues::default();
     match record::read(&dir, &mut issues) {
+        Some(record) if record.collection == found.owner => Err(format!(
+            "`{module}` was already copied from `{}`",
+            found.owner
+        )),
         Some(record) => Err(format!(
             "`{module}` was copied from `{}`; refusing the namesake from `{}`",
             record.collection, found.owner
@@ -352,13 +356,24 @@ impl Module {
     }
 
     pub fn apply(&self, root: &Path) -> Result<(), String> {
-        if matches!(self.listing, Listing::In(_)) {
-            let dir = layout::module(root, REMOTE_DIR)
-                .join(&self.from.owner)
-                .join(&self.name);
-            let _ = std::fs::remove_dir_all(&dir);
-            crate::init::copy_tree(&self.from.dir, &dir)?;
+        match self.listing {
+            Listing::NoImage => {
+                return Err(
+                    "`import module` needs an image; run `tect create image <name>` first".into(),
+                )
+            }
+            Listing::Declined => {
+                return Err(
+                    "`import module` needs an image to list it in; name one with `--image`".into(),
+                )
+            }
+            Listing::In(_) => {}
         }
+        let dir = layout::module(root, REMOTE_DIR)
+            .join(&self.from.owner)
+            .join(&self.name);
+        let _ = std::fs::remove_dir_all(&dir);
+        crate::init::copy_tree(&self.from.dir, &dir)?;
         let wrote = self.listing.apply_source(&self.from.owner, &self.name)?;
         report(root, &wrote);
         Ok(())
