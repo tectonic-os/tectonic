@@ -73,6 +73,15 @@ mod tests {
         assert!(!out.contains("30 12 * * *"), "{out}");
     }
 
+    #[test]
+    fn fresh_jobs_fetch_modules_before_reading_the_plan() {
+        assert!(BODY
+            .contains("run: |\n          ./scripts/tect.sh fetch modules\n          selection="));
+        assert!(BODY.contains(
+            "set -euo pipefail\n          ./scripts/tect.sh fetch modules\n          ./scripts/tect.sh plan"
+        ));
+    }
+
     /// Every shipped body, not just the one with regions in it: a marker left
     /// behind anywhere is a comment a repository commits and nobody wrote.
     #[test]
