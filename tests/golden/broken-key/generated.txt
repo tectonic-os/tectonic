@@ -5,6 +5,8 @@ set -euxo pipefail
 
 MODDIR=/ctx/modules/core/keys
 export MODDIR
+
+install -D -m 0644 -- '/ctx/keys/usr/share/secureboot/sb_cert.der' '/usr/share/secureboot/sb_cert.der'
 ==== generated/broken-key.graph.md
 # Broken Key capability graph
 

@@ -160,6 +160,12 @@ fn script(
         let _ = write!(out, "\ncp -rT {dir}/files /\n");
     }
 
+    for key in &module.keys {
+        let from = shell(&format!("/ctx/keys{}", key.public));
+        let to = shell(&key.public);
+        let _ = writeln!(out, "\ninstall -D -m 0644 -- {from} {to}",);
+    }
+
     if let Some(collected) = collection.by_module.get(&entry.path) {
         for one in collected {
             let staged = Path::new(&one.staged);
@@ -174,6 +180,10 @@ fn script(
     }
 
     out
+}
+
+fn shell(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
 
 /// `REPO_ID="fedora-thing"` out of a module's repo file, which is what says
@@ -198,4 +208,12 @@ fn te_files(dir: &Path) -> Vec<String> {
         .collect();
     out.sort();
     out
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn shell_paths_survive_a_single_quote() {
+        assert_eq!(super::shell("a'b"), "'a'\"'\"'b'");
+    }
 }

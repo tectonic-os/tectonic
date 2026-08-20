@@ -143,7 +143,7 @@ pub(crate) fn load(root: &Path) -> Loaded {
         resolve::order::apply(image, &order);
         resolve::graph::check_graph(image, root, &disk, &mut issues);
         resolve::graph::check_fragments(image, &mut issues);
-        let shipped = resolve::overlay::index(image, &disk);
+        let shipped = resolve::overlay::index(image, &disk, root);
         resolve::overlay::check(image, &shipped, &mut issues);
         let collected = resolve::collect::resolve_collects(image, root, &disk, &mut issues);
 

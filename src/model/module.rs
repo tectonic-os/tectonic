@@ -48,7 +48,7 @@ pub struct Contribution {
 
 /// A key `tect create key` generates for this module: which of the generators
 /// the tool has makes it, where the public half goes in the image, and what the
-/// private half is called at the repository root.
+/// private half is called under keys/private/.
 pub struct Key {
     pub kind: String,
     pub generator: String,
@@ -100,8 +100,8 @@ pub struct Module {
     pub flavour: Option<String>,
     pub collects: Vec<Collect>,
     pub contributes: Vec<Contribution>,
-    /// Keys this module holds the public half of. Each one's `public` is a
-    /// contract path, derived rather than declared a second time.
+    /// Keys this module declares. Each one's `public` is a contract path,
+    /// derived rather than declared a second time.
     pub keys: Vec<Key>,
     /// Build inputs the field sets cover, so that needing a secret or a build
     /// arg does not force a module to hand-write a whole RUN block.

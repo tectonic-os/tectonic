@@ -5,6 +5,8 @@ set -euxo pipefail
 
 MODDIR=/ctx/modules/kernel/signed-kernel
 export MODDIR
+
+install -D -m 0644 -- '/ctx/keys/usr/share/secureboot/sb_cert.der' '/usr/share/secureboot/sb_cert.der'
 ==== generated/signing.d/drivers/kvmfr.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.

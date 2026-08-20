@@ -161,9 +161,8 @@ Asks you for:
 ### `create key <kind>`
 
 Generates one of the keys the repository's modules declare, and writes:
-- The public half, into the `files/` overlay of the module that declared it
-- The private half, at the repository root under the name the declaration gives
-  it
+- The public half, under `keys/public/` at the path it has in the image
+- The private half, under `keys/private/` with the name the declaration gives it
 
 Asks you for:
 - Which kind, listing the kinds the modules declare, when no argument is given
@@ -173,7 +172,7 @@ Asks you for:
     --cn <name>       the certificate common name; the repository directory name by default
 
 #### Notes:
-- The private halves are covered by the scaffolded `.gitignore`. A repository
+- `keys/private/` is covered by the scaffolded `.gitignore`. A repository
   whose `.gitignore` does not cover one is told rather than edited.
 - An existing key is never replaced, because the private half cannot be
   recovered. A zero-byte placeholder is not a key.

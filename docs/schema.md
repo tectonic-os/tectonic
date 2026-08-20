@@ -538,7 +538,7 @@ A key `tect create key` generates for this module, and where each half of it goe
 
 | Node | Takes | Meaning |
 | --- | --- | --- |
-| `private` | a string, exactly one | What the private half is called at the repository root. |
+| `private` | a string, exactly one | What the private half is called under `keys/private/`. |
 
 #### `generator`
 

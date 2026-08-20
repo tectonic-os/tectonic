@@ -95,7 +95,7 @@ const KEY: Node = Node::new("key",
                     missing: Say::NONE },
             ], Say::new("unknown `public` property `{}`", "not part of the schema",
                 "`public` accepts `format`")),
-        Node::new("private", "What the private half is called at the repository root.")
+        Node::new("private", "What the private half is called under `keys/private/`.")
             .arg(Arg::Str, Say::new("`private` needs a filename", "no filename given", ""))
             .once("")
             .missing(NEEDED),
@@ -441,6 +441,20 @@ impl Module {
             })
             .collect();
         module.provides_files.extend(derived);
+
+        for key in &module.keys {
+            let file = layout::public_key(root, &key.public);
+            if !std::fs::metadata(&file).is_ok_and(|meta| meta.len() > 0) {
+                issues.push(
+                    Issue::new(
+                        format!("`{}` has no public half for its {} key", path, key.kind),
+                        src,
+                    )
+                    .at(key.span, format!("{} is missing or empty", file.display()))
+                    .help(format!("run `tect create key {}`", key.kind)),
+                );
+            }
+        }
 
         if module.description.is_empty() {
             issues.push(
@@ -870,7 +884,7 @@ pub fn parse_key(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Ke
         issues.push(
             Issue::new(format!("`{name}` is not a filename"), src)
                 .at(private.name().span(), "the private half is written here")
-                .help("the private half is written beside repo.kdl and never committed, so it is a plain name rather than a path"),
+                .help("the private half is written under keys/private/ and never committed, so it is a plain name rather than a path"),
         );
         return None;
     }

@@ -1,4 +1,3 @@
-cosign.key
-MOK.priv
+keys/private/
 out/
 modules/.remote/

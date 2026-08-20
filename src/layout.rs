@@ -11,6 +11,8 @@ pub const GENERATED: &str = "generated";
 /// Local exports, caches and scratch. Ignored, and nothing here is read back
 /// as a declaration.
 pub const OUT: &str = "out";
+/// Repository key material: committed public halves and ignored private halves.
+pub const KEYS: &str = "keys";
 
 /// A module's overlay tree, staged into the image by the collector.
 pub const OVERLAY: &str = "files";
@@ -61,6 +63,16 @@ pub fn modules(root: &Path) -> PathBuf {
 /// One module's directory, by its path relative to `modules/`.
 pub fn module(root: &Path, dir: impl AsRef<Path>) -> PathBuf {
     modules(root).join(dir)
+}
+
+pub fn public_key(root: &Path, path: &str) -> PathBuf {
+    root.join(KEYS)
+        .join("public")
+        .join(path.trim_start_matches('/'))
+}
+
+pub fn private_key(root: &Path, name: &str) -> PathBuf {
+    root.join(KEYS).join("private").join(name)
 }
 
 /// The module.kdl inside it, which is the file that declares it exists.

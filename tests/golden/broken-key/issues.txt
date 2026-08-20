@@ -127,6 +127,16 @@
     :        `-- the private half is written here
  15 |     passphrase "hunter2"
     `----
-  help: the private half is written beside repo.kdl and never committed, so it
-        is a plain name rather than a path
+  help: the private half is written under keys/private/ and never committed,
+        so it is a plain name rather than a path
+
+  x `core/keys` has no public half for its secureboot key
+    ,-[./modules/core/keys/module.kdl:18:1]
+ 17 | 
+ 18 | key "secureboot" {
+    : ^|^
+    :  `-- ./keys/public/usr/share/secureboot/sb_cert.der is missing or empty
+ 19 |     generator "openssl"
+    `----
+  help: run `tect create key secureboot`
 
