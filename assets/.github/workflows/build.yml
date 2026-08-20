@@ -28,7 +28,12 @@ on:
     # tect:end
 
 env:
+  # tect:only kernel
   KERNEL: ${{ github.event.inputs.kernel || (github.event.schedule == '45 9 1 * *' && 'stock') || '' }}
+  # tect:end
+  # tect:only no-kernel
+  KERNEL: ''
+  # tect:end
   PROBE_IMAGE: "quay.io/podman/hello:latest"
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"  # do not edit
 

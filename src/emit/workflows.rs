@@ -56,18 +56,19 @@ mod tests {
         assert!(with.contains("inputs:"), "{with}");
         assert!(with.contains("    - cron: '45 9 1 * *'"), "{with}");
 
-        let without = render(BODY, None, &[]);
+        let without = render(BODY, None, &["no-kernel"]);
         assert!(!without.contains("inputs:"), "{without}");
         assert!(!without.contains("- cron: '45 9 1 * *'"), "{without}");
         assert!(without.contains("  workflow_dispatch:\n"), "{without}");
         assert!(without.contains("  push:\n"), "{without}");
         // Every step reading it runs under `set -u`, so it is declared either way.
-        assert!(without.contains("\n  KERNEL: "), "{without}");
+        assert!(without.contains("\n  KERNEL: ''\n"), "{without}");
+        assert!(!without.contains("github.event.inputs.kernel"), "{without}");
     }
 
     #[test]
     fn the_declared_schedule_replaces_the_shipped_one() {
-        let out = render(BODY, Some("0 5 * * 1"), &[]);
+        let out = render(BODY, Some("0 5 * * 1"), &["no-kernel"]);
         assert!(out.contains("    - cron: '0 5 * * 1'\n"), "{out}");
         assert!(!out.contains("30 12 * * *"), "{out}");
     }
@@ -77,7 +78,7 @@ mod tests {
     #[test]
     fn no_marker_reaches_a_generated_file() {
         for shipped in crate::resolve::workflow::SHIPPED {
-            for facts in [&["kernel"][..], &[][..]] {
+            for facts in [&["kernel"][..], &["no-kernel"][..]] {
                 for schedule in [None, Some("0 5 * * 1")] {
                     let out = render(shipped.body, schedule, facts);
                     assert!(!out.contains("tect:"), "{}\n{out}", shipped.stem);

@@ -160,7 +160,7 @@ const KERNEL_ARG: &str = "KERNEL";
 pub fn facts(basis: &Basis) -> Vec<&'static str> {
     match basis.kernel {
         true => vec!["kernel"],
-        false => Vec::new(),
+        false => vec!["no-kernel"],
     }
 }
 
