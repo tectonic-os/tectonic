@@ -94,6 +94,18 @@ pub fn section(image: &Image, collection: &Collection, root: &Path) -> String {
     let mut out = String::new();
     let mut flavour_arg_emitted = false;
 
+    if image
+        .entries
+        .iter()
+        .filter_map(|entry| entry.module.as_ref())
+        .any(|module| !module.keys.is_empty())
+    {
+        let _ = write!(
+            out,
+            "### Public keys\nFROM ctx AS public-keys\nCOPY keys/public/ /public/\n\n"
+        );
+    }
+
     // The declared tag is in plan.json; what the build actually resolved it to
     // is what `tect build` passes down, and what the build record keeps.
     if image.base.is_some() {
@@ -230,10 +242,8 @@ fn standard(entry: &Entry, module: &Module, script: &Path) -> String {
     let script = script.display();
     let keys = match module.keys.is_empty() {
         true => String::new(),
-        false => format!(
-            "--mount=type=bind,from=ctx,source=/{}/public,target=/ctx/keys \\\n    ",
-            layout::KEYS
-        ),
+        false => "--mount=type=bind,from=public-keys,source=/public,target=/ctx/keys \\\n    "
+            .to_string(),
     };
     let mut out = String::new();
     let _ = write!(
