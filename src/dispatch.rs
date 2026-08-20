@@ -440,7 +440,7 @@ fn reading(
         }
         for name in &run.unpinned {
             eprintln!(
-                "tect: `{name}` is unpinned, so an import of it takes whatever its ref holds \
+                "tect: `{name}` is unpinned, so a fetch from it takes whatever its ref holds \
                  then, unverified"
             );
         }

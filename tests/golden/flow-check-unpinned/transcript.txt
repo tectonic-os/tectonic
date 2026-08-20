@@ -1,5 +1,5 @@
 Tectonic v{version}
 
-tect: `tectonic-os` is unpinned, so an import of it takes whatever its ref holds then, unverified
+tect: `tectonic-os` is unpinned, so a fetch from it takes whatever its ref holds then, unverified
 tect: 1 images, 0 modules, 0 flavours
 ==== exit 0
