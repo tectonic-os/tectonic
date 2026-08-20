@@ -58,6 +58,12 @@ impl Prompt {
         self.ask
     }
 
+    /// Whether an answer may be drawn, which is what a command with nothing to
+    /// do but ask has to know before it opens a picker instead of refusing.
+    pub fn draws(&self) -> bool {
+        self.draw
+    }
+
     /// `shown` is everything that stands before the answer, and `question` is
     /// what a run with no answer left for it names. One blank line follows,
     /// which is what separates a question from what comes after it.

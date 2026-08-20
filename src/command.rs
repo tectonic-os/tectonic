@@ -365,6 +365,15 @@ pub fn nouns(word: &str) -> Vec<&'static Spec> {
     COMMANDS.iter().filter(|spec| spec.word == word).collect()
 }
 
+/// Whether `word` alone is a list to pick from, which it is when every form of
+/// it takes a noun. `scap` and `fetch` also take an argument, so a picker of
+/// their nouns would hide half the surface and their bare form keeps its
+/// refusal.
+pub fn all_nouns(word: &str) -> bool {
+    let rows = nouns(word);
+    !rows.is_empty() && rows.iter().all(|spec| !spec.noun.is_empty())
+}
+
 /// The row `words` names, and what is left after the words that named it. A
 /// verb whose rows all carry a noun is refused listing them.
 pub fn resolve<'a>(words: &'a [&'a str]) -> Result<(&'static Spec, &'a [&'a str]), String> {
@@ -417,12 +426,12 @@ fn in_repo() -> bool {
         .is_some()
 }
 
-/// The rows the picker draws. Outside a repository the second column says why
-/// a command is there and will not run, rather than the list being shorter.
-pub fn choices() -> Vec<Choice> {
+/// `rows` as a picker draws them. Outside a repository the second column says
+/// why a command is there and will not run, rather than the list being
+/// shorter.
+pub fn choices(rows: &[&Spec]) -> Vec<Choice> {
     let here = in_repo();
-    listed()
-        .iter()
+    rows.iter()
         .map(|spec| match !here && spec.family == Family::Repo {
             true => Choice::new(spec.label(), "needs a repository"),
             false => Choice::new(spec.label(), spec.about),
@@ -551,6 +560,16 @@ mod tests {
             let (found, rest) = resolve(&words).unwrap();
             assert_eq!(found.verb, spec.verb, "{} resolved elsewhere", spec.label());
             assert!(rest.is_empty());
+        }
+    }
+
+    #[test]
+    fn only_a_verb_every_form_of_which_takes_a_noun_is_a_list() {
+        for word in ["create", "import", "registry"] {
+            assert!(all_nouns(word), "{word}");
+        }
+        for word in ["scap", "fetch", "check", "build", "nonsense"] {
+            assert!(!all_nouns(word), "{word}");
         }
     }
 
