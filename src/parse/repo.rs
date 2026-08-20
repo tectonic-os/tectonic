@@ -85,10 +85,10 @@ pub const REPO: Node = Node::new("repo",
                          schedule at once")),
             ], Say::NONE),
         Node::new("sources",
-            "The module collections `tect import module` resolves a name against.")
+            "The module collections `tect import module` and `tect copy module` resolve against.")
             .once("a second block would split one registry in two")
             .empty(Say::new("`sources` has no collections in it", "empty block",
-                "omit the block entirely; a repository with nothing here imports from nothing"))
+                "omit the block entirely; a repository with nothing here references or copies from nothing"))
             .children(&[COLLECTION], Say::NONE),
         Node::new("manifest",
             "Whether a build stamps the generated manifest onto the image as an OCI label.")

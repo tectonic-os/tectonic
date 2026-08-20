@@ -238,6 +238,24 @@ pub fn dispatch(
                 images,
                 prompt,
             )?
+            .apply(&root)?;
+            Ok(ExitCode::SUCCESS)
+        }
+        Verb::CopyModule => {
+            let name = one_name(rest, spec)?;
+            let root = repo_root(root_arg)?;
+            let (list, issues, context) = crate::declarations(&root);
+            if issues.report(&context) {
+                return Ok(ExitCode::from(REPO_ERROR));
+            }
+            crate::import::Copy::collect(
+                name,
+                &root,
+                &list.sources,
+                list.audit_enforce,
+                images,
+                prompt,
+            )?
             .apply(&root, &list.sources)?;
             Ok(ExitCode::SUCCESS)
         }

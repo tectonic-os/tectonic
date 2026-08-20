@@ -24,8 +24,8 @@
     :        `-- lowercase, digits and dashes, starting with a letter
  15 |     local "../modules" {
     `----
-  help: the name is the directory imports land in, `modules/<name>/<module>`,
-        and reaches every image that lists one of them
+  help: the name qualifies references as `<name>/<module>` and reaches every
+        image that lists one of them
 
   x `local` is a directory, so its `pin` says nothing
     ,-[./repo.kdl:16:9]

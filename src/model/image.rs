@@ -168,16 +168,22 @@ impl Entry {
         })
     }
 
-    /// What a seed calls this module: one this repository imported is already
-    /// named by the collection it came from, one of its own takes the
-    /// collection this repository publishes as, and one pinned to a source of
-    /// its own comes from no collection at all.
+    /// What a seed calls this module: a reference or copy keeps its source
+    /// collection, and one this repository owns takes the collection it
+    /// publishes as.
     pub fn qualified(&self, publishes_as: &str) -> Option<String> {
-        match (&self.remote, self.path.contains('/')) {
-            (Some(_), _) => None,
-            (None, true) => Some(self.path.clone()),
-            (None, false) => Some(format!("{publishes_as}/{}", self.path)),
+        if self.remote.is_some() {
+            return None;
         }
+        if self.source.is_some() {
+            return Some(self.path.clone());
+        }
+        let owner = self
+            .module
+            .as_ref()
+            .and_then(|module| module.imported.as_ref())
+            .map_or(publishes_as, |record| record.collection.as_str());
+        Some(format!("{owner}/{}", self.path))
     }
 }
 
@@ -204,7 +210,7 @@ pub struct List {
     /// The hour and minute the daily build runs, UTC, which every other
     /// schedule is an offset from.
     pub workflows_at: (u32, u32),
-    /// The module collections an import resolves a name against.
+    /// The module collections references and copies resolve against.
     pub sources: Vec<Collection>,
     /// Which image a build with nothing named builds, and which one a pull
     /// request builds.

@@ -11,5 +11,9 @@ list it in images [1, 0 for none]: 1
 
 
 example/
-└── ~ example.image.kdl  an image: its base, and the modules it lists
+├── modules/                  every module this repo owns or imported
+│   └── browser/
+│       ├── + module.kdl      what the module installs, places and provides
+│       └── + provenance.kdl  where it was imported from, and its hash
+└── ~ example.image.kdl       an image: its base, and the modules it lists
 ==== exit 0

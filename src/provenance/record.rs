@@ -1,4 +1,4 @@
-//! The record `import module` leaves inside the module it copied in: which
+//! The record `copy module` leaves inside the module it copied in: which
 //! collection it came from, what pinned that collection, and what the directory
 //! hashed to at the time.
 //!
@@ -23,7 +23,7 @@ pub const RECORD: &str = "provenance.kdl";
 #[rustfmt::skip]
 pub const IMPORTED: Node = Node::new("imported",
     "Where this module was copied from, and what its content hashed to then. Written by \
-     `tect import module`; the module's author does not maintain it.")
+     `tect copy module`; the module's author does not maintain it.")
     .arg(Arg::Str, Say::new("`imported` needs a collection name", "no collection given",
         "`imported \"tectonic-os\"`, the name the collection is declared under in `sources`"))
     .once("")

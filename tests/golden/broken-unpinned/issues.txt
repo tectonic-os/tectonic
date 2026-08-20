@@ -63,5 +63,5 @@
     :            `-- every module needs a manifest
  11 |             pin {
     `----
-  help: run ./scripts/tect.sh fetch modules to fetch what the image pins
+  help: run ./scripts/tect.sh fetch modules to fetch what the image references
 

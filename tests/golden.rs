@@ -229,6 +229,7 @@ fn import(name: &str, root: &Path) {
         "flatpak",
         "browser",
         "one/browser",
+        "two/browser",
         "nosuch",
         "one/nosuch",
         "flatpak",
@@ -260,7 +261,7 @@ fn import(name: &str, root: &Path) {
 
     out.push_str(&format!(
         "==== the record\n{}",
-        std::fs::read_to_string("modules/one/flatpak/provenance.kdl").unwrap()
+        std::fs::read_to_string("modules/flatpak/provenance.kdl").unwrap()
     ));
     out.push_str(&format!(
         "==== check\n{}",
@@ -273,7 +274,7 @@ fn import(name: &str, root: &Path) {
 
     // Forking an imported module is legitimate, so the edit is reported rather
     // than diagnosed.
-    std::fs::write("modules/one/flatpak/module.sh", "echo forked\n").unwrap();
+    std::fs::write("modules/flatpak/module.sh", "echo forked\n").unwrap();
     out.push_str(&format!(
         "==== modified after an edit\n{:?}\n{}",
         tect::provenance::record::modified(here),
@@ -657,12 +658,29 @@ fn flows() {
         &["--root", ".", "set", "workflows"],
     );
 
+    let root = flow_repo_sourced("flow-import");
     flow(
         "flow-import-module",
-        &flow_repo_sourced("flow-import"),
+        &root,
         None,
         &["--root", ".", "import", "module"],
     );
+    let image = std::fs::read_to_string(root.join("example.image.kdl")).unwrap();
+    assert!(image.contains("source \"one\" {\n            module \"browser\"\n        }"));
+    assert!(root
+        .join("modules/.remote/one/browser/module.kdl")
+        .is_file());
+    assert!(!root.join("modules/browser").exists());
+
+    let root = flow_repo_sourced("flow-copy");
+    flow(
+        "flow-copy-module",
+        &root,
+        None,
+        &["--root", ".", "copy", "module"],
+    );
+    assert!(root.join("modules/browser/provenance.kdl").is_file());
+    assert!(!root.join("modules/one").exists());
 
     // Neither branch reaches a generator, so neither needs one installed.
     flow(

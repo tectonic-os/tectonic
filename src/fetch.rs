@@ -1,4 +1,4 @@
-//! The out-of-tree modules an image pins, brought to where the resolver looks
+//! The out-of-tree modules an image references, brought to where the resolver looks
 //! for them. One fetch directory for the repository: a module two images pin is
 //! one tree on disk.
 
@@ -175,7 +175,7 @@ fn rooted(root: &Path, path: &str) -> PathBuf {
     }
 }
 
-/// Fetched trees no image pins any more, and the empty directories they leave.
+/// Fetched trees no image references any more, and the empty directories they leave.
 fn prune(root: &Path, pins: &[Pin]) -> Result<Vec<String>, String> {
     let fetched = layout::module(root, REMOTE_DIR);
     let mut said = Vec::new();

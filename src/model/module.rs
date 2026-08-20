@@ -128,8 +128,8 @@ pub struct Module {
     /// record. `plan.json` carries it, so `verify` fails on an edit that was
     /// never regenerated.
     pub content: Option<String>,
-    /// The record `import module` left inside it, for a module that was
-    /// imported rather than written here.
+    /// The record `copy module` left inside it, for a module that was
+    /// copied rather than written here.
     pub imported: Option<Record>,
     /// Whether it ships a `repo` file, which enables a third-party package
     /// repository inside the layer. There is no grammar for one: it is shell

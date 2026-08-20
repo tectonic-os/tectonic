@@ -50,11 +50,10 @@ regenerating them. `tect set workflows` is the editor for the block. `at` is
 the one time the schedules hang off: the daily build runs then, and every other
 scheduled workflow at its own offset from it.
 
-`sources` is the registry `tect import module <name>` resolves against. Each
-collection is named by the owner its modules land under, so
-`import flatpak` from the collection below writes
-`modules/tectonic-os/flatpak`, and the image lists it as
-`module "tectonic-os/flatpak"`.
+`sources` is the registry `tect import module <name>` and `tect copy module
+<name>` resolve against. Importing references a member under the collection's
+name; copying vendors it unqualified at `modules/<name>` and records the
+collection in `provenance.kdl`.
 
 ```kdl
 sources {
@@ -76,9 +75,9 @@ machine, relative to the repository root, which is read where it is: nothing is
 downloaded, so there is nothing to pin or hash. That is what makes iterating on
 a collection possible without re-tarring it on every edit.
 
-A name here is checked when it is imported from, not when the repository is
-checked: a directory that exists on one machine and not another is not a
-repository problem.
+A collection location is checked when something reads it, not when the
+repository is checked: a directory that exists on one machine and not another
+is not a repository problem.
 
 ### Collections that are not pinned
 
@@ -97,13 +96,12 @@ sources {
 }
 ```
 
-Every `import module` from an unpinned collection downloads the branch again
+Every reference or copy from an unpinned collection downloads the branch again
 and takes whatever it holds at that moment. There is no `sha256`, so nothing
-checks what arrived: a mistaken commit, or a compromised one, lands with
-nothing to catch it. What limits the damage is that the import is a copy into
-your tree, which you read and commit like any other change, rather than
-something the build fetches and runs. Tagging the collection instead would
-verify every fetch, at the cost of versioning every module in it together.
+checks what arrived. Audit enforcement refuses both; without enforcement a
+reference runs that unverified content, while a copy lands in the tracked tree
+for review. Tagging the collection instead verifies every fetch, at the cost of
+versioning every module in it together.
 
 `unpinned` is the third answer beside `renovate` and `manual` and excludes
 both: it says the ref moves on its own. It cannot be combined with a `sha256`,
@@ -193,13 +191,13 @@ The CI `tect generate` writes into .github/workflows/, named by file stem. One t
 
 ### `sources`
 
-The module collections `tect import module` resolves a name against.
+The module collections `tect import module` and `tect copy module` resolve against.
 
 *at most one, never empty*
 
 #### `<name>`
 
-One module collection, named by the owner its modules land under in modules/.
+One module collection, named by the owner its references use.
 
 *a string*
 
@@ -803,10 +801,10 @@ The verifier: what the fetched content is held to.
 
 ## The import record
 
-`tect import module` copies a module in and writes a `provenance.kdl` beside
+`tect copy module` copies a module in and writes a `provenance.kdl` beside
 its `module.kdl`, recording which collection it came from, what pinned that
 collection, and what the directory hashed to. It is a sibling file and never
-part of `module.kdl`: that is the author's file, and rewriting it on import
+part of `module.kdl`: that is the author's file, and rewriting it while copying
 would fork it from upstream and break the very comparison the hash exists to
 make. The record excludes itself from its own hash, so what `content` names is
 the directory except this one file.
@@ -832,7 +830,7 @@ silent.
 
 ### `imported`
 
-Where this module was copied from, and what its content hashed to then. Written by `tect import module`; the module's author does not maintain it.
+Where this module was copied from, and what its content hashed to then. Written by `tect copy module`; the module's author does not maintain it.
 
 *a string, exactly one*
 

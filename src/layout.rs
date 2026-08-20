@@ -31,14 +31,14 @@ pub const IMAGE_FILE: &str = "image.kdl";
 pub const IMAGE_SUFFIX: &str = ".image.kdl";
 /// What a module declares about itself.
 pub const MODULE_FILE: &str = "module.kdl";
-/// What `import module` writes beside a vendored module.kdl, never into it.
+/// What `copy module` writes beside a vendored module.kdl, never into it.
 pub const RECORD_FILE: &str = "provenance.kdl";
 
 /// Where the `tect` build stage copies the binary from, so every layer mounts
 /// the release the repository is pinned to.
 pub const MOUNTED: &str = "out/tect";
 /// Where a fetched collection is unpacked. Under `out/`, which is ignored: the
-/// copy that gets committed is the one under `modules/`.
+/// selected member is referenced or copied from here.
 pub const SOURCES_CACHE: &str = "out/sources";
 /// What a fetched tree hashed to, kept out of the tree it describes so nothing
 /// under `modules/` is tool-written state.

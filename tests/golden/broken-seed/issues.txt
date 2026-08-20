@@ -8,7 +8,7 @@
   8 |     modules {
   9 |         module "core/hello"
     :         ^^^|^^
-    :            `-- `core` is not declared in `sources`
+    :            `-- `tectonic-os` is not declared in `sources`
  10 |         module "steam-tweaks" {
     `----
   help: a seed lists a module by name and nothing else, so one nothing can

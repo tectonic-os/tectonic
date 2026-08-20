@@ -221,7 +221,7 @@ impl Repo {
     }
 }
 
-/// The tree a create or an import wrote, hung off what the repository calls
+/// The tree a create, import or copy wrote, hung off what the repository calls
 /// itself rather than off the directory it happens to sit in.
 pub fn report(root: &Path, wrote: &[(PathBuf, Change)]) {
     let id = crate::model::image::List::load(root).0.id;
@@ -595,18 +595,31 @@ impl Listing {
     /// image took it. Appending is the only thing this does, so every one of
     /// them is an update.
     pub fn apply(&self, path: &str) -> Result<Vec<(PathBuf, Change)>, String> {
+        self.apply_declaration(&format!("module \"{path}\""))
+    }
+
+    pub fn apply_source(&self, source: &str, name: &str) -> Result<Vec<(PathBuf, Change)>, String> {
+        self.apply_declaration(&format!(
+            "source \"{source}\" {{\n    module \"{name}\"\n}}"
+        ))
+    }
+
+    fn apply_declaration(&self, declaration: &str) -> Result<Vec<(PathBuf, Change)>, String> {
         match self {
             Self::NoImage => {
                 println!("no image lists it yet; `tect create image <name>` writes one");
                 Ok(Vec::new())
             }
             Self::Declined => {
-                println!("next, to build it, list it in an image:\n\x20 module \"{path}\"");
+                println!(
+                    "next, to build it, list it in an image:\n {}",
+                    declaration.replace('\n', "\n ")
+                );
                 Ok(Vec::new())
             }
             Self::In(files) => {
                 for file in files {
-                    append_module(file, path)?;
+                    append_declaration(file, declaration)?;
                 }
                 Ok(files
                     .iter()
@@ -617,10 +630,10 @@ impl Listing {
     }
 }
 
-/// One `module` line before the closing brace of the image's `modules` block.
+/// One declaration before the closing brace of the image's `modules` block.
 /// Every other byte is left where it was: the tool creates whole files and
 /// appends module lines, and never rewrites a value.
-fn append_module(file: &Path, path: &str) -> Result<(), String> {
+fn append_declaration(file: &Path, declaration: &str) -> Result<(), String> {
     let mut text =
         std::fs::read_to_string(file).map_err(|err| format!("{}: {err}", file.display()))?;
     let close = crate::parse::image::modules_close(&text)
@@ -629,8 +642,14 @@ fn append_module(file: &Path, path: &str) -> Result<(), String> {
     let start = text[..close].rfind('\n').map_or(0, |at| at + 1);
     let indent = &text[start..close];
     let (at, line) = match indent.trim().is_empty() {
-        true => (start, format!("{indent}    module \"{path}\"\n")),
-        false => (close, format!("module \"{path}\" ")),
+        true => (
+            start,
+            declaration
+                .lines()
+                .map(|line| format!("{indent}    {line}\n"))
+                .collect(),
+        ),
+        false => (close, format!("{} ", declaration.replace('\n', " "))),
     };
     text.insert_str(at, &line);
     std::fs::write(file, text).map_err(|err| format!("{}: {err}", file.display()))

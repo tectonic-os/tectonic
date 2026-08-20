@@ -44,5 +44,5 @@ base "quay.io/fedora/fedora-bootc:44" {
     family "fedora"
 }
 
-module "core/hello"
+module "tectonic-os/core/hello"
 ==== generated/plan.json

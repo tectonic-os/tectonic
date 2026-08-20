@@ -106,9 +106,9 @@ pub enum Role {
     Asset,
     /// A module that lives outside this repository, fetched and run as root.
     Module,
-    /// A module collection an import resolves a name against.
+    /// A module collection references and copies resolve against.
     Collection,
-    /// The record `import module` wrote: the collection as it stood then, read
+    /// The record `copy module` wrote: the collection as it stood then, read
     /// back rather than authored, so nothing about it is diagnosed twice.
     Record,
 }

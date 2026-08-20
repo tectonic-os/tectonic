@@ -7,7 +7,7 @@ the help, and are not in that list.
 
 `tect` with nothing after it opens a picker of the same list where the output
 is a terminal, and prints the list where it is not. A verb with no noun —
-`tect create`, `tect import`, `tect registry`, `tect set` — opens a picker of
+`tect create`, `tect copy`, `tect import`, `tect registry`, `tect set` — opens a picker of
 its nouns.
 Leaving a picker is not an error: it exits 0 having done nothing.
 
@@ -38,10 +38,10 @@ an image that is not declared is refused with nothing left behind. A step that
 fails stops the command: what earlier steps wrote stays, and each of those
 steps is a command of its own to finish the run with.
 
-`create repo`, `create image`, `create module` and `import module` end with a
-tree of the files they wrote, rooted at the repository, each leaf carrying a
-phrase saying what it is for. `create key` names its two halves instead: one of
-them is a private key outside the repository, which no tree rooted there holds.
+`create repo`, `create image`, `create module`, `import module` and `copy module`
+end with a tree of the files they wrote, rooted at the repository, each leaf
+carrying a phrase saying what it is for. `create key` names its two halves
+instead: one of them is private and ignored, so a tracked-file tree omits it.
 
 `--root <dir>` is accepted by every command below. A flag a command does not
 read is an error, not a silent no-op.
@@ -74,7 +74,7 @@ location is defined in the command:
   push are yours, and the closing lines are the commands for them.
 - The `repo.kdl` it writes declares `tectonic-os/modules` in `sources`, so
   `import module` works immediately. That collection is `unpinned`: it follows a
-  branch head, so every import takes whatever the branch holds then and no
+  branch head, so every fetch takes whatever the branch holds then and no
   `sha256` checks what arrived. Delete the block or replace it with a tagged and
   hashed pin if that trade is not one you want.
 - A repository does not nest, and one inside another is refused.
@@ -138,8 +138,10 @@ Asks you for:
 
 ### `import module [name]`
 
-Copies one module out of a source collection into `modules/<owner>/<name>`,
-where `<owner>` names the collection that holds it.
+References one module from a source collection by adding it to an image's
+`source` block. The module stays out of the tracked tree; import populates its
+ignored `modules/.remote/<owner>/<name>` cache, and a build fetches it again
+when the collection pin changes.
 
 Asks you for:
 - Which module, listing every one the collections hold with its description and
@@ -152,11 +154,19 @@ Asks you for:
 #### Notes:
 - A bare name is searched for in every collection. `<owner>/<name>` picks
   between two collections that both have it.
-- This is the only command that fetches a collection. Everything else reads what
-  is already on disk, which is why the base picker costs no network.
-- A pinned collection is downloaded and verified once and kept. An `unpinned`
-  one has no hash to cache on, so it is downloaded again every time,
-  unverified.
+- A pinned collection member is downloaded and verified once. An `unpinned`
+  member is downloaded unverified each time, and audit enforcement refuses the
+  reference.
+
+### `copy module [name]`
+
+Copies one module out of a source collection into `modules/<name>` and records
+its source in `provenance.kdl`.
+
+It asks the same questions and takes the same repeatable `--image` flag as
+`import module`. A bare name searches every collection; `<owner>/<name>` picks
+one. If another collection's namesake was already copied, the command refuses
+and names both collections.
 
 ### `create key <kind>`
 
@@ -323,11 +333,11 @@ downloaded asset came from, so this is merged into the SBOM the scan produces.
 
 ### `fetch modules`
 
-Fetches every out-of-tree module the images pin, verifies it against the hash
-they pin it at, and puts it under `modules/.remote/`.
+Fetches every out-of-tree module the images reference, verifies one whose pin
+has a hash, and puts it under `modules/.remote/`.
 
 #### Notes:
-- A tree already at its pin is left alone; one no image pins any more is
+- A tree already at its pin is left alone; one no image references any more is
   removed.
 - It reads the declarations rather than the resolved plan, so it runs before the
   modules it fetches can be read.

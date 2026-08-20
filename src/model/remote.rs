@@ -1,4 +1,4 @@
-//! Out-of-tree modules and the collections an import resolves against. Both are
+//! Out-of-tree modules and the collections that references resolve against. Both are
 //! one `Evidence`, the pin being the whole of what either declares.
 
 use crate::diag::Span;
@@ -7,8 +7,7 @@ use crate::provenance::Evidence;
 /// Where fetched module trees land, relative to `modules/`.
 pub const REMOTE_DIR: &str = ".remote";
 
-/// One module collection an import resolves against, named by the owner its
-/// modules land under in `modules/`.
+/// One module collection, named by the owner references use under `.remote`.
 pub struct Collection {
     pub name: String,
     pub at: At,
