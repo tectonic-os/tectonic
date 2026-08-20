@@ -683,6 +683,7 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
+          ./scripts/tect.sh fetch modules
           datastream="$(./scripts/tect.sh scap content --target "$TARGET")"
           {
             echo "datastream=${datastream}"

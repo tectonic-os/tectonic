@@ -80,6 +80,18 @@ mod tests {
         assert!(BODY.contains(
             "set -euo pipefail\n          ./scripts/tect.sh fetch modules\n          ./scripts/tect.sh plan"
         ));
+        assert!(BODY.contains(
+            "set -euo pipefail\n          ./scripts/tect.sh fetch modules\n          datastream="
+        ));
+        for shipped in crate::resolve::workflow::SHIPPED {
+            if shipped.body.contains("plan --json") {
+                assert!(
+                    shipped.body.contains("fetch modules"),
+                    "{} reads the plan without fetching modules",
+                    shipped.stem
+                );
+            }
+        }
     }
 
     /// Every shipped body, not just the one with regions in it: a marker left

@@ -30,6 +30,7 @@ jobs:
         id: probe
         run: |
           set -euo pipefail
+          ./scripts/tect.sh fetch modules
           changed=""
           while IFS='|' read -r image base recorded file; do
             [ -n "${image}" ] || continue

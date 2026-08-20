@@ -50,6 +50,7 @@ jobs:
             fi
           }
 
+          ./scripts/tect.sh fetch modules
           ./scripts/tect.sh plan --json > plan.json
           mapfile -t packages < <(jq -r '.images[].targets[].published' plan.json)
           for pkg in "${packages[@]}"; do

@@ -34,6 +34,7 @@ jobs:
 
       - name: Resolve image name
         run: |
+          ./scripts/tect.sh fetch modules
           echo "IMAGE_NAME=$(./scripts/tect.sh plan --json | jq -r .ungated_published)" \
             >> "${GITHUB_ENV}"
 

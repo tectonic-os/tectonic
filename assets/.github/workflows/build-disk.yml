@@ -36,6 +36,7 @@ jobs:
       - id: set
         run: |
           set -euo pipefail
+          ./scripts/tect.sh fetch modules
           plan="$(./scripts/tect.sh plan --json)"
           family="$(jq -r --arg t "$(jq -r .ungated_target <<< "$plan")" \
             '.images[] | select([.targets[].name] | index($t)) | .base.family' \
