@@ -122,6 +122,9 @@ pub struct Workflow {
 /// One entry in the list: a module, and the decisions the image author makes
 /// about it.
 pub struct Entry {
+    /// The collection this entry references, for a member listed under a
+    /// `source` block.
+    pub source: Option<String>,
     pub path: String,
     pub flavour: Option<String>,
     pub variant: Option<String>,
@@ -138,10 +141,31 @@ pub struct Entry {
 impl Entry {
     /// Where the module's directory is, relative to `modules/`.
     pub fn dir(&self) -> String {
-        match self.remote {
-            Some(_) => format!("{REMOTE_DIR}/{}", self.path),
-            None => self.path.clone(),
+        match (&self.source, &self.remote) {
+            (Some(_), _) | (_, Some(_)) => format!("{REMOTE_DIR}/{}", self.path),
+            (None, None) => self.path.clone(),
         }
+    }
+
+    /// The name inside its collection, or its whole local name.
+    pub fn name(&self) -> &str {
+        match &self.source {
+            Some(_) => self
+                .path
+                .split_once('/')
+                .map_or(&self.path, |(_, name)| name),
+            None => &self.path,
+        }
+    }
+
+    /// The pin that fetches it, whether declared on the entry or its source.
+    pub fn pin<'a>(&'a self, sources: &'a [Collection]) -> Option<&'a Evidence> {
+        self.remote.as_ref().or_else(|| {
+            self.source
+                .as_ref()
+                .and_then(|name| sources.iter().find(|source| &source.name == name))
+                .and_then(Collection::pin)
+        })
     }
 
     /// What a seed calls this module: one this repository imported is already

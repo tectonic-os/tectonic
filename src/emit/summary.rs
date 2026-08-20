@@ -27,7 +27,7 @@ pub fn render(list: &List, target: &str) -> Option<String> {
         if let Some(variant) = &entry.variant {
             let _ = write!(out, " `variant={variant}`");
         }
-        if let Some(remote) = &entry.remote {
+        if let Some(remote) = entry.pin(&list.sources) {
             let _ = write!(
                 out,
                 " `remote={}`",

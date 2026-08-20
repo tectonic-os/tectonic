@@ -29,6 +29,13 @@ const ENTRY: Node = Node::new("module", "One module the image is made of, named 
             "An option the module declares, set for this image by the node's name."),
     ], Say::NONE);
 
+#[rustfmt::skip]
+const SOURCE: Node = Node::new("source", "Modules referenced from one of the collections in `sources`.")
+    .arg(Arg::Str, Say::new("`source` needs a collection name", "no collection given",
+        "`source \"collection\" { module \"name\" }`"))
+    .children(&[ENTRY], Say::new("`{}` is not allowed inside a source block",
+        "only `module` belongs here", "source blocks do not nest"));
+
 /// The image file's grammar, and the whole of it.
 #[rustfmt::skip]
 pub const IMAGE: Node = Node::new("image",
@@ -122,16 +129,16 @@ pub const IMAGE: Node = Node::new("image",
                  even when empty"))
             .children(&[
                 ENTRY,
+                SOURCE,
                 Node::new("flavour", "The modules one flavour adds, which build only for that flavour.")
                     .arg(Arg::Str, Say::new("`flavour` needs a flavour name", "no name given",
                         "`flavour \"desktop\" { module \"...\" }`"))
-                    .children(&[ENTRY],
+                    .children(&[ENTRY, SOURCE],
                         Say::new("`{}` is not allowed inside a flavour block",
-                            "only `module` belongs here",
-                            "flavour blocks do not nest; a module gated to two flavours is listed \
-                             under each")),
+                            "only `module` and `source` belong here",
+                            "flavour blocks do not nest; a module gated to two flavours is listed under each")),
             ], Say::new("unknown node `{}` in `modules`", "not part of the schema",
-                "`modules` holds `module` entries and `flavour` blocks")),
+                "`modules` holds `module` entries, `source` blocks and `flavour` blocks")),
     ], Say::new("unknown image property `{}`", "not part of the schema",
         "an image accepts `id`, `name`, `pretty-name`, `url`, `issues-url`, `description`, \
          `keywords`, `logo-url` and `conforms`, and the `base`, `flavours` and `modules` blocks"));
@@ -293,10 +300,11 @@ impl Image {
         for node in kids(block) {
             match node.name().value() {
                 "module" => {
-                    if let Some(entry) = self.parse_entry(node, None, issues) {
+                    if let Some(entry) = self.parse_entry(node, None, None, issues) {
                         self.entries.push(entry);
                     }
                 }
+                "source" => self.parse_source(node, None, issues),
                 "flavour" => {
                     let Some(name) = string_arg(node).map(str::to_string) else {
                         continue;
@@ -316,11 +324,16 @@ impl Image {
                         );
                     }
                     for inner in kids(node) {
-                        if inner.name().value() != "module" {
-                            continue;
-                        }
-                        if let Some(entry) = self.parse_entry(inner, Some(name.clone()), issues) {
-                            self.entries.push(entry);
+                        match inner.name().value() {
+                            "module" => {
+                                if let Some(entry) =
+                                    self.parse_entry(inner, Some(name.clone()), None, issues)
+                                {
+                                    self.entries.push(entry);
+                                }
+                            }
+                            "source" => self.parse_source(inner, Some(name.clone()), issues),
+                            _ => {}
                         }
                     }
                 }
@@ -329,14 +342,33 @@ impl Image {
         }
     }
 
+    fn parse_source(&mut self, node: &KdlNode, flavour: Option<String>, issues: &mut Issues) {
+        let Some(source) = string_arg(node) else {
+            return;
+        };
+        for inner in kids(node) {
+            if inner.name().value() != "module" {
+                continue;
+            }
+            if let Some(entry) = self.parse_entry(inner, flavour.clone(), Some(source), issues) {
+                self.entries.push(entry);
+            }
+        }
+    }
+
     fn parse_entry(
         &self,
         node: &KdlNode,
         flavour: Option<String>,
+        source: Option<&str>,
         issues: &mut Issues,
     ) -> Option<Entry> {
         let src = &self.src;
-        let path = string_arg(node)?.to_string();
+        let name = string_arg(node)?;
+        let path = match source {
+            Some(source) => format!("{source}/{name}"),
+            None => name.to_string(),
+        };
 
         if let Some(dup) = self
             .entries
@@ -356,6 +388,14 @@ impl Image {
         let mut pin: Option<Evidence> = None;
         for child in kids(node) {
             if child.name().value() == "pin" {
+                if source.is_some() {
+                    issues.push(
+                        Issue::new(format!("`{path}` carries its collection's pin"), src)
+                            .at(child.name().span(), "a second pin would disagree")
+                            .help("pin the collection in repo.kdl"),
+                    );
+                    continue;
+                }
                 match pin.as_ref().map(|p| p.span) {
                     Some(first) => issues.push(
                         Issue::new(format!("`{path}` is pinned twice"), src)
@@ -373,15 +413,16 @@ impl Image {
             ));
         }
 
-        if pin.is_some() && !is_name(&path) {
+        if (pin.is_some() || source.is_some()) && !is_name(name) {
             issues.push(
                 Issue::new(format!("invalid module name `{path}`"), src)
                     .at(node.name().span(), "must be lowercase letters, digits and dashes, starting with a letter")
-                    .help(format!("a pinned module is fetched into modules/{REMOTE_DIR}/<name>, so its name is one path segment rather than a path")),
+                    .help(format!("a referenced module is fetched under modules/{REMOTE_DIR}/, so its name is one path segment rather than a path")),
             );
         }
 
         Some(Entry {
+            source: source.map(str::to_string),
             path,
             flavour,
             variant: prop(node, "variant").map(str::to_string),

@@ -14,8 +14,10 @@ image {
 
     modules {
         module "hello"
-        module "tectonic-os/flatpak" variant="beta" {
-            system-wide #false
+        source "tectonic-os" {
+            module "flatpak" variant="beta" {
+                system-wide #false
+            }
         }
         flavour "nvidia" {
             module "drivers"

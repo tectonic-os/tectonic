@@ -4,7 +4,7 @@ FROM ${BASE}
 ## Module layers
 
 # ---- tectonic-os/hello ----
-RUN --mount=type=bind,from=ctx,source=/modules/tectonic-os/hello,target=/ctx/modules/tectonic-os/hello \
+RUN --mount=type=bind,from=ctx,source=/modules/.remote/tectonic-os/hello,target=/ctx/modules/.remote/tectonic-os/hello \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
     --mount=type=bind,from=ctx,source=/generated/example.d/tectonic-os/hello.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \

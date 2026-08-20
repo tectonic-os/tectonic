@@ -242,15 +242,17 @@ fn bad_priority(node: &KdlNode) -> bool {
 
 impl Module {
     pub fn load(entry: &Entry, image: &Image, root: &Path, issues: &mut Issues) -> Option<Self> {
-        if entry.remote.is_some() && layout::module(root, &entry.path).is_dir() {
+        if (entry.remote.is_some() || entry.source.is_some())
+            && layout::module(root, &entry.path).is_dir()
+        {
             issues.push(
                 Issue::new(
-                    format!("`{}` is pinned but also exists in tree", entry.path),
+                    format!("`{}` is referenced but also exists in tree", entry.path),
                     &image.src,
                 )
                 .at(entry.span, "two modules would answer to this name")
                 .help(format!(
-                    "rename the pinned one, or drop modules/{}",
+                    "rename the referenced one, or drop modules/{}",
                     entry.path
                 )),
             );
@@ -271,10 +273,10 @@ impl Module {
                     &image.src,
                 )
                 .at(entry.span, "every module needs a manifest")
-                .help(match entry.remote {
-                    Some(_) => "run ./scripts/tect.sh fetch modules to fetch what the image pins"
+                .help(match (&entry.source, &entry.remote) {
+                    (Some(_), _) | (_, Some(_)) => "run ./scripts/tect.sh fetch modules to fetch what the image pins"
                         .to_string(),
-                    None => format!(
+                    (None, None) => format!(
                         "create {file}; modules/_template/module-name/module.kdl is a copy-me reference"
                     ),
                 }),

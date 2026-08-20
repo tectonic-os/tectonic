@@ -7,6 +7,8 @@ image {
     }
 
     modules {
-        module "tectonic-os/hello"
+        source "tectonic-os" {
+            module "hello"
+        }
     }
 }

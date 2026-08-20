@@ -355,13 +355,21 @@ Also holds [`pin`](#pin).
 | --- | --- | --- |
 | `<name>` |  | An option the module declares, set for this image by the node's name. |
 
+##### `source`
+
+Modules referenced from one of the collections in `sources`.
+
+*a string*
+
+Also holds `module`, as above.
+
 ##### `flavour`
 
 The modules one flavour adds, which build only for that flavour.
 
 *a string*
 
-Also holds `module`, as above.
+Also holds `module`, as above and `source`, as above.
 
 <!-- /schema: image -->
 

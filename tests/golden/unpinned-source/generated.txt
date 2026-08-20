@@ -3,7 +3,7 @@
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
-MODDIR=/ctx/modules/tectonic-os/hello
+MODDIR=/ctx/modules/.remote/tectonic-os/hello
 export MODDIR
 
 dnf5 install -y fastfetch

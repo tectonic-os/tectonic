@@ -14,7 +14,23 @@
   "audit": {
     "enforce": false
   },
-  "remotes": [],
+  "remotes": [
+    {
+      "name": "tectonic-os/hello",
+      "dir": "modules/.remote/tectonic-os/hello",
+      "file": "./example.image.kdl",
+      "pin": {
+        "locator": "https://github.com/tectonic-os/modules/archive/refs/heads/{version}.tar.gz",
+        "selector": "main",
+        "verifier": null,
+        "tracker": "unpinned",
+        "reason": "the collection this tool is published alongside, followed at its branch head",
+        "from": "asset",
+        "path": null,
+        "resolved": "https://github.com/tectonic-os/modules/archive/refs/heads/main.tar.gz"
+      }
+    }
+  ],
   "assets": [],
   "images": [
     {
@@ -51,10 +67,10 @@
           "modules": [
             {
               "path": "tectonic-os/hello",
-              "dir": "tectonic-os/hello",
+              "dir": ".remote/tectonic-os/hello",
               "flavour": null,
               "variant": null,
-              "remote": null,
+              "remote": "main",
               "description": "A module imported out of the unpinned collection",
               "options": {},
               "provides": [],
@@ -62,7 +78,16 @@
               "provenance": {
                 "content": "5e07652a052642f48a2ed4254583c3d2a255a61307560603b8da6bfbec66d840",
                 "repo": false,
-                "pin": null,
+                "pin": {
+                  "locator": "https://github.com/tectonic-os/modules/archive/refs/heads/{version}.tar.gz",
+                  "selector": "main",
+                  "verifier": null,
+                  "tracker": "unpinned",
+                  "reason": "the collection this tool is published alongside, followed at its branch head",
+                  "from": "asset",
+                  "path": null,
+                  "resolved": "https://github.com/tectonic-os/modules/archive/refs/heads/main.tar.gz"
+                },
                 "imported": null
               },
               "satisfies": []

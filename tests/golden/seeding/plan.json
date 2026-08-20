@@ -14,7 +14,23 @@
   "audit": {
     "enforce": false
   },
-  "remotes": [],
+  "remotes": [
+    {
+      "name": "tectonic-os/flatpak",
+      "dir": "modules/.remote/tectonic-os/flatpak",
+      "file": "./example.image.kdl",
+      "pin": {
+        "locator": "https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz",
+        "selector": "v1.0.0",
+        "verifier": "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3",
+        "tracker": "renovate",
+        "reason": null,
+        "from": "asset",
+        "path": null,
+        "resolved": "https://github.com/tectonic-os/modules/archive/refs/tags/v1.0.0.tar.gz"
+      }
+    }
+  ],
   "assets": [],
   "images": [
     {
@@ -80,10 +96,10 @@
             },
             {
               "path": "tectonic-os/flatpak",
-              "dir": "tectonic-os/flatpak",
+              "dir": ".remote/tectonic-os/flatpak",
               "flavour": null,
               "variant": "beta",
-              "remote": null,
+              "remote": "v1.0.0",
               "description": "A module imported from the collection this repository publishes",
               "options": {
                 "OPT_REMOTES": "flathub flathub-beta",
@@ -96,7 +112,16 @@
               "provenance": {
                 "content": "669ec9f26e62b112f7d7c790552d0ef16ceb1f04b9d3547cc263c175015182f4",
                 "repo": false,
-                "pin": null,
+                "pin": {
+                  "locator": "https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz",
+                  "selector": "v1.0.0",
+                  "verifier": "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3",
+                  "tracker": "renovate",
+                  "reason": null,
+                  "from": "asset",
+                  "path": null,
+                  "resolved": "https://github.com/tectonic-os/modules/archive/refs/tags/v1.0.0.tar.gz"
+                },
                 "imported": null
               },
               "satisfies": []
@@ -151,10 +176,10 @@
             },
             {
               "path": "tectonic-os/flatpak",
-              "dir": "tectonic-os/flatpak",
+              "dir": ".remote/tectonic-os/flatpak",
               "flavour": null,
               "variant": "beta",
-              "remote": null,
+              "remote": "v1.0.0",
               "description": "A module imported from the collection this repository publishes",
               "options": {
                 "OPT_REMOTES": "flathub flathub-beta",
@@ -167,7 +192,16 @@
               "provenance": {
                 "content": "669ec9f26e62b112f7d7c790552d0ef16ceb1f04b9d3547cc263c175015182f4",
                 "repo": false,
-                "pin": null,
+                "pin": {
+                  "locator": "https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz",
+                  "selector": "v1.0.0",
+                  "verifier": "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3",
+                  "tracker": "renovate",
+                  "reason": null,
+                  "from": "asset",
+                  "path": null,
+                  "resolved": "https://github.com/tectonic-os/modules/archive/refs/tags/v1.0.0.tar.gz"
+                },
                 "imported": null
               },
               "satisfies": []

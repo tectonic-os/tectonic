@@ -382,6 +382,28 @@ impl List {
 
     fn check_images(&self, issues: &mut Issues) {
         for (index, image) in self.images.iter().enumerate() {
+            for entry in &image.entries {
+                let Some(source) = &entry.source else {
+                    continue;
+                };
+                let declared = self
+                    .sources
+                    .iter()
+                    .find(|declared| &declared.name == source);
+                if declared.is_none() {
+                    issues.push(
+                        Issue::new(format!("`{source}` is not declared in `sources`"), &image.src)
+                            .at(entry.span, "this module has nowhere to come from")
+                            .help("declare the collection in repo.kdl, or list a local module outside a source block"),
+                    );
+                } else if self.audit_enforce && declared.is_some_and(|source| source.unpinned()) {
+                    issues.push(
+                        Issue::new(format!("`{source}` follows an unverified ref"), &image.src)
+                            .at(entry.span, "this reference cannot be verified")
+                            .help("pin the collection to a version and sha256, or drop audit enforcement"),
+                    );
+                }
+            }
             if image.id.is_empty() {
                 continue; // already reported as underivable
             }

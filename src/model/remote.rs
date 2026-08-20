@@ -17,8 +17,7 @@ pub struct Collection {
 
 /// Where a collection is.
 pub enum At {
-    /// A directory on this machine, read where it is: nothing is fetched, so
-    /// there is nothing to hash.
+    /// A directory on this machine, copied without a content hash.
     Dir(String),
     /// A pinned archive, fetched and verified like any other pin.
     Archive(Evidence),
