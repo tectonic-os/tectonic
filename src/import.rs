@@ -2,6 +2,8 @@
 //! tree. Nothing here writes an image file: what a repository holds and what an
 //! image is made of are different questions.
 
+use crate::create::{report, Change, Listing};
+use crate::dispatch::Error;
 use crate::layout;
 use crate::model::remote::{At, Collection};
 use crate::prompt::Prompt;
@@ -279,4 +281,71 @@ pub fn vendor(
     )?;
     wrote.push(dest.join(record::RECORD));
     Ok(wrote)
+}
+
+/// Which module is copied in, where it goes, and which image lists it: asked
+/// for before anything is written, like every other flow.
+pub struct Module {
+    from: Found,
+    dest: PathBuf,
+    /// `<owner>/<name>`, which is what an image lists.
+    path: String,
+    listing: Listing,
+}
+
+impl Module {
+    /// Asks which one when no name was given, and which collection when a name
+    /// is in more than one.
+    pub fn collect(
+        name: Option<String>,
+        root: &Path,
+        sources: &[Collection],
+        enforce: bool,
+        images: Vec<String>,
+        prompt: &Prompt,
+    ) -> Result<Self, Error> {
+        let name = match name {
+            Some(name) => name,
+            None => choose(root, sources, prompt)?,
+        };
+        let mut found = find(root, sources, &name, enforce)?;
+        let module = split(&name).1;
+        let at = match found.as_slice() {
+            [_] => 0,
+            many => {
+                let owners: Vec<String> = many.iter().map(|f| f.owner.clone()).collect();
+                let listed = owners.join(", ");
+                let options: Vec<Choice> =
+                    owners.iter().map(|owner| Choice::new(owner, "")).collect();
+                prompt
+                    .choose(&format!("`{module}` is in {listed}; which one"), &options)?
+                    .ok_or_else(|| {
+                        format!(
+                            "`{module}` is in {listed}; name which one, as `{}/{module}`",
+                            owners[0]
+                        )
+                    })?
+            }
+        };
+        let from = found.swap_remove(at);
+        let dest = destination(root, &from, module)?;
+        let path = format!("{}/{module}", from.owner);
+        let listing = Listing::collect(root, images, prompt)?;
+        Ok(Self {
+            from,
+            dest,
+            path,
+            listing,
+        })
+    }
+
+    pub fn apply(&self, root: &Path, sources: &[Collection]) -> Result<(), String> {
+        let mut wrote: Vec<(PathBuf, Change)> = vendor(root, sources, &self.from, &self.dest)?
+            .into_iter()
+            .map(|path| (path, Change::Created))
+            .collect();
+        wrote.extend(self.listing.apply(&self.path)?);
+        report(root, &wrote);
+        Ok(())
+    }
 }

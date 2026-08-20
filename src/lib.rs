@@ -5,6 +5,7 @@ pub mod build;
 pub mod command;
 pub mod create;
 pub mod diag;
+pub mod dispatch;
 pub mod emit;
 pub mod fetch;
 pub mod import;
@@ -392,6 +393,23 @@ fn verify(root: &Path, files: &[(PathBuf, String)], issues: &mut Issues) {
             .help("delete it, or declare what it belongs to"),
         );
     }
+}
+
+/// Writes what `generate` produced, after clearing the directory so an image or
+/// a module that is gone leaves with its files. Everything under `generated/`
+/// is written from here, which is what `verify` holds it to.
+pub fn write_generated(root: &Path, files: &[(PathBuf, String)]) -> Result<(), String> {
+    let dir = layout::generated(root);
+    if dir.is_dir() {
+        std::fs::remove_dir_all(&dir).map_err(|err| format!("{}: {err}", dir.display()))?;
+    }
+    for (path, text) in files {
+        let path = root.join(path);
+        let dir = path.parent().unwrap_or(&path);
+        std::fs::create_dir_all(dir).map_err(|err| format!("{}: {err}", dir.display()))?;
+        std::fs::write(&path, text).map_err(|err| format!("{}: {err}", path.display()))?;
+    }
+    Ok(())
 }
 
 /// The first line two texts differ on, as its span in `found` and what was

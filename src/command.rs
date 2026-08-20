@@ -408,13 +408,26 @@ pub fn listed() -> Vec<&'static Spec> {
     rows
 }
 
-/// One row of the picker. Outside a repository the second column says why a
-/// command is there and will not run, rather than the list being shorter.
-pub fn choice(spec: &Spec, in_repo: bool) -> Choice {
-    match !in_repo && spec.family == Family::Repo {
-        true => Choice::new(spec.label(), "needs a repository"),
-        false => Choice::new(spec.label(), spec.about),
-    }
+/// Whether there is a repository here or above, which is the one thing both
+/// renderings below need to know.
+fn in_repo() -> bool {
+    std::env::current_dir()
+        .ok()
+        .and_then(|here| crate::find_root(&here))
+        .is_some()
+}
+
+/// The rows the picker draws. Outside a repository the second column says why
+/// a command is there and will not run, rather than the list being shorter.
+pub fn choices() -> Vec<Choice> {
+    let here = in_repo();
+    listed()
+        .iter()
+        .map(|spec| match !here && spec.family == Family::Repo {
+            true => Choice::new(spec.label(), "needs a repository"),
+            false => Choice::new(spec.label(), spec.about),
+        })
+        .collect()
 }
 
 const HEAD: &str = "usage: tect [--root <dir>] <command>\n";
@@ -428,7 +441,8 @@ stderr; exit 1 is the invocation, exit 2 the repository.
 ";
 
 /// The same list the picker draws, as text.
-pub fn usage(in_repo: bool) -> String {
+pub fn usage() -> String {
+    let in_repo = in_repo();
     let rows = listed();
     let width = rows
         .iter()
