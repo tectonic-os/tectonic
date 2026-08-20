@@ -37,7 +37,6 @@ impl Key {
         };
 
         let mut declaring = disk.keys.remove(&kind).unwrap_or_default();
-        declaring.retain(|(dir, _)| !dir.starts_with(&format!("{REMOTE_DIR}/")));
         if declaring.is_empty() {
             return Err(absent(root, &kind, &disk));
         }
@@ -143,16 +142,17 @@ fn which(disk: &Disk, prompt: &Prompt) -> Result<String, String> {
         })
 }
 
-/// Which module holds the public half, where more than one declares the kind.
-/// A fetched module is not offered: its tree is replaced on the next fetch and
-/// is not committed.
+/// Which module declares the key, where more than one declares the kind.
 fn provider(
     declaring: &[(String, Declared)],
     kind: &str,
     given: Option<String>,
     prompt: &Prompt,
 ) -> Result<usize, String> {
-    let dirs: Vec<&str> = declaring.iter().map(|(dir, _)| dir.as_str()).collect();
+    let dirs: Vec<&str> = declaring
+        .iter()
+        .map(|(dir, _)| dir.strip_prefix(&format!("{REMOTE_DIR}/")).unwrap_or(dir))
+        .collect();
     if let Some(given) = given {
         return dirs
             .iter()
@@ -469,5 +469,29 @@ key "secureboot" {
             "{message}"
         );
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_referenced_module_can_declare_a_repository_key() {
+        let root = std::env::temp_dir().join("tect-remote-key-test");
+        let _ = std::fs::remove_dir_all(&root);
+        crate::init::put(
+            &root.join("modules/.remote/one/keyholder/module.kdl"),
+            SECUREBOOT,
+        )
+        .unwrap();
+        let key = Key::collect(
+            &root,
+            Some("secureboot".into()),
+            Some("one/keyholder".into()),
+            Some("Test Key".into()),
+            &Prompt::silent(),
+        )
+        .unwrap();
+        assert_eq!(
+            key.public,
+            root.join("keys/public/usr/share/secureboot/sb_cert.der")
+        );
+        let _ = std::fs::remove_dir_all(root);
     }
 }
