@@ -71,7 +71,9 @@ jobs:
           git add ./*.kdl
           git commit -m "Record the base image signature status" \
             -m "${SUMMARY}"
-          git push --force-with-lease origin "${branch}"
+          # A fresh checkout has no remote-tracking ref to lease against, and
+          # the branch is rebuilt from the base ref every run regardless.
+          git push --force origin "${branch}"
 
           if gh pr view "${branch}" --json number > /dev/null 2>&1; then
             echo "updated the open PR for ${branch}"
