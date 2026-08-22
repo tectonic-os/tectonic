@@ -38,8 +38,8 @@ an image that is not declared is refused with nothing left behind. A step that
 fails stops the command: what earlier steps wrote stays, and each of those
 steps is a command of its own to finish the run with.
 
-`create repo`, `create image`, `create module`, `import module` and `copy module`
-end with a tree of the files they wrote, rooted at the repository, each leaf
+`create repo`, `create image`, `create flavour`, `create module`, `import
+module` and `copy module` end with a tree of the files they wrote, rooted at the repository, each leaf
 carrying a phrase saying what it is for. `create key` names its two halves
 instead: one of them is private and ignored, so a tracked-file tree omits it.
 
@@ -106,6 +106,28 @@ Asks you for:
 - Writing a second image into a repository that declares no `default-image`
   appends one naming the image already there, so a bare build builds what it
   built before. Nothing else in `repo.kdl` moves.
+
+### `create flavour [name]`
+
+Writes one flavour into an image's `flavours` block, creating the block when
+the image has none. A flavour is published as `<image>-<flavour>` beside the
+image's ungated build.
+
+Asks you for:
+- The flavour name
+- Which image publishes it, when `--image` names none
+
+#### Flags:
+    --image <name>    the image that publishes the flavour
+
+#### Notes:
+- Neither `default` nor `pr-build` is written. Both are edits: `default`
+  changes what a bare `--target <image>` builds, which is not a thing to write
+  into a file on your behalf.
+- Listing a module under the flavour is a separate step; the `flavours` block
+  declares the flavour, the `modules` block gates the modules.
+- A name the image already declares is refused, as is `none`, which is what the
+  ungated build is called.
 
 ### `create module [name]`
 

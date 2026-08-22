@@ -9,6 +9,7 @@ use crate::ui::Choice;
 pub enum Verb {
     CreateRepo,
     CreateImage,
+    CreateFlavour,
     CreateModule,
     CreateKey,
     ImportModule,
@@ -40,6 +41,7 @@ pub enum Verb {
 pub const ALL: &[Verb] = &[
     Verb::CreateRepo,
     Verb::CreateImage,
+    Verb::CreateFlavour,
     Verb::CreateModule,
     Verb::CreateKey,
     Verb::ImportModule,
@@ -146,6 +148,15 @@ pub const COMMANDS: &[Spec] = &[
         about: "add an image: its name, and what it builds on",
         family: Family::Repo,
         takes: &["root", "owner", "base"],
+    },
+    Spec {
+        verb: Verb::CreateFlavour,
+        word: "create",
+        noun: "flavour",
+        arg: "[name]",
+        about: "add a gated module set an image also publishes",
+        family: Family::Repo,
+        takes: &["root", "image"],
     },
     Spec {
         verb: Verb::CreateModule,
@@ -602,7 +613,7 @@ mod tests {
         let err = resolve(&["create"]).unwrap_err();
         assert_eq!(
             err,
-            "`create` takes `repo [name]`, `image [name]`, `module [name]` or `key <kind>`"
+            "`create` takes `repo [name]`, `image [name]`, `flavour [name]`, `module [name]` or `key <kind>`"
         );
     }
 }

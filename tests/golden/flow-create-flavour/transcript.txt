@@ -1,0 +1,11 @@
+Tectonic v{version}
+
+flavour name: dx
+
+  1) example  Example
+which image publishes it [1, 0 for none]: 1
+
+
+example/
+└── ~ example.image.kdl  an image: its base, and the modules it lists
+==== exit 0

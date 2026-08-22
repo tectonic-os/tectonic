@@ -194,6 +194,7 @@ fn run() -> Result<ExitCode, Error> {
         spec.verb,
         Verb::CreateRepo
             | Verb::CreateImage
+            | Verb::CreateFlavour
             | Verb::CreateModule
             | Verb::CreateKey
             | Verb::ImportModule

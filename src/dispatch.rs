@@ -213,6 +213,16 @@ pub fn dispatch(
             crate::create::report(&root, &wrote);
             Ok(ExitCode::SUCCESS)
         }
+        Verb::CreateFlavour => {
+            let name = one_name(rest, spec)?;
+            let Some(root) = open(root_arg)? else {
+                return Ok(ExitCode::from(REPO_ERROR));
+            };
+            let wrote =
+                crate::create::Flavour::collect(&root, name, images, prompt)?.apply(&root)?;
+            crate::create::report(&root, &wrote);
+            Ok(ExitCode::SUCCESS)
+        }
         Verb::CreateModule => {
             let name = one_name(rest, spec)?;
             let Some(root) = open(root_arg)? else {

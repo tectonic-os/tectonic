@@ -652,6 +652,13 @@ fn flows() {
     );
 
     flow(
+        "flow-create-flavour",
+        &flow_repo("flow-flavour"),
+        None,
+        &["--root", ".", "create", "flavour"],
+    );
+
+    flow(
         "flow-set-workflows",
         &flow_repo("flow-set"),
         None,
