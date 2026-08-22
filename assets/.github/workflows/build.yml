@@ -276,13 +276,16 @@ jobs:
           } >> "${GITHUB_ENV}"
 
       - name: Prepare environment
+        env:
+          TARGET: ${{ matrix.target }}
         run: |
           {
             echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}"
             echo "IMAGE_NAME=$(jq -r '.published' "$TARGET_PLAN")"
             echo "CONTAINERFILE=generated/$(jq -r '.image' "$TARGET_PLAN")"
             echo "RECHUNK=$(jq -r '.base.provides | index("rechunking") != null' "$IMAGE_PLAN")"
-            echo "IMAGE_DESC=$(jq -r '.description' "$IMAGE_PLAN")"
+            echo "IMAGE_DESC=$(jq -r --arg t "$TARGET" \
+              '.description | if . == "" then $t else "\(.) (\($t))" end' "$IMAGE_PLAN")"
             echo "IMAGE_KEYWORDS=$(jq -r '.keywords | join(",")' "$IMAGE_PLAN")"
             echo "IMAGE_LOGO_URL=$(jq -r '.logo_url' "$IMAGE_PLAN")"
           } >> "${GITHUB_ENV}"
@@ -332,7 +335,7 @@ jobs:
         id: date
         run: |
           echo "date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
-          echo "version=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+          echo "version=$(date -u +%Y%m%d).$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Resolve base image digest
         id: base
@@ -356,7 +359,7 @@ jobs:
           labels: |
             io.artifacthub.package.readme-url=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.sha }}/README.md
             org.opencontainers.image.created=${{ steps.date.outputs.date }}
-            org.opencontainers.image.description=${{ env.IMAGE_DESC }} (${{ matrix.target }})
+            org.opencontainers.image.description=${{ env.IMAGE_DESC }}
             org.opencontainers.image.documentation=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.sha }}/README.md
             org.opencontainers.image.source=https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/blob/${{ github.sha }}/${{ env.CONTAINERFILE }}
             org.opencontainers.image.title=${{ env.IMAGE_NAME }}
