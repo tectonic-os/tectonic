@@ -142,7 +142,7 @@ Asks you for:
 #### Flags:
     --pkg <name>          a package the module installs; repeatable
     --with verb=value     one more line in the manifest, such as `--with provides=browser`; repeatable
-    --image <name>        list the module in this image; repeatable
+    --image <name>        list the module in this image or flavour; repeatable
 
 #### Notes:
 - Packages are scaffolded under the repository's own family, as
@@ -152,11 +152,18 @@ Asks you for:
 - `enablerepo=` is Fedora-only, and naming it on a Debian or Ubuntu group is a
   `check` diagnostic.
 - Anything `--with` writes is held to the schema like the rest of the manifest.
-- You are asked which of the declared images list the module, and several are an
-  answer: space toggles one on a terminal, and `1 3` or `1,3` answers the
-  numbered list where there is not one. So is none: having a module and listing
-  it in an image are different decisions. A name the repository does not declare
-  is refused before the module is written.
+- You are asked which of the declared images list the module, with each image's
+  flavours under it, and several are an answer: enter or space toggles one on a
+  terminal, and `1 3` or `1,3` answers the numbered list where there is not one.
+  A repository with one image and no flavours is asked as a yes or a no instead.
+- An image and one of its own flavours cannot both be chosen: the ungated entry
+  is already in every flavour, so the gated one would be a duplicate. Two
+  flavours of one image can, and are two lines in the one file.
+- `--image` takes what `--target` takes: `example` for the ungated entry and
+  `example/dx` for a flavour of it. A name the repository does not declare is
+  refused before the module is written.
+- None is an answer too: having a module and listing it in an image are
+  different decisions. Leaving the picker instead writes nothing at all.
 
 ### `import module [name]`
 
@@ -168,11 +175,11 @@ when the collection pin changes.
 Asks you for:
 - Which module, listing every one the collections hold with its description and
   what it requires, when no name is given
-- Which images the module is listed in; an import with none has no repository
-  representation and is refused
+- Which images or flavours the module is listed in; an import with none has no
+  repository representation and is refused
 
 #### Flags:
-    --image <name>    list the module in this image; repeatable
+    --image <name>    list the module in this image or flavour; repeatable
 
 #### Notes:
 - A bare name is searched for in every collection. `<owner>/<name>` picks
