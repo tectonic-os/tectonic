@@ -27,6 +27,8 @@ on:
         default: ''
     # tect:end
 
+permissions: {}
+
 env:
   # tect:only kernel
   KERNEL: ${{ github.event.inputs.kernel || (github.event.schedule == '45 9 1 * *' && 'stock') || '' }}
@@ -50,6 +52,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: true
           ref: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref || '' }}
           fetch-depth: 0
 
@@ -156,6 +159,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           ref: ${{ needs.checksums.outputs.ref }}
 
       - name: Install shfmt
@@ -180,6 +184,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           ref: ${{ needs.checksums.outputs.ref }}
 
       - name: Run actionlint
@@ -194,6 +199,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           ref: ${{ needs.checksums.outputs.ref }}
 
       - name: Discover and run kernel-freshness tests
@@ -208,12 +214,15 @@ jobs:
     needs: [checksums, lint, actionlint, script-tests]
     if: github.event_name != 'push' || github.actor != 'renovate[bot]'
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     outputs:
       targets: ${{ steps.set.outputs.targets }}
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           ref: ${{ needs.checksums.outputs.ref }}
       - id: set
         run: |
@@ -247,6 +256,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           ref: ${{ needs.checksums.outputs.ref }}
 
       - name: Resolve the plan
@@ -672,6 +682,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           ref: ${{ needs.checksums.outputs.ref }}
 
       # Nothing when the target declares neither a claim nor a `conforms`,

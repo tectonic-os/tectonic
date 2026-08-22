@@ -114,4 +114,91 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn every_shipped_job_declares_its_own_permissions() {
+        let is_job = |line: &str| -> bool {
+            let Some(rest) = line.strip_prefix("  ") else {
+                return false;
+            };
+            let Some(name) = rest.strip_suffix(':') else {
+                return false;
+            };
+            !name.is_empty()
+                && name
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        };
+        for shipped in crate::resolve::workflow::SHIPPED {
+            let lines: Vec<&str> = shipped.body.lines().collect();
+            let Some(jobs_at) = lines.iter().position(|line| *line == "jobs:") else {
+                panic!("{}: has no `jobs:` section", shipped.stem);
+            };
+            assert!(
+                lines[..jobs_at].contains(&"permissions: {}"),
+                "{}: no top-level `permissions: {{}}`",
+                shipped.stem
+            );
+            let mut job: Option<&str> = None;
+            let mut declared = false;
+            for line in &lines[jobs_at + 1..] {
+                if is_job(line) {
+                    if let Some(prev) = job {
+                        assert!(
+                            declared,
+                            "{}: job `{}` declares no permissions",
+                            shipped.stem, prev
+                        );
+                    }
+                    job = Some(&line[2..line.len() - 1]);
+                    declared = false;
+                } else if !declared && *line == "    permissions:" {
+                    declared = true;
+                }
+            }
+            if let Some(prev) = job {
+                assert!(
+                    declared,
+                    "{}: job `{}` declares no permissions",
+                    shipped.stem, prev
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_checkout_says_whether_it_keeps_the_token() {
+        let mut checkouts = 0;
+        let mut persist = 0;
+        for shipped in crate::resolve::workflow::SHIPPED {
+            let lines: Vec<&str> = shipped.body.lines().collect();
+            for (at, line) in lines.iter().enumerate() {
+                if !line.contains("uses: actions/checkout@") {
+                    continue;
+                }
+                checkouts += 1;
+                let indent = line.len() - line.trim_start().len();
+                let declared = lines[at + 1..]
+                    .iter()
+                    .take_while(|next| {
+                        let trimmed = next.trim_start();
+                        !(trimmed.starts_with("- ") && next.len() - trimmed.len() <= indent)
+                    })
+                    .any(|next| next.trim().starts_with("persist-credentials:"));
+                assert!(
+                    declared,
+                    "{}: checkout step does not name `persist-credentials:`",
+                    shipped.stem
+                );
+            }
+            persist += lines
+                .iter()
+                .filter(|line| line.trim().starts_with("persist-credentials:"))
+                .count();
+        }
+        assert_eq!(
+            checkouts, persist,
+            "every checkout names whether it keeps the token"
+        );
+    }
 }

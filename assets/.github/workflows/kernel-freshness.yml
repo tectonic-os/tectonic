@@ -9,18 +9,21 @@ on:
 env:
   GH_TOKEN: ${{ github.token }}
 
-permissions:
-  contents: write
-  issues: write
-  pull-requests: write
-  actions: write
+permissions: {}
 
 jobs:
   check:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: write
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: true
 
       - name: Discover and run kernel freshness scripts
         id: fresh

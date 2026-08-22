@@ -12,6 +12,8 @@ on:
       - 'scripts/render-iso-config.sh'
       - '.github/workflows/build-disk.yml'
 
+permissions: {}
+
 env:
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"  # do not edit
   PROBE_IMAGE: "quay.io/podman/hello:latest"
@@ -32,6 +34,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - id: set
         run: |
@@ -60,6 +64,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Prepare environment
         run: |
