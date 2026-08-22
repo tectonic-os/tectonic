@@ -694,6 +694,35 @@ fn flows() {
         "{image}"
     );
 
+    // The ungated entry is in every flavour, so it and a gated one are each
+    // other's duplicate. Two flavours of one image are not.
+    tect(
+        &root,
+        &[
+            "--no-tui", "--root", ".", "create", "flavour", "gaming", "--image", "example",
+        ],
+    );
+    let listed = |at: &str| {
+        tect::create::Listing::collect(
+            &root,
+            vec![at.into()],
+            "dev-tools",
+            None,
+            &tect::prompt::Prompt::silent(),
+        )
+        .err()
+        .unwrap_or_default()
+    };
+    assert_eq!(
+        listed("example/dx"),
+        "`example/dx` already lists `dev-tools`"
+    );
+    assert_eq!(
+        listed("example"),
+        "`example/dx` already lists `dev-tools`, so `example` lists it twice"
+    );
+    assert_eq!(listed("example/gaming"), "");
+
     flow(
         "flow-set-workflows",
         &flow_repo("flow-set"),
