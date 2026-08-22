@@ -376,7 +376,13 @@ impl Module {
         })
         .collect::<Result<Vec<Member>, String>>()?;
 
-        let workflows = match crate::resolve::workflow::unlocked(&list, &declares.args).as_slice() {
+        // Both offers are about what an image ends up holding, so neither is
+        // worth asking where the answer listed it in nothing.
+        let unlocked = match listing.images().is_empty() {
+            true => Vec::new(),
+            false => crate::resolve::workflow::unlocked(&list, &declares.args),
+        };
+        let workflows = match unlocked.as_slice() {
             [] => None,
             unlocked => {
                 let named: Vec<&'static str> = unlocked.iter().map(|s| s.stem).collect();

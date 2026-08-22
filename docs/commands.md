@@ -106,6 +106,12 @@ Asks you for:
 - Writing a second image into a repository that declares no `default-image`
   appends one naming the image already there, so a bare build builds what it
   built before. Nothing else in `repo.kdl` moves.
+- The `modules` block opens with whatever fills the family-adapter role for the
+  base's family: the module that `supports` it and `provides
+  "build-environment"`, taken from the collections `sources` declares. It is an
+  ordinary line, so deleting it is how you decline it. A collection this
+  machine has not fetched seeds nothing, and the reference the seed writes
+  resolves on the next `tect fetch modules`.
 
 ### `create flavour [name]`
 
@@ -177,6 +183,8 @@ Asks you for:
   what it requires, when no name is given
 - Which images or flavours the module is listed in; an import with none has no
   repository representation and is refused
+- Whether to import what it requires and nothing in those images provides
+- Whether to generate the CI it makes runnable
 
 #### Flags:
     --image <name>    list the module in this image or flavour; repeatable
@@ -187,6 +195,14 @@ Asks you for:
 - A pinned collection member is downloaded and verified once. An `unpinned`
   member is downloaded unverified each time, and audit enforcement refuses the
   reference.
+- An image already listing the module is refused here rather than at the next
+  command that reads the file. A module gated to two flavours is listed under
+  each, so only an overlap is a duplicate.
+- The requirements the offer brings in are listed in the same images, ahead of
+  the module itself. Declining leaves a file that is still valid; `check` then
+  names the import that would satisfy what is missing.
+- Nothing here is automatic. Both offers default to no where there is nobody to
+  ask, so a scripted import writes exactly what it was told to.
 
 ### `copy module [name]`
 
