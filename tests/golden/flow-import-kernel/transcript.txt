@@ -1,0 +1,15 @@
+Tectonic v{version}
+
+list it in example (Yes/No)
+Yes
+
+`custom-kernel` makes CI runnable that this repo does not generate:
+`kernel-freshness` tracks the kernel a module pins, and proposes a bump
+Generate it now? (Yes/No)
+Yes
+
+
+example/
+├── ~ example.image.kdl  an image: its base, and the modules it lists
+└── ~ repo.kdl           what the repo pins, and where modules come from
+==== exit 0

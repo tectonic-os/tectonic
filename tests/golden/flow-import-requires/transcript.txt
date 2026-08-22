@@ -1,0 +1,13 @@
+Tectonic v{version}
+
+list it in example (Yes/No)
+Yes
+
+`browser` requires `flatpak`, which nothing in `example` provides.
+Import `one/flatpak` as well? (Yes/No)
+Yes
+
+
+example/
+└── ~ example.image.kdl  an image: its base, and the modules it lists
+==== exit 0

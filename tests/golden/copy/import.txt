@@ -4,6 +4,8 @@ two
 ==== the catalog
 one/browser  A browser, from the first collection
 two/browser  A browser, from the second collection (requires flatpak)
+one/custom-kernel  A kernel the image pins, swapped in over the base's own
+one/fedora-family  dnf5 and its plugins, which every fedora build layer reaches for
 one/flatpak  Flatpak client and a daily update timer
 one/signature-policy  Sigstore signature verification for the image's own updates
 ==== copy flatpak

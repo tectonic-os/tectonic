@@ -314,16 +314,28 @@ fn select(
     Ok((found.swap_remove(at), module))
 }
 
-/// Which collection member an image references.
-pub struct Module {
+/// One collection member a reference places under `.remote`, and the name an
+/// image lists it by.
+struct Member {
     from: Found,
     name: String,
+}
+
+/// Which collection member an image references.
+pub struct Module {
+    member: Member,
+    /// What it requires that the images it is listed in do not have, where the
+    /// offer to bring them along was taken.
+    also: Vec<Member>,
     listing: Listing,
+    /// The CI the import makes runnable, where that offer was taken.
+    workflows: Option<crate::set::Workflows>,
 }
 
 impl Module {
     /// Asks which one when no name was given, and which collection when a name
-    /// is in more than one.
+    /// is in more than one. Then the two offers: what it requires and nothing
+    /// provides, and the CI it makes runnable.
     pub fn collect(
         name: Option<String>,
         root: &Path,
@@ -332,7 +344,8 @@ impl Module {
         images: Vec<String>,
         prompt: &Prompt,
     ) -> Result<Self, Error> {
-        if crate::model::image::List::load(root).0.images.is_empty() {
+        let (list, _) = crate::model::image::List::load(root);
+        if list.images.is_empty() {
             return Err(
                 "`import module` needs an image; run `tect create image <name>` first"
                     .to_string()
@@ -340,11 +353,53 @@ impl Module {
             );
         }
         let (from, name) = select(name, root, sources, enforce, "import", prompt)?;
+        let declares = crate::parse::module::summary(&from.dir.join(layout::MODULE_FILE));
         let listing = Listing::collect(root, images, &name, Some(&from.owner), prompt)?;
+
+        let also = short(
+            root,
+            sources,
+            &list,
+            &listing,
+            &name,
+            &declares.requires,
+            prompt,
+        )?
+        .into_iter()
+        .map(|qualified| {
+            let mut found = find(root, sources, &qualified, enforce)?;
+            let member = split(&qualified).1.to_string();
+            Ok(Member {
+                from: found.swap_remove(0),
+                name: member,
+            })
+        })
+        .collect::<Result<Vec<Member>, String>>()?;
+
+        let workflows = match crate::resolve::workflow::unlocked(&list, &declares.args).as_slice() {
+            [] => None,
+            unlocked => {
+                let named: Vec<&'static str> = unlocked.iter().map(|s| s.stem).collect();
+                let rows: Vec<String> = unlocked
+                    .iter()
+                    .map(|s| format!("`{}` {}", s.stem, s.about))
+                    .collect();
+                let question = format!(
+                    "`{name}` makes CI runnable that this repo does not generate:\n{}\n\
+                     Generate it now?",
+                    rows.join("\n")
+                );
+                prompt
+                    .confirm(&question, "Yes", "No")?
+                    .then(|| crate::set::Workflows::adding(&list, &named))
+            }
+        };
+
         Ok(Self {
-            from,
-            name,
+            member: Member { from, name },
+            also,
             listing,
+            workflows,
         })
     }
 
@@ -370,14 +425,115 @@ impl Module {
             }
             Listing::In(_) => {}
         }
-        let dir = layout::module(root, REMOTE_DIR)
-            .join(&self.from.owner)
-            .join(&self.name);
-        let _ = std::fs::remove_dir_all(&dir);
-        crate::init::copy_tree(&self.from.dir, &dir)?;
-        let wrote = self.listing.apply_source(&self.from.owner, &self.name)?;
+        let mut wrote: Vec<(PathBuf, Change)> = Vec::new();
+        // What it requires goes in first, so the list reads in build order.
+        for member in self.also.iter().chain(std::iter::once(&self.member)) {
+            let dir = layout::module(root, REMOTE_DIR)
+                .join(&member.from.owner)
+                .join(&member.name);
+            let _ = std::fs::remove_dir_all(&dir);
+            crate::init::copy_tree(&member.from.dir, &dir)?;
+            for written in self
+                .listing
+                .apply_source(&member.from.owner, &member.name)?
+            {
+                if !wrote.iter().any(|(held, _)| *held == written.0) {
+                    wrote.push(written);
+                }
+            }
+        }
+        if let Some(workflows) = &self.workflows {
+            wrote.extend(workflows.apply(root)?);
+        }
         report(root, &wrote);
         Ok(())
+    }
+}
+
+/// What the module requires that the images it is being listed in do not have,
+/// as the collection members that would satisfy it. The offer is one question:
+/// declining it leaves a file that is still valid and a `check` that says so.
+fn short(
+    root: &Path,
+    sources: &[Collection],
+    list: &crate::model::image::List,
+    listing: &Listing,
+    name: &str,
+    requires: &[String],
+    prompt: &Prompt,
+) -> Result<Vec<String>, String> {
+    let images: Vec<&crate::model::image::Image> = listing
+        .images()
+        .iter()
+        .filter_map(|named| list.images.iter().find(|image| image.name == *named))
+        .collect();
+    if images.is_empty() || requires.is_empty() {
+        return Ok(Vec::new());
+    }
+    let disk = crate::parse::disk::Disk::scan(root);
+    let index = crate::provider::Index::scan(root, sources, &disk, false);
+
+    let mut unmet: Vec<&String> = Vec::new();
+    let mut bring: Vec<String> = Vec::new();
+    for want in requires {
+        let met = images.iter().all(|image| {
+            image
+                .base
+                .iter()
+                .flat_map(|base| base.provides.iter().chain(base.provides_files.iter()))
+                .any(|decl| decl.name == *want)
+                || image.entries.iter().any(|entry| {
+                    index
+                        .at(&entry.dir())
+                        .is_some_and(|held| held.declares.provides.contains(want))
+                })
+        });
+        // A provider the repository owns needs a line rather than an import,
+        // which is what the unsatisfied-`requires` help already says.
+        let Some(provider) = (match met {
+            true => None,
+            false => index.of(want).into_iter().find(|held| held.owner.is_some()),
+        }) else {
+            continue;
+        };
+        unmet.push(want);
+        let qualified = provider.qualified();
+        if !bring.contains(&qualified) {
+            bring.push(qualified);
+        }
+    }
+    if bring.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let question = format!(
+        "`{name}` requires {}, which nothing in {} provides.\nImport {} as well?",
+        said(
+            &unmet
+                .iter()
+                .map(|want| format!("`{want}`"))
+                .collect::<Vec<_>>()
+        ),
+        said(
+            &images
+                .iter()
+                .map(|image| format!("`{}`", image.id))
+                .collect::<Vec<_>>()
+        ),
+        said(&bring.iter().map(|at| format!("`{at}`")).collect::<Vec<_>>()),
+    );
+    match prompt.confirm(&question, "Yes", "No")? {
+        true => Ok(bring),
+        false => Ok(Vec::new()),
+    }
+}
+
+/// A list as a sentence reads it.
+fn said(items: &[String]) -> String {
+    match items.split_last() {
+        None => String::new(),
+        Some((last, [])) => last.clone(),
+        Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
     }
 }
 
@@ -392,12 +548,16 @@ mod tests {
         crate::init::put(&from.join(layout::MODULE_FILE), "description \"x\"\n").unwrap();
 
         Module {
-            from: Found {
-                owner: "one".into(),
-                dir: from.clone(),
+            member: Member {
+                from: Found {
+                    owner: "one".into(),
+                    dir: from.clone(),
+                },
+                name: "module".into(),
             },
-            name: "module".into(),
+            also: Vec::new(),
             listing: Listing::Cancelled,
+            workflows: None,
         }
         .apply(&root)
         .unwrap();

@@ -1,0 +1,5 @@
+description "A kernel the image pins, swapped in over the base's own"
+
+supports "fedora"
+
+arg "KERNEL"

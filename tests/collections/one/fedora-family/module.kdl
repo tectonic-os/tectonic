@@ -1,0 +1,5 @@
+description "dnf5 and its plugins, which every fedora build layer reaches for"
+
+supports "fedora"
+
+provides "build-environment"

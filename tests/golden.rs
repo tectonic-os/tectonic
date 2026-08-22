@@ -614,12 +614,25 @@ fn flows() {
 
     // Sourced, so the picker offers what the collection describes as well as
     // what the tool ships with.
+    // The scaffolded image opens with whatever fills the family-adapter role,
+    // which is what a fresh repository could otherwise not resolve without.
+    let root = flow_repo_sourced("flow-image");
     flow(
         "flow-create-image",
-        &flow_repo_sourced("flow-image"),
+        &root,
         None,
         &["--root", ".", "create", "image"],
     );
+    let image = std::fs::read_to_string(root.join("beta.image.kdl")).unwrap();
+    assert!(
+        image.contains(
+            "    modules {\n        source \"one\" {\n            module \"fedora-family\"\n        }\n    }"
+        ),
+        "{image}"
+    );
+    // A reference the next fetch resolves, and nothing else is wanted.
+    tect(&root, &["--no-tui", "--root", ".", "fetch", "modules"]);
+    tect(&root, &["--no-tui", "--root", ".", "check"]);
     flow(
         "flow-check-shadow",
         &flow_repo_sourced("flow-shadow"),
@@ -688,6 +701,34 @@ fn flows() {
         &["--root", ".", "set", "workflows"],
     );
 
+    // What a module requires and nothing in the image provides comes with it,
+    // and the CI it makes runnable is offered rather than left to be found.
+    let requires = flow_repo_sourced("flow-requires");
+    flow(
+        "flow-import-requires",
+        &requires,
+        None,
+        &["--root", ".", "import", "module", "two/browser"],
+    );
+    let image = std::fs::read_to_string(requires.join("example.image.kdl")).unwrap();
+    assert!(
+        image.contains("source \"one\" {\n            module \"flatpak\"")
+            && image.contains("source \"two\" {\n            module \"browser\""),
+        "{image}"
+    );
+    // The offer is the whole point: what it left behind has to resolve.
+    tect(&requires, &["--no-tui", "--root", ".", "check"]);
+    let kernel = flow_repo_sourced("flow-kernel");
+    flow(
+        "flow-import-kernel",
+        &kernel,
+        None,
+        &["--root", ".", "import", "module", "one/custom-kernel"],
+    );
+    assert!(std::fs::read_to_string(kernel.join("repo.kdl"))
+        .unwrap()
+        .contains("    kernel-freshness\n"));
+
     let root = flow_repo_sourced("flow-import");
     flow(
         "flow-import-module",
@@ -731,6 +772,22 @@ fn flows() {
     let image = std::fs::read_to_string(root.join("example.image.kdl")).unwrap();
     assert_eq!(image.matches("source \"one\"").count(), 1);
     assert!(image.contains("module \"browser\"\n            module \"flatpak\""));
+
+    // A duplicate is refused at the edit, not at the next command that reads
+    // the file. A module gated to two flavours is listed under each, so only
+    // an overlap is one.
+    let twice = tect::import::Module::collect(
+        Some("one/flatpak".into()),
+        &root,
+        &list.sources,
+        false,
+        vec!["example".into()],
+        &tect::prompt::Prompt::silent(),
+    )
+    .err()
+    .map(|err| err.message().to_string())
+    .unwrap_or_default();
+    assert_eq!(twice, "`example` already lists `flatpak`");
 
     let root = flow_repo_sourced("flow-copy");
     flow(

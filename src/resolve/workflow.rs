@@ -156,6 +156,26 @@ impl Basis {
 const FEDORA: &str = "fedora";
 const KERNEL_ARG: &str = "KERNEL";
 
+/// The workflows a module declaring `args` would make runnable that the
+/// repository does not already declare. `Basis::of` derives the fact; this is
+/// what asks about it. Nothing where the block names a workflow the tool does
+/// not ship, since it cannot be rewritten without dropping that line.
+pub fn unlocked(list: &List, args: &[String]) -> Vec<&'static Shipped> {
+    if list.workflows.is_empty() || list.workflows.iter().any(|w| find(&w.name).is_none()) {
+        return Vec::new();
+    }
+    let was = Basis::of(list);
+    let now = Basis {
+        fedora: was.fedora,
+        kernel: was.kernel || args.iter().any(|arg| arg == KERNEL_ARG),
+    };
+    SHIPPED
+        .iter()
+        .filter(|shipped| shipped.met(&now) && !shipped.met(&was))
+        .filter(|shipped| !list.workflows.iter().any(|w| w.name == shipped.stem))
+        .collect()
+}
+
 /// The facts a body's guarded regions are kept by.
 pub fn facts(basis: &Basis) -> Vec<&'static str> {
     match basis.kernel {

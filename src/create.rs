@@ -793,6 +793,21 @@ impl Listing {
         matches!(self, Self::Cancelled)
     }
 
+    /// The images the answer writes into, by `name`, which is what a check
+    /// made at the point of the edit is made against.
+    pub fn images(&self) -> Vec<&str> {
+        let Self::In(listed) = self else {
+            return Vec::new();
+        };
+        let mut out: Vec<&str> = Vec::new();
+        for target in listed {
+            if !out.contains(&target.image.as_str()) {
+                out.push(&target.image);
+            }
+        }
+        out
+    }
+
     pub fn apply_source(&self, source: &str, name: &str) -> Result<Vec<(PathBuf, Change)>, String> {
         self.apply_declaration(name, Some(source))
     }

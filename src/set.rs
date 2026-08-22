@@ -33,6 +33,22 @@ impl Workflows {
             .collect()
     }
 
+    /// What the repository already declares, with `more` turned on as well:
+    /// the block a question answered somewhere else edits.
+    pub fn adding(list: &crate::model::image::List, more: &[&'static str]) -> Self {
+        Self {
+            chosen: SHIPPED
+                .iter()
+                .filter(|shipped| {
+                    more.contains(&shipped.stem)
+                        || list.workflows.iter().any(|w| w.name == shipped.stem)
+                })
+                .map(|shipped| shipped.stem)
+                .collect(),
+            at: list.workflows_at,
+        }
+    }
+
     /// `on` is what is already true. Answering with nothing is a repository
     /// that generates no CI, and leaving is `None`.
     pub fn collect(
