@@ -29,7 +29,7 @@ RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
 ARG CONTRACT_FILES=""
 ARG VERIFY_EXCEPTIONS=""
 ARG MODULE_PRESETS=""
-RUN bootc container lint
+RUN --mount=type=tmpfs,target=/run --network=none bootc container lint
 RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     CONTRACT_FILES="${CONTRACT_FILES}" \
     VERIFY_EXCEPTIONS="${VERIFY_EXCEPTIONS}" \
