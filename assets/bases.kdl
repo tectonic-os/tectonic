@@ -10,6 +10,7 @@ base "ghcr.io/ublue-os/bazzite:stable" {
     family "fedora"
     provides "rechunking" "flatpak"
     provides-file "/usr/bin/flatpak"
+    signed #true
 }
 
 base "ghcr.io/ublue-os/aurora:stable" {
@@ -17,6 +18,7 @@ base "ghcr.io/ublue-os/aurora:stable" {
     family "fedora"
     provides "rechunking" "flatpak"
     provides-file "/usr/bin/flatpak"
+    signed #true
 }
 
 base "ghcr.io/ublue-os/bluefin:stable" {
@@ -24,6 +26,7 @@ base "ghcr.io/ublue-os/bluefin:stable" {
     family "fedora"
     provides "rechunking" "flatpak"
     provides-file "/usr/bin/flatpak"
+    signed #true
 }
 
 base "ghcr.io/ublue-os/kinoite-main:44" {
@@ -31,6 +34,7 @@ base "ghcr.io/ublue-os/kinoite-main:44" {
     family "fedora"
     provides "rechunking" "flatpak"
     provides-file "/usr/bin/flatpak"
+    signed #true
 }
 
 // Bootcrew images - bootc implemented for non-RHEL based images. Neither ships
