@@ -4,7 +4,7 @@ use crate::diag::{Issue, Issues};
 use crate::layout;
 use crate::model::image::{Entry, Image};
 use crate::model::module::{Decl, Module};
-use crate::parse::disk::Disk;
+use crate::provider::Index;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -53,7 +53,7 @@ fn names(decls: &[&Decl]) -> String {
 }
 
 /// Single pass over the resolved graph.
-pub fn check_graph(image: &Image, root: &Path, disk: &Disk, issues: &mut Issues) {
+pub fn check_graph(image: &Image, root: &Path, index: &Index, issues: &mut Issues) {
     let mut offered: BTreeMap<&str, Vec<&Module>> = BTreeMap::new();
     for module in image.modules() {
         for decl in module.provides.iter().chain(module.provides_files.iter()) {
@@ -185,15 +185,24 @@ pub fn check_graph(image: &Image, root: &Path, disk: &Disk, issues: &mut Issues)
             }
 
             let Some(providers) = offered.get(decl.name.as_str()) else {
-                let help = match disk.providers.get(&decl.name) {
-                    Some(candidates) => format!(
+                let candidates = index.of(&decl.name);
+                let named: Vec<String> = candidates.iter().map(|p| p.qualified()).collect();
+                let help = match candidates.iter().find(|p| p.here) {
+                    Some(_) => format!(
                         "{} would satisfy it; add it to this image. Nothing is included automatically, so the list stays the complete statement of what is in the image",
-                        candidates.join(" or ")
+                        named.join(" or ")
                     ),
-                    None => format!(
-                        "no module in the repository declares `provides {:?}`, and neither does the `base` node in {}",
-                        decl.name, image.src.name()
-                    ),
+                    None => match candidates.first() {
+                        Some(first) => format!(
+                            "{} would satisfy it; `tect import module {}` brings it in and lists it",
+                            named.join(" or "),
+                            first.qualified()
+                        ),
+                        None => format!(
+                            "no module in the repository or its collections declares `provides {:?}`, and neither does the `base` node in {}",
+                            decl.name, image.src.name()
+                        ),
+                    },
                 };
                 issues.push(
                     Issue::new(

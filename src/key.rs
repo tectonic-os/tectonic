@@ -180,11 +180,11 @@ fn provider(
 /// does, and the line that fetches it.
 fn absent(root: &Path, kind: &str, disk: &Disk) -> String {
     let (list, ..) = crate::declarations(root);
-    let found: Vec<String> = crate::import::catalog(root, &list.sources)
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|module| module.keys.iter().any(|declared| declared == kind))
-        .map(|module| module.qualified)
+    let index = crate::provider::Index::scan(root, &list.sources, disk, true);
+    let found: Vec<String> = index
+        .declaring_key(kind)
+        .iter()
+        .map(|module| module.qualified())
         .collect();
     match found.first() {
         Some(first) => format!(

@@ -7,6 +7,7 @@ use crate::layout;
 use crate::model::remote::{At, Collection, REMOTE_DIR};
 use crate::prompt::Prompt;
 use crate::provenance::record;
+use crate::provider::Provider;
 use crate::ui::Choice;
 use std::path::{Path, PathBuf};
 
@@ -102,54 +103,39 @@ pub fn find(
     Ok(found)
 }
 
-/// One module a collection has, and what its manifest says about it.
-pub struct Listed {
-    pub owner: String,
-    pub name: String,
-    /// `<owner>/<name>`, which names it whatever else has the same name.
-    pub qualified: String,
-    pub description: String,
-    pub requires: Vec<String>,
-    /// The key kinds it declares, which is what an absent one is traced back
-    /// to this module by.
-    pub keys: Vec<String>,
-}
-
-impl Listed {
-    /// What a picker shows beside the name.
-    pub fn about(&self) -> String {
-        match self.requires.is_empty() {
-            true => self.description.clone(),
-            false => format!(
-                "{} (requires {})",
-                self.description,
-                self.requires.join(", ")
-            ),
-        }
-    }
-}
-
-/// Every module every declared collection holds, by name and then by collection.
-pub fn catalog(root: &Path, sources: &[Collection]) -> Result<Vec<Listed>, String> {
-    let mut listed: Vec<Listed> = Vec::new();
+/// Every module every declared collection holds, by name and then by
+/// collection. `fetch` decides whether a collection that is not on this
+/// machine is downloaded to answer or passed over.
+pub fn catalog(root: &Path, sources: &[Collection], fetch: bool) -> Result<Vec<Provider>, String> {
+    let mut listed: Vec<Provider> = Vec::new();
     for collection in sources {
-        let tree = tree(root, collection)?.join(collection.subtree().unwrap_or(""));
-        let dirs = std::fs::read_dir(&tree)
-            .map_err(|err| format!("`{}`: {}: {err}", collection.name, tree.display()))?;
+        let tree = match fetch {
+            true => tree(root, collection)?,
+            false => match cached(root, collection) {
+                Some(dir) => dir,
+                None => continue,
+            },
+        };
+        let tree = tree.join(collection.subtree().unwrap_or(""));
+        let dirs = match std::fs::read_dir(&tree) {
+            Ok(dirs) => dirs,
+            Err(_) if !fetch => continue,
+            Err(err) => return Err(format!("`{}`: {}: {err}", collection.name, tree.display())),
+        };
         for dir in dirs.flatten().map(|entry| entry.path()) {
-            if !dir.join(layout::MODULE_FILE).is_file() {
+            let manifest = dir.join(layout::MODULE_FILE);
+            if !manifest.is_file() {
                 continue;
             }
-            let name = dir.file_name().unwrap_or_default().to_string_lossy();
-            let (description, requires, keys) =
-                crate::parse::module::summary(&dir.join(layout::MODULE_FILE));
-            listed.push(Listed {
-                qualified: format!("{}/{name}", collection.name),
-                name: name.into_owned(),
-                owner: collection.name.clone(),
-                description,
-                requires,
-                keys,
+            listed.push(Provider {
+                owner: Some(collection.name.clone()),
+                name: dir
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .into_owned(),
+                here: false,
+                declares: crate::parse::module::summary(&manifest),
             });
         }
     }
@@ -164,16 +150,16 @@ pub fn choose(
     command: &str,
     prompt: &Prompt,
 ) -> Result<String, String> {
-    let listed = catalog(root, sources)?;
+    let listed = catalog(root, sources, true)?;
     if listed.is_empty() {
         return Err(format!("no module in {}", names(sources)));
     }
     let options: Vec<Choice> = listed
         .iter()
-        .map(|module| Choice::new(&module.qualified, module.about()))
+        .map(|module| Choice::new(module.qualified(), module.about()))
         .collect();
     match prompt.choose("which module", &options)? {
-        Some(chosen) => Ok(listed[chosen].qualified.clone()),
+        Some(chosen) => Ok(listed[chosen].qualified()),
         None => Err(format!(
             "no module chosen; `tect {command} module <name>` names one"
         )),
@@ -354,7 +340,7 @@ impl Module {
             );
         }
         let (from, name) = select(name, root, sources, enforce, "import", prompt)?;
-        let listing = Listing::collect(root, images, prompt)?;
+        let listing = Listing::collect(root, images, &name, Some(&from.owner), prompt)?;
         Ok(Self {
             from,
             name,
@@ -477,7 +463,7 @@ impl Copy {
     ) -> Result<Self, Error> {
         let (from, name) = select(name, root, sources, enforce, "copy", prompt)?;
         let dest = destination(root, &from, &name)?;
-        let listing = Listing::collect(root, images, prompt)?;
+        let listing = Listing::collect(root, images, &name, None, prompt)?;
         Ok(Self {
             from,
             dest,

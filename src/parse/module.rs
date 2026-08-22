@@ -905,15 +905,31 @@ pub fn parse_key(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Ke
     })
 }
 
-/// What a manifest says about itself where a picker has to show it, or where a
-/// key has to be traced back to the module declaring it: the description, what
-/// it requires and the key kinds, and nothing where it does not parse.
-pub fn summary(file: &Path) -> (String, Vec<String>, Vec<String>) {
+/// What a manifest says about itself, read without resolving it: what anything
+/// asking about a module no image has loaded goes on. Nothing where it does
+/// not parse.
+#[derive(Default)]
+pub struct Summary {
+    pub description: String,
+    /// Everything it declares as available to another module: `provides`,
+    /// `provides-file`, and the public half of every key it declares.
+    pub provides: Vec<String>,
+    pub supports: Vec<String>,
+    pub requires: Vec<String>,
+    /// The key kinds it declares, which is what an absent one is traced back
+    /// to this module by.
+    pub keys: Vec<String>,
+    /// The build args its layer reads, which is what decides whether a
+    /// workflow may run here at all.
+    pub args: Vec<String>,
+}
+
+pub fn summary(file: &Path) -> Summary {
     let Some(doc) = std::fs::read_to_string(file)
         .ok()
         .and_then(|text| text.parse::<KdlDocument>().ok())
     else {
-        return (String::new(), Vec::new(), Vec::new());
+        return Summary::default();
     };
     let strings = |name: &str| -> Vec<String> {
         doc.nodes()
@@ -923,11 +939,31 @@ pub fn summary(file: &Path) -> (String, Vec<String>, Vec<String>) {
             .filter_map(|entry| entry.value().as_string().map(str::to_string))
             .collect()
     };
-    (
-        strings("description").join(" "),
-        strings("requires"),
-        strings("key"),
-    )
+    let mut provides = strings("provides");
+    provides.extend(strings("provides-file"));
+    // A key's public half is a file the image gets, like any other.
+    provides.extend(
+        doc.nodes()
+            .iter()
+            .filter(|node| node.name().value() == "key")
+            .filter_map(|node| {
+                node.children()?
+                    .get("public")?
+                    .entries()
+                    .first()?
+                    .value()
+                    .as_string()
+            })
+            .map(str::to_string),
+    );
+    Summary {
+        description: strings("description").join(" "),
+        provides,
+        supports: strings("supports"),
+        requires: strings("requires"),
+        keys: strings("key"),
+        args: strings("arg"),
+    }
 }
 
 /// Every module on disk that no image lists, held to the schema on its own.

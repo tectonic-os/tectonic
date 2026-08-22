@@ -16,6 +16,7 @@ pub mod model;
 pub mod parse;
 pub mod prompt;
 pub mod provenance;
+pub mod provider;
 pub mod registry;
 pub mod resolve;
 pub mod runtime;
@@ -127,6 +128,8 @@ pub(crate) fn load(root: &Path) -> Loaded {
     let context = context(&list, root);
 
     let disk = parse::disk::Disk::scan(root);
+    // Costs no network: a collection not on this machine is passed over.
+    let index = provider::Index::scan(root, &list.sources, &disk, false);
     parse::module::check_unlisted(&list, root, &disk, &mut issues);
 
     let mut resolved: Vec<Resolved> = Vec::new();
@@ -141,7 +144,7 @@ pub(crate) fn load(root: &Path) -> Loaded {
         resolve::graph::suppress(image);
         let order = resolve::order::sort(image, &mut issues);
         resolve::order::apply(image, &order);
-        resolve::graph::check_graph(image, root, &disk, &mut issues);
+        resolve::graph::check_graph(image, root, &index, &mut issues);
         resolve::graph::check_fragments(image, &mut issues);
         let shipped = resolve::overlay::index(image, &disk);
         resolve::overlay::check(image, &shipped, &mut issues);

@@ -32,6 +32,12 @@ const IMAGES: &str =
 
 const GH_INSTALL: &str = "install gh from https://github.com/cli/cli";
 
+/// The family-adapter role: what makes a family's package manager usable from
+/// a build layer. Every family needs the same role filled by a different
+/// module, which is why this is the name of a role and not a row of a
+/// family-to-capability table.
+const BUILD_ENVIRONMENT: &str = "build-environment";
+
 /// The prefix every URL a repository writes is built from.
 pub fn origin(host: &str, owner: &str) -> String {
     format!("https://{host}/{owner}")
@@ -352,12 +358,17 @@ impl Image {
                 bases.first().map(|base| base.family.as_str()),
             )?,
         };
+        // Costs no network, the way the base catalog beside it does: a
+        // collection this machine has not fetched seeds nothing.
+        let disk = crate::parse::disk::Disk::scan(root);
+        let index = crate::provider::Index::scan(root, &list.sources, &disk, false);
         let text = image_kdl(
             &name,
             url.as_deref(),
             &base,
             &family,
             crate::base::find(&bases, &base),
+            &seeded(index.adapter(BUILD_ENVIRONMENT, &family)),
         );
         Ok(Self {
             text,
@@ -560,7 +571,7 @@ impl Module {
             };
 
         let text = module_kdl(&name, &family(root)?, &pkgs, &with)?;
-        let listing = Listing::collect(root, images, prompt)?;
+        let listing = Listing::collect(root, images, &path, None, prompt)?;
         Ok(Self {
             path,
             file,
@@ -659,7 +670,15 @@ pub struct Listed {
 }
 
 impl Listing {
-    pub fn collect(root: &Path, given: Vec<String>, prompt: &Prompt) -> Result<Self, String> {
+    /// `name` and `source` are the declaration the answer writes, which is what
+    /// an image already listing it is recognised by.
+    pub fn collect(
+        root: &Path,
+        given: Vec<String>,
+        name: &str,
+        source: Option<&str>,
+        prompt: &Prompt,
+    ) -> Result<Self, String> {
         let (list, _) = crate::model::image::List::load(root);
         if list.images.is_empty() {
             return Ok(Self::NoImage);
@@ -701,6 +720,38 @@ impl Listing {
                 "`{gated}` is inside `{}`, so listing it in both lists it twice",
                 gated.image
             ));
+        }
+
+        // The same thing against what the file already says: a module gated to
+        // two flavours is listed under each, so only an overlap is a duplicate.
+        let dir = match source {
+            Some(owner) => format!("{}/{owner}/{name}", crate::model::remote::REMOTE_DIR),
+            None => name.to_string(),
+        };
+        for target in chosen.iter().map(|at| &targets[*at]) {
+            let Some(image) = list.images.iter().find(|image| image.id == target.image) else {
+                continue;
+            };
+            let gated = target.flavour != crate::model::image::NO_FLAVOUR;
+            let Some(held) = image.entries.iter().find(|entry| {
+                entry.dir() == dir
+                    && (!gated
+                        || entry.flavour.is_none()
+                        || entry.flavour.as_deref() == Some(target.flavour.as_str()))
+            }) else {
+                continue;
+            };
+            let at = crate::model::image::Target {
+                image: image.id.clone(),
+                flavour: held
+                    .flavour
+                    .clone()
+                    .unwrap_or_else(|| crate::model::image::NO_FLAVOUR.to_string()),
+            };
+            return Err(match at.to_string() == target.to_string() {
+                true => format!("`{at}` already lists `{name}`"),
+                false => format!("`{at}` already lists `{name}`, so `{target}` lists it twice"),
+            });
         }
 
         Ok(match chosen.is_empty() {
@@ -886,12 +937,31 @@ fn append(
     std::fs::write(file, text).map_err(|err| format!("{}: {err}", file.display()))
 }
 
+/// The one module a fresh image opens with: whatever fills the family-adapter
+/// role, wrapped in its source block where it is a collection's. An image with
+/// nothing to fill it opens with an empty block, which is what it always did.
+fn seeded(adapter: Option<&crate::provider::Provider>) -> String {
+    let Some(adapter) = adapter else {
+        return String::new();
+    };
+    let chain: Vec<(&str, Option<&str>)> = adapter
+        .owner
+        .iter()
+        .map(|owner| ("source", Some(owner.as_str())))
+        .collect();
+    wrap(&chain, &format!("module \"{}\"", adapter.name))
+        .lines()
+        .map(|line| format!("\x20       {line}\n"))
+        .collect()
+}
+
 fn image_kdl(
     name: &str,
     url: Option<&str>,
     base: &str,
     family: &str,
     known: Option<&crate::base::Base>,
+    modules: &str,
 ) -> String {
     let urls = match url {
         Some(url) => format!(
@@ -925,6 +995,7 @@ fn image_kdl(
          \x20   }}\n\
          \n\
          \x20   modules {{\n\
+         {modules}\
          \x20   }}\n\
          }}\n"
     )
@@ -1014,6 +1085,7 @@ mod tests {
             bazzite,
             "fedora",
             crate::base::find(&seeded, bazzite),
+            "",
         );
         assert!(
             known.contains("        provides \"rechunking\" \"flatpak\"\n"),
@@ -1030,6 +1102,7 @@ mod tests {
             bazzite,
             "fedora",
             None,
+            "",
         );
         assert!(
             shared.contains("    url \"https://github.com/someone/example\"\n")
@@ -1047,10 +1120,17 @@ mod tests {
             signed: true,
             span: crate::diag::Span::default(),
         };
-        let extended = image_kdl("Own", None, &described.image, "fedora", Some(&described));
+        let extended = image_kdl(
+            "Own",
+            None,
+            &described.image,
+            "fedora",
+            Some(&described),
+            "",
+        );
         assert!(extended.contains("        signed #true\n"), "{extended}");
 
-        let unknown = image_kdl("Own", None, "example.invalid/own:1", "fedora", None);
+        let unknown = image_kdl("Own", None, "example.invalid/own:1", "fedora", None, "");
         assert!(!unknown.contains("provides"), "{unknown}");
         assert!(
             unknown.contains("base \"example.invalid/own:1\" {\n        family \"fedora\"\n"),
@@ -1091,6 +1171,7 @@ mod tests {
                 "quay.io/fedora/fedora-bootc:44",
                 "fedora",
                 None,
+                "",
             ),
         )
         .unwrap();
