@@ -718,6 +718,29 @@ fn flows() {
     );
     // The offer is the whole point: what it left behind has to resolve.
     tect(&requires, &["--no-tui", "--root", ".", "check"]);
+    // Declining leaves a file that is still valid, and a `check` that says
+    // which import would satisfy what is missing.
+    let declined = flow_repo_sourced("flow-declined");
+    tect(
+        &declined,
+        &[
+            "--no-tui",
+            "--root",
+            ".",
+            "import",
+            "module",
+            "two/browser",
+            "--image",
+            "example",
+        ],
+    );
+    flow(
+        "flow-check-unmet",
+        &declined,
+        None,
+        &["--root", ".", "check"],
+    );
+
     let kernel = flow_repo_sourced("flow-kernel");
     flow(
         "flow-import-kernel",
