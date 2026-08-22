@@ -6,6 +6,10 @@
 
   "rebaseWhen": "never",
 
+  // `tect generate` writes the workflows and `tect verify` byte-compares
+  // them, so a bump inside one is reverted by the next regeneration.
+  "ignorePaths": [".github/workflows/**"],
+
   // Early enough that the PR build and automerge finish before the 12:30 UTC
   // image build.
   "timezone": "Etc/UTC",
@@ -16,12 +20,6 @@
       "matchPackageNames": ["*"],
       "groupName": "scheduled updates",
       "automerge": true,
-    },
-    {
-      "enabled": false,
-      "matchUpdateTypes": ["digest", "pinDigest", "pin"],
-      "matchDepTypes": ["container"],
-      "matchFileNames": [".github/workflows/**.yaml", ".github/workflows/**.yml"],
     },
     {
       // quay.io/fedora prunes untagged manifests within days, so a pinned

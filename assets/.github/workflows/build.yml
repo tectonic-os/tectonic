@@ -188,7 +188,7 @@ jobs:
           ref: ${{ needs.checksums.outputs.ref }}
 
       - name: Run actionlint
-        uses: docker://rhysd/actionlint:1.7.12
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667  # 1.7.12
 
   script-tests:
     needs: checksums
@@ -212,7 +212,6 @@ jobs:
 
   compute-matrix:
     needs: [checksums, lint, actionlint, script-tests]
-    if: github.event_name != 'push' || github.actor != 'renovate[bot]'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
