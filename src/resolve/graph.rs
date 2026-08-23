@@ -106,6 +106,29 @@ pub fn check_graph(image: &Image, root: &Path, index: &Index, issues: &mut Issue
         .map(|decl| (decl.name.as_str(), decl))
         .collect();
 
+    let mut helpers: BTreeMap<&str, &Module> = BTreeMap::new();
+    for module in image.modules() {
+        for helper in &module.helpers {
+            let name = Path::new(&helper.name)
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or_default();
+            if let Some(first) = helpers.insert(name, module) {
+                issues.push(
+                    Issue::new(
+                        format!("two enabled modules declare helper `{name}`"),
+                        &module.src,
+                    )
+                    .at(helper.span, "mounted to the same path")
+                    .help(format!(
+                        "also declared by `{}`; helper basenames must be unique across an image",
+                        first.path
+                    )),
+                );
+            }
+        }
+    }
+
     // Anything the base covers entirely is already suppressed, so what reaches
     // here is a module the base covers in part: its layer still builds, and
     // would provision what the base ships a second time.

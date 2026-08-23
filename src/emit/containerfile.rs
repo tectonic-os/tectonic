@@ -131,7 +131,12 @@ pub fn section(image: &Image, collection: &Collection, root: &Path) -> String {
             blocks.push(fragment(entry, body));
         }
         if module.standard_layer {
-            blocks.push(standard(entry, module, &module_build::path(image, entry)));
+            blocks.push(standard(
+                entry,
+                module,
+                image,
+                &module_build::path(image, entry),
+            ));
         }
         if let Some(body) = module.fragment.as_ref().filter(|_| module.fragment_after) {
             blocks.push(fragment(entry, body));
@@ -222,7 +227,7 @@ fn finalize_layer(
 
 /// The layer is the mounts and the build inputs only a Containerfile can
 /// name; everything the host resolved is in the script it runs.
-fn standard(entry: &Entry, module: &Module, script: &Path) -> String {
+fn standard(entry: &Entry, module: &Module, image: &Image, script: &Path) -> String {
     let mut env = String::new();
 
     let mut secrets = String::new();
@@ -246,10 +251,25 @@ fn standard(entry: &Entry, module: &Module, script: &Path) -> String {
             .to_string(),
     };
     let mut out = String::new();
+    let helpers: String = image
+        .modules()
+        .flat_map(|owner| owner.helpers.iter().map(move |helper| (owner, helper)))
+        .map(|(owner, helper)| {
+            let name = Path::new(&helper.name)
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy();
+            format!(
+                "--mount=type=bind,from=ctx,source=/modules/{}/{},target=/ctx/lib/{name} \\\n    ",
+                owner.dir, helper.name
+            )
+        })
+        .collect();
     let _ = write!(
         out,
         "RUN --mount=type=bind,from=ctx,source=/modules/{path},target=/ctx/modules/{path} \\\n    \
          --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \\\n    \
+         {helpers}\
          --mount=type=bind,from=ctx,source=/{script},target=/ctx/module.sh \\\n    \
          {keys}{TECT_MOUNT}\
          --mount=type=cache,target=/var/cache \\\n    \

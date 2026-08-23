@@ -114,6 +114,8 @@ pub struct Module {
     /// Packages keyed to base family, installed by the generator before
     /// module.sh runs.
     pub packages: Vec<PackageGroup>,
+    /// Files mounted by basename into /ctx/lib in every standard module layer.
+    pub helpers: Vec<Decl>,
     pub satisfies: Vec<Coverage>,
     /// Resolved option name to value, ready to become env on the layer.
     pub resolved: Vec<(String, String)>,

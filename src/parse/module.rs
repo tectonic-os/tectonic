@@ -147,6 +147,8 @@ pub const MODULE: Node = Node::new("module",
             .arg(Arg::Strs, Say::new("`{}` needs a name", "nothing named", "")),
         Node::new("arg", "A build argument this module's layer reads.")
             .arg(Arg::Strs, Say::new("`{}` needs a name", "nothing named", "")),
+        Node::new("helpers", "Files from this module mounted by basename into /ctx/lib in every module layer.")
+            .arg(Arg::Strs, Say::new("`helpers` needs a path", "nothing named", "")),
 
         Node::new("allow-verify",
             "One `tect validate-image` diagnostic accepted on one unit rather than image-wide.")
@@ -336,6 +338,7 @@ impl Module {
             variants: Vec::new(),
             assets: Vec::new(),
             packages: Vec::new(),
+            helpers: Vec::new(),
             satisfies: Vec::new(),
             resolved: Vec::new(),
             fragment: std::fs::read_to_string(dir.join("Containerfile.inc")).ok(),
@@ -377,6 +380,7 @@ impl Module {
                         }
                     }
                 }
+                "helpers" => module.parse_helpers(node, &dir, src, issues),
                 "allow-verify" => module.parse_allow_verify(node, src, issues),
                 "collects" => module.parse_collects(node, src, issues),
                 "contributes" => module.parse_contributes(node, &dir, src, issues),
@@ -740,6 +744,39 @@ impl Module {
                     .at(span, "there is nothing to be before or after")
                     .help("`standard-layer #false` makes the fragment the only thing this module emits"),
                 );
+            }
+        }
+    }
+
+    /// `helpers "lib/family.sh"` Files mounted from this module into every
+    /// standard layer, including layers ordered before this module.
+    fn parse_helpers(&mut self, node: &KdlNode, dir: &Path, src: &Source, issues: &mut Issues) {
+        for helper in string_args(node) {
+            let path = Path::new(helper);
+            if path.is_absolute()
+                || path
+                    .components()
+                    .any(|part| !matches!(part, std::path::Component::Normal(_)))
+            {
+                issues.push(
+                    Issue::new(format!("`{helper}` is not a path inside this module"), src)
+                        .at(node.name().span(), "helpers are module content")
+                        .help("name a relative file shipped inside this module, such as `lib/family.sh`"),
+                );
+            } else if !dir.join(path).is_file() {
+                issues.push(
+                    Issue::new(
+                        format!("`{}` declares a helper it does not ship", self.path),
+                        src,
+                    )
+                    .at(node.name().span(), format!("{helper} is missing"))
+                    .help("shipping the file is what makes it available to module layers"),
+                );
+            } else {
+                self.helpers.push(Decl {
+                    name: helper.to_string(),
+                    span: node.name().span().into(),
+                });
             }
         }
     }
