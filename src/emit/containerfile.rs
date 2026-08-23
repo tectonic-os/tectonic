@@ -90,7 +90,7 @@ fn identity(image: &Image) -> Vec<(&'static str, String)> {
     vars
 }
 
-pub fn section(image: &Image, collection: &Collection, root: &Path) -> String {
+pub fn section(image: &Image, _collection: &Collection, root: &Path) -> String {
     let mut out = String::new();
     let mut flavour_arg_emitted = false;
 
@@ -113,6 +113,10 @@ pub fn section(image: &Image, collection: &Collection, root: &Path) -> String {
     }
 
     let _ = write!(out, "## Module layers\n\n");
+    let _ = write!(
+        out,
+        "# ---- /opt build root ----\nRUN mv /opt /opt.bak && mkdir /opt\n\n"
+    );
 
     for entry in &image.entries {
         // A module that could not be read is already an issue, and there is
@@ -174,25 +178,15 @@ pub fn section(image: &Image, collection: &Collection, root: &Path) -> String {
          RUN {TECT_MOUNT}IMAGE_VERSION=\"${{IMAGE_VERSION}}\" {identity_env}/ctx/tect os-release\n\n"
     );
 
-    if let Some(layer) = finalize_layer(image, collection, &identity_env, root) {
-        let _ = write!(out, "{layer}\n\n");
-    }
+    let _ = write!(out, "{}\n\n", finalize_layer(image, &identity_env, root));
 
     out
 }
 
 /// The one layer below the modules: the collected files assembled, then every
 /// finalize hook, with only the module directories those hooks read mounted.
-fn finalize_layer(
-    image: &Image,
-    collection: &Collection,
-    identity_env: &str,
-    root: &Path,
-) -> Option<String> {
+fn finalize_layer(image: &Image, identity_env: &str, root: &Path) -> String {
     let hooks = finalize::hooks(image, root);
-    if collection.assembled.is_empty() && hooks.is_empty() {
-        return None;
-    }
     let script = finalize::path(image).display().to_string();
     let mut out = format!(
         "# ---- finalize ----\n\
@@ -222,7 +216,7 @@ fn finalize_layer(
     );
     out.push_str(identity_env);
     out.push_str("bash /ctx/finalize.sh");
-    Some(out)
+    out
 }
 
 /// The layer is the mounts and the build inputs only a Containerfile can

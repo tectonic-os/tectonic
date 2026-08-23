@@ -36,13 +36,9 @@ pub fn hooks<'a>(image: &'a Image, root: &Path) -> Vec<&'a Entry> {
         .collect()
 }
 
-/// The script, or None when there is nothing to assemble and no hook to run.
+/// The script assembling collected files, running hooks, and finalizing the image.
 pub fn script(image: &Image, collection: &Collection, root: &Path) -> Option<(PathBuf, String)> {
     let hooks = hooks(image, root);
-    if collection.assembled.is_empty() && hooks.is_empty() {
-        return None;
-    }
-
     let mut out = String::from(HEADER);
     for (dest, parts) in &collection.assembled {
         // A part whose contributor is gated out of this build is not there,
@@ -75,6 +71,40 @@ pub fn script(image: &Image, collection: &Collection, root: &Path) -> Option<(Pa
         }
         let _ = write!(out, "\n# ---- {} ----\n{body}", entry.path);
     }
+
+    out.push_str(
+        "\n# ---- /opt relocation ----\n\
+         mkdir -p /usr/lib/opt\n\
+         tmpfiles=/usr/lib/tmpfiles.d/zz-opt-symlinks.conf\n\
+         printf 'd /var/opt 0755 root root -\\n' > \"$tmpfiles\"\n\
+         for d in /opt/*/; do\n\
+         \x20   [ -d \"$d\" ] || continue\n\
+         \x20   name=\"$(basename \"$d\")\"\n\
+         \x20   cp -a \"$d\" \"/usr/lib/opt/${name}\"\n\
+         \x20   esc=\"${name// /\\\\x20}\"\n\
+         \x20   printf 'L+ /var/opt/%s - - - - /usr/lib/opt/%s\\n' \"$esc\" \"$esc\" >> \"$tmpfiles\"\n\
+         done\n\
+         rm -rf /opt\n\
+         mv /opt.bak /opt\n\
+         \n\
+         # ---- module presets ----\n\
+         apply_module_presets() {\n\
+         \x20   local scope=\"$1\" dir=\"$2\" flag=() f verb unit\n\
+         \x20   [ \"$scope\" = user ] && flag=(--global)\n\
+         \x20   for f in \"$dir\"/45-module-*.preset; do\n\
+         \x20       [ -f \"$f\" ] || continue\n\
+         \x20       while read -r verb unit; do\n\
+         \x20           case \"$verb\" in\n\
+         \x20               enable) systemctl \"${flag[@]}\" enable \"$unit\" ;;\n\
+         \x20               disable) systemctl \"${flag[@]}\" disable \"$unit\" ;;\n\
+         \x20               *) ;;\n\
+         \x20           esac\n\
+         \x20       done < \"$f\"\n\
+         \x20   done\n\
+         }\n\
+         apply_module_presets system /usr/lib/systemd/system-preset\n\
+         apply_module_presets user /usr/lib/systemd/user-preset\n",
+    );
 
     Some((path(image), out))
 }
