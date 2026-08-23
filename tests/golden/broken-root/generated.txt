@@ -13,6 +13,8 @@ set -euxo pipefail
 MODDIR=/ctx/modules/core/hello
 export MODDIR
 
+source /ctx/lib/family.sh
+
 install_packages 'fastfetch'
 ==== generated/same.d/finalize.sh
 #!/usr/bin/env bash
@@ -110,6 +112,8 @@ set -euxo pipefail
 
 MODDIR=/ctx/modules/core/hello
 export MODDIR
+
+source /ctx/lib/family.sh
 
 install_packages 'fastfetch'
 ==== generated/same.d/finalize.sh

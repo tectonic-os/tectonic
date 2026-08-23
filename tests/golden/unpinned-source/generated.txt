@@ -13,6 +13,8 @@ set -euxo pipefail
 MODDIR=/ctx/modules/.remote/tectonic-os/hello
 export MODDIR
 
+source /ctx/lib/family.sh
+
 install_packages 'fastfetch'
 ==== generated/example.d/finalize.sh
 #!/usr/bin/env bash

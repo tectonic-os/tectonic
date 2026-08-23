@@ -90,7 +90,11 @@ fn script(
         }
     }
 
-    for group in module.packages.iter().filter(|g| g.family == base_family) {
+    let packages = module.packages.iter().filter(|g| g.family == base_family);
+    if packages.clone().next().is_some() {
+        out.push_str("\nsource /ctx/lib/family.sh\n");
+    }
+    for group in packages {
         let packages = group
             .packages
             .iter()
