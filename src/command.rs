@@ -271,7 +271,7 @@ pub const COMMANDS: &[Spec] = &[
         verb: Verb::Why,
         word: "why",
         noun: "",
-        arg: "<module>",
+        arg: "[module]",
         about: "print one module's trust read-out, byte by byte",
         family: Family::Repo,
         takes: &["root", "format"],

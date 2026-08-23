@@ -476,7 +476,7 @@ the target's name and tag. The ungated target when none is named.
     --target <t>          the target, else the ungated one
     --tag <x>             the tag, else $DEFAULT_TAG, else latest
 
-### `why <module> [--format md|json]`
+### `why [module] [--format md|json]`
 
 One module's trust read-out: which targets build it, what it provides and who
 requires that, what it requires and what provides it, what it claims to

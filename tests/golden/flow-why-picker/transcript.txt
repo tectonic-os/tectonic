@@ -1,0 +1,33 @@
+which module: core/one
+
+# core/one
+
+Builds things
+
+## Where it is built
+
+example
+
+## What it exchanges
+
+Nothing: it neither provides nor requires.
+
+## What it claims
+
+Nothing. It declares no `satisfies`.
+
+## Where it came from
+
+Its content hashes to `71cf98d5efb9a591512bd530eb250ccaed9451bfff685cfd1166d092666198b2`.
+
+It was written in this repository rather than imported, so nothing upstream to compare it against.
+
+## What it pulls in
+
+Nothing. It declares no `asset`.
+
+## Third-party repositories
+
+None. It ships no `repo` file.
+
+==== exit 0

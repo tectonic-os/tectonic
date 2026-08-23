@@ -516,6 +516,55 @@ fn flow(name: &str, dir: &Path, gh: Option<&str>, args: &[&str]) {
     compare(name, "transcript.txt", &transcript);
 }
 
+/// One real terminal picker. `script` supplies the pty; the test answers the
+/// cursor-position query before choosing the first row.
+fn drawn_flow(name: &str, dir: &Path) {
+    use std::io::{Read, Write};
+    use std::process::Stdio;
+
+    let command = format!("'{}' --root . why", env!("CARGO_BIN_EXE_tect"));
+    let mut child = std::process::Command::new("script")
+        .args(["-qfec", &command, "/dev/null"])
+        .current_dir(dir)
+        .env("TECT_ASSETS", crate_dir().join("assets"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("script from util-linux");
+    let mut input = child.stdin.take().unwrap();
+    let mut output = child.stdout.take().unwrap();
+    let mut raw = Vec::new();
+    let mut byte = [0];
+    while !raw.ends_with(b"\x1b[6n") {
+        output.read_exact(&mut byte).unwrap();
+        raw.push(byte[0]);
+    }
+    input.write_all(b"\x1b[1;1R").unwrap();
+    input.flush().unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    input.write_all(b"\r").unwrap();
+    drop(input);
+    output.read_to_end(&mut raw).unwrap();
+    let status = child.wait().unwrap();
+    let mut errors = String::new();
+    child
+        .stderr
+        .take()
+        .unwrap()
+        .read_to_string(&mut errors)
+        .unwrap();
+    assert!(status.success(), "{errors}");
+
+    let text = String::from_utf8_lossy(&raw);
+    let stable = text.rsplit_once("which module:").unwrap().1;
+    compare(
+        name,
+        "transcript.txt",
+        &format!("which module:{stable}==== exit 0\n"),
+    );
+}
+
 fn tmp() -> PathBuf {
     PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
 }
@@ -789,6 +838,22 @@ fn flows() {
         None,
         &["--root", ".", "check"],
     );
+
+    let why = flow_repo("flow-why-picker");
+    std::fs::create_dir_all(why.join("modules/core/one")).unwrap();
+    std::fs::write(
+        why.join("modules/core/one/module.kdl"),
+        "description \"Builds things\"\n\nsupports \"fedora\"\n",
+    )
+    .unwrap();
+    let image = why.join("example.image.kdl");
+    let listed = std::fs::read_to_string(&image).unwrap().replace(
+        "    modules {\n    }",
+        "    modules {\n        module \"core/one\"\n    }",
+    );
+    assert!(listed.contains("module \"core/one\""), "{listed}");
+    std::fs::write(image, listed).unwrap();
+    drawn_flow("flow-why-picker", &why);
 
     let kernel = flow_repo_sourced("flow-kernel");
     flow(

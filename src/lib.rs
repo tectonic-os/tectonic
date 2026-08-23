@@ -173,6 +173,10 @@ pub(crate) fn load(root: &Path) -> Loaded {
 /// result. `arg` names the image `section` renders and the target `summary` and
 /// `sbom` answer about; the defaults otherwise.
 pub fn run(command: Command, arg: Option<&str>, root: &Path) -> Run {
+    run_loaded(command, arg, root, load(root))
+}
+
+pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loaded: Loaded) -> Run {
     let (target_arg, image_arg, module_arg) = match command.arg() {
         Some(Arg::Target) => (arg, None, None),
         Some(Arg::Module) => (None, None, arg),
@@ -185,7 +189,7 @@ pub fn run(command: Command, arg: Option<&str>, root: &Path) -> Run {
         facts,
         mut issues,
         context,
-    } = load(root);
+    } = loaded;
 
     let (shadowed, unpinned, modified) = match command {
         Command::Check => (

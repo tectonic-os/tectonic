@@ -184,11 +184,9 @@ impl Prompt {
         }
         if self.draw {
             let chosen = crate::ui::select(question, options)?;
-            let answer = match chosen {
-                Some(index) => options[index].label.as_str(),
-                None => "none",
-            };
-            println!("{question}: {answer}\n");
+            if let Some(index) = chosen {
+                println!("{question}: {}\n", options[index].label);
+            }
             return Ok(chosen);
         }
         self.numbered(options, &[]);
