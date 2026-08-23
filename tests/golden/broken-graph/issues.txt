@@ -19,13 +19,24 @@
    `----
   help: known families: fedora, debian, ubuntu
 
-  x `core/two` provides `rechunking`, which the base image already provides
+  x two enabled modules declare helper `shared.sh`
    ,-[./modules/core/two/module.kdl:5:1]
  4 | 
- 5 | provides "rechunking"
+ 5 | helpers "lib/two/shared.sh"
+   : ^^^|^^^
+   :    `-- mounted to the same path
+ 6 | provides "rechunking"
+   `----
+  help: also declared by `core/one`; helper basenames must be unique across an
+        image
+
+  x `core/two` provides `rechunking`, which the base image already provides
+   ,-[./modules/core/two/module.kdl:6:1]
+ 5 | helpers "lib/two/shared.sh"
+ 6 | provides "rechunking"
    : ^^^^|^^^
    :     `-- already provided by the base
- 6 | provides "shell-tools"
+ 7 | provides "shell-tools"
    `----
   help: a module the base covers entirely is suppressed instead. This one also
         provides `shell-tools`, so its layer still builds and would provision
@@ -35,9 +46,9 @@
   help: it declares support for: arch
 
   x `shell-tools` is provided by more than one enabled module
-   ,-[./modules/core/two/module.kdl:6:1]
- 5 | provides "rechunking"
- 6 | provides "shell-tools"
+   ,-[./modules/core/two/module.kdl:7:1]
+ 6 | provides "rechunking"
+ 7 | provides "shell-tools"
    : ^^^^|^^^
    :     `-- also provided elsewhere
    `----
@@ -45,12 +56,12 @@
         satisfies a requirement is never ambiguous
 
   x `core/one` requires `package-manager`, which nothing enabled provides
-   ,-[./modules/core/one/module.kdl:5:1]
- 4 | 
- 5 | requires "package-manager"
+   ,-[./modules/core/one/module.kdl:6:1]
+ 5 | helpers "lib/one/shared.sh"
+ 6 | requires "package-manager"
    : ^^^^|^^^
    :     `-- unsatisfied
- 6 | requires-file "/usr/bin/nothing"
+ 7 | requires-file "/usr/bin/nothing"
    `----
   help: no module in the repository declares `provides "package-manager"`, and
         neither does the `base` node in ./image.kdl. repo.kdl declares no
@@ -58,9 +69,9 @@
 
   x `core/one` requires-file `/usr/bin/nothing`, which nothing enabled
   | provides
-   ,-[./modules/core/one/module.kdl:6:1]
- 5 | requires "package-manager"
- 6 | requires-file "/usr/bin/nothing"
+   ,-[./modules/core/one/module.kdl:7:1]
+ 6 | requires "package-manager"
+ 7 | requires-file "/usr/bin/nothing"
    : ^^^^^^|^^^^^^
    :       `-- unsatisfied
    `----

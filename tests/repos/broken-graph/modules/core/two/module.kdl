@@ -2,5 +2,6 @@ description "Provides what the base already provides"
 
 supports "fedora"
 
+helpers "lib/two/shared.sh"
 provides "rechunking"
 provides "shell-tools"

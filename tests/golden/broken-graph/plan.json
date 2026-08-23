@@ -63,7 +63,7 @@
                 "package-manager"
               ],
               "provenance": {
-                "content": "9bd8a11d8d253879ace9233413b5e364e5871c2e1cf94941706d06af77f8b2a1",
+                "content": "b5e1d522d5610020a24a32ee4ec7f6ea52d058d43a74f607d3d1072c653af31d",
                 "repo": false,
                 "pin": null,
                 "imported": null
@@ -84,7 +84,7 @@
               ],
               "requires": [],
               "provenance": {
-                "content": "68d732dc606702e2a5c8eb3a40dd65ba88726aac5235eda837f84763ec3c5891",
+                "content": "8be1a54ebdf5472ed5728519b398d412875d6d634edf7a562f3f5f9059d3e091",
                 "repo": false,
                 "pin": null,
                 "imported": null

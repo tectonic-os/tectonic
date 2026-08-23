@@ -525,6 +525,7 @@ Also holds [`option`](#option), [`variant`](#variant) and [`asset`](#asset).
 | `overrides` | one or more strings | An absolute path this module replaces deliberately. |
 | `secret` | one or more strings | A build secret this module's layer mounts. |
 | `arg` | one or more strings | A build argument this module's layer reads. |
+| `helpers` | one or more strings | Files from this module mounted by basename into /ctx/lib in every module layer. |
 
 ### `provides-file`
 

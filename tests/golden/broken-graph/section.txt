@@ -6,6 +6,8 @@ FROM ${BASE}
 # ---- core/one ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/one,target=/ctx/modules/core/one \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/modules/core/one/lib/one/shared.sh,target=/ctx/lib/shared.sh \
+    --mount=type=bind,from=ctx,source=/modules/core/two/lib/two/shared.sh,target=/ctx/lib/shared.sh \
     --mount=type=bind,from=ctx,source=/generated/broken-graph.d/core/one.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
@@ -16,6 +18,8 @@ RUN --mount=type=bind,from=ctx,source=/modules/core/one,target=/ctx/modules/core
 # ---- core/two ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/two,target=/ctx/modules/core/two \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/modules/core/one/lib/one/shared.sh,target=/ctx/lib/shared.sh \
+    --mount=type=bind,from=ctx,source=/modules/core/two/lib/two/shared.sh,target=/ctx/lib/shared.sh \
     --mount=type=bind,from=ctx,source=/generated/broken-graph.d/core/two.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
@@ -26,6 +30,8 @@ RUN --mount=type=bind,from=ctx,source=/modules/core/two,target=/ctx/modules/core
 # ---- core/three ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/three,target=/ctx/modules/core/three \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/modules/core/one/lib/one/shared.sh,target=/ctx/lib/shared.sh \
+    --mount=type=bind,from=ctx,source=/modules/core/two/lib/two/shared.sh,target=/ctx/lib/shared.sh \
     --mount=type=bind,from=ctx,source=/generated/broken-graph.d/core/three.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
