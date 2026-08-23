@@ -3,6 +3,9 @@ FROM ${BASE}
 
 ## Module layers
 
+# ---- /opt build root ----
+RUN mv /opt /opt.bak && mkdir /opt
+
 # ---- core/shared ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/shared,target=/ctx/modules/core/shared \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \

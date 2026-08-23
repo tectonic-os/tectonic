@@ -11,6 +11,42 @@ export ASSET_TRACKED_AND_MANUAL_URL="https://example.com/download/v1.0.0/tool.ta
 export ASSET_TRACKED_AND_MANUAL_SHA256="NOTHEX"
 export ASSET_NO_TRACKING_VERSION="1.0.0"
 export ASSET_NO_TRACKING_URL="https://example.com/download/v{tag}/tool.tar.gz; rm -rf /"
+==== generated/broken-asset.d/finalize.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+# ---- /opt relocation ----
+mkdir -p /usr/lib/opt
+tmpfiles=/usr/lib/tmpfiles.d/zz-opt-symlinks.conf
+printf 'd /var/opt 0755 root root -\n' > "$tmpfiles"
+for d in /opt/*/; do
+    [ -d "$d" ] || continue
+    name="$(basename "$d")"
+    cp -a "$d" "/usr/lib/opt/${name}"
+    esc="${name// /\\x20}"
+    printf 'L+ /var/opt/%s - - - - /usr/lib/opt/%s\n' "$esc" "$esc" >> "$tmpfiles"
+done
+rm -rf /opt
+mv /opt.bak /opt
+
+# ---- module presets ----
+apply_module_presets() {
+    local scope="$1" dir="$2" flag=() f verb unit
+    [ "$scope" = user ] && flag=(--global)
+    for f in "$dir"/45-module-*.preset; do
+        [ -f "$f" ] || continue
+        while read -r verb unit; do
+            case "$verb" in
+                enable) systemctl "${flag[@]}" enable "$unit" ;;
+                disable) systemctl "${flag[@]}" disable "$unit" ;;
+                *) ;;
+            esac
+        done < "$f"
+    done
+}
+apply_module_presets system /usr/lib/systemd/system-preset
+apply_module_presets user /usr/lib/systemd/user-preset
 ==== generated/broken-asset.graph.md
 # Broken Asset capability graph
 

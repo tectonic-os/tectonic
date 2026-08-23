@@ -3,6 +3,9 @@ FROM ${BASE}
 
 ## Module layers
 
+# ---- /opt build root ----
+RUN mv /opt /opt.bak && mkdir /opt
+
 # ---- core/menu ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/menu,target=/ctx/modules/core/menu \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \

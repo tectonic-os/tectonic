@@ -3,6 +3,9 @@ FROM ${BASE}
 
 ## Module layers
 
+# ---- /opt build root ----
+RUN mv /opt /opt.bak && mkdir /opt
+
 # ---- core/nameless ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/nameless,target=/ctx/modules/core/nameless \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
@@ -30,4 +33,14 @@ ARG IMAGE_REGISTRY=""
 # ---- os-release ----
 RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     IMAGE_VERSION="${IMAGE_VERSION}" IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" /ctx/tect os-release
+
+# ---- finalize ----
+RUN --mount=type=bind,from=ctx,source=/generated/broken-module.d/finalize.sh,target=/ctx/finalize.sh \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    FLAVOUR=${FLAVOUR} IMAGE_VERSION="${IMAGE_VERSION}" \
+    IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" bash /ctx/finalize.sh
 
