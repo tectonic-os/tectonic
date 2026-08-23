@@ -13,6 +13,7 @@ image {
     }
 
     modules {
+        module "fedora-family"
         module "hello"
         source "tectonic-os" {
             module "flatpak" variant="beta" {

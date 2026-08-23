@@ -6,9 +6,21 @@ FROM ${BASE}
 # ---- /opt build root ----
 RUN mv /opt /opt.bak && mkdir /opt
 
+# ---- debian-family ----
+RUN --mount=type=bind,from=ctx,source=/modules/debian-family,target=/ctx/modules/debian-family \
+    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/modules/debian-family/lib/family.sh,target=/ctx/lib/family.sh \
+    --mount=type=bind,from=ctx,source=/generated/debian.d/debian-family.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/module.sh
+
 # ---- core/shared ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/shared,target=/ctx/modules/core/shared \
     --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/modules/debian-family/lib/family.sh,target=/ctx/lib/family.sh \
     --mount=type=bind,from=ctx,source=/generated/debian.d/core/shared.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \

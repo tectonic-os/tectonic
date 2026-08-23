@@ -25,6 +25,9 @@ image {
 
     modules {
         module "my-editor"
+        source "one" {
+            module "fedora-family"
+        }
     }
 }
 ==== server.image.kdl
@@ -41,6 +44,9 @@ image {
 
     modules {
         module "my-editor"
+        source "one" {
+            module "fedora-family"
+        }
     }
 }
 ==== check

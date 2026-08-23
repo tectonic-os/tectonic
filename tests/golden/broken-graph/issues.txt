@@ -42,6 +42,15 @@
         provides `shell-tools`, so its layer still builds and would provision
         `rechunking` a second time: split it, or drop the declaration
 
+  x image `broken-graph` installs packages for `fedora`, but no enabled module
+  | provides `build-environment` for that family
+   ,-[./image.kdl:1:1]
+ 1 | image {
+   : ^^|^^
+   :   `-- missing family adapter
+ 2 |     name "Broken Graph"
+   `----
+
   x `core/three` does not support the `fedora` base family
   help: it declares support for: arch
 
@@ -56,25 +65,25 @@
         satisfies a requirement is never ambiguous
 
   x `core/one` requires `package-manager`, which nothing enabled provides
-   ,-[./modules/core/one/module.kdl:6:1]
- 5 | helpers "lib/one/shared.sh"
- 6 | requires "package-manager"
-   : ^^^^|^^^
-   :     `-- unsatisfied
- 7 | requires-file "/usr/bin/nothing"
-   `----
+    ,-[./modules/core/one/module.kdl:10:1]
+  9 | helpers "lib/one/shared.sh"
+ 10 | requires "package-manager"
+    : ^^^^|^^^
+    :     `-- unsatisfied
+ 11 | requires-file "/usr/bin/nothing"
+    `----
   help: no module in the repository declares `provides "package-manager"`, and
         neither does the `base` node in ./image.kdl. repo.kdl declares no
         `sources`, so there is no collection to import one from
 
   x `core/one` requires-file `/usr/bin/nothing`, which nothing enabled
   | provides
-   ,-[./modules/core/one/module.kdl:7:1]
- 6 | requires "package-manager"
- 7 | requires-file "/usr/bin/nothing"
-   : ^^^^^^|^^^^^^
-   :       `-- unsatisfied
-   `----
+    ,-[./modules/core/one/module.kdl:11:1]
+ 10 | requires "package-manager"
+ 11 | requires-file "/usr/bin/nothing"
+    : ^^^^^^|^^^^^^
+    :       `-- unsatisfied
+    `----
   help: no module in the repository declares `provides "/usr/bin/nothing"`,
         and neither does the `base` node in ./image.kdl. repo.kdl declares no
         `sources`, so there is no collection to import one from

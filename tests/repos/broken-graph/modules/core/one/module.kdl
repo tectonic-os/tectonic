@@ -2,6 +2,10 @@ description "Requires a capability nothing in this image provides"
 
 supports "fedora"
 
+packages {
+    fedora "fastfetch"
+}
+
 helpers "lib/one/shared.sh"
 requires "package-manager"
 requires-file "/usr/bin/nothing"

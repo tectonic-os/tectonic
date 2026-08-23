@@ -1,0 +1,7 @@
+description "apt, which every Debian-family build layer reaches for"
+
+supports "debian" "ubuntu"
+
+provides "build-environment"
+
+helpers "lib/family.sh"

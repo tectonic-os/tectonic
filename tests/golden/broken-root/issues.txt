@@ -3,12 +3,12 @@
         `notes.image.kdl`, or move it out of the repository root
 
   x `same` is declared twice
-    ,-[./image.kdl:14:1]
- 13 | 
- 14 | image {
+    ,-[./image.kdl:15:1]
+ 14 | 
+ 15 | image {
     : ^^|^^
     :   `-- also declared above
- 15 |     name "Same"
+ 16 |     name "Same"
     `----
   help: two images cannot publish under one name; declare `id` on one of them
 

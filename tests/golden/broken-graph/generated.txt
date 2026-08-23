@@ -5,6 +5,8 @@ set -euxo pipefail
 
 MODDIR=/ctx/modules/core/one
 export MODDIR
+
+install_packages 'fastfetch'
 ==== generated/broken-graph.d/core/two.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.

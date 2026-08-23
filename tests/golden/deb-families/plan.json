@@ -50,6 +50,26 @@
           "siblings": [],
           "modules": [
             {
+              "path": "debian-family",
+              "dir": "debian-family",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "apt, which every Debian-family build layer reaches for",
+              "options": {},
+              "provides": [
+                "build-environment"
+              ],
+              "requires": [],
+              "provenance": {
+                "content": "d0aef64747bab757d5abe18e45642c433f89d89fedefa3ff470157d222d2bb48",
+                "repo": false,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": []
+            },
+            {
               "path": "core/shared",
               "dir": "core/shared",
               "flavour": null,
@@ -113,6 +133,26 @@
           "pr": false,
           "siblings": [],
           "modules": [
+            {
+              "path": "debian-family",
+              "dir": "debian-family",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "apt, which every Debian-family build layer reaches for",
+              "options": {},
+              "provides": [
+                "build-environment"
+              ],
+              "requires": [],
+              "provenance": {
+                "content": "d0aef64747bab757d5abe18e45642c433f89d89fedefa3ff470157d222d2bb48",
+                "repo": false,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": []
+            },
             {
               "path": "core/shared",
               "dir": "core/shared",

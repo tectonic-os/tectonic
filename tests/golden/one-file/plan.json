@@ -50,6 +50,26 @@
           "siblings": [],
           "modules": [
             {
+              "path": "fedora-family",
+              "dir": "fedora-family",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "dnf5 and its plugins, which every fedora build layer reaches for",
+              "options": {},
+              "provides": [
+                "build-environment"
+              ],
+              "requires": [],
+              "provenance": {
+                "content": "5c6f954af6de4efc68c5525e8a65e941dff618e34ac7cb721cf0abb9f85e1364",
+                "repo": false,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": []
+            },
+            {
               "path": "core/hello",
               "dir": "core/hello",
               "flavour": null,
@@ -113,6 +133,26 @@
           "pr": false,
           "siblings": [],
           "modules": [
+            {
+              "path": "fedora-family",
+              "dir": "fedora-family",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "dnf5 and its plugins, which every fedora build layer reaches for",
+              "options": {},
+              "provides": [
+                "build-environment"
+              ],
+              "requires": [],
+              "provenance": {
+                "content": "5c6f954af6de4efc68c5525e8a65e941dff618e34ac7cb721cf0abb9f85e1364",
+                "repo": false,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": []
+            },
             {
               "path": "core/hello",
               "dir": "core/hello",

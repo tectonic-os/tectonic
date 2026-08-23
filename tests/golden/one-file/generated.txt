@@ -1,3 +1,10 @@
+==== generated/alpha.d/fedora-family.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/fedora-family
+export MODDIR
 ==== generated/alpha.d/core/hello.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
@@ -55,18 +62,28 @@ right.
 ```mermaid
 graph LR
     base["quay.io/fedora/fedora-bootc:44"]
-    m0["core/hello"]
+    m0["fedora-family"]
+    m1["core/hello"]
 ```
 
 ## Capabilities
 
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
+| `build-environment` | capability | `fedora-family` |  |  |
 | `rechunking` | capability | `base` |  |  |
 ==== generated/alpha.graph.json
 {
   "image": "alpha",
   "capabilities": [
+    {
+      "name": "build-environment",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "fedora-family",
+      "required_by": [],
+      "after": []
+    },
     {
       "name": "rechunking",
       "kind": "capability",
@@ -79,6 +96,13 @@ graph LR
   "overrides": [],
   "suppressed": []
 }
+==== generated/beta.d/fedora-family.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/fedora-family
+export MODDIR
 ==== generated/beta.d/core/hello.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
@@ -136,18 +160,28 @@ right.
 ```mermaid
 graph LR
     base["quay.io/fedora/fedora-bootc:44"]
-    m0["core/hello"]
+    m0["fedora-family"]
+    m1["core/hello"]
 ```
 
 ## Capabilities
 
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
+| `build-environment` | capability | `fedora-family` |  |  |
 | `rechunking` | capability | `base` |  |  |
 ==== generated/beta.graph.json
 {
   "image": "beta",
   "capabilities": [
+    {
+      "name": "build-environment",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "fedora-family",
+      "required_by": [],
+      "after": []
+    },
     {
       "name": "rechunking",
       "kind": "capability",
