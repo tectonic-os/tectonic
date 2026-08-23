@@ -52,8 +52,9 @@
    :     `-- unsatisfied
  6 | requires-file "/usr/bin/nothing"
    `----
-  help: no module in the repository or its collections declares `provides
-        "package-manager"`, and neither does the `base` node in ./image.kdl
+  help: no module in the repository declares `provides "package-manager"`, and
+        neither does the `base` node in ./image.kdl. repo.kdl declares no
+        `sources`, so there is no collection to import one from
 
   x `core/one` requires-file `/usr/bin/nothing`, which nothing enabled
   | provides
@@ -63,6 +64,7 @@
    : ^^^^^^|^^^^^^
    :       `-- unsatisfied
    `----
-  help: no module in the repository or its collections declares `provides "/
-        usr/bin/nothing"`, and neither does the `base` node in ./image.kdl
+  help: no module in the repository declares `provides "/usr/bin/nothing"`,
+        and neither does the `base` node in ./image.kdl. repo.kdl declares no
+        `sources`, so there is no collection to import one from
 

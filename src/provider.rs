@@ -54,8 +54,18 @@ impl Provider {
     }
 }
 
-/// Every module a repository could reach, the ones already on it first.
-pub struct Index(Vec<Provider>);
+/// Every module a repository could reach, the ones already on it first —
+/// and the declared collections this scan never looked in, so that nothing
+/// reading the index states as fact what it did not check.
+pub struct Index {
+    held: Vec<Provider>,
+    /// Declared collections not on this machine, which a scan that does not
+    /// fetch skips: empty when every one was read, and empty when none were
+    /// declared, which `sourced` tells apart.
+    unread: Vec<String>,
+    /// Whether the repository declares any collections at all.
+    sourced: bool,
+}
 
 impl Index {
     /// `fetch` decides whether a collection that is not on this machine is
@@ -76,12 +86,38 @@ impl Index {
                 out.push(module);
             }
         }
-        Self(out)
+        Self {
+            held: out,
+            // The collections `catalog` just skipped: `cached` is the same
+            // question it asked, and on `fetch` there is nothing to skip.
+            unread: match fetch {
+                true => Vec::new(),
+                false => sources
+                    .iter()
+                    .filter(|collection| crate::import::cached(root, collection).is_none())
+                    .map(|collection| collection.name.clone())
+                    .collect(),
+            },
+            sourced: !sources.is_empty(),
+        }
+    }
+
+    /// The declared collections this index cannot speak for, because nothing
+    /// read them. A diagnostic saying nothing provides a capability has to say
+    /// this too, or it claims to have searched them.
+    pub fn unread(&self) -> &[String] {
+        &self.unread
+    }
+
+    /// Whether the repository declares collections at all, which is how an
+    /// empty `unread` is told from having nowhere else to look.
+    pub fn sourced(&self) -> bool {
+        self.sourced
     }
 
     /// Every module declaring `capability`, the repository's own first.
     pub fn of(&self, capability: &str) -> Vec<&Provider> {
-        self.0
+        self.held
             .iter()
             .filter(|held| held.declares.provides.iter().any(|has| has == capability))
             .collect()
@@ -98,7 +134,7 @@ impl Index {
 
     /// Every module declaring a key of this kind.
     pub fn declaring_key(&self, kind: &str) -> Vec<&Provider> {
-        self.0
+        self.held
             .iter()
             .filter(|held| held.declares.keys.iter().any(|has| has == kind))
             .collect()
@@ -107,7 +143,7 @@ impl Index {
     /// The one an image entry names, which is how what an image already has is
     /// read back off its declaration.
     pub fn at(&self, dir: &str) -> Option<&Provider> {
-        self.0.iter().find(|held| held.dir() == dir)
+        self.held.iter().find(|held| held.dir() == dir)
     }
 }
 
