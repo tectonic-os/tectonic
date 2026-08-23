@@ -1,7 +1,7 @@
 # Commands
 
-`tect --help` lists the commands a person runs: `create repo`, and the ones
-that need a repository. The two families at the end of this file — what a build
+`tect --help` lists the commands a person runs: `upgrade` and `create repo`,
+and the ones that need a repository. The two families at the end of this file — what a build
 runs against, and what runs inside a build layer — are the contract rather than
 the help, and are not in that list.
 
@@ -45,6 +45,38 @@ instead: one of them is private and ignored, so a tracked-file tree omits it.
 
 `--root <dir>` is accepted by every command below. A flag a command does not
 read is an error, not a silent no-op.
+
+## Upgrading the tool
+
+### `upgrade`
+
+Replaces this `tect`, and the assets it scaffolds from, with the latest
+published release. It takes no argument and no flag.
+
+It prints the running version and the latest one, and stops there when they are
+the same or when the running build is ahead of the tag.
+
+#### Notes:
+- The binary and the assets move together. A binary that arrived alone would
+  leave the host scaffolding from whatever stale `assets/` it already had, with
+  no diagnostic, which is the failure this command exists to prevent.
+- Where the two go is chosen by who runs it, and never falls back between the
+  pairs: root takes `/usr/local/bin` with `/usr/local/share/tectonic/assets`,
+  anyone else takes `~/.local/bin` with `$XDG_DATA_HOME/tectonic/assets`, which
+  is `~/.local/share/tectonic/assets` unless that variable says otherwise. A
+  destination it cannot write is refused, naming the other pair, because
+  falling back to one you did not ask for is the guess it exists not to make.
+- The assets are swapped rather than merged, so a file a release dropped does
+  not survive into every repository created afterwards.
+- The download is verified against the `.sha256` published beside it before
+  anything on disk is touched, so a refusal leaves the existing install intact.
+- An `assets` directory beside the binary outranks the pair this places, and is
+  refused before anything is fetched. A set `TECT_ASSETS` outranks it too, but
+  that is environment rather than disk and may be deliberate, so it warns.
+- x86_64 Linux is what is published. Anywhere else it refuses by name rather
+  than fetching a 404.
+- On a machine with no `tect` yet, the same thing is
+  `curl -fsSL https://raw.githubusercontent.com/tectonic-os/tectonic/main/install.sh | sh`.
 
 ## Starting a repository
 

@@ -9,6 +9,25 @@ section that comes out of it.
 Nothing in the build derives a name, a target, a tag or an order. The tool
 does, once, and the shell that runs inside a layer is handed the result.
 
+## Installing it
+
+    curl -fsSL https://raw.githubusercontent.com/tectonic-os/tectonic/main/install.sh | sh
+
+That places the binary and the scaffolding it copies, together:
+`~/.local/bin/tect` with `~/.local/share/tectonic/assets`, or both under
+`/usr/local` when it is run as root. A `tect` that arrives without a matching
+`assets/` scaffolds from whatever stale copy the host already has, silently, so
+the two halves are never moved apart. `tect upgrade` does the same afterwards
+without needing the URL again: it says what is running and what the latest
+release is, moves both halves, and says so instead when there is nothing to
+move.
+
+x86_64 Linux is what is published. Anywhere else, build it.
+
+Both resolve the latest release at run time, so what arrives is what is tagged
+rather than what is on `main`. `tect upgrade` is newer than the current tag, so
+a copy installed today does not have it yet.
+
 ## What a repository looks like
 
     repo.kdl              the repository: schema version, tool pin, default
@@ -32,6 +51,7 @@ tool accepts.
 
 This is the whole surface today. The rest of it is not built yet.
 
+    tect upgrade          replace this tect and its assets with the latest
     tect create repo [name]
                           start a repository, and offer an image in it
     tect create image [name]
@@ -71,10 +91,11 @@ Data goes to stdout and diagnostics to stderr. Exit 1 is the invocation, exit
 
     cargo build --release
 
-There is no tagged release yet, so a repository cannot fetch a binary. Until
-there is one, run the local build against a repository with `--root`, and
-point `TECT_ASSETS` at this repository's `assets/` so `tect create repo` can
-find the scaffolding it copies.
+A local build is not an install, and running one is where the assets bite:
+`tect` looks for an `assets` directory beside the binary and then at the
+installed paths, so a binary out of `target/` scaffolds from whatever copy the
+host has, silently. Point `TECT_ASSETS` at this repository's `assets/` when you
+run one, and aim it at a repository elsewhere with `--root`.
 
 ## Developing
 
