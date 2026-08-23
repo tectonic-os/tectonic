@@ -26,7 +26,7 @@ tect-version "0.0.0"
 default-image "workstation"
 pr-image "workstation"
 
-workflows at="12:30" {
+workflows at="12:30" scan="scheduled" {
     build
     smoke-test
 }
@@ -49,6 +49,10 @@ rather than present and switched off, and a tool upgrade re-syncs the rest by
 regenerating them. `tect set workflows` is the editor for the block. `at` is
 the one time the schedules hang off: the daily build runs then, and every other
 scheduled workflow at its own offset from it.
+
+`scan="scheduled"` keeps image scans on the daily build but omits them from
+push builds. Without it, scans run on both pushes and scheduled builds. Whether
+there is SCAP content to scan remains derived from each image's `conforms`.
 
 `sources` is the registry `tect import module <name>` and `tect copy module
 <name>` resolve against. Importing references a member under the collection's
@@ -184,6 +188,7 @@ The CI `tect generate` writes into .github/workflows/, named by file stem. One t
 | Property | Value | Meaning |
 | --- | --- | --- |
 | `at=` | a string | The hour and minute the daily build runs, UTC. Every other schedule is an offset from it. |
+| `scan=` | a string | When image scans run. `scheduled` moves them off pushes while keeping the daily measurement. |
 
 | Node | Takes | Meaning |
 | --- | --- | --- |

@@ -666,7 +666,12 @@ jobs:
     needs: [checksums, compute-matrix, build_push]
     name: Scan the claims (${{ matrix.target }})
     runs-on: ubuntu-24.04
+    # tect:only push-scan
     if: github.event_name != 'pull_request'
+    # tect:end
+    # tect:only scheduled-scan
+    if: github.event_name == 'schedule'
+    # tect:end
 
     strategy:
       matrix:

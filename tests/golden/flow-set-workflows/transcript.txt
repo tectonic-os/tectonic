@@ -6,6 +6,9 @@
   6) [x] smoke-test  installs the image to a disk and boots it under qemu
 the CI to generate [1-6, several, 0 for none]: 1 3
 
+run image scans only on scheduled builds (Yes/No)
+Yes
+
 what time the daily build runs, UTC [12:30]: 05:45
 
 

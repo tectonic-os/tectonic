@@ -792,12 +792,44 @@ fn flows() {
     );
     assert_eq!(listed("example/gaming"), "");
 
+    let prompted = flow_repo("flow-set");
     flow(
         "flow-set-workflows",
-        &flow_repo("flow-set"),
+        &prompted,
         None,
         &["--root", ".", "set", "workflows"],
     );
+    let declaration =
+        "workflows at=\"05:45\" scan=\"scheduled\" {\n    build\n    base-sig-probe\n}";
+    let prompted_repo = std::fs::read_to_string(prompted.join("repo.kdl")).unwrap();
+    assert!(prompted_repo.contains(declaration), "{prompted_repo}");
+
+    let direct = flow_repo("flow-cadence-direct");
+    let repo_path = direct.join("repo.kdl");
+    let mut direct_repo = std::fs::read_to_string(&repo_path).unwrap();
+    let span = tect::parse::repo::workflows_span(&direct_repo).unwrap();
+    direct_repo.replace_range(span.offset..span.offset + span.len, declaration);
+    std::fs::write(&repo_path, direct_repo).unwrap();
+
+    let generated_build = |root: &Path| {
+        let run = tect::run(Command::Generate, None, root);
+        assert!(run.issues.is_empty(), "{}", run.issues.plain());
+        tect::write_generated(root, &run.files).unwrap();
+        assert!(
+            tect::run(Command::Verify, None, root).issues.is_empty(),
+            "verify rejected its generated workflow"
+        );
+        run.files
+            .into_iter()
+            .find(|(path, _)| path == Path::new(".github/workflows/build.yml"))
+            .unwrap()
+            .1
+    };
+    let prompted_build = generated_build(&prompted);
+    let direct_build = generated_build(&direct);
+    assert_eq!(prompted_build, direct_build);
+    assert!(prompted_build.contains("    if: github.event_name == 'schedule'\n"));
+    assert!(!prompted_build.contains("    if: github.event_name != 'pull_request'\n"));
 
     // What a module requires and nothing in the image provides comes with it,
     // and the CI it makes runnable is offered rather than left to be found.

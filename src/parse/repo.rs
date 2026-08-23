@@ -73,9 +73,14 @@ pub const REPO: Node = Node::new("repo",
                     desc: "The hour and minute the daily build runs, UTC. Every other schedule \
                            is an offset from it.",
                     say: Say::new("`{}` must be a time of day", "not a string", ""),
+                     missing: Say::NONE },
+                Prop { name: "scan", kind: Kind::Str,
+                    desc: "When image scans run. `scheduled` moves them off pushes while keeping \
+                           the daily measurement.",
+                    say: Say::new("`{}` must be a cadence", "not a string", "`scan=\"scheduled\"`"),
                     missing: Say::NONE },
             ], Say::new("unknown workflows property `{}`", "not part of the schema",
-                "a workflows block accepts `at`"))
+                "a workflows block accepts `at` and `scan`"))
             .children(&[
                 Node::new("", "One workflow, named by the node.")
                     .arg(Arg::None, Say::new("a workflow takes no arguments", "unexpected value",
@@ -242,6 +247,7 @@ impl List {
             images: Vec::new(),
             workflows: Vec::new(),
             workflows_at: crate::resolve::workflow::DEFAULT_AT,
+            scans_scheduled: false,
             sources: Vec::new(),
             default_image_id: None,
             pr_image_id: None,
@@ -581,6 +587,22 @@ impl List {
                         .help(
                             "`workflows at=\"12:30\"`, the hour and minute the daily build \
                                runs, UTC",
+                        ),
+                ),
+            }
+        }
+        if let Some(scan) = prop(block, "scan") {
+            match scan {
+                "scheduled" => self.scans_scheduled = true,
+                _ => issues.push(
+                    Issue::new(format!("`{scan}` is not a scan cadence"), src)
+                        .at(
+                            prop_span(block, "scan").unwrap_or_default(),
+                            "not `scheduled`",
+                        )
+                        .help(
+                            "`workflows scan=\"scheduled\"`, to scan only on the daily build; \
+                               omit `scan` to scan on pushes too",
                         ),
                 ),
             }
