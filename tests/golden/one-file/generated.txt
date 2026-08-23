@@ -6,7 +6,7 @@ set -euxo pipefail
 MODDIR=/ctx/modules/core/hello
 export MODDIR
 
-dnf5 install -y fastfetch
+install_packages 'fastfetch'
 ==== generated/alpha.graph.md
 # Alpha capability graph
 
@@ -51,7 +51,7 @@ set -euxo pipefail
 MODDIR=/ctx/modules/core/hello
 export MODDIR
 
-dnf5 install -y fastfetch
+install_packages 'fastfetch'
 ==== generated/beta.graph.md
 # Beta capability graph
 

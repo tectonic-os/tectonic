@@ -6,7 +6,7 @@ set -euxo pipefail
 MODDIR=/ctx/modules/.remote/tectonic-os/hello
 export MODDIR
 
-dnf5 install -y fastfetch
+install_packages 'fastfetch'
 ==== generated/example.graph.md
 # Example capability graph
 

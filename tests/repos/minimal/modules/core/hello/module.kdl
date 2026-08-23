@@ -3,5 +3,5 @@ description "The smallest module a repository can hold"
 supports "fedora"
 
 packages {
-    fedora "fastfetch"
+    fedora "fastfetch" enablerepo="updates-testing"
 }

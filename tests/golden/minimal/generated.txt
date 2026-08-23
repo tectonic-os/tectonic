@@ -6,7 +6,7 @@ set -euxo pipefail
 MODDIR=/ctx/modules/core/hello
 export MODDIR
 
-dnf5 install -y fastfetch
+TECT_ENABLE_REPO='updates-testing' install_packages 'fastfetch'
 ==== generated/minimal.graph.md
 # Minimal capability graph
 

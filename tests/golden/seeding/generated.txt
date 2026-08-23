@@ -6,7 +6,7 @@ set -euxo pipefail
 MODDIR=/ctx/modules/hello
 export MODDIR
 
-dnf5 install -y fastfetch
+install_packages 'fastfetch'
 ==== generated/example.d/tectonic-os/flatpak.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
@@ -18,7 +18,7 @@ export MODDIR
 OPT_REMOTES=(flathub flathub-beta)
 export OPT_SYSTEM_WIDE="0"
 
-dnf5 install -y flatpak
+install_packages 'flatpak'
 ==== generated/example.d/drivers@nvidia.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
@@ -32,7 +32,7 @@ if [ "${FLAVOUR:-}" != "nvidia" ]; then
     exit 0
 fi
 
-dnf5 install -y akmod-nvidia
+install_packages 'akmod-nvidia'
 ==== generated/example.graph.md
 # Example capability graph
 
