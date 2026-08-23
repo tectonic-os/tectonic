@@ -91,29 +91,18 @@ fn script(
     }
 
     for group in module.packages.iter().filter(|g| g.family == base_family) {
-        let packages = group.packages.join(" ");
-        match base_family {
-            "fedora" => {
-                let repo = match &group.enablerepo {
-                    Some(repo) => format!(" --enablerepo='{repo}'"),
-                    None => String::new(),
-                };
-                let _ = write!(out, "\ndnf5 install -y{repo} {packages}\n");
-            }
-            "debian" | "ubuntu" => {
-                // A bootc image ships an empty /var, so apt's state directories
-                // are not there to be written to until they are made.
-                let _ = write!(
-                    out,
-                    "\nmkdir -p /var/lib/apt/lists/partial /var/lib/dpkg /var/cache/apt/archives/partial\n\
-                     apt-get update\n\
-                     DEBIAN_FRONTEND=noninteractive apt-get install -y {packages}\n\
-                     apt-get clean\n\
-                     rm -rf /var/lib/apt/lists/*\n"
-                );
-            }
-            _ => {}
-        }
+        let packages = group
+            .packages
+            .iter()
+            .map(|package| shell(package))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let repo = group
+            .enablerepo
+            .as_ref()
+            .map(|repo| format!("TECT_ENABLE_REPO={} ", shell(repo)))
+            .unwrap_or_default();
+        let _ = write!(out, "\n{repo}install_packages {packages}\n");
     }
 
     // The guard is `dnf5 config-manager`'s layout. A deb family writes its
