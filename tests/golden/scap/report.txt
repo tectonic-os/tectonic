@@ -93,6 +93,9 @@ The scan measured 4 rules: 2 pass, 1 fail.
 ==== the content it is measured with
 /usr/share/xml/scap/ssg/content/ssg-fedora-ds.xml
 ==== exit 0
+==== and for an image declaring claims but no profile
+
+==== exit 0
 ==== and for an image declaring neither a claim nor a profile
 
 ==== exit 0

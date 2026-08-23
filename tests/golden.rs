@@ -1174,6 +1174,30 @@ fn scap() {
     let baseline = tmp().join("scap-baseline.json");
     let _ = std::fs::remove_file(&baseline);
     let datastream = fixtures.join("datastream.xml");
+    let claim_only = tmp().join("scap-claim-only");
+    let _ = std::fs::remove_dir_all(&claim_only);
+    copy(&enforced, &claim_only);
+    let image = claim_only.join("example.image.kdl");
+    let text = std::fs::read_to_string(&image).unwrap();
+    std::fs::write(&image, text.replace("    conforms \"cis\"\n", "")).unwrap();
+
+    let (report, said, code) = scap_run(
+        &claim_only,
+        &[
+            "--root",
+            ".",
+            "scap",
+            &fixtures.join("arf.xml").display().to_string(),
+            "--datastream",
+            &datastream.display().to_string(),
+        ],
+    );
+    assert!(
+        code == 2,
+        "explicit datastream did not evaluate claims: {said}"
+    );
+    assert!(report.contains("| one/hello | cis-fedora | 1.1.1.1 | pass |"));
+
     let mut out = String::new();
     for (heading, arf) in [
         ("the first scan, which is the baseline", "arf.xml"),
@@ -1246,6 +1270,10 @@ fn scap() {
     // asks to be measured against nothing.
     for (heading, at) in [
         ("the content it is measured with", &enforced),
+        (
+            "and for an image declaring claims but no profile",
+            &claim_only,
+        ),
         (
             "and for an image declaring neither a claim nor a profile",
             &crate_dir().join("tests/repos/minimal"),
