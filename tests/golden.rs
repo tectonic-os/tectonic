@@ -703,15 +703,11 @@ fn flows() {
         ],
     );
     let listed = |at: &str| {
-        tect::create::Listing::collect(
-            &root,
-            vec![at.into()],
-            "dev-tools",
-            None,
-            &tect::prompt::Prompt::silent(),
-        )
-        .err()
-        .unwrap_or_default()
+        let (list, _, _) = tect::declarations(&root);
+        tect::create::Listing::collect(&root, vec![at.into()], &tect::prompt::Prompt::silent())
+            .and_then(|listing| listing.refuse_duplicate(&list, "dev-tools", None))
+            .err()
+            .unwrap_or_default()
     };
     assert_eq!(
         listed("example/dx"),
@@ -840,6 +836,23 @@ fn flows() {
     .map(|err| err.message().to_string())
     .unwrap_or_default();
     assert_eq!(twice, "`example` already lists `flatpak`");
+
+    // Several at once: one listing answer, and one of each offer for the set.
+    let several = flow_repo_sourced("flow-several");
+    flow(
+        "flow-import-several",
+        &several,
+        None,
+        &["--root", ".", "import", "module"],
+    );
+    let image = std::fs::read_to_string(several.join("example.image.kdl")).unwrap();
+    for module in ["flatpak", "browser", "custom-kernel"] {
+        assert!(image.contains(&format!("module \"{module}\"")), "{image}");
+    }
+    assert!(std::fs::read_to_string(several.join("repo.kdl"))
+        .unwrap()
+        .contains("    kernel-freshness\n"));
+    tect(&several, &["--no-tui", "--root", ".", "check"]);
 
     let root = flow_repo_sourced("flow-copy");
     flow(

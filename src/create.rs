@@ -571,7 +571,8 @@ impl Module {
             };
 
         let text = module_kdl(&name, &family(root)?, &pkgs, &with)?;
-        let listing = Listing::collect(root, images, &path, None, prompt)?;
+        let listing = Listing::collect(root, images, prompt)?;
+        listing.refuse_duplicate(&crate::model::image::List::load(root).0, &path, None)?;
         Ok(Self {
             path,
             file,
@@ -670,15 +671,10 @@ pub struct Listed {
 }
 
 impl Listing {
-    /// `name` and `source` are the declaration the answer writes, which is what
-    /// an image already listing it is recognised by.
-    pub fn collect(
-        root: &Path,
-        given: Vec<String>,
-        name: &str,
-        source: Option<&str>,
-        prompt: &Prompt,
-    ) -> Result<Self, String> {
+    /// The question alone: which images, and nothing about what goes in them.
+    /// What one answer writes into each is checked per module by
+    /// `refuse_duplicate`, since one answer covers a set.
+    pub fn collect(root: &Path, given: Vec<String>, prompt: &Prompt) -> Result<Self, String> {
         let (list, _) = crate::model::image::List::load(root);
         if list.images.is_empty() {
             return Ok(Self::NoImage);
@@ -722,38 +718,6 @@ impl Listing {
             ));
         }
 
-        // The same thing against what the file already says: a module gated to
-        // two flavours is listed under each, so only an overlap is a duplicate.
-        let dir = match source {
-            Some(owner) => format!("{}/{owner}/{name}", crate::model::remote::REMOTE_DIR),
-            None => name.to_string(),
-        };
-        for target in chosen.iter().map(|at| &targets[*at]) {
-            let Some(image) = list.images.iter().find(|image| image.id == target.image) else {
-                continue;
-            };
-            let gated = target.flavour != crate::model::image::NO_FLAVOUR;
-            let Some(held) = image.entries.iter().find(|entry| {
-                entry.dir() == dir
-                    && (!gated
-                        || entry.flavour.is_none()
-                        || entry.flavour.as_deref() == Some(target.flavour.as_str()))
-            }) else {
-                continue;
-            };
-            let at = crate::model::image::Target {
-                image: image.id.clone(),
-                flavour: held
-                    .flavour
-                    .clone()
-                    .unwrap_or_else(|| crate::model::image::NO_FLAVOUR.to_string()),
-            };
-            return Err(match at.to_string() == target.to_string() {
-                true => format!("`{at}` already lists `{name}`"),
-                false => format!("`{at}` already lists `{name}`, so `{target}` lists it twice"),
-            });
-        }
-
         Ok(match chosen.is_empty() {
             true => Self::Declined {
                 asked: prompt.asks(),
@@ -782,11 +746,56 @@ impl Listing {
         })
     }
 
+    /// The declaration `name` and `source` write, against what the images the
+    /// answer names already say. A module gated to two flavours is listed under
+    /// each, so only an overlap is a duplicate.
+    pub fn refuse_duplicate(
+        &self,
+        list: &crate::model::image::List,
+        name: &str,
+        source: Option<&str>,
+    ) -> Result<(), String> {
+        let Self::In(listed) = self else {
+            return Ok(());
+        };
+        let dir = match source {
+            Some(owner) => format!("{}/{owner}/{name}", crate::model::remote::REMOTE_DIR),
+            None => name.to_string(),
+        };
+        let target = |image: &crate::model::image::Image, flavour: &Option<String>| {
+            crate::model::image::Target {
+                image: image.id.clone(),
+                flavour: flavour
+                    .clone()
+                    .unwrap_or_else(|| crate::model::image::NO_FLAVOUR.to_string()),
+            }
+        };
+        for into in listed {
+            let Some(image) = list.images.iter().find(|image| image.name == into.image) else {
+                continue;
+            };
+            let Some(held) = image.entries.iter().find(|entry| {
+                entry.dir() == dir
+                    && (into.flavour.is_none()
+                        || entry.flavour.is_none()
+                        || entry.flavour == into.flavour)
+            }) else {
+                continue;
+            };
+            let (at, into) = (target(image, &held.flavour), target(image, &into.flavour));
+            return Err(match at.to_string() == into.to_string() {
+                true => format!("`{at}` already lists `{name}`"),
+                false => format!("`{at}` already lists `{name}`, so `{into}` lists it twice"),
+            });
+        }
+        Ok(())
+    }
+
     /// The image files the module got a line in, which is nothing where no
     /// image took it. Appending is the only thing this does, so every one of
     /// them is an update.
     pub fn apply(&self, path: &str) -> Result<Vec<(PathBuf, Change)>, String> {
-        self.apply_declaration(path, None)
+        self.apply_declaration(&[(path, None)])
     }
 
     pub fn cancelled(&self) -> bool {
@@ -808,16 +817,20 @@ impl Listing {
         out
     }
 
-    pub fn apply_source(&self, source: &str, name: &str) -> Result<Vec<(PathBuf, Change)>, String> {
-        self.apply_declaration(name, Some(source))
+    /// One answer applied to a set: every member gets its line in every image
+    /// the answer named, in the order they are given.
+    pub fn apply_source(&self, members: &[(&str, &str)]) -> Result<Vec<(PathBuf, Change)>, String> {
+        let declarations: Vec<(&str, Option<&str>)> = members
+            .iter()
+            .map(|(source, name)| (*name, Some(*source)))
+            .collect();
+        self.apply_declaration(&declarations)
     }
 
     fn apply_declaration(
         &self,
-        name: &str,
-        source: Option<&str>,
+        declarations: &[(&str, Option<&str>)],
     ) -> Result<Vec<(PathBuf, Change)>, String> {
-        let leaf = format!("module \"{name}\"");
         match self {
             Self::Cancelled => Ok(Vec::new()),
             Self::NoImage => {
@@ -825,22 +838,26 @@ impl Listing {
                 Ok(Vec::new())
             }
             Self::Declined { .. } => {
-                let shown = wrap(&listed_in(None, source)[1..], &leaf);
-                println!(
-                    "next, to build it, list it in an image:\n {}",
-                    shown.replace('\n', "\n ")
-                );
+                for (name, source) in declarations {
+                    let shown = wrap(&listed_in(None, *source)[1..], &leaf(name));
+                    println!(
+                        "next, to build it, list it in an image:\n {}",
+                        shown.replace('\n', "\n ")
+                    );
+                }
                 Ok(Vec::new())
             }
             Self::In(listed) => {
                 let mut wrote: Vec<(PathBuf, Change)> = Vec::new();
                 for target in listed {
-                    append(
-                        &target.file,
-                        &target.image,
-                        &listed_in(target.flavour.as_deref(), source),
-                        &leaf,
-                    )?;
+                    for (name, source) in declarations {
+                        append(
+                            &target.file,
+                            &target.image,
+                            &listed_in(target.flavour.as_deref(), *source),
+                            &leaf(name),
+                        )?;
+                    }
                     // Two flavours of one image are two lines in one file.
                     if !wrote.iter().any(|(file, _)| *file == target.file) {
                         wrote.push((target.file.clone(), Change::Updated));
@@ -850,6 +867,11 @@ impl Listing {
             }
         }
     }
+}
+
+/// The declaration a module gets, which is one line whatever wraps it.
+fn leaf(name: &str) -> String {
+    format!("module \"{name}\"")
 }
 
 /// The listing question: every image with its flavours under it, since listing

@@ -173,23 +173,26 @@ Asks you for:
 
 ### `import module [name]`
 
-References one module from a source collection by adding it to an image's
+References modules from a source collection by adding them to an image's
 `source` block. The module stays out of the tracked tree; import populates its
 ignored `modules/.remote/<owner>/<name>` cache, and a build fetches it again
 when the collection pin changes.
 
 Asks you for:
-- Which module, listing every one the collections hold with its description and
-  what it requires, when no name is given
-- Which images or flavours the module is listed in; an import with none has no
+- Which modules, listing every one the collections hold with its description and
+  what it requires, when no name is given. Several may be chosen, and they share
+  the one listing answer and one of each offer below
+- Which images or flavours the modules are listed in; an import with none has no
   repository representation and is refused
-- Whether to import what it requires and nothing in those images provides
-- Whether to generate the CI it makes runnable
+- Whether to import what they require and nothing in those images provides
+- Whether to generate the CI they make runnable
 
 #### Flags:
     --image <name>    list the module in this image or flavour; repeatable
 
 #### Notes:
+- The argument names one module. The picker is what takes several, since one
+  answer per question is what makes a set cheaper than a module at a time.
 - A bare name is searched for in every collection. `<owner>/<name>` picks
   between two collections that both have it.
 - A pinned collection member is downloaded and verified once. An `unpinned`
