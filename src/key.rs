@@ -196,23 +196,25 @@ fn absent(root: &Path, kind: &str, disk: &Disk) -> String {
     }
 }
 
-/// Nothing in the repository and nothing in its collections declares it, so
-/// what is missing is the declaration itself.
+/// Nothing in the repository and nothing in its collections declares it.
 fn undeclared(kind: &str, disk: &Disk) -> String {
-    let kind = match kind.is_empty() {
-        true => "<kind>",
-        false => kind,
+    let noun = match kind.is_empty() {
+        true => "a signing key".to_string(),
+        false => format!("a {kind} key"),
     };
-    let here = match disk.keys.is_empty() {
-        true => String::new(),
-        false => format!("\nThe keys declared here are {}.", listed(disk)),
-    };
-    format!(
-        "nothing here or in the collections this repository declares carries a {kind} key.\n\
-         The module shipping the public half is what declares one, as `key \"{kind}\"` \
-         naming a generator, the path the image ships the public half at, and the file \
-         the private half is written to.{here}"
-    )
+    match disk.keys.is_empty() {
+        true => format!(
+            "no module in this repository declares {noun}.\n\n\
+             Keys come from modules: image signing from a module carrying the cosign public \
+             key, Secure Boot from a kernel module carrying a MOK certificate. Import one and \
+             run this again."
+        ),
+        false => format!(
+            "no module in this repository declares {noun}.\n\n\
+             The keys declared here are {}. Import a module carrying one and run this again.",
+            listed(disk)
+        ),
+    }
 }
 
 fn listed(disk: &Disk) -> String {
@@ -247,7 +249,7 @@ fn cosign(work: &Path) -> Result<(PathBuf, PathBuf), String> {
     finish(
         generate,
         "cosign",
-        "get it from https://github.com/sigstore/cosign/releases, or `dnf install cosign`",
+        "get it from https://github.com/sigstore/cosign/releases",
     )?;
     Ok((work.join("cosign.pub"), work.join("cosign.key")))
 }
@@ -274,7 +276,11 @@ fn openssl(work: &Path, declared: &Declared, cn: &str) -> Result<(PathBuf, PathB
         .arg(&public)
         .arg("-keyout")
         .arg(&private);
-    finish(generate, "openssl", "`dnf install openssl`")?;
+    finish(
+        generate,
+        "openssl",
+        "install it from your platform's openssl package",
+    )?;
     Ok((public, private))
 }
 
@@ -468,10 +474,10 @@ key "secureboot" {
         let message = Key::collect(&root, Some("cosign".into()), None, None, &Prompt::silent())
             .map(|_| ())
             .unwrap_err();
-        assert!(message.contains("carries a cosign key"), "{message}");
-        assert!(
-            message.contains("declared here are secureboot"),
-            "{message}"
+        assert_eq!(
+            message,
+            "no module in this repository declares a cosign key.\n\n\
+             The keys declared here are secureboot. Import a module carrying one and run this again."
         );
         let _ = std::fs::remove_dir_all(&root);
     }

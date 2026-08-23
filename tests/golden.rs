@@ -905,6 +905,25 @@ fn flows() {
         None,
         &["--root", ".", "create", "key"],
     );
+
+    // A kind nothing declares anywhere: the two fixture collections are on
+    // this machine and are searched, and neither they nor the repository
+    // carries one.
+    flow(
+        "flow-key-undeclared",
+        &flow_repo_sourced("flow-key-undeclared"),
+        None,
+        &["--root", ".", "create", "key", "sbom"],
+    );
+
+    // No kind named and nothing to prompt from, which is the path that used to
+    // print the literal `<kind>`.
+    flow(
+        "flow-key-no-kind",
+        &flow_repo("flow-key-no-kind"),
+        None,
+        &["--root", ".", "create", "key"],
+    );
 }
 
 /// The reference in docs/schema.md, re-rendered from the tables. The renderer

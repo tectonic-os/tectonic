@@ -1093,7 +1093,7 @@ fn git_init(root: &Path) -> Result<(), String> {
         )),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Err(
             "`git` is not installed, and it is what initialises the repository: \
-             `dnf install git`"
+             install it from your platform's git package"
                 .to_string(),
         ),
         Err(err) => Err(format!("git: {err}")),
