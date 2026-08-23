@@ -161,6 +161,31 @@ pub fn check_graph(image: &Image, root: &Path, index: &Index, issues: &mut Issue
         .as_ref()
         .map(|b| b.family.as_str())
         .filter(|f| !f.is_empty());
+    if let Some(base_family) = base_family {
+        let needs_adapter = image.modules().any(|module| {
+            module
+                .packages
+                .iter()
+                .any(|group| group.family == base_family)
+        });
+        let has_adapter = offered.get("build-environment").is_some_and(|providers| {
+            providers
+                .iter()
+                .any(|module| module.supports.iter().any(|family| family == base_family))
+        });
+        if needs_adapter && !has_adapter {
+            issues.push(
+                Issue::new(
+                    format!(
+                        "image `{}` installs packages for `{base_family}`, but no enabled module provides `build-environment` for that family",
+                        image.id
+                    ),
+                    &image.src,
+                )
+                .at(image.span, "missing family adapter"),
+            );
+        }
+    }
     for module in image.modules() {
         let Some(base_family) = base_family else {
             break;
