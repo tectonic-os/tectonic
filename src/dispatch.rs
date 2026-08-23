@@ -178,6 +178,16 @@ pub fn dispatch(
         no_cache_from,
     } = flags;
     match spec.verb {
+        Verb::Upgrade => {
+            if let [word, ..] = rest {
+                return Err(Error::Invocation(format!(
+                    "`{}` does not take {word}",
+                    spec.name()
+                )));
+            }
+            crate::upgrade::run()?;
+            Ok(ExitCode::SUCCESS)
+        }
         Verb::CreateRepo => {
             let name = one_name(rest, spec)?;
             // The image `create repo` writes is one, so its `--image` is a name.

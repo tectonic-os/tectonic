@@ -23,6 +23,7 @@ pub mod runtime;
 pub mod scap;
 pub mod set;
 pub mod ui;
+pub mod upgrade;
 
 pub use command::{Arg, Command};
 use diag::Issue;

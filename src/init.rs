@@ -55,8 +55,9 @@ pub fn assets() -> Result<PathBuf, String> {
     }
 }
 
-/// `$XDG_DATA_HOME`, else `~/.local/share`.
-fn data_home() -> Option<PathBuf> {
+/// `$XDG_DATA_HOME`, else `~/.local/share`. `upgrade` reads it too, so the
+/// per-user assets path has one definition rather than two that drift.
+pub(crate) fn data_home() -> Option<PathBuf> {
     std::env::var_os("XDG_DATA_HOME")
         .filter(|dir| !dir.is_empty())
         .map(PathBuf::from)

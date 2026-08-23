@@ -7,6 +7,7 @@ use crate::ui::Choice;
 /// Every command word the binary answers, one variant per dispatch arm.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Verb {
+    Upgrade,
     CreateRepo,
     CreateImage,
     CreateFlavour,
@@ -39,6 +40,7 @@ pub enum Verb {
 /// Beside the enum, so a variant with no row is a failed test rather than a
 /// word nothing resolves to.
 pub const ALL: &[Verb] = &[
+    Verb::Upgrade,
     Verb::CreateRepo,
     Verb::CreateImage,
     Verb::CreateFlavour,
@@ -131,6 +133,15 @@ impl Spec {
 const ROOT: &[&str] = &["root"];
 
 pub const COMMANDS: &[Spec] = &[
+    Spec {
+        verb: Verb::Upgrade,
+        word: "upgrade",
+        noun: "",
+        arg: "",
+        about: "replace this tect and its assets with the latest",
+        family: Family::Anywhere,
+        takes: &[],
+    },
     Spec {
         verb: Verb::CreateRepo,
         word: "create",
