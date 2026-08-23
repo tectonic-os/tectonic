@@ -234,9 +234,19 @@ pub fn report(root: &Path, wrote: &[(PathBuf, Change)]) {
     crate::ui::tree::print(&id, wrote, describe);
 }
 
+/// What a line in the tree says: the edit where the file already existed, and
+/// what the file is for where it was written whole. A `~` restating a file kind
+/// says what the path says.
+fn describe(path: &Path, change: Option<&Change>) -> String {
+    match change {
+        Some(Change::Updated(edit)) if !edit.is_empty() => edit.clone(),
+        _ => kind(path).to_string(),
+    }
+}
+
 /// What one short phrase per kind of file says it is for, empty for a file
 /// that speaks for itself. UI copy, written once and read forever.
-fn describe(path: &Path) -> &'static str {
+fn kind(path: &Path) -> &'static str {
     let name = path.file_name().unwrap_or_default().to_string_lossy();
     if layout::is_image_file(&name) {
         return "an image: its base, and the modules it lists";
@@ -383,7 +393,10 @@ impl Image {
         let mut wrote = vec![(under(root, &self.file), Change::Created)];
         if let Some(was) = &self.names_default {
             append_default_image(root, was)?;
-            wrote.push((under(root, Path::new(layout::REPO_FILE)), Change::Updated));
+            wrote.push((
+                under(root, Path::new(layout::REPO_FILE)),
+                Change::Updated(format!("{was} set as the default image")),
+            ));
         }
         Ok(wrote)
     }
@@ -504,7 +517,10 @@ impl Flavour {
 
     pub fn apply(&self, root: &Path) -> Result<Vec<(PathBuf, Change)>, String> {
         append(&self.file, &self.image, &[("flavours", None)], &self.name)?;
-        Ok(vec![(under(root, &self.file), Change::Updated)])
+        Ok(vec![(
+            under(root, &self.file),
+            Change::Updated(format!("{} added to flavours", self.name)),
+        )])
     }
 }
 
@@ -849,6 +865,15 @@ impl Listing {
             }
             Self::In(listed) => {
                 let mut wrote: Vec<(PathBuf, Change)> = Vec::new();
+                let added = format!(
+                    "{} added to modules",
+                    crate::import::said(
+                        &declarations
+                            .iter()
+                            .map(|(name, _)| (*name).to_string())
+                            .collect::<Vec<_>>()
+                    )
+                );
                 for target in listed {
                     for (name, source) in declarations {
                         append(
@@ -860,7 +885,7 @@ impl Listing {
                     }
                     // Two flavours of one image are two lines in one file.
                     if !wrote.iter().any(|(file, _)| *file == target.file) {
-                        wrote.push((target.file.clone(), Change::Updated));
+                        wrote.push((target.file.clone(), Change::Updated(added.clone())));
                     }
                 }
                 Ok(wrote)

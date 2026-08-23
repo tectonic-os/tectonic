@@ -14,5 +14,5 @@ example/
 ├── modules/              every module this repo owns or imported
 │   └── dev-tools/
 │       └── + module.kdl  what the module installs, places and provides
-└── ~ example.image.kdl   an image: its base, and the modules it lists
+└── ~ example.image.kdl   dev-tools added to modules
 ==== exit 0

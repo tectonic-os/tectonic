@@ -106,7 +106,10 @@ impl Workflows {
             std::fs::read_to_string(&file).map_err(|err| format!("{}: {err}", file.display()))?;
         std::fs::write(&file, self.spliced(&text))
             .map_err(|err| format!("{}: {err}", file.display()))?;
-        Ok(vec![(PathBuf::from(layout::REPO_FILE), Change::Updated)])
+        Ok(vec![(
+            PathBuf::from(layout::REPO_FILE),
+            Change::Updated("the workflows it generates".to_string()),
+        )])
     }
 
     /// In place of the block that was there, else at the end. A repository

@@ -621,7 +621,7 @@ fn quoted(picked: &[(Found, String)]) -> Vec<String> {
 }
 
 /// A list as a sentence reads it.
-fn said(items: &[String]) -> String {
+pub(crate) fn said(items: &[String]) -> String {
     match items.split_last() {
         None => String::new(),
         Some((last, [])) => last.clone(),

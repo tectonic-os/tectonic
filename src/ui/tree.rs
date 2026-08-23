@@ -17,25 +17,25 @@ const GAP: usize = 2;
 const LEAST: usize = 12;
 
 /// How a written file appears in the tree: a new one, or one a later step took
-/// further.
-#[derive(Clone, Copy)]
+/// further and what that step added to it, which a path cannot say.
+#[derive(Clone)]
 pub enum Change {
     Created,
-    Updated,
+    Updated(String),
 }
 
 /// What a file carries before its name, coloured the way a diff colours the
 /// same two symbols where anything is watching.
-fn mark(change: Change) -> String {
+fn mark(change: &Change) -> String {
     let symbol = match change {
         Change::Created => "+",
-        Change::Updated => "~",
+        Change::Updated(_) => "~",
     };
     match colour() {
         false => format!("{symbol} "),
         true => match change {
             Change::Created => format!("{} ", symbol.green()),
-            Change::Updated => format!("{} ", symbol.yellow()),
+            Change::Updated(_) => format!("{} ", symbol.yellow()),
         },
     }
 }
@@ -48,9 +48,13 @@ struct Node {
 }
 
 /// The tree of what a command wrote, hung off its root: `label` is the name
-/// the repository reads from its own tree, and `describe` names what one of
-/// the files is for — empty for a file that speaks for itself.
-pub fn print(label: &str, wrote: &[(PathBuf, Change)], describe: fn(&Path) -> &'static str) {
+/// the repository reads from its own tree, and `describe` says what one of the
+/// lines is — empty for a file that speaks for itself.
+pub fn print(
+    label: &str,
+    wrote: &[(PathBuf, Change)],
+    describe: fn(&Path, Option<&Change>) -> String,
+) {
     let mut lines = Vec::new();
     walk(&of(wrote), Path::new(""), "", describe, &mut lines);
 
@@ -92,7 +96,7 @@ fn of(wrote: &[(PathBuf, Change)]) -> Node {
                 .or_default();
             node.dir |= at + 1 < depth;
             if at + 1 == depth {
-                node.change = Some(*change);
+                node.change = Some(change.clone());
             }
         }
     }
@@ -103,8 +107,8 @@ fn walk(
     node: &Node,
     at: &Path,
     prefix: &str,
-    describe: fn(&Path) -> &'static str,
-    out: &mut Vec<(String, String, &'static str)>,
+    describe: fn(&Path, Option<&Change>) -> String,
+    out: &mut Vec<(String, String, String)>,
 ) {
     let mut names: Vec<&String> = node.children.keys().collect();
     names.sort_by_key(|name| !node.children[*name].dir);
@@ -122,18 +126,18 @@ fn walk(
                 (base.clone(), base)
             }
             false => {
-                let change = child.change.unwrap_or(Change::Created);
+                let change = child.change.clone().unwrap_or(Change::Created);
                 let bare = match change {
                     Change::Created => "+ ",
-                    Change::Updated => "~ ",
+                    Change::Updated(_) => "~ ",
                 };
                 (
                     format!("{prefix_shown}{bare}{name}"),
-                    format!("{prefix_shown}{}{name}", mark(change)),
+                    format!("{prefix_shown}{}{name}", mark(&change)),
                 )
             }
         };
-        out.push((plain, shown, describe(&path)));
+        out.push((plain, shown, describe(&path, child.change.as_ref())));
         walk(child, &path, &format!("{prefix}{carry}"), describe, out);
     }
 }
@@ -176,18 +180,24 @@ fn width() -> usize {
 mod tests {
     use super::*;
 
-    fn phrase(path: &Path) -> &'static str {
+    fn phrase(path: &Path, change: Option<&Change>) -> String {
+        if let Some(Change::Updated(edit)) = change {
+            if !edit.is_empty() {
+                return edit.clone();
+            }
+        }
         match path.to_string_lossy().as_ref() {
             "modules" => "every module the repo holds",
             "repo.kdl" => "what the repo pins",
             _ => "",
         }
+        .to_string()
     }
 
-    fn drawn(wrote: &[(&str, Change)]) -> Vec<(String, &'static str)> {
+    fn drawn(wrote: &[(&str, Change)]) -> Vec<(String, String)> {
         let wrote: Vec<(PathBuf, Change)> = wrote
             .iter()
-            .map(|(path, change)| (PathBuf::from(path), *change))
+            .map(|(path, change)| (PathBuf::from(path), change.clone()))
             .collect();
         let mut lines = Vec::new();
         walk(&of(&wrote), Path::new(""), "", phrase, &mut lines);
@@ -200,8 +210,11 @@ mod tests {
     #[test]
     fn directories_come_first_and_carry_the_branch_their_children_hang_off() {
         let lines = drawn(&[
-            ("repo.kdl", Change::Updated),
-            ("modules/mine/module.kdl", Change::Created),
+            ("repo.kdl", Change::Updated(String::new())),
+            (
+                "modules/mine/module.kdl",
+                Change::Updated("rewritten by hand".into()),
+            ),
             ("README.md", Change::Created),
         ]);
         let branches: Vec<&str> = lines.iter().map(|(branch, _)| branch.as_str()).collect();
@@ -210,13 +223,17 @@ mod tests {
             [
                 "├── modules/",
                 "│   └── mine/",
-                "│       └── + module.kdl",
+                "│       └── ~ module.kdl",
                 "├── + README.md",
                 "└── ~ repo.kdl",
             ]
         );
         assert_eq!(lines[0].1, "every module the repo holds");
+        // An edit says what it was; one with nothing to say falls back to what
+        // the file is.
+        assert_eq!(lines[2].1, "rewritten by hand");
         assert_eq!(lines[3].1, "");
+        assert_eq!(lines[4].1, "what the repo pins");
     }
 
     #[test]

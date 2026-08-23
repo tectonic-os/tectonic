@@ -17,5 +17,5 @@ example/
 │   └── browser/
 │       ├── + module.kdl      what the module installs, places and provides
 │       └── + provenance.kdl  where it was imported from, and its hash
-└── ~ example.image.kdl       an image: its base, and the modules it lists
+└── ~ example.image.kdl       browser added to modules
 ==== exit 0

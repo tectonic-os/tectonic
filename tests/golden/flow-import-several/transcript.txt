@@ -22,6 +22,6 @@ Yes
 
 
 example/
-├── ~ example.image.kdl  an image: its base, and the modules it lists
-└── ~ repo.kdl           what the repo pins, and where modules come from
+├── ~ example.image.kdl  flatpak, browser and custom-kernel added to modules
+└── ~ repo.kdl           the workflows it generates
 ==== exit 0

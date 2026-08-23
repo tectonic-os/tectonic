@@ -10,7 +10,7 @@ what time the daily build runs, UTC [12:30]: 05:45
 
 
 example/
-└── ~ repo.kdl  what the repo pins, and where modules come from
+└── ~ repo.kdl  the workflows it generates
 
 next, in .:
   tect generate

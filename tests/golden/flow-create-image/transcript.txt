@@ -17,5 +17,5 @@ What is the base image for this image? [1-9, 0 for none]: 9
 
 example/
 ├── + beta.image.kdl  an image: its base, and the modules it lists
-└── ~ repo.kdl        what the repo pins, and where modules come from
+└── ~ repo.kdl        example set as the default image
 ==== exit 0
