@@ -264,15 +264,20 @@ impl Prompt {
     }
 }
 
+/// Past this many, an answer echoes as a count: a screen of labels reads back
+/// as nothing at all.
+const LISTED: usize = 8;
+
 /// What a widget echoes after itself, so a terminal reads back the same answer
 /// a script typed.
 fn said(answer: &Answer, options: &[Choice]) -> String {
     let Answer::Chosen(chosen) = answer else {
         return "none".to_string();
     };
-    match chosen.is_empty() {
-        true => "none".to_string(),
-        false => chosen
+    match chosen.len() {
+        0 => "none".to_string(),
+        many if many > LISTED => format!("{many} chosen"),
+        _ => chosen
             .iter()
             .map(|at| options[*at].label.as_str())
             .collect::<Vec<_>>()
@@ -286,5 +291,27 @@ fn range(options: &[Choice]) -> String {
     match options.len() {
         1 => "1".to_string(),
         n => format!("1-{n}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn options(count: usize) -> Vec<Choice> {
+        (0..count)
+            .map(|at| Choice::new(format!("rule {at}"), ""))
+            .collect()
+    }
+
+    #[test]
+    fn a_short_answer_reads_back_as_itself_and_a_long_one_as_a_count() {
+        let options = options(20);
+        let short = Answer::Chosen((0..LISTED).collect());
+        assert!(said(&short, &options).starts_with("rule 0, rule 1,"));
+        let long = Answer::Chosen((0..LISTED + 1).collect());
+        assert_eq!(said(&long, &options), format!("{} chosen", LISTED + 1));
+        assert_eq!(said(&Answer::Chosen(Vec::new()), &options), "none");
+        assert_eq!(said(&Answer::Cancelled, &options), "none");
     }
 }
