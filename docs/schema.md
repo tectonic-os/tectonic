@@ -382,8 +382,9 @@ Also holds `module`, as above and `source`, as above.
 ## Out-of-tree modules
 
 A list entry may name a module that lives in another repository. It is
-fetched, verified against the hash, and unpacked under `modules/.remote/`, so
-its name is one path segment rather than a path.
+fetched, verified against the hash, and unpacked under `modules/.remote/`. A
+name that nests, `hardening/coredumps`, names the directories the collection
+groups its members in; every part of it is a name in its own right.
 
 ```kdl
 module "steam-tweaks" {

@@ -45,7 +45,12 @@ pub fn find(
     enforce: bool,
 ) -> Result<Vec<Found>, String> {
     let (owner, module) = split(name);
-    if module.is_empty() || module.contains('/') || module.starts_with('.') {
+    // A collection may group its members in directories, so the name is a path
+    // under it and every part of it is held to what one part always was.
+    if module
+        .split('/')
+        .any(|part| part.is_empty() || part.starts_with('.'))
+    {
         return Err(format!(
             "`{name}` is not a module: `<name>`, or `<owner>/<name>` when two collections have it"
         ));
@@ -106,6 +111,11 @@ pub fn find(
 /// Every module every declared collection holds, by name and then by
 /// collection. `fetch` decides whether a collection that is not on this
 /// machine is downloaded to answer or passed over.
+///
+/// The walk goes as deep as `Disk::scan`'s, so a member the collection groups
+/// under a directory is named by its path and is otherwise a member like any
+/// other. A dot directory is passed over: a collection read out of a working
+/// tree carries `.git`.
 pub fn catalog(root: &Path, sources: &[Collection], fetch: bool) -> Result<Vec<Provider>, String> {
     let mut listed: Vec<Provider> = Vec::new();
     for collection in sources {
@@ -117,23 +127,34 @@ pub fn catalog(root: &Path, sources: &[Collection], fetch: bool) -> Result<Vec<P
             },
         };
         let tree = tree.join(collection.subtree().unwrap_or(""));
-        let dirs = match std::fs::read_dir(&tree) {
-            Ok(dirs) => dirs,
+        let mut dirs: Vec<PathBuf> = match std::fs::read_dir(&tree) {
+            Ok(dirs) => dirs.flatten().map(|entry| entry.path()).collect(),
             Err(_) if !fetch => continue,
             Err(err) => return Err(format!("`{}`: {}: {err}", collection.name, tree.display())),
         };
-        for dir in dirs.flatten().map(|entry| entry.path()) {
+        while let Some(dir) = dirs.pop() {
+            let hidden = |name: &std::ffi::OsStr| name.to_string_lossy().starts_with('.');
+            if !dir.is_dir() || dir.file_name().is_some_and(hidden) {
+                continue;
+            }
             let manifest = dir.join(layout::MODULE_FILE);
             if !manifest.is_file() {
+                dirs.extend(
+                    std::fs::read_dir(&dir)
+                        .into_iter()
+                        .flatten()
+                        .flatten()
+                        .map(|entry| entry.path()),
+                );
                 continue;
             }
             listed.push(Provider {
                 owner: Some(collection.name.clone()),
                 name: dir
-                    .file_name()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .into_owned(),
+                    .strip_prefix(&tree)
+                    .unwrap_or(&dir)
+                    .display()
+                    .to_string(),
                 here: false,
                 declares: crate::parse::module::summary(&manifest),
             });

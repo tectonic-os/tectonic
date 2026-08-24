@@ -450,11 +450,11 @@ impl Image {
             ));
         }
 
-        if (pin.is_some() || source.is_some()) && !is_name(name) {
+        if (pin.is_some() || source.is_some()) && !name.split('/').all(is_name) {
             issues.push(
                 Issue::new(format!("invalid module name `{path}`"), src)
-                    .at(node.name().span(), "must be lowercase letters, digits and dashes, starting with a letter")
-                    .help(format!("a referenced module is fetched under modules/{REMOTE_DIR}/, so its name is one path segment rather than a path")),
+                    .at(node.name().span(), "every part must be lowercase letters, digits and dashes, starting with a letter")
+                    .help(format!("a referenced module is fetched under modules/{REMOTE_DIR}/, so a name that nests names the directories a collection groups its members in")),
             );
         }
 
