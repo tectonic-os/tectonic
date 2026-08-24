@@ -20,11 +20,11 @@ pub const REPO: Node = Node::new("repo",
             .arg(Arg::Int, Say::new("`{}` needs a number", "not a version", "`schema-version 1`"))
             .once(""),
         Node::new("tect-version",
-            "The tect release this repository is built with, which every command holds itself to.")
+            "The tect release this repository is built with, which `scripts/tect.sh` fetches for the build.")
             .arg(Arg::Str, Say::new("`{}` needs a release", "not a version",
                 concat!("`tect-version \"", env!("CARGO_PKG_VERSION"),
-                        "\"`, the release the build fetches and every command checks itself \
-                         against")))
+                        "\"`, the release the build fetches; another release reads the \
+                         repository and says so")))
             .once(""),
         Node::new("name",
             "What the repository calls itself, whatever the directory holding it is called.")
@@ -178,9 +178,10 @@ fn pins(root: &Path) -> Option<Pins> {
 
 /// Whether this release may work in the repository at all. `parse/` understands
 /// one schema, so a repository written against another is refused rather than
-/// read against the wrong grammar; and a repository pinned to another release
-/// is refused rather than generating what that release would not, which is the
-/// case `scripts/tect.sh` does not cover because it fetches the pin.
+/// read against the wrong grammar. That is the whole gate: `tect-version` names
+/// a release rather than a grammar, and every node the walker accepts is in a
+/// schema table, so a pin naming another release says nothing about whether the
+/// declarations here can be read. See `pinned_elsewhere`.
 pub fn compatible(root: &Path) -> Issues {
     let mut issues = Issues::default();
     let Some(pins) = pins(root) else {
@@ -213,20 +214,20 @@ pub fn compatible(root: &Path) -> Issues {
         return issues;
     }
 
-    if let Some((version, span)) = pins.tect.filter(|(v, _)| v != TECT_VERSION) {
-        issues.push(
-            Issue::new(
-                format!("this repository is pinned to tect {version}"),
-                &pins.src,
-            )
-            .at(span, format!("this is tect {TECT_VERSION}"))
-            .help(
-                "run the pinned release, which `scripts/tect.sh` fetches, or edit `tect-version` \
-                 to move the pin to this one",
-            ),
-        );
-    }
     issues
+}
+
+/// The release a repository pins, when that is not this one.
+///
+/// A notice rather than a refusal. What a pin protects is *generated output*,
+/// not readability: a different release writes different workflow bodies, and
+/// `verify` already reports that as drift with `generate` to resolve it.
+/// Refusing instead made every repository unusable between releases, patch
+/// bumps included, while `schema-version` — the thing that does decide whether
+/// the declarations parse — sat unchanged.
+pub fn pinned_elsewhere(root: &Path) -> Option<String> {
+    let version = pins(root)?.tect?.0;
+    (version != TECT_VERSION).then_some(version)
 }
 
 impl List {
@@ -676,6 +677,36 @@ pub fn at_text((hour, minute): (u32, u32)) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A repo.kdl holding `text` and nothing else, since both readers under
+    /// test take a root rather than a document.
+    fn root(name: &str, text: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("tect-pin-{name}"));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("a temp root");
+        std::fs::write(dir.join(layout::REPO_FILE), text).expect("repo.kdl");
+        dir
+    }
+
+    #[test]
+    fn a_pin_naming_another_release_is_reported_and_this_one_is_not() {
+        let other = root("other", "schema-version 1\ntect-version \"0.0.1\"\n");
+        assert_eq!(pinned_elsewhere(&other).as_deref(), Some("0.0.1"));
+        let ours = root(
+            "ours",
+            &format!("schema-version 1\ntect-version \"{TECT_VERSION}\"\n"),
+        );
+        assert_eq!(pinned_elsewhere(&ours), None);
+        let none = root("none", "schema-version 1\n");
+        assert_eq!(pinned_elsewhere(&none), None);
+    }
+
+    #[test]
+    fn a_pin_naming_another_release_refuses_nothing() {
+        let dir = root("open", "schema-version 1\ntect-version \"0.0.1\"\n");
+        let issues = compatible(&dir);
+        assert!(issues.is_empty(), "{}", issues.plain());
+    }
 
     fn messages(text: &str) -> Vec<String> {
         let doc: KdlDocument = text.parse().expect("valid KDL");

@@ -1,10 +1,11 @@
-  x this repository is pinned to tect 0.0.1
-   ,-[./repo.kdl:4:1]
- 3 | 
- 4 | tect-version "0.0.1"
-   : ^^^^^^|^^^^^
-   :       `-- this is tect {version}
-   `----
-  help: run the pinned release, which `scripts/tect.sh` fetches, or edit
-        `tect-version` to move the pin to this one
+  x `core/hello` has no module.kdl
+    ,-[./image.kdl:10:9]
+  9 |     modules {
+ 10 |         module "core/hello"
+    :         ^^^|^^
+    :            `-- every module needs a manifest
+ 11 |     }
+    `----
+  help: create ./modules/core/hello/module.kdl; modules/_template/module-name/
+        module.kdl is a copy-me reference
 

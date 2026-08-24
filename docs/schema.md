@@ -38,10 +38,13 @@ instead of reporting every node it cannot place. A repository behind this
 release behind this one is read by nothing here, and nothing here moves it
 forward; one ahead of it is read by the release it pins.
 
-`tect-version` is that release. `scripts/tect.sh` fetches it, so the build
-runs the tool the repository was written for whatever is installed on the
-machine, and every command refuses to run in a repository pinned to a release
-it is not. A repository that pins nothing is held to nothing.
+`tect-version` is that release. `scripts/tect.sh` fetches it, so the build runs
+the tool the repository was written for whatever is installed on the machine.
+Another release still reads the repository — `schema-version` is what decides
+that — and says once that the pin names a different one, because what differs is
+the output it would generate rather than the declarations it can parse. `verify`
+reports that as drift and `tect generate` resolves it. A repository that pins
+nothing is silent.
 
 A workflow is named by its file stem under `.github/workflows/`, and `tect
 generate` writes exactly the ones named here — so one nobody names is absent
@@ -164,7 +167,7 @@ the seed of it would leave a new repository unbuildable.
 | Node | Takes | Meaning |
 | --- | --- | --- |
 | `schema-version` | a number, at most one | The schema release this repository is written against, which picks the reader. |
-| `tect-version` | a string, at most one | The tect release this repository is built with, which every command holds itself to. |
+| `tect-version` | a string, at most one | The tect release this repository is built with, which `scripts/tect.sh` fetches for the build. |
 | `name` | a string, exactly one | What the repository calls itself, whatever the directory holding it is called. |
 | `default-image` | a string, at most one | The image a command given no image answers about, and a build with no target builds. |
 | `pr-image` | a string, at most one | The image a pull request builds. |

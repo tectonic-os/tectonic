@@ -6,6 +6,7 @@ use crate::prompt::Prompt;
 use crate::Command;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// The invocation is wrong: an unknown command, a bad argument, no repository.
 pub const USAGE_ERROR: u8 = 1;
@@ -76,23 +77,46 @@ fn one_name(rest: &[&str], spec: &Spec) -> Result<Option<String>, Error> {
 /// named the way `--root .` names one: every path a command prints hangs off
 /// this, and a person reads `modules/x` rather than where their home is.
 fn repo_root(given: Option<PathBuf>) -> Result<PathBuf, Error> {
-    if let Some(root) = given {
-        return Ok(root);
+    let root = match given {
+        Some(root) => root,
+        None => {
+            let here = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+            let found = crate::find_root(&here).ok_or_else(|| {
+                Error::Invocation(format!(
+                    "no repo.kdl in {} or any parent directory",
+                    here.display()
+                ))
+            })?;
+            match here.strip_prefix(&found).map(|d| d.components().count()) {
+                Ok(0) => PathBuf::from("."),
+                Ok(up) => (0..up).map(|_| "..").collect(),
+                Err(_) => found,
+            }
+        }
+    };
+    note_pin(&root);
+    Ok(root)
+}
+
+/// Whether the pin notice is already on stderr, since `repo_root` answers more
+/// than once in an invocation and the notice is about the run, not the call.
+static PINNED: AtomicBool = AtomicBool::new(false);
+
+/// A repository pinned to another release still reads: `schema-version` is what
+/// decides that. What differs is what this release would generate, so the
+/// notice names the two commands that settle it and nothing refuses.
+fn note_pin(root: &Path) {
+    if PINNED.swap(true, Ordering::Relaxed) {
+        return;
     }
-    let here = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let found = crate::find_root(&here).ok_or_else(|| {
-        Error::Invocation(format!(
-            "no repo.kdl in {} or any parent directory",
-            here.display()
-        ))
-    })?;
-    Ok(
-        match here.strip_prefix(&found).map(|d| d.components().count()) {
-            Ok(0) => PathBuf::from("."),
-            Ok(up) => (0..up).map(|_| "..").collect(),
-            Err(_) => found,
-        },
-    )
+    if let Some(version) = crate::parse::repo::pinned_elsewhere(root) {
+        eprintln!(
+            "tect: this repository pins tect {version} and this is {}, so what it generates may \
+             differ; `tect generate` writes this release's output, `tect-version` moves the pin, \
+             and `scripts/tect.sh` fetches the pinned release",
+            crate::model::image::TECT_VERSION
+        );
+    }
 }
 
 /// `why` off the baked documents: the manifest is what the image declares it is
