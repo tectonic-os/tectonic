@@ -643,6 +643,10 @@ pub struct Content {
     pub numbers: BTreeMap<String, BTreeSet<String>>,
     /// A rule to its title, which is the one line naming it a person reads.
     pub titles: BTreeMap<String, String>,
+    /// A rule to the head of its description, which is the only prose the
+    /// content carries about it. Markup between the open and the text drops it,
+    /// the way a title's does.
+    pub descriptions: BTreeMap<String, String>,
     ids: BTreeSet<String>,
     pub profiles: Vec<Profile>,
 }
@@ -670,6 +674,20 @@ impl Profile {
     }
 }
 
+/// The tail of a rule id, which names it without the datastream's own prefix.
+pub fn rule_name(id: &str) -> &str {
+    id.rsplit_once("_rule_").map_or(id, |(_, tail)| tail)
+}
+
+/// A dotted benchmark number as what it sorts by, with a part that is not one
+/// sorting after every part that is, so 1.9 reads before 1.10.
+pub fn ordinal(number: &str) -> Vec<u64> {
+    number
+        .split('.')
+        .map(|part| part.parse().unwrap_or(u64::MAX))
+        .collect()
+}
+
 impl Content {
     pub fn read(text: &str) -> Self {
         let mut content = Content::default();
@@ -690,7 +708,7 @@ impl Content {
                 }
                 xml::Event::Close { name: "Rule" } => rule.clear(),
                 xml::Event::Open {
-                    name: name @ ("reference" | "ident" | "version" | "title"),
+                    name: name @ ("reference" | "ident" | "version" | "title" | "description"),
                     ..
                 } => wanted = Some(name),
                 xml::Event::Text(text) => match want {
@@ -706,6 +724,12 @@ impl Content {
                                 profile.title = text.to_string();
                             }
                         }
+                    }
+                    Some("description") if !rule.is_empty() => {
+                        content
+                            .descriptions
+                            .entry(rule.clone())
+                            .or_insert_with(|| text.to_string());
                     }
                     Some(_) if !rule.is_empty() => {
                         content

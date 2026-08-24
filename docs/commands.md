@@ -343,6 +343,40 @@ Asks you for:
 - There are no toggle flags, the same way `set workflows` has none: with nobody
   to ask this says to write the line into the image file.
 
+### `set claims <module>`
+
+Chooses the benchmark rules one module this repository holds claims to cover,
+and writes them into its `satisfies` block as numbers.
+
+Asks you for:
+- Which profile the rules are read out of, out of the ones the datastream
+  carries
+- Which of that profile's rules the module claims, as a tree grouped by the
+  numbers' own dotted sections, opening on what it already claims
+
+#### Notes:
+- `--datastream <file>` names the content, and without it this reads the copy
+  installed on this machine for the family the module `supports`, refusing by
+  naming `scap-security-guide` and the flag when there is none. The contract is
+  `set conforms`'s: a number written into a manifest has to be one the scan that
+  measures it will carry.
+- Nothing here reads a scan. A claim is what the module says it supplies, and
+  `tect scap` is what measures whether the built image kept it.
+- The row carries the number, the rule's title and the rule the number resolves
+  to, so a number naming more than one rule is visible while it is being chosen.
+  A rule no number of its own reaches is left out and counted in a line above
+  the question, since no `satisfies` could name it.
+- Choosing a group chooses every rule under it, and the numbers are written out
+  under one benchmark node, a number per line. No prefix ever reaches the file:
+  a claim that grows when the content does is not a claim.
+- A claim about a rule the chosen profile does not select is kept, so measuring
+  a module against a second profile does not drop what the first one wrote.
+- Claiming nothing takes the block away, the way `set workflows` takes the
+  workflow block away. Leaving either picker changes nothing.
+- The benchmark each number is written under is `<profile>-<family>`, and it is
+  decorative: a number resolves against the datastream, never against the name
+  it was written under.
+
 ### `check`
 
 Reads every manifest and reports every problem at the line that caused it, then

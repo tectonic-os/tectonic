@@ -355,6 +355,23 @@ pub fn dispatch(
             crate::create::report(&root, &wrote);
             Ok(ExitCode::SUCCESS)
         }
+        Verb::SetClaims => {
+            let named = one_name(rest, spec)?.ok_or_else(|| {
+                Error::Invocation(format!("`{}` takes the module to claim for", spec.name()))
+            })?;
+            let Some(root) = open(root_arg)? else {
+                return Ok(ExitCode::from(REPO_ERROR));
+            };
+            if !prompt.asks() {
+                return Err(Error::Invocation(crate::set::CLAIMS_BY_HAND.to_string()));
+            }
+            let Some(set) = crate::set::Claims::collect(&root, &named, datastream, prompt)? else {
+                return Ok(ExitCode::SUCCESS);
+            };
+            let wrote = set.apply(&root)?;
+            crate::create::report(&root, &wrote);
+            Ok(ExitCode::SUCCESS)
+        }
         Verb::FetchModules => {
             let root = repo_root(root_arg)?;
             let (list, issues, context) = crate::declarations(&root);

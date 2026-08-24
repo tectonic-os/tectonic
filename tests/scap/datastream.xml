@@ -22,6 +22,7 @@
       </Rule>
       <Rule id="xccdf_org.ssgproject.content_rule_sshd_disable_root_login">
         <title>Disable SSH Root Login</title>
+        <description>Root login over SSH is what the rule closes.</description>
         <reference href="https://www.cisecurity.org/">5.2.20</reference>
         <ident system="https://public.cyber.mil/stigs/">RHEL-09-232010</ident>
       </Rule>

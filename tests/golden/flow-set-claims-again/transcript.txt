@@ -1,0 +1,15 @@
+  1) cis  CIS Benchmark
+  2) cis_server_l2  CIS Level 2 Server
+which profile [1-2, 0 for none]: cis
+
+  1) [ ] 1.1.1.1  Install AIDE  package_aide_installed  Read this rather than the &gt; below.
+  2) [ ] 4.1.3.1  Record Attempts to Alter Logon and Logout Events  audit_rules_login_events
+  3) [x] 5.2.20  Disable SSH Root Login  sshd_disable_root_login  Root login over SSH is what the rule closes.
+which rules `sshd` claims [1-3, several, 0 for none]: 1 3
+
+
+example/
+└── modules/              every module this repo owns or imported
+    └── sshd/
+        └── ~ module.kdl  claiming 2 rules of `cis`
+==== exit 0

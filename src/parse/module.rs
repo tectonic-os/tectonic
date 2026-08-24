@@ -942,6 +942,18 @@ pub fn parse_key(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Ke
     })
 }
 
+/// The span the `satisfies` block takes, which is what a claim written by hand
+/// or by a picker replaces. `None` is a manifest declaring none, which the
+/// writer appends to instead.
+pub fn satisfies_span(kdl: &str) -> Option<Span> {
+    let doc: KdlDocument = kdl.parse().ok()?;
+    let node = doc
+        .nodes()
+        .iter()
+        .find(|node| node.name().value() == "satisfies")?;
+    Some(node.span().into())
+}
+
 /// What a manifest says about itself, read without resolving it: what anything
 /// asking about a module no image has loaded goes on. Nothing where it does
 /// not parse.

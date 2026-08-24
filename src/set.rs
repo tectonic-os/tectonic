@@ -7,10 +7,11 @@
 use crate::dispatch::Error;
 use crate::prompt::Prompt;
 use crate::resolve::workflow::{Basis, Shipped, DEFAULT_AT, SHIPPED};
-use crate::scap::Content;
+use crate::scap::{ordinal, rule_name, Content};
 use crate::ui::tree::Change;
 use crate::ui::{Answer, Choice};
 use crate::{layout, parse};
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 /// What to do instead, where there is nobody to ask. The declaration file was
@@ -24,6 +25,39 @@ pub const BY_HAND: &str = "nothing can be asked here; edit the `workflows` block
 pub const CONFORMS_BY_HAND: &str = "nothing can be asked here; write `conforms \"<profile>\"` \
                                     into the image, and `tect scap content` prints the \
                                     datastream it is then measured with";
+
+/// The same, for the rules a module claims: the manifest was always the
+/// interface, and a claim is a number read out of a datastream or nothing.
+pub const CLAIMS_BY_HAND: &str = "nothing can be asked here; write `satisfies { <benchmark> \
+                                  \"<number>\" }` into the module, and `tect scap content` \
+                                  prints the datastream those numbers are read out of";
+
+/// A top-level block put back where it was, else at the end of the file.
+/// Taking one away takes the blank line above it with it.
+fn splice(text: &str, was: Option<crate::diag::Span>, block: &str) -> String {
+    let mut out = text.to_string();
+    match was {
+        Some(was) => {
+            let end = was.offset + was.len;
+            let start = match block.is_empty() {
+                true => text[..was.offset].trim_end_matches(['\n', ' ']).len(),
+                false => was.offset,
+            };
+            out.replace_range(start..end, block);
+        }
+        None if block.is_empty() => {}
+        None => {
+            if !out.ends_with('\n') {
+                out.push('\n');
+            }
+            out.push_str(&format!("\n{block}\n"));
+        }
+    }
+    if !out.ends_with('\n') {
+        out.push('\n');
+    }
+    out
+}
 
 /// Which CI the repository generates, and the one time the schedules hang off.
 pub struct Workflows {
@@ -149,29 +183,7 @@ impl Workflows {
                 format!("workflows{at}{scan} {{\n{named}}}")
             }
         };
-        let mut out = text.to_string();
-        match parse::repo::workflows_span(text) {
-            Some(was) => {
-                let end = was.offset + was.len;
-                // Taking the block away takes the blank line above it too.
-                let start = match block.is_empty() {
-                    true => text[..was.offset].trim_end_matches(['\n', ' ']).len(),
-                    false => was.offset,
-                };
-                out.replace_range(start..end, &block);
-            }
-            None if block.is_empty() => {}
-            None => {
-                if !out.ends_with('\n') {
-                    out.push('\n');
-                }
-                out.push_str(&format!("\n{block}\n"));
-            }
-        }
-        if !out.ends_with('\n') {
-            out.push('\n');
-        }
-        out
+        splice(text, parse::repo::workflows_span(text), &block)
     }
 }
 
@@ -360,6 +372,192 @@ impl Conforms {
     }
 }
 
+/// The branch a benchmark number sits in: its dotted prefix, and one flat
+/// branch for a number with no dot to group it by, since a STIG ident nests
+/// nowhere.
+fn group(number: &str) -> &str {
+    number.rsplit_once('.').map_or("other", |(head, _)| head)
+}
+
+/// The benchmark numbers one module claims, chosen out of the rules a profile
+/// selects rather than typed. A claim is recorded here and measured by `tect
+/// scap`; nothing in this command reads a scan.
+pub struct Claims {
+    /// The manifest, from the repository root.
+    file: PathBuf,
+    /// What the numbers are written under, which is decorative: a number
+    /// resolves against the content, never against this.
+    benchmark: String,
+    profile: String,
+    /// Every number the block will hold, chosen or kept.
+    numbers: Vec<String>,
+    /// How many of the profile's rules were chosen, which is what the tree
+    /// reads out.
+    claimed: usize,
+}
+
+impl Claims {
+    /// Which profile the rules come out of, then which of them this module
+    /// claims, opening on what it already declares. Leaving either picker is
+    /// `None` and writes nothing.
+    pub fn collect(
+        root: &Path,
+        named: &str,
+        datastream: Option<PathBuf>,
+        prompt: &Prompt,
+    ) -> Result<Option<Self>, Error> {
+        let file = Path::new(layout::MODULES)
+            .join(named)
+            .join(layout::MODULE_FILE);
+        if !root.join(&file).is_file() {
+            return Err(Error::Invocation(format!(
+                "`{named}` is not a module this repository holds; there is no {}",
+                file.display()
+            )));
+        }
+        let summary = parse::module::summary(&root.join(&file));
+        let family = summary.supports.first().map_or("", String::as_str);
+        let path = crate::scap::content_path(family, datastream.as_deref())?;
+        let text =
+            std::fs::read_to_string(&path).map_err(|err| format!("{}: {err}", path.display()))?;
+        let content = Content::read(&text);
+        if content.profiles.is_empty() {
+            return Err(format!("{} carries no profile to claim against", path.display()).into());
+        }
+
+        let options: Vec<Choice> = content
+            .profiles
+            .iter()
+            .map(|profile| Choice::new(profile.name(), &profile.title))
+            .collect();
+        let Some(chosen) = prompt.choose("which profile", &options)? else {
+            return Ok(None);
+        };
+        let profile = &content.profiles[chosen];
+
+        // A rule no number reaches is one nothing can claim, so it is left out
+        // rather than drawn as a row that would write nothing.
+        let selected = content.selected(&profile.id);
+        let mut rules: Vec<(&String, &BTreeSet<String>)> = selected
+            .iter()
+            .filter_map(|rule| content.numbers.get(rule).map(|numbers| (rule, numbers)))
+            .collect();
+        rules.sort_by_key(|(rule, numbers)| {
+            (
+                numbers
+                    .iter()
+                    .next()
+                    .map(|n| ordinal(n))
+                    .unwrap_or_default(),
+                (*rule).clone(),
+            )
+        });
+        if rules.is_empty() {
+            return Err(format!(
+                "no rule `{}` selects carries a number, so nothing can be claimed against it",
+                profile.name()
+            )
+            .into());
+        }
+        match selected.len() - rules.len() {
+            0 => {}
+            missed => println!(
+                "{missed} of the rules `{}` selects are reached by no number of their own, so no \
+                 `satisfies` can name them.\n",
+                profile.name()
+            ),
+        }
+
+        let first = |at: usize| rules[at].1.iter().next().expect("a number reaches it");
+        let options: Vec<Choice> = (0..rules.len())
+            .map(|at| {
+                let (rule, _) = rules[at];
+                Choice::new(
+                    format!(
+                        "{}  {}  {}",
+                        first(at),
+                        content.titles.get(rule).unwrap_or(rule),
+                        rule_name(rule)
+                    ),
+                    content.descriptions.get(rule).cloned().unwrap_or_default(),
+                )
+                .within(group(first(at)))
+            })
+            .collect();
+        let held = crate::scap::reached(&content, summary.satisfies.iter());
+        let on: Vec<usize> = (0..rules.len())
+            .filter(|at| held.contains(rules[*at].0))
+            .collect();
+
+        let Answer::Chosen(chosen) =
+            prompt.choose_many(&format!("which rules `{named}` claims"), &options, &on)?
+        else {
+            return Ok(None);
+        };
+
+        // A claim the picker never offered is one about another profile, and
+        // replacing the block wholesale would drop it.
+        let offered: BTreeSet<&String> = rules
+            .iter()
+            .flat_map(|(_, numbers)| numbers.iter())
+            .collect();
+        let mut numbers: Vec<String> = summary
+            .satisfies
+            .iter()
+            .filter(|number| !offered.contains(number))
+            .cloned()
+            .collect();
+        numbers.extend(chosen.iter().map(|at| first(*at).clone()));
+        numbers.sort_by_key(|number| (ordinal(number), number.clone()));
+        numbers.dedup();
+        Ok(Some(Self {
+            file,
+            benchmark: match family.is_empty() {
+                true => profile.name().to_string(),
+                false => format!("{}-{family}", profile.name()),
+            },
+            profile: profile.name().to_string(),
+            numbers,
+            claimed: chosen.len(),
+        }))
+    }
+
+    pub fn apply(&self, root: &Path) -> Result<Vec<(PathBuf, Change)>, String> {
+        let file = root.join(&self.file);
+        let text =
+            std::fs::read_to_string(&file).map_err(|err| format!("{}: {err}", file.display()))?;
+        let spliced = splice(&text, parse::module::satisfies_span(&text), &self.block());
+        std::fs::write(&file, spliced).map_err(|err| format!("{}: {err}", file.display()))?;
+        Ok(vec![(
+            self.file.clone(),
+            Change::Updated(match self.claimed {
+                0 => format!("claiming no rule of `{}`", self.profile),
+                1 => format!("claiming one rule of `{}`", self.profile),
+                many => format!("claiming {many} rules of `{}`", self.profile),
+            }),
+        )])
+    }
+
+    /// One benchmark node, since declaring one twice is a diagnostic, and one
+    /// number per line through KDL's own continuation, since a claim is read
+    /// and reviewed a number at a time. Claiming nothing declares no block, the
+    /// way generating no CI declares none.
+    fn block(&self) -> String {
+        match self.numbers.is_empty() {
+            true => String::new(),
+            false => format!(
+                "satisfies {{\n    {} {}\n}}",
+                self.benchmark,
+                self.numbers
+                    .iter()
+                    .map(|number| format!("\"{number}\""))
+                    .collect::<Vec<String>>()
+                    .join(" \\\n        ")
+            ),
+        }
+    }
+}
+
 /// Which modules elsewhere claim rules the profile selects that the image does
 /// not have, as the question whether to bring them. A claimant the repository
 /// owns needs a line rather than an import, which is what `check`'s own
@@ -438,6 +636,15 @@ mod tests {
                 .unwrap(),
             "image {\n    name \"Example\"\nconforms \"cis\"\n\n}\n"
         );
+    }
+
+    /// A number with no dot has no prefix to nest under, so every one of them
+    /// shares the one flat branch.
+    #[test]
+    fn a_number_that_does_not_nest_goes_in_the_one_flat_branch() {
+        assert_eq!(group("1.1.1.1"), "1.1.1");
+        assert_eq!(group("5.2"), "5");
+        assert_eq!(group("RHEL-09-232010"), "other");
     }
 
     fn set(chosen: &[&'static str], at: (u32, u32)) -> Workflows {
