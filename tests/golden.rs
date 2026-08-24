@@ -835,6 +835,36 @@ fn flows() {
     );
     assert_eq!(listed("example/gaming"), "");
 
+    // Declaring what the image is measured against: the profile is chosen out
+    // of the content a scan of it would read, and the collection member
+    // claiming its rules is offered with it. A second run replaces the
+    // declaration rather than writing a second one, and by then the claimant
+    // is listed, so there is nothing left to offer.
+    let measured = flow_repo("flow-set-conforms-in");
+    let mut repo = std::fs::read_to_string(measured.join("repo.kdl"))
+        .unwrap()
+        .replace(&tect::init::sources(&crate_dir().join("assets")), "");
+    repo.push_str(&format!(
+        "sources {{\n    three {:?}\n}}\n",
+        crate_dir().join("tests/collections/three").display()
+    ));
+    std::fs::write(measured.join("repo.kdl"), repo).unwrap();
+    for name in ["flow-set-conforms", "flow-set-conforms-again"] {
+        flow(
+            name,
+            &measured,
+            None,
+            &["--root", ".", "set", "conforms", "--datastream", &stream],
+        );
+    }
+    let declared = std::fs::read_to_string(measured.join("example.image.kdl")).unwrap();
+    assert_eq!(declared.matches("conforms ").count(), 1, "{declared}");
+    assert!(
+        declared.contains("    conforms \"cis_server_l2\"\n")
+            && declared.contains("source \"three\" {\n            module \"sshd\""),
+        "{declared}"
+    );
+
     let prompted = flow_repo("flow-set");
     flow(
         "flow-set-workflows",

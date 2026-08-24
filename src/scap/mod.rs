@@ -76,6 +76,57 @@ pub fn conformance(
     Ok(out)
 }
 
+/// What an image still owes the profile it is measured against.
+pub struct Owed<'a> {
+    /// How many rules the profile selects, which is what `open` is out of.
+    pub selects: usize,
+    /// The selected rules nothing the image lists claims.
+    pub open: BTreeSet<String>,
+    /// Modules elsewhere claiming one of them, already minus what the image
+    /// lists: an offer is only worth making about what it does not have.
+    pub helping: Vec<&'a crate::provider::Provider>,
+    /// The open rules `helping` would close, which is fewer than `open` where
+    /// nothing claims the rest.
+    pub covered: BTreeSet<String>,
+}
+
+/// Which of a profile's rules an image is still missing, and who would claim
+/// them. The claim resolves **forward** through `Content::rules`; the search
+/// for who would help runs **backward** through `Content::numbering`, and the
+/// two are not interchangeable.
+pub fn owed<'a>(image: &Image, content: &Content, profile: &Profile, index: &'a Index) -> Owed<'a> {
+    let selected = content.selected(&profile.id);
+    let claimed = reached(
+        content,
+        image
+            .modules()
+            .flat_map(|module| module.satisfies.iter())
+            .flat_map(|coverage| coverage.rules.iter()),
+    );
+    let open: BTreeSet<String> = selected.difference(&claimed).cloned().collect();
+    // A module the image already lists is not an answer to what it is missing.
+    let listed: BTreeSet<String> = image.entries.iter().map(Entry::dir).collect();
+    let helping: Vec<&crate::provider::Provider> = match open.is_empty() {
+        true => Vec::new(),
+        false => index
+            .claiming(&content.numbering(&open))
+            .into_iter()
+            .filter(|provider| !listed.contains(&provider.dir()))
+            .collect(),
+    };
+    let covered: BTreeSet<String> = helping
+        .iter()
+        .flat_map(|provider| reached(content, provider.declares.satisfies.iter()))
+        .filter(|rule| open.contains(rule))
+        .collect();
+    Owed {
+        selects: selected.len(),
+        open,
+        helping,
+        covered,
+    }
+}
+
 /// The rules `numbers` reach: a claim names the first rule in document order
 /// carrying it, which is the direction a claim resolves in.
 fn reached<'a>(content: &Content, numbers: impl Iterator<Item = &'a String>) -> BTreeSet<String> {
@@ -97,32 +148,12 @@ fn unclaimed(image: &Image, content: &Content, index: &Index) -> Option<String> 
             names.join(", ")
         ));
     };
-    let selected = content.selected(&profile.id);
-    let claimed = reached(
-        content,
-        image
-            .modules()
-            .flat_map(|module| module.satisfies.iter())
-            .flat_map(|coverage| coverage.rules.iter()),
-    );
-    let open: BTreeSet<String> = selected.difference(&claimed).cloned().collect();
-    if open.is_empty() {
+    let owed = owed(image, content, profile, index);
+    if owed.open.is_empty() {
         return None;
     }
-
-    // A module the image already lists is not an answer to what it is missing.
-    let listed: BTreeSet<String> = image.entries.iter().map(Entry::dir).collect();
-    let helping: Vec<&crate::provider::Provider> = index
-        .claiming(&content.numbering(&open))
-        .into_iter()
-        .filter(|provider| !listed.contains(&provider.dir()))
-        .collect();
-    let covered: BTreeSet<String> = helping
-        .iter()
-        .flat_map(|provider| reached(content, provider.declares.satisfies.iter()))
-        .filter(|rule| open.contains(rule))
-        .collect();
-    let named: Vec<String> = helping
+    let named: Vec<String> = owed
+        .helping
         .iter()
         .map(|provider| format!("`{}`", provider.qualified()))
         .collect();
@@ -133,7 +164,11 @@ fn unclaimed(image: &Image, content: &Content, index: &Index) -> Option<String> 
     };
     let found = match named.is_empty() {
         true => format!("nothing in {searched} claims them"),
-        false => format!("{} would claim {} of them", named.join(", "), covered.len()),
+        false => format!(
+            "{} would claim {} of them",
+            named.join(", "),
+            owed.covered.len()
+        ),
     };
     let unsearched = match index.unsearched() {
         clause if clause.is_empty() => String::new(),
@@ -144,8 +179,8 @@ fn unclaimed(image: &Image, content: &Content, index: &Index) -> Option<String> 
          {found}{unsearched}",
         image.id,
         image.conforms,
-        open.len(),
-        selected.len()
+        owed.open.len(),
+        owed.selects
     ))
 }
 
@@ -177,14 +212,46 @@ fn datastream(list: &List, named: Option<&str>) -> Result<String, String> {
     if image.conforms.is_empty() {
         return Ok(String::new());
     }
-    let family = image.base.as_ref().map_or("", |base| base.family.as_str());
+    Ok(installed(
+        CONTENT,
+        image.base.as_ref().map_or("", |base| base.family.as_str()),
+    )?
+    .display()
+    .to_string())
+}
+
+/// Where a runner installs the content for one family.
+fn installed(dir: &str, family: &str) -> Result<PathBuf, String> {
     let file = match family {
         "fedora" => "ssg-fedora-ds.xml",
         "debian" => "ssg-debian12-ds.xml",
         "ubuntu" => "ssg-ubuntu2404-ds.xml",
         _ => return Err(format!("no SSG content is known for the `{family}` family")),
     };
-    Ok(format!("{CONTENT}/{file}"))
+    Ok(Path::new(dir).join(file))
+}
+
+/// The content a profile is chosen out of: what was named, else the copy this
+/// machine has for the family. **This probes the host deliberately**, unlike
+/// `coverage`, because a profile written into an image has to be one the scan
+/// that measures it will carry; a command whose output is a golden must not.
+pub fn content_path(family: &str, given: Option<&Path>) -> Result<PathBuf, String> {
+    content_at(CONTENT, family, given)
+}
+
+fn content_at(dir: &str, family: &str, given: Option<&Path>) -> Result<PathBuf, String> {
+    if let Some(path) = given {
+        return Ok(path.to_path_buf());
+    }
+    let path = installed(dir, family)?;
+    match path.is_file() {
+        true => Ok(path),
+        false => Err(format!(
+            "{} is not there, so there is no content to choose a profile out of; install \
+             `scap-security-guide`, or name one with `--datastream <file>`",
+            path.display()
+        )),
+    }
 }
 
 /// Reads the repository, the datastream and the report, prints what the three
@@ -790,6 +857,37 @@ mod tests {
             .collect();
         assert_eq!(claiming, ["one/hello"]);
         assert!(index.claiming(&BTreeSet::new()).is_empty());
+    }
+
+    /// The flag wins; with none, the family's installed copy, and its absence
+    /// names both ways to answer it.
+    #[test]
+    fn a_named_datastream_is_taken_and_a_missing_one_names_both_remedies() {
+        let given = fixture("tests/scap/datastream.xml");
+        assert_eq!(
+            content_at("/nowhere", "fedora", Some(&given)).unwrap(),
+            given
+        );
+        assert_eq!(
+            content_at(
+                given
+                    .parent()
+                    .expect("a fixture directory")
+                    .to_str()
+                    .unwrap(),
+                "fedora",
+                None
+            )
+            .unwrap_err(),
+            format!(
+                "{} is not there, so there is no content to choose a profile out of; install \
+                 `scap-security-guide`, or name one with `--datastream <file>`",
+                given.with_file_name("ssg-fedora-ds.xml").display()
+            )
+        );
+        assert!(content_at("/nowhere", "arch", None)
+            .unwrap_err()
+            .contains("no SSG content is known"));
     }
 
     /// The datastream-backed tier over a repository whose every source was

@@ -471,8 +471,18 @@ impl Module {
     }
 
     pub fn apply(&self, root: &Path) -> Result<(), String> {
+        let wrote = self.write(root)?;
+        if !wrote.is_empty() {
+            report(root, &wrote);
+        }
+        Ok(())
+    }
+
+    /// Everything `apply` does but say so, for a caller drawing a tree of its
+    /// own around it.
+    pub(crate) fn write(&self, root: &Path) -> Result<Vec<(PathBuf, Change)>, String> {
         match self.listing {
-            Listing::Cancelled => return Ok(()),
+            Listing::Cancelled => return Ok(Vec::new()),
             Listing::NoImage => {
                 return Err(
                     "`import module` needs an image; run `tect create image <name>` first".into(),
@@ -508,9 +518,43 @@ impl Module {
         if let Some(workflows) = &self.workflows {
             wrote.extend(workflows.apply(root)?);
         }
-        report(root, &wrote);
-        Ok(())
+        Ok(wrote)
     }
+
+    /// The names the set brings, as the tree a caller of `write` draws says
+    /// what it added.
+    pub(crate) fn brought(&self) -> Vec<String> {
+        self.members
+            .iter()
+            .map(|member| member.name.clone())
+            .collect()
+    }
+}
+
+/// The same import, made out of an offer somewhere else: named members listed
+/// in one image, with none of `import module`'s own offers on top.
+pub fn bring(
+    root: &Path,
+    sources: &[Collection],
+    enforce: bool,
+    named: &[String],
+    image: &str,
+) -> Result<Module, String> {
+    let members = named
+        .iter()
+        .map(|qualified| {
+            let mut found = find(root, sources, qualified, enforce)?;
+            Ok(Member {
+                from: found.swap_remove(0),
+                name: split(qualified).1.to_string(),
+            })
+        })
+        .collect::<Result<Vec<Member>, String>>()?;
+    Ok(Module {
+        members,
+        listing: Listing::collect(root, vec![image.to_string()], &Prompt::silent())?,
+        workflows: None,
+    })
 }
 
 /// What the set requires that the images it is being listed in do not have, as

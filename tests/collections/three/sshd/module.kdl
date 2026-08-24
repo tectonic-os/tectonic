@@ -1,0 +1,7 @@
+description "SSH daemon hardening, claiming the benchmark rules it covers"
+
+supports "fedora"
+
+satisfies {
+    cis-fedora "5.2.20"
+}

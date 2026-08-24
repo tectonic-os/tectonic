@@ -309,6 +309,35 @@ Asks you for:
   rather than putting in `plan.json`, because the forge reads it out of the
   file before any job exists.
 
+### `set conforms [image]`
+
+Chooses the benchmark profile a scan measures one image against, and writes it
+into that image's `conforms`. Naming no image picks the only one, or asks which.
+
+Asks you for:
+- Which profile, out of the ones the datastream carries, with what each is
+  called beside it
+- Whether to import the collection modules claiming rules that profile selects
+  and nothing the image lists claims
+
+#### Notes:
+- `--datastream <file>` names the content to choose out of. Without it this
+  reads the copy installed on this machine for the image's family, and refuses
+  by naming `scap-security-guide` and the flag when there is none. `tect
+  coverage` never probes the host; this does, because a profile written into an
+  image has to be one the scan that measures it will carry.
+- The question says the cost first: a `conforms` is the whole scan gate, so
+  declaring one turns the image scan on for every build. Where the repository
+  declares `audit { enforce #true }` it says that a rule the image fails fails
+  the build instead.
+- It is not a claim to pass. `conforms` is what the image is measured against,
+  and declaring one before reaching it is the point.
+- A second run replaces the declaration rather than adding a second one.
+- The import offer covers collection members only. A module the repository owns
+  needs a line rather than an import, which is what `check` already says.
+- There are no toggle flags, the same way `set workflows` has none: with nobody
+  to ask this says to write the line into the image file.
+
 ### `check`
 
 Reads every manifest and reports every problem at the line that caused it, then
@@ -491,9 +520,9 @@ profile the datastream carries, and what stopped passing since the last scan.
 
 ### `scap content`
 
-Prints the datastream the target is measured with, and nothing at all when it
-declares neither a `satisfies` nor a `conforms`, which is an image asking not
-to be scanned. This is what the scan job gates on.
+Prints the datastream the target is measured with, and nothing at all when the
+image declares no `conforms`, which is an image asking not to be scanned. This
+is what the scan job gates on, and `tect set conforms` is what opens it.
 
 #### Flags:
     --target <t>          the target, else the ungated one

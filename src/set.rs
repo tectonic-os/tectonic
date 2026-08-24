@@ -1,11 +1,13 @@
-//! `tect set`, the config family. A question answered into repo.kdl, which
-//! `generate` then acts on: nothing here writes an artifact.
+//! `tect set`, the config family. A question answered into a declaration file,
+//! which `generate` then acts on: nothing here writes an artifact.
 //!
 //! Collect-then-apply like every other flow, so `create repo` holds one of
 //! these rather than calling the command.
 
+use crate::dispatch::Error;
 use crate::prompt::Prompt;
 use crate::resolve::workflow::{Basis, Shipped, DEFAULT_AT, SHIPPED};
+use crate::scap::Content;
 use crate::ui::tree::Change;
 use crate::ui::{Answer, Choice};
 use crate::{layout, parse};
@@ -15,6 +17,13 @@ use std::path::{Path, PathBuf};
 /// always the interface, so a flag writing the same line would be a second one.
 pub const BY_HAND: &str = "nothing can be asked here; edit the `workflows` block in repo.kdl, \
                            then run `tect generate`";
+
+/// The same, for the profile an image is measured against: the image file was
+/// always the interface, and there is a datastream to pick out of or there is
+/// not.
+pub const CONFORMS_BY_HAND: &str = "nothing can be asked here; write `conforms \"<profile>\"` \
+                                    into the image, and `tect scap content` prints the \
+                                    datastream it is then measured with";
 
 /// Which CI the repository generates, and the one time the schedules hang off.
 pub struct Workflows {
@@ -166,9 +175,253 @@ impl Workflows {
     }
 }
 
+/// The benchmark profile one image is measured against, and whatever claiming
+/// modules the offer alongside it brought.
+pub struct Conforms {
+    /// The image file, as the image was read from.
+    file: PathBuf,
+    /// The image's `name`, which is what the writer walks to.
+    image: String,
+    profile: String,
+    brought: Vec<String>,
+    bring: Option<crate::import::Module>,
+}
+
+impl Conforms {
+    /// Which image, then which profile out of the content a scan of it would
+    /// read, then whether to bring the modules claiming its rules. Leaving
+    /// either picker is `None` and writes nothing.
+    pub fn collect(
+        root: &Path,
+        named: Option<String>,
+        datastream: Option<PathBuf>,
+        prompt: &Prompt,
+    ) -> Result<Option<Self>, Error> {
+        let crate::Loaded { list, index, .. } = crate::load(root);
+        if list.images.is_empty() {
+            return Err(
+                "`set conforms` needs an image; run `tect create image <name>` first"
+                    .to_string()
+                    .into(),
+            );
+        }
+        let ids: Vec<&str> = list.images.iter().map(|image| image.id.as_str()).collect();
+        let at = match named {
+            Some(name) => list
+                .images
+                .iter()
+                .position(|image| image.id == name)
+                .ok_or_else(|| {
+                    Error::Invocation(format!(
+                        "`{name}` is not a declared image; there is {}",
+                        ids.join(", ")
+                    ))
+                })?,
+            None if list.images.len() == 1 => 0,
+            None => {
+                let options: Vec<Choice> = list
+                    .images
+                    .iter()
+                    .map(|image| match image.name == image.id {
+                        true => Choice::new(&image.id, ""),
+                        false => Choice::new(&image.id, &image.name),
+                    })
+                    .collect();
+                match prompt.choose("which image is measured", &options)? {
+                    Some(at) => at,
+                    None => return Ok(None),
+                }
+            }
+        };
+        let image = &list.images[at];
+
+        let family = image.base.as_ref().map_or("", |base| base.family.as_str());
+        let path = crate::scap::content_path(family, datastream.as_deref())?;
+        let text =
+            std::fs::read_to_string(&path).map_err(|err| format!("{}: {err}", path.display()))?;
+        let content = Content::read(&text);
+        if content.profiles.is_empty() {
+            return Err(format!(
+                "{} carries no profile to be measured against",
+                path.display()
+            )
+            .into());
+        }
+
+        // A `conforms` is the scan gate, so the answer costs a scan on every
+        // build, and in an enforcing repository it costs the build itself.
+        println!(
+            "{}\n",
+            match list.audit_enforce {
+                false => format!(
+                    "A `conforms` turns the scan on: every build measures `{}` against the \
+                     profile and publishes the score.",
+                    image.id
+                ),
+                true => format!(
+                    "A `conforms` turns the scan on, and this repository enforces: every build \
+                     measures `{}` against the profile, and a rule it fails fails the build.",
+                    image.id
+                ),
+            }
+        );
+        let options: Vec<Choice> = content
+            .profiles
+            .iter()
+            .map(|profile| Choice::new(profile.name(), &profile.title))
+            .collect();
+        let Some(chosen) = prompt.choose("which profile", &options)? else {
+            return Ok(None);
+        };
+        let profile = &content.profiles[chosen];
+
+        let bring = offer(image, &content, profile, &index, prompt)?;
+        let bring = match bring.is_empty() {
+            true => None,
+            false => Some(crate::import::bring(
+                root,
+                &list.sources,
+                list.audit_enforce,
+                &bring,
+                &image.id,
+            )?),
+        };
+        Ok(Some(Self {
+            file: PathBuf::from(image.src.name()),
+            image: image.name.clone(),
+            profile: profile.name().to_string(),
+            brought: bring
+                .as_ref()
+                .map(crate::import::Module::brought)
+                .unwrap_or_default(),
+            bring,
+        }))
+    }
+
+    /// The import first, since it writes into the same file, then the
+    /// declaration over whatever is there now.
+    pub fn apply(&self, root: &Path) -> Result<Vec<(PathBuf, Change)>, String> {
+        let mut wrote = match &self.bring {
+            Some(bring) => bring.write(root)?,
+            None => Vec::new(),
+        };
+        let text = std::fs::read_to_string(&self.file)
+            .map_err(|err| format!("{}: {err}", self.file.display()))?;
+        let spliced = self.spliced(&text)?;
+        std::fs::write(&self.file, spliced)
+            .map_err(|err| format!("{}: {err}", self.file.display()))?;
+        // Last, so the one line the tree draws for the file says both edits.
+        wrote.push((
+            self.file.clone(),
+            Change::Updated(match self.brought.is_empty() {
+                true => format!("measured against `{}`", self.profile),
+                false => format!(
+                    "measured against `{}`, and {} added to modules",
+                    self.profile,
+                    crate::import::said(&self.brought)
+                ),
+            }),
+        ));
+        Ok(wrote)
+    }
+
+    /// In place of the declaration that was there, else in front of `base`,
+    /// which is where the schema lists it.
+    fn spliced(&self, text: &str) -> Result<String, String> {
+        let was = parse::image::conforms_span(text, &self.image)
+            .ok_or_else(|| format!("{} declares no image `{}`", self.file.display(), self.image))?;
+        let indent = &text[text[..was.offset].rfind('\n').map_or(0, |at| at + 1)..was.offset];
+        let mut out = text.to_string();
+        out.replace_range(
+            was.offset..was.offset + was.len,
+            &match was.len {
+                0 => format!("conforms \"{}\"\n\n{indent}", self.profile),
+                _ => format!("conforms \"{}\"", self.profile),
+            },
+        );
+        Ok(out)
+    }
+}
+
+/// Which modules elsewhere claim rules the profile selects that the image does
+/// not have, as the question whether to bring them. A claimant the repository
+/// owns needs a line rather than an import, which is what `check`'s own
+/// conformance notice already says.
+fn offer(
+    image: &crate::model::image::Image,
+    content: &Content,
+    profile: &crate::scap::Profile,
+    index: &crate::provider::Index,
+    prompt: &Prompt,
+) -> Result<Vec<String>, String> {
+    let owed = crate::scap::owed(image, content, profile, index);
+    let named: Vec<String> = owed
+        .helping
+        .iter()
+        .filter(|provider| provider.owner.is_some())
+        .map(|provider| provider.qualified())
+        .collect();
+    if named.is_empty() {
+        return Ok(Vec::new());
+    }
+    let question = format!(
+        "{} {} {} of the {} rules `{}` selects that nothing `{}` lists claims.\nImport {} as well?",
+        crate::import::said(&named.iter().map(|at| format!("`{at}`")).collect::<Vec<_>>()),
+        match named.len() {
+            1 => "claims",
+            _ => "claim",
+        },
+        owed.covered.len(),
+        owed.open.len(),
+        profile.name(),
+        image.id,
+        match named.len() {
+            1 => "it",
+            _ => "them",
+        },
+    );
+    match prompt.confirm(&question, "Yes", "No")? {
+        true => Ok(named),
+        false => Ok(Vec::new()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn conforms(profile: &str) -> Conforms {
+        Conforms {
+            file: PathBuf::from("example.image.kdl"),
+            image: "Example".to_string(),
+            profile: profile.to_string(),
+            brought: Vec::new(),
+            bring: None,
+        }
+    }
+
+    /// The declaration replaces the one that was there and goes in front of
+    /// `base` otherwise, which is where the schema lists it.
+    #[test]
+    fn the_profile_replaces_the_one_that_was_there() {
+        let text =
+            "image {\n    name \"Example\"\n\n    conforms \"cis\"\n\n    base \"x\" {\n    }\n}\n";
+        assert_eq!(
+            conforms("cis_server_l2").spliced(text).unwrap(),
+            text.replace("\"cis\"", "\"cis_server_l2\"")
+        );
+    }
+
+    /// An image with no `base` for it to stand in front of still gets one.
+    #[test]
+    fn an_image_with_nothing_to_stand_in_front_of_still_takes_one() {
+        assert_eq!(
+            conforms("cis")
+                .spliced("image {\n    name \"Example\"\n}\n")
+                .unwrap(),
+            "image {\n    name \"Example\"\nconforms \"cis\"\n\n}\n"
+        );
+    }
 
     fn set(chosen: &[&'static str], at: (u32, u32)) -> Workflows {
         Workflows {

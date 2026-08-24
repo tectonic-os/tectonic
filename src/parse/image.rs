@@ -163,6 +163,33 @@ pub fn block_close(kdl: &str, image: &str, chain: &[(&str, Option<&str>)]) -> Op
     kdl[..span.offset + span.len].rfind('}')
 }
 
+/// The span an image's `conforms` declaration takes, which is the node itself
+/// where there is one and an empty span where the next one would go: in front
+/// of `base`, which is where the schema lists it. `None` only when the file
+/// declares no image by that name.
+pub fn conforms_span(kdl: &str, image: &str) -> Option<Span> {
+    let doc: KdlDocument = kdl.parse().ok()?;
+    let node = doc
+        .nodes()
+        .iter()
+        .filter(|node| node.name().value() == "image")
+        .find(|node| text(node, "name") == image)?;
+    let at = |name: &str| -> Option<Span> {
+        kids(node)
+            .iter()
+            .find(|kid| kid.name().value() == name)
+            .map(|kid| kid.span().into())
+    };
+    match (at("conforms"), at("base")) {
+        (Some(span), _) => Some(span),
+        (None, Some(base)) => Some(Span {
+            offset: base.offset,
+            len: 0,
+        }),
+        (None, None) => block_close(kdl, image, &[]).map(|offset| Span { offset, len: 0 }),
+    }
+}
+
 /// Every `name "a" "b"` under a node, as declarations pointing at the node.
 fn decls(node: &KdlNode, name: &str) -> Vec<Decl> {
     kids(node)
@@ -489,6 +516,29 @@ mod tests {
             .filter_map(|line| line.strip_prefix("  x "))
             .map(str::to_string)
             .collect()
+    }
+
+    /// The three places a `conforms` can land: over the one that is there,
+    /// in front of `base`, and last of all in an image with no base at all.
+    #[test]
+    fn the_span_a_conforms_takes_is_the_node_or_where_the_next_one_goes() {
+        let held = "image {\n    name \"E\"\n    conforms \"cis\"\n    base \"x\" {\n    }\n}\n";
+        let span = conforms_span(held, "E").expect("the image is there");
+        assert_eq!(
+            &held[span.offset..span.offset + span.len],
+            "conforms \"cis\""
+        );
+
+        let bare = "image {\n    name \"E\"\n\n    base \"x\" {\n    }\n}\n";
+        let span = conforms_span(bare, "E").expect("the image is there");
+        assert_eq!(span.len, 0);
+        assert!(bare[span.offset..].starts_with("base \"x\""));
+
+        let baseless = "image {\n    name \"E\"\n}\n";
+        let span = conforms_span(baseless, "E").expect("the image is there");
+        assert_eq!((span.len, &baseless[span.offset..]), (0, "}\n"));
+
+        assert!(conforms_span(held, "Other").is_none());
     }
 
     /// Every shape the golden corpus has no broken fixture for.

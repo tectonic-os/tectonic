@@ -339,6 +339,21 @@ pub fn dispatch(
             println!("\nnext, in {}:\n\x20 tect generate\n", root.display());
             Ok(ExitCode::SUCCESS)
         }
+        Verb::SetConforms => {
+            let name = one_name(rest, spec)?;
+            let Some(root) = open(root_arg)? else {
+                return Ok(ExitCode::from(REPO_ERROR));
+            };
+            if !prompt.asks() {
+                return Err(Error::Invocation(crate::set::CONFORMS_BY_HAND.to_string()));
+            }
+            let Some(set) = crate::set::Conforms::collect(&root, name, datastream, prompt)? else {
+                return Ok(ExitCode::SUCCESS);
+            };
+            let wrote = set.apply(&root)?;
+            crate::create::report(&root, &wrote);
+            Ok(ExitCode::SUCCESS)
+        }
         Verb::FetchModules => {
             let root = repo_root(root_arg)?;
             let (list, issues, context) = crate::declarations(&root);
