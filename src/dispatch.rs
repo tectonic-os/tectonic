@@ -449,13 +449,13 @@ fn reading(
         if matches!(command.arg(), Some(crate::Arg::Module)) && arg.is_none() && prompt.draws() {
             let loaded = crate::load(&root);
             let known = crate::emit::why::known(&loaded.list);
-            let options = known
-                .iter()
-                .map(|name| crate::ui::Choice::new(name, ""))
-                .collect::<Vec<_>>();
             if known.is_empty() {
                 crate::run_loaded(command, None, &root, loaded)
             } else {
+                let options = known
+                    .iter()
+                    .map(|name| crate::ui::Choice::new(name, ""))
+                    .collect::<Vec<_>>();
                 let Some(at) = prompt.choose("which module", &options)? else {
                     return Ok(ExitCode::SUCCESS);
                 };

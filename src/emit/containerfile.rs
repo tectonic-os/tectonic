@@ -5,7 +5,6 @@ use crate::emit::{finalize, module_build};
 use crate::layout;
 use crate::model::image::{Entry, Image};
 use crate::model::module::Module;
-use crate::resolve::collect::Collection;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
@@ -90,7 +89,7 @@ fn identity(image: &Image) -> Vec<(&'static str, String)> {
     vars
 }
 
-pub fn section(image: &Image, _collection: &Collection, root: &Path) -> String {
+pub fn section(image: &Image, root: &Path) -> String {
     let mut out = String::new();
     let mut flavour_arg_emitted = false;
 
@@ -259,10 +258,11 @@ fn standard(entry: &Entry, module: &Module, image: &Image, script: &Path) -> Str
             )
         })
         .collect();
+    let rw = if helpers.is_empty() { "" } else { ",rw" };
     let _ = write!(
         out,
         "RUN --mount=type=bind,from=ctx,source=/modules/{path},target=/ctx/modules/{path} \\\n    \
-         --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \\\n    \
+         --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib{rw} \\\n    \
          {helpers}\
          --mount=type=bind,from=ctx,source=/{script},target=/ctx/module.sh \\\n    \
          {keys}{TECT_MOUNT}\
@@ -271,9 +271,6 @@ fn standard(entry: &Entry, module: &Module, image: &Image, script: &Path) -> Str
          --mount=type=tmpfs,target=/tmp \\\n    \
          {secrets}{env}bash /ctx/module.sh"
     );
-    if !helpers.is_empty() {
-        out = out.replacen("target=/ctx/lib ", "target=/ctx/lib,rw ", 1);
-    }
     out
 }
 

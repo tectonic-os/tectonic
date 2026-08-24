@@ -266,7 +266,7 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
     if matches!(command, Command::Generate | Command::Verify) {
         for (image, resolved) in list.images.iter().zip(&resolved) {
             if let Some(skeleton) = &skeleton {
-                let section = emit::containerfile::section(image, &resolved.collected, root);
+                let section = emit::containerfile::section(image, root);
                 files.push((
                     emit::containerfile::path(image),
                     emit::containerfile::file(skeleton, image, &section),
@@ -317,7 +317,7 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
             None => String::new(),
         },
         Command::Section => match one {
-            Some(i) => emit::containerfile::section(&list.images[i], &resolved[i].collected, root),
+            Some(i) => emit::containerfile::section(&list.images[i], root),
             None => String::new(),
         },
         Command::Generate => files
