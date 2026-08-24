@@ -3,12 +3,14 @@
 //!
 //! One index, because three things ask the same question — the
 //! unsatisfied-`requires` help, the offer `import module` makes, and the family
-//! module `create image` seeds — and a fourth asks it of a key kind.
+//! module `create image` seeds — a fourth asks it of a key kind, and a fifth
+//! asks which modules claim the rules a profile selects.
 
 use crate::model::remote::{Collection, REMOTE_DIR};
 use crate::parse::disk::Disk;
 use crate::parse::module::Summary;
 use crate::{layout, parse};
+use std::collections::BTreeSet;
 use std::path::Path;
 
 /// One module that could satisfy a requirement, and what it takes to get it.
@@ -137,6 +139,21 @@ impl Index {
         self.held
             .iter()
             .filter(|held| held.declares.keys.iter().any(|has| has == kind))
+            .collect()
+    }
+
+    /// Every module claiming one of these benchmark numbers, which answers
+    /// which modules help an image conform once the numbers are the ones the
+    /// declared profile's rules are reached by.
+    pub fn claiming(&self, numbers: &BTreeSet<String>) -> Vec<&Provider> {
+        self.held
+            .iter()
+            .filter(|held| {
+                held.declares
+                    .satisfies
+                    .iter()
+                    .any(|number| numbers.contains(number))
+            })
             .collect()
     }
 

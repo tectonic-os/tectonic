@@ -959,6 +959,10 @@ pub struct Summary {
     /// The build args its layer reads, which is what decides whether a
     /// workflow may run here at all.
     pub args: Vec<String>,
+    /// Every benchmark number it claims, over all the benchmarks it names,
+    /// since a number resolves against the content rather than against the
+    /// benchmark it was written under.
+    pub satisfies: Vec<String>,
 }
 
 pub fn summary(file: &Path) -> Summary {
@@ -1000,6 +1004,16 @@ pub fn summary(file: &Path) -> Summary {
         requires: strings("requires"),
         keys: strings("key"),
         args: strings("arg"),
+        satisfies: doc
+            .nodes()
+            .iter()
+            .filter(|node| node.name().value() == "satisfies")
+            .filter_map(KdlNode::children)
+            .flat_map(KdlDocument::nodes)
+            .flat_map(KdlNode::entries)
+            .filter(|entry| entry.name().is_none())
+            .filter_map(|entry| entry.value().as_string().map(str::to_string))
+            .collect(),
     }
 }
 
