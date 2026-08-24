@@ -18,7 +18,9 @@ Nothing. It declares no `satisfies`.
 
 ## Where it came from
 
-Its content hashes to `71cf98d5efb9a591512bd530eb250ccaed9451bfff685cfd1166d092666198b2`.
+| Content | Hash |
+| --- | --- |
+| declared | `71cf98d5efb9a591512bd530eb250ccaed9451bfff685cfd1166d092666198b2` |
 
 It was written in this repository rather than imported, so nothing upstream to compare it against.
 

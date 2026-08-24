@@ -24,31 +24,29 @@ A claim the tool records rather than certifies. The scan is what confirms it.
 
 ## Where it came from
 
-Its content hashes to `143d40b94ab50b255daf037b1ffc7a31b7c7760e934213fe72cca5a5b1fa1670`.
+| Content | Hash |
+| --- | --- |
+| declared | `143d40b94ab50b255daf037b1ffc7a31b7c7760e934213fe72cca5a5b1fa1670` |
 
-Imported from the `one` collection, at:
-
-- locator: https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz
-- selector: v1.0.0
-- verifier: b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3
-- tracker: renovate
+| Collection | Locator | Selector | Verifier | Tracker |
+| --- | --- | --- | --- | --- |
+| `one` | https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3 | renovate |
 
 **It has been edited since it was imported.** Forking a module is legitimate; what the record buys is that the fork is visible.
 
 ## What it pulls in
 
-`hello`
-
-- locator: https://github.com/owner/hello/releases/download/v{version}/hello.tar.gz
-- selector: 1.4.0
-- verifier: b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3
-- tracker: renovate
+| Asset | Locator | Selector | Verifier | Tracker |
+| --- | --- | --- | --- | --- |
+| `hello` | https://github.com/owner/hello/releases/download/v{version}/hello.tar.gz | 1.4.0 | b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3 | renovate |
 
 ## Third-party repositories
 
 It enables one, in `modules/one/hello/repo`. There is no grammar for that file, so read it: it is shell calling the family's config manager.
 
-- https://example.com/hello/hello.repo
+| URL it names |
+| --- |
+| https://example.com/hello/hello.repo |
 
 ==== json
 {
@@ -138,47 +136,43 @@ A claim the tool records rather than certifies. The scan is what confirms it.
 
 ## Where it came from
 
-Its content hashes to `143d40b94ab50b255daf037b1ffc7a31b7c7760e934213fe72cca5a5b1fa1670`.
+| Content | Hash |
+| --- | --- |
+| declared | `143d40b94ab50b255daf037b1ffc7a31b7c7760e934213fe72cca5a5b1fa1670` |
 
-Imported from the `one` collection, at:
-
-- locator: https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz
-- selector: v1.0.0
-- verifier: b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3
-- tracker: renovate
+| Collection | Locator | Selector | Verifier | Tracker |
+| --- | --- | --- | --- | --- |
+| `one` | https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3 | renovate |
 
 **It has been edited since it was imported.** Forking a module is legitimate; what the record buys is that the fork is visible.
 
 ## What it pulls in
 
-`hello`
-
-- locator: https://github.com/owner/hello/releases/download/v{version}/hello.tar.gz
-- selector: 1.4.0
-- verifier: b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3
-- tracker: renovate
+| Asset | Locator | Selector | Verifier | Tracker |
+| --- | --- | --- | --- | --- |
+| `hello` | https://github.com/owner/hello/releases/download/v{version}/hello.tar.gz | 1.4.0 | b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3 | renovate |
 
 ## Third-party repositories
 
 It enables one, in `modules/one/hello/repo`. There is no grammar for that file, so read it: it is shell calling the family's config manager.
 
-- not readable from here: a finished image carries the manifest, not the module tree
+Not readable from here: a finished image carries the manifest, not the module tree.
 
 ==== the names it knows
 core/consumer, one/hello
 ==== against a build record that disagrees
 
 
-The build observed its content as `not what was declared`.
+| Content | Hash |
+| --- | --- |
+| declared | `143d40b94ab50b255daf037b1ffc7a31b7c7760e934213fe72cca5a5b1fa1670` |
+| observed by the build | `not what was declared` |
 
-**The manifest beside it declares `143d40b94ab50b255daf037b1ffc7a31b7c7760e934213fe72cca5a5b1fa1670`.** The two documents disagree, which they cannot if both came from this build.
+**The two documents disagree**, which they cannot if both came from this build.
 
-Imported from the `one` collection, at:
-
-- locator: https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz
-- selector: v1.0.0
-- verifier: b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3
-- tracker: renovate
+| Collection | Locator | Selector | Verifier | Tracker |
+| --- | --- | --- | --- | --- |
+| `one` | https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3 | renovate |
 
 **It has been edited since it was imported.** Forking a module is legitimate; what the record buys is that the fork is visible.
 

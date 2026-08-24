@@ -240,22 +240,23 @@ impl Why {
 
         let _ = writeln!(out, "## Where it came from\n");
         match (&self.content, &self.built) {
-            (Some(hash), None) => {
-                let _ = writeln!(out, "Its content hashes to `{hash}`.\n");
-            }
-            (declared, Some(built)) => {
-                let _ = writeln!(out, "The build observed its content as `{built}`.\n");
-                if declared.as_ref() != Some(built) {
-                    let _ = writeln!(
-                        out,
-                        "**The manifest beside it declares `{}`.** The two documents disagree, \
-                         which they cannot if both came from this build.\n",
-                        declared.clone().unwrap_or_else(|| "nothing".into())
-                    );
-                }
-            }
             (None, None) => {
                 let _ = writeln!(out, "Nothing hashed it.\n");
+            }
+            (declared, built) => {
+                let _ = writeln!(out, "| Content | Hash |\n| --- | --- |");
+                let _ = writeln!(out, "| declared | {} |", hash(declared));
+                if let Some(built) = built {
+                    let _ = writeln!(out, "| observed by the build | `{built}` |");
+                }
+                out.push('\n');
+                if built.is_some() && declared != built {
+                    let _ = writeln!(
+                        out,
+                        "**The two documents disagree**, which they cannot if both came from \
+                         this build.\n"
+                    );
+                }
             }
         }
         match &self.imported {
@@ -267,8 +268,7 @@ impl Why {
                 );
             }
             Some((collection, pin)) => {
-                let _ = writeln!(out, "Imported from the `{collection}` collection, at:\n");
-                let _ = writeln!(out, "{}", slots(pin));
+                out.push_str(&evidence("Collection", &[(collection.as_str(), pin)]));
                 let _ = writeln!(
                     out,
                     "{}\n",
@@ -288,10 +288,12 @@ impl Why {
                 let _ = writeln!(out, "Nothing. It declares no `asset`.\n");
             }
             false => {
-                for fetch in &self.fetches {
-                    let _ = writeln!(out, "`{}`\n", fetch.name);
-                    let _ = writeln!(out, "{}", slots(fetch));
-                }
+                let rows: Vec<(&str, &Fetch)> = self
+                    .fetches
+                    .iter()
+                    .map(|pin| (pin.name.as_str(), pin))
+                    .collect();
+                out.push_str(&evidence("Asset", &rows));
             }
         }
 
@@ -307,22 +309,27 @@ impl Why {
                      read it: it is shell calling the family's config manager.\n",
                     self.path
                 );
-                for url in urls {
-                    let _ = writeln!(out, "- {url}");
-                }
-                if urls.is_empty() {
-                    let _ = writeln!(
-                        out,
-                        "{}",
-                        match self.repo_read {
-                            true => "- no URL in it",
-                            false =>
-                                "- not readable from here: a finished image carries the \
-                                      manifest, not the module tree",
+                match urls.is_empty() {
+                    true => {
+                        let _ = writeln!(
+                            out,
+                            "{}\n",
+                            match self.repo_read {
+                                true => "No URL in it.",
+                                false =>
+                                    "Not readable from here: a finished image carries the \
+                                     manifest, not the module tree.",
+                            }
+                        );
+                    }
+                    false => {
+                        let _ = writeln!(out, "| URL it names |\n| --- |");
+                        for url in urls {
+                            let _ = writeln!(out, "| {url} |");
                         }
-                    );
+                        out.push('\n');
+                    }
                 }
-                out.push('\n');
             }
         }
         out
@@ -385,17 +392,32 @@ impl Why {
     }
 }
 
-/// The four slots, as a list rather than a table: one pin at a time reads
-/// better down the page than across it.
-fn slots(pin: &Fetch) -> String {
+/// The four evidence slots across a row, one row per pin; `first` names what
+/// the rows are.
+fn evidence(first: &str, pins: &[(&str, &Fetch)]) -> String {
     let say = |value: &Option<String>| value.clone().unwrap_or_else(|| "not declared".into());
-    format!(
-        "- locator: {}\n- selector: {}\n- verifier: {}\n- tracker: {}\n",
-        say(&pin.locator),
-        say(&pin.selector),
-        say(&pin.verifier),
-        pin.tracker
-    )
+    let mut out = format!(
+        "| {first} | Locator | Selector | Verifier | Tracker |\n| --- | --- | --- | --- | --- |\n"
+    );
+    for (name, pin) in pins {
+        let _ = writeln!(
+            out,
+            "| `{name}` | {} | {} | {} | {} |",
+            say(&pin.locator),
+            say(&pin.selector),
+            say(&pin.verifier),
+            pin.tracker
+        );
+    }
+    out.push('\n');
+    out
+}
+
+fn hash(value: &Option<String>) -> String {
+    match value {
+        Some(hash) => format!("`{hash}`"),
+        None => "nothing".to_string(),
+    }
 }
 
 // ---- on a live host ------------------------------------------------------
