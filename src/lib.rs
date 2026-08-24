@@ -277,7 +277,7 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
                 &resolved.collected,
                 root,
             ));
-            files.extend(emit::finalize::script(image, &resolved.collected, root));
+            files.push(emit::finalize::script(image, &resolved.collected, root));
             files.extend(emit::graph::files(image));
         }
         files.extend(emit::seed::file(&list));
