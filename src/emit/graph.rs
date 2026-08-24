@@ -1,6 +1,7 @@
 //! What one image's modules promise each other, as a diagram and as data.
 
 use crate::emit::json::Json;
+use crate::emit::Table;
 use crate::layout;
 use crate::model::image::Image;
 use crate::model::module::Module;
@@ -104,15 +105,6 @@ pub fn of(image: &Image) -> Graph<'_> {
     }
 
     graph
-}
-
-/// One table of the graph, in whatever the caller renders tables with: a
-/// terminal draws it, the committed markdown writes the same data as pipes.
-pub struct Table {
-    pub title: &'static str,
-    pub header: &'static [&'static str],
-    /// Each row's cells, and whether what the row says is a defect.
-    pub rows: Vec<(Vec<String>, bool)>,
 }
 
 /// Both renderings of one image's graph, for `generate` to write.
@@ -233,7 +225,7 @@ impl<'a> Graph<'a> {
         let mut tables = Vec::new();
         if !self.caps.is_empty() {
             tables.push(Table {
-                title: "Capabilities",
+                title: "Capabilities".to_string(),
                 header: &["Name", "Kind", "Provided by", "Required by", "After"],
                 rows: self
                     .caps
@@ -257,7 +249,7 @@ impl<'a> Graph<'a> {
         }
         if !self.suppressed.is_empty() {
             tables.push(Table {
-                title: "Suppressed",
+                title: "Suppressed".to_string(),
                 header: &["Module", "Provides"],
                 rows: self
                     .suppressed
@@ -270,7 +262,7 @@ impl<'a> Graph<'a> {
         }
         if !self.overrides.is_empty() {
             tables.push(Table {
-                title: "Overrides",
+                title: "Overrides".to_string(),
                 header: &["Module", "Path"],
                 rows: self
                     .overrides

@@ -395,6 +395,30 @@ it, what only orders against it, and what the base already carries.
 #### Flags:
     --format <md|json>    markdown holding a mermaid diagram by default, or json
 
+### `coverage [image] [--format md|json]`
+
+Every rule the profile an image declares `conforms` to selects, the number a
+claim names it by, which of the image's modules claims it, and which module in
+the repository or its collections would claim one nothing does. The default
+image when none is named, a picker where there is a terminal to pick on.
+
+#### Flags:
+    --datastream <f>      the SSG content the profile is read out of
+    --format <md|json>    markdown, the default, or json
+
+#### Notes:
+- No scan is involved and no report is read. This says what is claimed, not
+  what passes; `tect scap` is what measures.
+- The content is only ever the one `--datastream` names. Nothing probes the
+  host for installed SSG, so what this prints does not depend on the machine.
+  `tect scap content` prints the path a scan of this repository would use.
+- A terminal draws it as a table, red for a rule nothing claims. Everything
+  else gets the markdown, so `tect coverage > report.md` is the export.
+- The counts and the collections nothing read go to stderr, since the second
+  is about this machine rather than about the image.
+- A rule with no number in the `Number` column is one no `satisfies` can name.
+  It is unclaimable rather than unclaimed.
+
 ## For scripts
 
 None of these is in the help a person reads. They are the contract the build

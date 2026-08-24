@@ -1,0 +1,86 @@
+==== the read-out, with no scan behind it
+# Enforced coverage of `cis`
+
+`cis` (CIS Benchmark) selects 3 rules, and what `enforced` lists claims 2 of them.
+
+| Number | Rule | Claimed by | Would claim |
+|---|---|---|---|
+| `1.1.1.1` | Install AIDE | `one/hello` |  |
+| `4.1.3.1` | Record Attempts to Alter Logon and Logout Events |  |  |
+| `5.2.20`, `RHEL-09-232010` | Disable SSH Root Login | `one/hello` |  |
+tect: 1 of 3 rules are unclaimed
+==== exit 0
+==== and as json
+{
+  "image": "enforced",
+  "profile": "cis",
+  "title": "CIS Benchmark",
+  "rules": [
+    {
+      "rule": "xccdf_org.ssgproject.content_rule_package_aide_installed",
+      "numbers": [
+        "1.1.1.1"
+      ],
+      "title": "Install AIDE",
+      "claimed_by": [
+        "one/hello"
+      ],
+      "would_claim": []
+    },
+    {
+      "rule": "xccdf_org.ssgproject.content_rule_audit_rules_login_events",
+      "numbers": [
+        "4.1.3.1"
+      ],
+      "title": "Record Attempts to Alter Logon and Logout Events",
+      "claimed_by": [],
+      "would_claim": []
+    },
+    {
+      "rule": "xccdf_org.ssgproject.content_rule_sshd_disable_root_login",
+      "numbers": [
+        "5.2.20",
+        "RHEL-09-232010"
+      ],
+      "title": "Disable SSH Root Login",
+      "claimed_by": [
+        "one/hello"
+      ],
+      "would_claim": []
+    }
+  ]
+}
+tect: 1 of 3 rules are unclaimed
+==== exit 0
+==== conforming to a profile the content does not carry
+  × `enforced` conforms to `nosuch`, which is none of the profiles this
+  │ datastream carries
+   ╭─[./example.image.kdl:1:1]
+ 1 │ image {
+   · ──┬──
+   ·   ╰── this is what it is measured against
+ 2 │     name "Enforced"
+   ╰────
+  help: the datastream carries: cis, cis_server_l2
+
+tect: 1 problem in ./example.image.kdl, ./repo.kdl
+==== exit 2
+==== and measured against nothing at all
+  × `minimal` declares no `conforms`
+   ╭─[./image.kdl:1:1]
+ 1 │ image {
+   · ──┬──
+   ·   ╰── this image is measured against nothing
+ 2 │     name "Minimal"
+   ╰────
+  help: `conforms "<profile>"` is the profile a scan measures it against, and
+        what this read-out is coverage of
+
+tect: 1 problem in ./image.kdl, ./repo.kdl
+==== exit 2
+==== and with nothing to measure it against
+Tectonic v{version}
+
+Error: `coverage` needs the content the image is measured against: `tect coverage --datastream <file>`, and `tect scap content` prints the path a scan of this repository uses.
+
+==== exit 1

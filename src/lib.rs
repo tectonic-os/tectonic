@@ -63,9 +63,9 @@ fn context(list: &List, root: &Path) -> String {
 /// and the counts `check` reports.
 pub struct Run {
     pub stdout: String,
-    /// What `graph` says, as data, for a terminal to draw instead of the
-    /// markdown in `stdout`. Only `graph` fills it.
-    pub tables: Vec<emit::graph::Table>,
+    /// What a read-out says, as data, for a terminal to draw instead of the
+    /// markdown in `stdout`. `graph` and `coverage` fill it.
+    pub tables: Vec<emit::Table>,
     /// What `generate` produced, as the path each file is written at relative
     /// to the repository root, and its contents.
     pub files: Vec<(PathBuf, String)>,
@@ -249,6 +249,7 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
         Command::Summary | Command::Sbom => target_arg.is_none(),
         Command::Graph | Command::GraphJson | Command::Section => image_arg.is_none(),
         Command::Why | Command::WhyJson => false,
+        Command::Coverage | Command::CoverageJson => image_arg.is_none(),
         Command::Plan => true,
         Command::Check | Command::Generate | Command::Verify => false,
     };
@@ -366,7 +367,11 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
                 String::new()
             }
         },
-        Command::Check | Command::Verify => String::new(),
+        // `coverage` is filled by the caller: it reads a datastream a flag
+        // names, and nothing here reads a flag.
+        Command::Check | Command::Verify | Command::Coverage | Command::CoverageJson => {
+            String::new()
+        }
     };
 
     Run {

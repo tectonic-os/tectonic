@@ -22,6 +22,7 @@ pub enum Verb {
     Section,
     Graph,
     Why,
+    Coverage,
     Plan,
     Verify,
     Summary,
@@ -55,6 +56,7 @@ pub const ALL: &[Verb] = &[
     Verb::Section,
     Verb::Graph,
     Verb::Why,
+    Verb::Coverage,
     Verb::Plan,
     Verb::Verify,
     Verb::Summary,
@@ -275,6 +277,15 @@ pub const COMMANDS: &[Spec] = &[
         about: "print one module's trust read-out, byte by byte",
         family: Family::Repo,
         takes: &["root", "format"],
+    },
+    Spec {
+        verb: Verb::Coverage,
+        word: "coverage",
+        noun: "",
+        arg: "[image]",
+        about: "print who claims each rule the image conforms to",
+        family: Family::Repo,
+        takes: &["root", "format", "datastream"],
     },
     Spec {
         verb: Verb::Plan,
@@ -533,6 +544,8 @@ pub enum Command {
     Sbom,
     Why,
     WhyJson,
+    Coverage,
+    CoverageJson,
 }
 
 /// What a command's one argument names.
@@ -552,7 +565,7 @@ impl Command {
             | Self::Verify
             | Self::Graph
             | Self::GraphJson => None,
-            Self::Section => Some(Arg::Image),
+            Self::Section | Self::Coverage | Self::CoverageJson => Some(Arg::Image),
             Self::Summary | Self::Sbom => Some(Arg::Target),
             Self::Why | Self::WhyJson => Some(Arg::Module),
         }
@@ -572,6 +585,7 @@ impl Verb {
             Self::Summary => Command::Summary,
             Self::Sbom => Command::Sbom,
             Self::Why => Command::Why,
+            Self::Coverage => Command::Coverage,
             _ => return None,
         })
     }
