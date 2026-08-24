@@ -175,6 +175,23 @@ impl Workflows {
     }
 }
 
+/// A `conforms` is the scan gate, so writing one costs a scan on every build,
+/// and in an enforcing repository it costs the build itself. `measured` is the
+/// subject already quoted, since an offer elsewhere may name more than one
+/// image.
+pub(crate) fn cost(measured: &str, enforce: bool) -> String {
+    match enforce {
+        false => format!(
+            "A `conforms` turns the scan on: every build measures {measured} against the profile \
+             and publishes the score."
+        ),
+        true => format!(
+            "A `conforms` turns the scan on, and this repository enforces: every build measures \
+             {measured} against the profile, and a rule it fails fails the build."
+        ),
+    }
+}
+
 /// The benchmark profile one image is measured against, and whatever claiming
 /// modules the offer alongside it brought.
 pub struct Conforms {
@@ -188,6 +205,22 @@ pub struct Conforms {
 }
 
 impl Conforms {
+    /// The same declaration made out of an offer somewhere else: one image, one
+    /// profile already chosen, and the names the tree says arrived with it.
+    pub(crate) fn declaring(
+        image: &crate::model::image::Image,
+        profile: &str,
+        brought: Vec<String>,
+    ) -> Self {
+        Self {
+            file: PathBuf::from(image.src.name()),
+            image: image.name.clone(),
+            profile: profile.to_string(),
+            brought,
+            bring: None,
+        }
+    }
+
     /// Which image, then which profile out of the content a scan of it would
     /// read, then whether to bring the modules claiming its rules. Leaving
     /// either picker is `None` and writes nothing.
@@ -248,23 +281,7 @@ impl Conforms {
             .into());
         }
 
-        // A `conforms` is the scan gate, so the answer costs a scan on every
-        // build, and in an enforcing repository it costs the build itself.
-        println!(
-            "{}\n",
-            match list.audit_enforce {
-                false => format!(
-                    "A `conforms` turns the scan on: every build measures `{}` against the \
-                     profile and publishes the score.",
-                    image.id
-                ),
-                true => format!(
-                    "A `conforms` turns the scan on, and this repository enforces: every build \
-                     measures `{}` against the profile, and a rule it fails fails the build.",
-                    image.id
-                ),
-            }
-        );
+        println!("{}\n", cost(&format!("`{}`", image.id), list.audit_enforce));
         let options: Vec<Choice> = content
             .profiles
             .iter()

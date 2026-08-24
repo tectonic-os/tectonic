@@ -218,9 +218,14 @@ Asks you for:
   repository representation and is refused
 - Whether to import what they require and nothing in those images provides
 - Whether to generate the CI they make runnable
+- Which profile to be measured against, where they claim benchmark rules a
+  profile selects and an image listing them declares no `conforms`
 
 #### Flags:
     --image <name>    list the module in this image or flavour; repeatable
+    --datastream <f>  the SCAP content the profile offer is read out of;
+                      defaults to the family's installed copy, and no content
+                      is no offer
 
 #### Notes:
 - The argument names one module. The picker is what takes several, since one

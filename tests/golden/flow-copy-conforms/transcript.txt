@@ -1,0 +1,13 @@
+Tectonic v{version}
+
+list it in example (Yes/No)
+Yes
+
+
+example/
+├── modules/                  every module this repo owns or imported
+│   └── sshd/
+│       ├── + module.kdl      what the module installs, places and provides
+│       └── + provenance.kdl  where it was imported from, and its hash
+└── ~ example.image.kdl       sshd added to modules
+==== exit 0

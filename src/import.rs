@@ -368,18 +368,23 @@ pub struct Module {
     listing: Listing,
     /// The CI the import makes runnable, where that offer was taken.
     workflows: Option<crate::set::Workflows>,
+    /// The profile the images it is listed in are measured against, where the
+    /// set claims rules one selects and that offer was taken.
+    conforms: Vec<crate::set::Conforms>,
 }
 
 impl Module {
     /// Asks which ones when no name was given, and which collection when a name
-    /// is in more than one. Then the two offers, once for the set: what it
-    /// requires and nothing provides, and the CI it makes runnable.
+    /// is in more than one. Then the three offers, once for the set: what it
+    /// requires and nothing provides, the CI it makes runnable, and the profile
+    /// its claims would have the images measured against.
     pub fn collect(
         name: Option<String>,
         root: &Path,
         sources: &[Collection],
         enforce: bool,
         images: Vec<String>,
+        datastream: Option<&Path>,
         prompt: &Prompt,
     ) -> Result<Self, Error> {
         let (list, _) = crate::model::image::List::load(root);
@@ -463,10 +468,15 @@ impl Module {
         // What the set requires goes in first, so the list reads in build order.
         let mut members = also;
         members.extend(picked.into_iter().map(|(from, name)| Member { from, name }));
+        let brought: Vec<String> = members.iter().map(|member| member.name.clone()).collect();
+        let conforms = measured(
+            &list, &listing, &named, &declares, datastream, &brought, prompt,
+        )?;
         Ok(Self {
             members,
             listing,
             workflows,
+            conforms,
         })
     }
 
@@ -518,6 +528,11 @@ impl Module {
         if let Some(workflows) = &self.workflows {
             wrote.extend(workflows.apply(root)?);
         }
+        // Last, since it splices into the image files this just wrote the
+        // module lines into, and the tree keeps the line that says both.
+        for conforms in &self.conforms {
+            wrote.extend(conforms.apply(root)?);
+        }
         Ok(wrote)
     }
 
@@ -554,6 +569,7 @@ pub fn bring(
         members,
         listing: Listing::collect(root, vec![image.to_string()], &Prompt::silent())?,
         workflows: None,
+        conforms: Vec::new(),
     })
 }
 
@@ -659,6 +675,112 @@ fn short(
     }
 }
 
+/// Which profile the set's claims would have the images it is listed in
+/// measured against, as the question whether to declare one. `conforms` means
+/// measure me against this rather than I pass this, so an image that has just
+/// taken a claiming module is exactly the one worth measuring.
+///
+/// The content is probed the way `set conforms` probes it, since this writes
+/// the same declaration and a profile has to be one the scan carries. No
+/// content on this machine is no offer rather than a refusal: an import is not
+/// a conformance command, and `tect set conforms` is the one that says so.
+fn measured(
+    list: &crate::model::image::List,
+    listing: &Listing,
+    named: &[String],
+    declares: &[crate::parse::module::Summary],
+    datastream: Option<&Path>,
+    brought: &[String],
+    prompt: &Prompt,
+) -> Result<Vec<crate::set::Conforms>, String> {
+    let claims: Vec<&String> = declares
+        .iter()
+        .flat_map(|held| held.satisfies.iter())
+        .collect();
+    if !prompt.asks() || claims.is_empty() {
+        return Ok(Vec::new());
+    }
+    let images: Vec<&crate::model::image::Image> = listing
+        .images()
+        .iter()
+        .filter_map(|named| list.images.iter().find(|image| image.name == *named))
+        .filter(|image| image.conforms.is_empty())
+        .collect();
+    let Some(first) = images.first() else {
+        return Ok(Vec::new());
+    };
+    let family = first.base.as_ref().map_or("", |base| base.family.as_str());
+    let Ok(path) = crate::scap::content_path(family, datastream) else {
+        return Ok(Vec::new());
+    };
+    let text = match std::fs::read_to_string(&path) {
+        Ok(text) => text,
+        // A named datastream that does not read is a typo, and refuses the way
+        // `check` and `coverage` do. One only this machine happens to have is
+        // silence.
+        Err(err) if datastream.is_some() => return Err(format!("{}: {err}", path.display())),
+        Err(_) => return Ok(Vec::new()),
+    };
+    let content = crate::scap::Content::read(&text);
+    let claimed = crate::scap::reached(&content, claims.into_iter());
+    let profiles: Vec<&crate::scap::Profile> = content
+        .profiles
+        .iter()
+        .filter(|profile| !content.selected(&profile.id).is_disjoint(&claimed))
+        .collect();
+    if profiles.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let measured = said(
+        &images
+            .iter()
+            .map(|i| format!("`{}`", i.id))
+            .collect::<Vec<_>>(),
+    );
+    println!(
+        "{} {} rules {} {}, and {measured} {} no `conforms`.\n{}\n",
+        said(
+            &named
+                .iter()
+                .map(|name| format!("`{name}`"))
+                .collect::<Vec<_>>()
+        ),
+        match named.len() {
+            1 => "claims",
+            _ => "claim",
+        },
+        said(
+            &profiles
+                .iter()
+                .map(|p| format!("`{}`", p.name()))
+                .collect::<Vec<_>>()
+        ),
+        match profiles.len() {
+            1 => "selects",
+            _ => "select",
+        },
+        match images.len() {
+            1 => "declares",
+            _ => "declare",
+        },
+        crate::set::cost(&measured, list.audit_enforce),
+    );
+    let options: Vec<Choice> = profiles
+        .iter()
+        .map(|profile| Choice::new(profile.name(), &profile.title))
+        .collect();
+    let Some(chosen) = prompt.choose("which profile", &options)? else {
+        return Ok(Vec::new());
+    };
+    Ok(images
+        .iter()
+        .map(|image| {
+            crate::set::Conforms::declaring(image, profiles[chosen].name(), brought.to_vec())
+        })
+        .collect())
+}
+
 /// A set of members as a sentence names them.
 fn quoted(picked: &[(Found, String)]) -> Vec<String> {
     picked.iter().map(|(_, name)| format!("`{name}`")).collect()
@@ -693,6 +815,7 @@ mod tests {
             }],
             listing: Listing::Cancelled,
             workflows: None,
+            conforms: Vec::new(),
         }
         .apply(&root)
         .unwrap();
@@ -728,6 +851,7 @@ mod tests {
             &[],
             false,
             Vec::new(),
+            None,
             &Prompt::silent(),
         );
         let message = match result {

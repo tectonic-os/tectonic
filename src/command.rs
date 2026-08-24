@@ -189,7 +189,7 @@ pub const COMMANDS: &[Spec] = &[
         arg: "[name]",
         about: "reference a module from a collection repo.kdl declares",
         family: Family::Repo,
-        takes: &["root", "image"],
+        takes: &["root", "image", "datastream"],
     },
     Spec {
         verb: Verb::CopyModule,

@@ -194,6 +194,7 @@ fn create(name: &str, root: &Path) {
         &list.sources,
         false,
         vec!["example".into(), "server".into()],
+        None,
         &silent,
     )
     .unwrap_or_else(|err| panic!("{}", err.message()))
@@ -659,6 +660,21 @@ fn flow_repo_sourced(name: &str) -> PathBuf {
     root
 }
 
+/// The same, with the collection whose one module claims a benchmark rule,
+/// which is what every offer about conformance reads.
+fn flow_repo_claiming(name: &str) -> PathBuf {
+    let root = flow_repo(name);
+    let mut repo = std::fs::read_to_string(root.join("repo.kdl"))
+        .unwrap()
+        .replace(&tect::init::sources(&crate_dir().join("assets")), "");
+    repo.push_str(&format!(
+        "sources {{\n    three {:?}\n}}\n",
+        crate_dir().join("tests/collections/three").display()
+    ));
+    std::fs::write(root.join("repo.kdl"), repo).unwrap();
+    root
+}
+
 /// A module declaring a key, which is what `create key` reads everything but
 /// the kind out of.
 const KEYHOLDER: &str = "description \"Signs the modules it builds\"\n\n\
@@ -840,15 +856,7 @@ fn flows() {
     // claiming its rules is offered with it. A second run replaces the
     // declaration rather than writing a second one, and by then the claimant
     // is listed, so there is nothing left to offer.
-    let measured = flow_repo("flow-set-conforms-in");
-    let mut repo = std::fs::read_to_string(measured.join("repo.kdl"))
-        .unwrap()
-        .replace(&tect::init::sources(&crate_dir().join("assets")), "");
-    repo.push_str(&format!(
-        "sources {{\n    three {:?}\n}}\n",
-        crate_dir().join("tests/collections/three").display()
-    ));
-    std::fs::write(measured.join("repo.kdl"), repo).unwrap();
+    let measured = flow_repo_claiming("flow-set-conforms-in");
     for name in ["flow-set-conforms", "flow-set-conforms-again"] {
         flow(
             name,
@@ -864,6 +872,51 @@ fn flows() {
             && declared.contains("source \"three\" {\n            module \"sshd\""),
         "{declared}"
     );
+
+    // The reverse offer, the third `import module` makes: the set claims rules
+    // a profile selects and the image listing it declares no `conforms`, so
+    // the import offers one and both edits land in the one file. Declining
+    // writes only the import, and `copy module` is never asked at all.
+    let import_sshd = [
+        "--root",
+        ".",
+        "import",
+        "module",
+        "three/sshd",
+        "--datastream",
+        stream.as_str(),
+    ];
+    let claiming = flow_repo_claiming("flow-import-conforms-in");
+    flow("flow-import-conforms", &claiming, None, &import_sshd);
+    let taken = std::fs::read_to_string(claiming.join("example.image.kdl")).unwrap();
+    assert!(
+        taken.contains("    conforms \"cis\"\n")
+            && taken.contains("source \"three\" {\n            module \"sshd\""),
+        "{taken}"
+    );
+
+    let unmeasured = flow_repo_claiming("flow-import-conforms-none");
+    flow(
+        "flow-import-conforms-declined",
+        &unmeasured,
+        None,
+        &import_sshd,
+    );
+    let left = std::fs::read_to_string(unmeasured.join("example.image.kdl")).unwrap();
+    assert!(
+        !left.contains("conforms") && left.contains("module \"sshd\""),
+        "{left}"
+    );
+
+    let vendored = flow_repo_claiming("flow-copy-conforms-in");
+    flow(
+        "flow-copy-conforms",
+        &vendored,
+        None,
+        &["--root", ".", "copy", "module", "three/sshd"],
+    );
+    let copied = std::fs::read_to_string(vendored.join("example.image.kdl")).unwrap();
+    assert!(!copied.contains("conforms"), "{copied}");
 
     let prompted = flow_repo("flow-set");
     flow(
@@ -1043,6 +1096,7 @@ fn flows() {
         &list.sources,
         false,
         Vec::new(),
+        None,
         &tect::prompt::Prompt::silent(),
     )
     .unwrap_or_else(|err| panic!("{}", err.message()))
@@ -1056,6 +1110,7 @@ fn flows() {
         &list.sources,
         false,
         vec!["example".into()],
+        None,
         &tect::prompt::Prompt::silent(),
     )
     .unwrap_or_else(|err| panic!("{}", err.message()))
@@ -1074,6 +1129,7 @@ fn flows() {
         &list.sources,
         false,
         vec!["example".into()],
+        None,
         &tect::prompt::Prompt::silent(),
     )
     .err()

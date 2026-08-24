@@ -286,6 +286,7 @@ pub fn dispatch(
                 &list.sources,
                 list.audit_enforce,
                 images,
+                datastream.as_deref(),
                 prompt,
             )?
             .apply(&root)?;
