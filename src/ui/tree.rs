@@ -1,13 +1,9 @@
 //! What a command wrote, drawn where it wrote it.
 
+use super::{colour, width};
 use ratatui::crossterm::style::Stylize;
-use ratatui::crossterm::terminal;
 use std::collections::BTreeMap;
-use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
-
-/// What a terminal that will not say how wide it is is taken to be.
-const NARROWEST: usize = 80;
 
 /// The gap between the longest branch and the descriptions beside it.
 const GAP: usize = 2;
@@ -142,12 +138,6 @@ fn walk(
     }
 }
 
-/// Whether the marker takes its colour, which is the terminal `width()` asks
-/// anyway, so a redirected run and a piped one read the same bare marker.
-fn colour() -> bool {
-    std::io::stdout().is_terminal()
-}
-
 /// `desc` cut to `room` at a word boundary, and empty where too little of it
 /// survives to be worth reading. Never folded: a wrapped tree stops lining up,
 /// and the shape is the point.
@@ -164,15 +154,6 @@ fn fit(desc: &str, room: usize) -> &str {
     match cut >= LEAST {
         true => &desc[..cut],
         false => "",
-    }
-}
-
-/// Asked of the terminal only where the output is one, so a redirected run and
-/// a piped one draw the same tree whatever is behind them.
-fn width() -> usize {
-    match colour() {
-        true => terminal::size().map_or(NARROWEST, |(cols, _)| cols as usize),
-        false => NARROWEST,
     }
 }
 

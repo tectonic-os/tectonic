@@ -495,7 +495,20 @@ fn reading(
     if command == Command::Generate {
         crate::write_generated(&root, &run.files)?;
     }
-    print!("{}", run.stdout);
+    // A terminal gets the tables and nothing else; a pipe, a redirect and
+    // `--no-tui` get the markdown a forge would render.
+    print!(
+        "{}",
+        match command == Command::Graph && prompt.draws() {
+            false => run.stdout,
+            true => run
+                .tables
+                .iter()
+                .map(|t| crate::ui::table::render(t.title, t.header, &t.rows))
+                .collect::<Vec<String>>()
+                .join("\n"),
+        }
+    );
     if command == Command::Check {
         for shadow in &run.shadowed {
             eprintln!(

@@ -2,6 +2,7 @@
 //! normal scroll, never an alternate screen, and only where the caller has
 //! already found a terminal to draw on.
 
+pub mod table;
 pub mod tree;
 
 use ratatui::backend::Backend;
@@ -12,6 +13,25 @@ use ratatui::style::{Style, Stylize};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{List, ListItem, ListState};
 use ratatui::{DefaultTerminal, Frame, TerminalOptions, Viewport};
+use std::io::IsTerminal;
+
+/// What a terminal that will not say how wide it is is taken to be.
+const NARROWEST: usize = 80;
+
+/// Whether anything drawn is being watched, which is what decides both colour
+/// and whether a read-out is a table or the markdown a file would hold.
+pub fn colour() -> bool {
+    std::io::stdout().is_terminal()
+}
+
+/// Asked of the terminal only where the output is one, so a redirected run and
+/// a piped one draw the same thing whatever is behind them.
+pub fn width() -> usize {
+    match colour() {
+        true => terminal::size().map_or(NARROWEST, |(cols, _)| cols as usize),
+        false => NARROWEST,
+    }
+}
 
 /// One option, and what a person needs to see to pick between it and the rest.
 pub struct Choice {
