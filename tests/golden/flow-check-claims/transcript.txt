@@ -1,0 +1,6 @@
+Tectonic v{version}
+
+tect: `tectonic-os` is unpinned, so a fetch from it takes whatever its ref holds then, unverified
+tect: `example` conforms to `cis`, and nothing it lists claims 3 of the 3 rules it selects; `hardening` would claim 1 of them. The `tectonic-os` collection is declared but not on this machine, so nothing read it: `tect fetch modules` downloads it
+tect: 1 images, 0 modules, 0 flavours
+==== exit 0

@@ -1,0 +1,6 @@
+Tectonic v{version}
+
+tect: `tectonic-os` is unpinned, so a fetch from it takes whatever its ref holds then, unverified
+tect: `example` conforms to `cis` and no module it lists declares `satisfies`, so nothing here claims a rule of it. Nothing read a datastream, so that counts declarations rather than rules: `tect check --datastream <file>` says which of the profile's rules are unclaimed
+tect: 1 images, 0 modules, 0 flavours
+==== exit 0

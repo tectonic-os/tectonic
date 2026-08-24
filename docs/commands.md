@@ -315,10 +315,22 @@ Reads every manifest and reports every problem at the line that caused it, then
 the counts on the last line: images, modules, flavours, and how many listed
 modules the base already provides.
 
+#### Flags:
+    --datastream <f>      the SSG content, for the conformance read-out
+
 #### Notes:
 - Above the counts it names every base a collection describes differently from
-  the tool's own entry, and every collection declared `unpinned`.
-- Neither of those is an error, and neither changes the exit code.
+  the tool's own entry, every collection declared `unpinned`, and every image
+  declaring a `conforms` nothing it lists claims a rule of.
+- None of those is an error, and none changes the exit code. An image is
+  allowed to declare a target it has not reached; that is what declaring one
+  first is for.
+- The conformance read-out has two tiers. Without `--datastream` it reads the
+  manifests alone, so it can only report an image measured against a profile
+  that lists no module declaring `satisfies`. With one it says how many of the
+  profile's rules nothing listed claims and which modules would claim them,
+  and it names any declared collection nothing read rather than concluding
+  from its silence. `tect scap content` prints the path to pass it.
 
 ### `generate`
 

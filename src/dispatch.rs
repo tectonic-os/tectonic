@@ -422,7 +422,7 @@ pub fn dispatch(
             crate::runtime::fetch(rest)?;
             Ok(ExitCode::SUCCESS)
         }
-        _ => reading(spec, rest, format.as_deref(), root_arg, prompt),
+        _ => reading(spec, rest, format.as_deref(), root_arg, datastream, prompt),
     }
 }
 
@@ -433,6 +433,7 @@ fn reading(
     rest: &[&str],
     format: Option<&str>,
     root_arg: Option<PathBuf>,
+    datastream: Option<PathBuf>,
     prompt: &Prompt,
 ) -> Result<ExitCode, Error> {
     let command = spec.verb.reads().expect("a command run reads");
@@ -526,6 +527,9 @@ fn reading(
         }
         for name in &run.modified {
             eprintln!("tect: `{name}` has been edited since it was imported");
+        }
+        for line in crate::scap::conformance(&run.list, &run.index, datastream.as_deref())? {
+            eprintln!("tect: {line}");
         }
         match run.images {
             0 => eprintln!("tect: no image yet; `tect create image <name>` writes one"),

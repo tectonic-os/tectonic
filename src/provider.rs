@@ -117,6 +117,23 @@ impl Index {
         self.sourced
     }
 
+    /// The same thing as a sentence, so every diagnostic concluding from
+    /// silence carries one voice. Empty where the scan was complete.
+    pub fn unsearched(&self) -> String {
+        let named: Vec<String> = self.unread.iter().map(|name| format!("`{name}`")).collect();
+        match named.len() {
+            0 => String::new(),
+            1 => format!(
+                "The {} collection is declared but not on this machine, so nothing read it: `tect fetch modules` downloads it",
+                named.join(", ")
+            ),
+            _ => format!(
+                "The {} collections are declared but not on this machine, so nothing read them: `tect fetch modules` downloads them",
+                named.join(", ")
+            ),
+        }
+    }
+
     /// Every module declaring `capability`, the repository's own first.
     pub fn of(&self, capability: &str) -> Vec<&Provider> {
         self.held

@@ -720,6 +720,46 @@ fn flows() {
         &["--root", ".", "check"],
     );
 
+    // An image measured against a profile, and a module on disk claiming a
+    // rule of it that the image does not list. Without a datastream `check`
+    // can only count declarations; with one it says which rules are open and
+    // what would close them, and under-claims for the collection nothing read.
+    let conforms = flow_repo("flow-conforms");
+    std::fs::create_dir_all(conforms.join("modules/hardening")).unwrap();
+    std::fs::write(
+        conforms.join("modules/hardening/module.kdl"),
+        "description \"Claims a rule the profile selects\"\n\nsupports \"fedora\"\n\n\
+         satisfies {\n    cis-fedora \"5.2.20\"\n}\n",
+    )
+    .unwrap();
+    let image = conforms.join("example.image.kdl");
+    let declared = std::fs::read_to_string(&image)
+        .unwrap()
+        .replace("    modules {", "    conforms \"cis\"\n\n    modules {");
+    assert!(declared.contains("conforms \"cis\""), "{declared}");
+    std::fs::write(&image, declared).unwrap();
+    flow(
+        "flow-check-conforms",
+        &conforms,
+        None,
+        &["--root", ".", "check"],
+    );
+    flow(
+        "flow-check-claims",
+        &conforms,
+        None,
+        &[
+            "--root",
+            ".",
+            "check",
+            "--datastream",
+            &crate_dir()
+                .join("tests/scap/datastream.xml")
+                .display()
+                .to_string(),
+        ],
+    );
+
     let root = flow_repo("flow-module");
     let module = ["--root", ".", "create", "module"];
     flow("flow-create-module", &root, None, &module);

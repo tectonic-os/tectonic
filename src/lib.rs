@@ -87,6 +87,9 @@ pub struct Run {
     /// Forking one is legitimate, so this is a read-out rather than a
     /// diagnostic; `check`'s alone.
     pub modified: Vec<String>,
+    /// Who provides what, as the run saw it: `check`'s conformance notice
+    /// asks it what would claim a rule the image is missing.
+    pub(crate) index: provider::Index,
     /// The reading this ran against, so a caller that needs one after a command
     /// acts on what the command saw rather than reading the tree again.
     pub(crate) list: List,
@@ -123,6 +126,7 @@ pub(crate) struct Loaded {
     workflows: Vec<resolve::workflow::Declared>,
     /// What a workflow body's guarded regions are kept by.
     facts: Vec<&'static str>,
+    index: provider::Index,
     issues: Issues,
     context: String,
 }
@@ -167,6 +171,7 @@ pub(crate) fn load(root: &Path) -> Loaded {
         resolved,
         workflows,
         facts,
+        index,
         issues,
         context,
     }
@@ -190,6 +195,7 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
         resolved,
         workflows,
         facts,
+        index,
         mut issues,
         context,
     } = loaded;
@@ -376,6 +382,7 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
         shadowed,
         unpinned,
         modified,
+        index,
         list,
         resolved,
     }

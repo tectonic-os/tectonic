@@ -221,7 +221,7 @@ pub const COMMANDS: &[Spec] = &[
         arg: "",
         about: "read every manifest and say what is wrong with it",
         family: Family::Repo,
-        takes: ROOT,
+        takes: &["root", "datastream"],
     },
     Spec {
         verb: Verb::Generate,
