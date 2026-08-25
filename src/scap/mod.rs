@@ -942,9 +942,9 @@ mod tests {
         let profile = content
             .profiles
             .iter()
-            .find(|profile| profile.is("cis"))
-            .expect("the fixture carries `cis`");
-        assert_eq!(profile.title, "CIS Benchmark");
+            .find(|profile| profile.is("standard"))
+            .expect("the fixture carries `standard`");
+        assert_eq!(profile.title, "Standard System Security Profile for Fedora");
         assert_eq!(
             content
                 .titles
@@ -957,7 +957,7 @@ mod tests {
         // group the profile selects but no `Rule` defines reaches nothing.
         let numbers = content.numbering(&content.selected(&profile.id));
         assert!(numbers.contains("5.2.20") && numbers.contains("RHEL-09-232010"));
-        assert!(!numbers.contains("5.5.2"), "`cis` does not select it");
+        assert!(!numbers.contains("5.5.2"), "`standard` does not select it");
 
         let root = fixture("tests/repos/enforced");
         let index = Index::scan(&root, &[], &Disk::scan(&root), false);
@@ -1017,7 +1017,7 @@ mod tests {
         assert_eq!(
             said,
             [
-                "`enforced` conforms to `cis`, and nothing it lists claims 1 of the 3 rules it \
+                "`enforced` conforms to `standard`, and nothing it lists claims 1 of the 3 rules it \
               selects; nothing in the repository claims them"
             ]
         );

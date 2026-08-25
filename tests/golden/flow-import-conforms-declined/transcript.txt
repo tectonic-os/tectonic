@@ -3,11 +3,11 @@ Tectonic v{version}
 list it in example (Yes/No)
 Yes
 
-`sshd` claims rules `cis` and `cis_server_l2` select, and `example` declares no `conforms`.
+`sshd` claims rules `standard` and `ospp` select, and `example` declares no `conforms`.
 A `conforms` turns the scan on: every build measures `example` against the profile and publishes the score.
 
-  1) cis  CIS Benchmark
-  2) cis_server_l2  CIS Level 2 Server
+  1) standard  Standard System Security Profile for Fedora
+  2) ospp  Protection Profile for General Purpose Operating Systems
 which profile [1-2, 0 for none]: 0
 
 

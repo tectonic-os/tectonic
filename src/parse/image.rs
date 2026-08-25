@@ -522,11 +522,12 @@ mod tests {
     /// in front of `base`, and last of all in an image with no base at all.
     #[test]
     fn the_span_a_conforms_takes_is_the_node_or_where_the_next_one_goes() {
-        let held = "image {\n    name \"E\"\n    conforms \"cis\"\n    base \"x\" {\n    }\n}\n";
+        let held =
+            "image {\n    name \"E\"\n    conforms \"standard\"\n    base \"x\" {\n    }\n}\n";
         let span = conforms_span(held, "E").expect("the image is there");
         assert_eq!(
             &held[span.offset..span.offset + span.len],
-            "conforms \"cis\""
+            "conforms \"standard\""
         );
 
         let bare = "image {\n    name \"E\"\n\n    base \"x\" {\n    }\n}\n";

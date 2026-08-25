@@ -14,8 +14,8 @@ The scan measured 4 rules: 2 pass, 1 fail.
 
 | Profile | Selected | Pass | Fail | Other |
 | --- | --- | --- | --- | --- |
-| `cis` (declared) | 3 | 1 | 1 | 1 |
-| `cis_server_l2` | 3 | 1 | 1 | 1 |
+| `standard` (declared) | 3 | 1 | 1 | 1 |
+| `ospp` | 3 | 1 | 1 | 1 |
 
 ## Since the last scan
 
@@ -42,8 +42,8 @@ The scan measured 4 rules: 1 pass, 2 fail.
 
 | Profile | Selected | Pass | Fail | Other |
 | --- | --- | --- | --- | --- |
-| `cis` (declared) | 3 | 1 | 1 | 1 |
-| `cis_server_l2` | 3 | 0 | 2 | 1 |
+| `standard` (declared) | 3 | 1 | 1 | 1 |
+| `ospp` | 3 | 0 | 2 | 1 |
 
 ## Since the last scan
 
@@ -77,8 +77,8 @@ Not load-bearing: one/hello cis-fedora 1.1.1.1. The base alone already passes it
 
 | Profile | Selected | Pass | Fail | Other |
 | --- | --- | --- | --- | --- |
-| `cis` (declared) | 3 | 1 | 1 | 1 |
-| `cis_server_l2` | 3 | 1 | 1 | 1 |
+| `standard` (declared) | 3 | 1 | 1 | 1 |
+| `ospp` | 3 | 1 | 1 | 1 |
 
 tect: one/hello claims cis-fedora 5.2.20 and the image fails it
 tect: one/hello claims cis-fedora 9.9.9.9, which names no rule in the datastream
@@ -90,13 +90,13 @@ tect: 3 findings, and the repository does not enforce
 
 | Profile | Selected | Pass | Fail | Other |
 | --- | --- | --- | --- | --- |
-| `cis` | 3 | 1 | 1 | 1 |
-| `cis_server_l2` | 3 | 1 | 1 | 1 |
+| `standard` | 3 | 1 | 1 | 1 |
+| `ospp` | 3 | 1 | 1 | 1 |
 
 tect: one/hello claims cis-fedora 5.2.20 and the image fails it
 tect: one/hello claims cis-fedora 9.9.9.9, which names no rule in the datastream
 tect: one/hello claims stig RHEL-09-232010 and the image fails it
-tect: this image conforms to `nosuch`, which is none of the profiles the datastream carries: cis, cis_server_l2
+tect: this image conforms to `nosuch`, which is none of the profiles the datastream carries: standard, ospp
 tect: 4 findings, and the repository does not enforce
 ==== exit 0
 ==== enforced, and the report is the same
@@ -115,8 +115,8 @@ The scan measured 4 rules: 2 pass, 1 fail.
 
 | Profile | Selected | Pass | Fail | Other |
 | --- | --- | --- | --- | --- |
-| `cis` (declared) | 3 | 1 | 1 | 1 |
-| `cis_server_l2` | 3 | 1 | 1 | 1 |
+| `standard` (declared) | 3 | 1 | 1 | 1 |
+| `ospp` | 3 | 1 | 1 | 1 |
 
 ==== the content it is measured with
 /usr/share/xml/scap/ssg/content/ssg-fedora-ds.xml

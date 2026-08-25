@@ -1,6 +1,6 @@
-# Example coverage of `cis`
+# Example coverage of `standard`
 
-`cis` (CIS Benchmark) selects 3 rules, and what `example` lists claims 0 of them.
+`standard` (Standard System Security Profile for Fedora) selects 3 rules, and what `example` lists claims 0 of them.
 
 | Number | Rule | Claimed by | Would claim |
 |---|---|---|---|

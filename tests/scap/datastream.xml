@@ -1,17 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- A miniature of an SSG datastream: the profile names are the real
+     content's and the four rules under them obviously are not. -->
 <ds:data-stream-collection xmlns:ds="http://scap.nist.gov/schema/scap/source/1.2">
   <ds:component id="scap_org.open-scap_comp_ssg-fedora-xccdf.xml">
     <Benchmark xmlns="http://checklists.nist.gov/xccdf/1.2" id="xccdf_org.ssgproject.content_benchmark_FEDORA">
       <!-- A comment, and a > inside an attribute value, which the scanner has to walk past. -->
-      <Profile id="xccdf_org.ssgproject.content_profile_cis">
-        <title>CIS Benchmark</title>
+      <Profile id="xccdf_org.ssgproject.content_profile_standard">
+        <title>Standard System Security Profile for Fedora</title>
         <select idref="xccdf_org.ssgproject.content_rule_package_aide_installed" selected="true"/>
         <select idref="xccdf_org.ssgproject.content_rule_sshd_disable_root_login" selected="true"/>
         <select idref="xccdf_org.ssgproject.content_rule_audit_rules_login_events" selected="true"/>
         <select idref="xccdf_org.ssgproject.content_group_nothing" selected="true"/>
       </Profile>
-      <Profile id="xccdf_org.ssgproject.content_profile_cis_server_l2" extends="xccdf_org.ssgproject.content_profile_cis">
-        <title>CIS Level 2 Server</title>
+      <Profile id="xccdf_org.ssgproject.content_profile_ospp" extends="xccdf_org.ssgproject.content_profile_standard">
+        <title>Protection Profile for General Purpose Operating Systems</title>
         <select idref="xccdf_org.ssgproject.content_rule_no_empty_passwords" selected="true"/>
         <select idref="xccdf_org.ssgproject.content_rule_package_aide_installed" selected="false"/>
       </Profile>

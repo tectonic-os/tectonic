@@ -369,6 +369,9 @@ Asks you for:
 - Choosing a group chooses every rule under it, and the numbers are written out
   under one benchmark node, a number per line. No prefix ever reaches the file:
   a claim that grows when the content does is not a claim.
+- That node is named for the profile the rules were chosen out of, and for
+  nothing else. The family is already declared in `supports`, and a name that
+  folds one in is a second spelling that can disagree with the first.
 - A claim about a rule the chosen profile does not select is kept, so measuring
   a module against a second profile does not drop what the first one wrote.
 - Claiming nothing takes the block away, the way `set workflows` takes the

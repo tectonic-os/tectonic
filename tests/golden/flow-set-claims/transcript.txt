@@ -1,6 +1,6 @@
-  1) cis  CIS Benchmark
-  2) cis_server_l2  CIS Level 2 Server
-which profile [1-2, 0 for none]: cis
+  1) standard  Standard System Security Profile for Fedora
+  2) ospp  Protection Profile for General Purpose Operating Systems
+which profile [1-2, 0 for none]: standard
 
   1) 1.1.1.1  Install AIDE  package_aide_installed  Read this rather than the &gt; below.
   2) 4.1.3.1  Record Attempts to Alter Logon and Logout Events  audit_rules_login_events
@@ -11,5 +11,5 @@ which rules `sshd` claims [1-3, several, 0 for none]: 3
 example/
 └── modules/              every module this repo owns or imported
     └── sshd/
-        └── ~ module.kdl  claiming one rule of `cis`
+        └── ~ module.kdl  claiming one rule of `standard`
 ==== exit 0

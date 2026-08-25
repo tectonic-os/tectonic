@@ -1,7 +1,7 @@
 ==== the read-out, with no scan behind it
-# Enforced coverage of `cis`
+# Enforced coverage of `standard`
 
-`cis` (CIS Benchmark) selects 3 rules, and what `enforced` lists claims 2 of them.
+`standard` (Standard System Security Profile for Fedora) selects 3 rules, and what `enforced` lists claims 2 of them.
 
 | Number | Rule | Claimed by | Would claim |
 |---|---|---|---|
@@ -13,8 +13,8 @@ tect: 1 of 3 rules are unclaimed
 ==== and as json
 {
   "image": "enforced",
-  "profile": "cis",
-  "title": "CIS Benchmark",
+  "profile": "standard",
+  "title": "Standard System Security Profile for Fedora",
   "rules": [
     {
       "rule": "xccdf_org.ssgproject.content_rule_package_aide_installed",
@@ -61,7 +61,7 @@ tect: 1 of 3 rules are unclaimed
    ·   ╰── this is what it is measured against
  2 │     name "Enforced"
    ╰────
-  help: the datastream carries: cis, cis_server_l2
+  help: the datastream carries: standard, ospp
 
 tect: 1 problem in ./example.image.kdl, ./repo.kdl
 ==== exit 2

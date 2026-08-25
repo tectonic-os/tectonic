@@ -385,9 +385,10 @@ fn group(number: &str) -> &str {
 pub struct Claims {
     /// The manifest, from the repository root.
     file: PathBuf,
-    /// What the numbers are written under, which is decorative: a number
-    /// resolves against the content, never against this.
-    benchmark: String,
+    /// What the numbers are written under, which is the profile they were
+    /// chosen out of and is decorative: a number resolves against the content,
+    /// never against this. The family is not folded in, because `supports`
+    /// already declares it and a second spelling can disagree with the first.
     profile: String,
     /// Every number the block will hold, chosen or kept.
     numbers: Vec<String>,
@@ -512,10 +513,6 @@ impl Claims {
         numbers.dedup();
         Ok(Some(Self {
             file,
-            benchmark: match family.is_empty() {
-                true => profile.name().to_string(),
-                false => format!("{}-{family}", profile.name()),
-            },
             profile: profile.name().to_string(),
             numbers,
             claimed: chosen.len(),
@@ -547,7 +544,7 @@ impl Claims {
             true => String::new(),
             false => format!(
                 "satisfies {{\n    {} {}\n}}",
-                self.benchmark,
+                self.profile,
                 self.numbers
                     .iter()
                     .map(|number| format!("\"{number}\""))
@@ -620,10 +617,10 @@ mod tests {
     #[test]
     fn the_profile_replaces_the_one_that_was_there() {
         let text =
-            "image {\n    name \"Example\"\n\n    conforms \"cis\"\n\n    base \"x\" {\n    }\n}\n";
+            "image {\n    name \"Example\"\n\n    conforms \"standard\"\n\n    base \"x\" {\n    }\n}\n";
         assert_eq!(
-            conforms("cis_server_l2").spliced(text).unwrap(),
-            text.replace("\"cis\"", "\"cis_server_l2\"")
+            conforms("ospp").spliced(text).unwrap(),
+            text.replace("\"standard\"", "\"ospp\"")
         );
     }
 
@@ -631,10 +628,10 @@ mod tests {
     #[test]
     fn an_image_with_nothing_to_stand_in_front_of_still_takes_one() {
         assert_eq!(
-            conforms("cis")
+            conforms("standard")
                 .spliced("image {\n    name \"Example\"\n}\n")
                 .unwrap(),
-            "image {\n    name \"Example\"\nconforms \"cis\"\n\n}\n"
+            "image {\n    name \"Example\"\nconforms \"standard\"\n\n}\n"
         );
     }
 
