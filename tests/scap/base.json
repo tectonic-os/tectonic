@@ -1,0 +1,7 @@
+{
+  "target": "base",
+  "passed": [
+    "xccdf_org.ssgproject.content_rule_package_aide_installed",
+    "xccdf_org.ssgproject.content_rule_sshd_disable_root_login"
+  ]
+}

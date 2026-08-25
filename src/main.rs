@@ -146,6 +146,7 @@ fn run() -> Result<ExitCode, Error> {
         target: args.flag("target")?,
         datastream: args.flag("datastream")?.map(PathBuf::from),
         baseline: args.flag("baseline")?.map(PathBuf::from),
+        base_scan: args.flag("base-scan")?.map(PathBuf::from),
         tags: args.flags("tag")?,
         kernel: args.flag("kernel")?,
         backend: args.flag("backend")?,

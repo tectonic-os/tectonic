@@ -538,6 +538,7 @@ profile the datastream carries, and what stopped passing since the last scan.
     --target <t>          the target, else the ungated one
     --datastream <f>      the SSG content, else the one `scap content` names
     --baseline <f>        the last scan's pass set, read then rewritten
+    --base-scan <f>       what the bare base passed alone, read only
 
 #### Notes:
 - The mapping from a benchmark number to a rule is the datastream's own, over
@@ -554,6 +555,12 @@ profile the datastream carries, and what stopped passing since the last scan.
   that passed the last scan and does not now is a finding, and every run leaves
   the current pass set behind as the next floor. One deliberate regression is
   one red run rather than a file somebody has to go and delete.
+- `--base-scan` names a pass set a scan of the bare base wrote, in the same
+  format `--baseline` writes, and adds a *base alone* column. A claim the base
+  already passes is reported not load-bearing, which is a notice and never a
+  finding: the module may implement the rule as well, and it applies its
+  settings either way. The document records passes only, so a rule missing from
+  it is not a rule the base failed.
 - Findings are fatal only under `audit { enforce #true }`, like every other
   audit fact, and the report goes to stdout either way.
 

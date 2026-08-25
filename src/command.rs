@@ -370,7 +370,7 @@ pub const COMMANDS: &[Spec] = &[
         arg: "<arf.xml>",
         about: "print what one scan says about the target",
         family: Family::Script,
-        takes: &["root", "target", "datastream", "baseline"],
+        takes: &["root", "target", "datastream", "baseline", "base-scan"],
     },
     Spec {
         verb: Verb::RegistryNamespace,

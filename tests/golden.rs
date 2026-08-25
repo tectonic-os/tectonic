@@ -1569,6 +1569,33 @@ fn scap() {
         out.push_str(&format!("==== {heading}\n{report}{said}==== exit {code}\n"));
     }
 
+    // The bare base's own pass set beside the image's. A claim the base already
+    // passes is a notice and never a finding, and one the base passed that the
+    // image now fails names the base rather than the module that claimed it.
+    let base = fixtures.join("base.json");
+    let against_base = [
+        "--root",
+        ".",
+        "scap",
+        &fixtures.join("arf.xml").display().to_string(),
+        "--datastream",
+        &datastream.display().to_string(),
+        "--base-scan",
+        &base.display().to_string(),
+    ]
+    .map(String::from);
+    let borrowed: Vec<&str> = against_base.iter().map(String::as_str).collect();
+    let (report, said, code) = scap_run(&root, &borrowed);
+    out.push_str(&format!(
+        "==== and against what the bare base passes alone\n{report}{said}==== exit {code}\n"
+    ));
+    let (_, said, code) = scap_run(&enforced, &borrowed);
+    assert!(code == 2, "enforcement did not fail the scan: {said}");
+    assert!(
+        said.contains("quay.io/fedora/fedora-bootc:44` alone passed this rule"),
+        "the base-regression help did not name the base: {said}"
+    );
+
     // A profile the datastream does not carry: the open vocabulary means only
     // the scan can catch it, and what it is worth is the list it comes back
     // with.

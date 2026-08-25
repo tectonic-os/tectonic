@@ -23,6 +23,9 @@ pub struct Options {
     pub target: Option<String>,
     pub datastream: Option<PathBuf>,
     pub baseline: Option<PathBuf>,
+    /// What the bare base passed on its own, as a scan of an image listing no
+    /// module wrote it. Read with `baseline()`, because it is that document.
+    pub base: Option<PathBuf>,
 }
 
 /// What the scan came back with; the report is on stdout either way.
@@ -284,6 +287,19 @@ pub fn run(root: &Path, arf: &Path, opts: &Options) -> Result<Verdict, String> {
     };
     let content = Content::read(&read(&datastream)?);
     let measured = results(&read(arf)?);
+    let base = match &opts.base {
+        None => None,
+        Some(path) => {
+            let doc =
+                Json::parse(&read(path)?).map_err(|err| format!("{}: {err}", path.display()))?;
+            Some(baseline(&doc).ok_or_else(|| {
+                format!(
+                    "{}: no `passed` list, so it is not a scan's pass set",
+                    path.display()
+                )
+            })?)
+        }
+    };
 
     let mut found: Vec<Finding> = Vec::new();
     let mut out = String::new();
@@ -310,6 +326,7 @@ pub fn run(root: &Path, arf: &Path, opts: &Options) -> Result<Verdict, String> {
             gate,
             content: &content,
             measured: &measured,
+            base: base.as_ref(),
         },
     );
     profiles(&mut out, &mut found, image, &content, &measured);
@@ -366,11 +383,16 @@ struct Measured<'a> {
     gate: &'a str,
     content: &'a Content,
     measured: &'a BTreeMap<String, String>,
+    /// What the bare base passed alone. It holds passes and nothing else, so a
+    /// rule missing from it may have failed there or never been measured.
+    base: Option<&'a BTreeSet<String>>,
 }
 
-/// Every rule the target's modules claim, against what the scan measured.
+/// Every rule the target's modules claim, against what the scan measured, and
+/// where a base scan was read, against what the bare base passed alone.
 fn claims(out: &mut String, found: &mut Vec<Finding>, m: Measured) {
     let mut rows = String::new();
+    let mut redundant: Vec<String> = Vec::new();
     for entry in m.entries {
         let Some(module) = entry.module.as_ref() else {
             continue;
@@ -381,8 +403,10 @@ fn claims(out: &mut String, found: &mut Vec<Finding>, m: Measured) {
                 let Some(id) = m.content.rules.get(rule) else {
                     let _ = writeln!(
                         rows,
-                        "| {} | {} | {rule} | **maps to nothing** |",
-                        entry.path, coverage.benchmark
+                        "| {} | {} | {rule} |{} **maps to nothing** |",
+                        entry.path,
+                        coverage.benchmark,
+                        base_cell(m.base, None)
                     );
                     found.push(Finding {
                         message: format!(
@@ -398,24 +422,33 @@ fn claims(out: &mut String, found: &mut Vec<Finding>, m: Measured) {
                     });
                     continue;
                 };
+                let over = m.base.is_some_and(|passed| passed.contains(id));
                 let result = m.measured.get(id).map_or("notselected", String::as_str);
                 let _ = writeln!(
                     rows,
-                    "| {} | {} | {rule} | {result} |",
-                    entry.path, coverage.benchmark
+                    "| {} | {} | {rule} |{} {result} |",
+                    entry.path,
+                    coverage.benchmark,
+                    base_cell(m.base, Some(id))
                 );
+                if over && result == "pass" {
+                    redundant.push(format!("{} {} {rule}", entry.path, coverage.benchmark));
+                }
                 if result != "fail" {
                     continue;
                 }
                 // A claim whose files another module replaced is a composition
                 // failure: the claimant is honest and the image is not hardened.
                 let lost = overridden(m.image, m.shipped, m.gate, &entry.path);
-                let help = lost.first().map(|(path, by)| {
-                    format!(
-                        "{by} owns the final {path}, so this claim is not contradicted; the \
-                         composition defeats it"
-                    )
-                });
+                let help = lost
+                    .first()
+                    .map(|(path, by)| {
+                        format!(
+                            "{by} owns the final {path}, so this claim is not contradicted; the \
+                             composition defeats it"
+                        )
+                    })
+                    .or_else(|| over.then(|| regressed(m.image)));
                 found.push(Finding {
                     message: format!(
                         "{} claims {} {rule} and the image fails it",
@@ -431,11 +464,62 @@ fn claims(out: &mut String, found: &mut Vec<Finding>, m: Measured) {
         let _ = writeln!(out, "No module here declares `satisfies`.\n");
         return;
     }
-    let _ = write!(
+    let head = match m.base.is_some() {
+        true => {
+            "| Module | Benchmark | Rule | Base alone | Result |\n| --- | --- | --- | --- | \
+                 --- |\n"
+        }
+        false => "| Module | Benchmark | Rule | Result |\n| --- | --- | --- | --- |\n",
+    };
+    let _ = write!(out, "## Declared coverage, measured\n\n{head}{rows}\n");
+    if m.base.is_none() {
+        return;
+    }
+    let _ = writeln!(
         out,
-        "## Declared coverage, measured\n\n\
-         | Module | Benchmark | Rule | Result |\n| --- | --- | --- | --- |\n{rows}\n"
+        "The base column is the bare base's own pass set. It records what passed and nothing \
+         else, so `-` is not a failure: the rule may have failed on the base, or may never have \
+         been measured there.\n"
     );
+    if !redundant.is_empty() {
+        let _ = writeln!(
+            out,
+            "Not load-bearing: {}. The base alone already passes {}, so the image passes with \
+             the module and without it. Whether the module implements it too is not something \
+             this scan can say, and it applies its settings either way.\n",
+            redundant.join(", "),
+            match redundant.len() {
+                1 => "it",
+                _ => "them",
+            }
+        );
+    }
+}
+
+/// The `base alone` cell, absent where no base scan was read. The document
+/// holds a pass set and nothing else, so the only two answers it has are that
+/// the base passed the rule and that it does not say.
+fn base_cell(base: Option<&BTreeSet<String>>, id: Option<&str>) -> String {
+    match base {
+        None => String::new(),
+        Some(passed) => match id.is_some_and(|id| passed.contains(id)) {
+            true => " pass |".into(),
+            false => " - |".into(),
+        },
+    }
+}
+
+/// A claim the base alone passed and the built image now fails, which is the
+/// base moving under the image rather than the module failing to act.
+fn regressed(image: &Image) -> String {
+    format!(
+        "{} alone passed this rule when the base scan was taken, so the image lost it rather \
+         than never having had it: a base that moved, or a layer over it",
+        image
+            .base
+            .as_ref()
+            .map_or("the base".to_string(), |base| format!("`{}`", base.image))
+    )
 }
 
 /// What the image scores against every profile the datastream carries, which
