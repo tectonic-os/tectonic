@@ -692,9 +692,9 @@ jobs:
           persist-credentials: false
           ref: ${{ needs.checksums.outputs.ref }}
 
-      # Nothing when the target declares neither a claim nor a `conforms`,
-      # which is an image asking not to be measured, and every step below is
-      # gated on it.
+      # Nothing when the target declares no `conforms`, which is an image
+      # asking not to be measured. A module's `satisfies` no longer opens
+      # this gate, and every step below is gated on it.
       - name: What this target is measured with
         id: content
         env:
@@ -755,7 +755,7 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" \
             | sudo podman login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-      - name: Scan the image
+      - name: Choose the scanner for this family
         if: steps.content.outputs.datastream != ''
         env:
           TARGET: ${{ matrix.target }}
@@ -770,8 +770,30 @@ jobs:
             fedora) installer="dnf -y install openscap-scanner" ;;
             *) installer="apt-get update && apt-get install -y openscap-scanner" ;;
           esac
+          # The observed failure is corrupt cached repodata, so a retry that
+          # does not drop the cache re-reads the same corruption and fails
+          # identically. The cleaner runs only between attempts.
+          case "$family" in
+            fedora) cleaner="dnf clean all" ;;
+            *) cleaner="apt-get clean" ;;
+          esac
+          {
+            echo "INSTALLER=${installer}"
+            echo "CLEANER=${cleaner}"
+          } >> "$GITHUB_ENV"
 
+      - name: Pull the image
+        if: steps.content.outputs.datastream != ''
+        run: |
+          set -euo pipefail
           sudo podman pull "$IMAGE_REF"
+
+      - name: Evaluate the rules
+        if: steps.content.outputs.datastream != ''
+        env:
+          DATASTREAM: ${{ steps.content.outputs.datastream }}
+        run: |
+          set -euo pipefail
           # The scanner runs inside the image, not over its mounted rootfs: a
           # chroot scan reads the runner's rpm database path, a bootc image
           # keeps an empty /var and its database under /usr, and the content
@@ -784,10 +806,21 @@ jobs:
           # never has to run separately. oscap exits non-zero whenever any rule
           # fails, which is expected.
           cp "$DATASTREAM" "${RUNNER_TEMP}/ds.xml"
+          # The scanner is installed inside the image being measured, over
+          # the network, on every scan, so a transient mirror error is the
+          # same red X as a false claim. It retries rather than failing the
+          # run, and gives up rather than evaluating without a scanner.
           sudo podman run --rm --entrypoint "" \
             -v "${RUNNER_TEMP}:/scan:z" "$IMAGE_REF" \
-            sh -c "${installer} > /dev/null && oscap xccdf eval \
-              --profile '(all)' --results-arf /scan/arf.xml /scan/ds.xml" || true
+            sh -c "n=0
+              until $INSTALLER > /dev/null; do
+                n=\$((n+1))
+                [ \"\$n\" -ge 3 ] && exit 1
+                $CLEANER > /dev/null 2>&1 || true
+                sleep 15
+              done
+              oscap xccdf eval \
+                --profile '(all)' --results-arf /scan/arf.xml /scan/ds.xml" || true
           [ -s "${RUNNER_TEMP}/arf.xml" ] || { echo "::error::the scan wrote no report"; exit 1; }
           sudo chown "$(id -u):$(id -g)" "${RUNNER_TEMP}/arf.xml"
 
