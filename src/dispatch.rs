@@ -470,17 +470,9 @@ fn coverage(
     run: &mut crate::Run,
     json: bool,
     arg: Option<&str>,
-    datastream: Option<&Path>,
+    datastream: &Path,
 ) -> Result<(), Error> {
-    let Some(path) = datastream else {
-        return Err(Error::Invocation(
-            "`coverage` needs the content the image is measured against: `tect coverage \
-             --datastream <file>`, and `tect scap content` prints the path a scan of this \
-             repository uses"
-                .into(),
-        ));
-    };
-    let content = crate::scap::content_of(path)?;
+    let content = crate::scap::content_of(datastream)?;
 
     let image = match arg {
         // An argument naming no image is already an issue on the run.
@@ -569,6 +561,15 @@ fn reading(
         }
     };
 
+    if matches!(command, Command::Coverage | Command::CoverageJson) && datastream.is_none() {
+        return Err(Error::Invocation(
+            "`coverage` reads the profile out of a SCAP datastream, and never probes this machine \
+             for one: `tect coverage --datastream <file>`\n\nhelp: `tect scap content` prints the \
+             path a scan of this repository uses"
+                .into(),
+        ));
+    }
+
     // `why` is the one command a live host runs, where the image carries the
     // two documents and there is no repository at all.
     if matches!(command, Command::Why | Command::WhyJson) && repo_root(root_arg.clone()).is_err() {
@@ -616,7 +617,9 @@ fn reading(
             &mut run,
             command == Command::CoverageJson,
             arg,
-            datastream.as_deref(),
+            datastream
+                .as_deref()
+                .expect("coverage checked its datastream"),
         )?;
     }
     if run.issues.report(&run.context) {

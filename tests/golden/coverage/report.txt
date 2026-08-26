@@ -81,6 +81,8 @@ tect: 1 problem in ./image.kdl, ./repo.kdl
 ==== and with nothing to measure it against
 Tectonic v{version}
 
-Error: `coverage` needs the content the image is measured against: `tect coverage --datastream <file>`, and `tect scap content` prints the path a scan of this repository uses.
+Error: `coverage` reads the profile out of a SCAP datastream, and never probes this machine for one: `tect coverage --datastream <file>`
+
+help: `tect scap content` prints the path a scan of this repository uses
 
 ==== exit 1
