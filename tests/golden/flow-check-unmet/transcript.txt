@@ -11,4 +11,5 @@ Tectonic v{version}
         it in and lists it
 
 tect: 1 problem in ./example.image.kdl, ./repo.kdl
+tect: one/bases.kdl replaces the tool's own entry for quay.io/fedora/fedora-bootc:44
 ==== exit 2

@@ -622,26 +622,7 @@ fn reading(
                 .expect("coverage checked its datastream"),
         )?;
     }
-    if run.issues.report(&run.context) {
-        return Ok(ExitCode::from(REPO_ERROR));
-    }
-    if command == Command::Generate {
-        crate::write_generated(&root, &run.files)?;
-    }
-    // A terminal gets the tables and nothing else; a pipe, a redirect and
-    // `--no-tui` get the markdown a forge would render.
-    print!(
-        "{}",
-        match matches!(command, Command::Graph | Command::Coverage) && prompt.draws() {
-            false => run.stdout,
-            true => run
-                .tables
-                .iter()
-                .map(|t| crate::ui::table::render(&t.title, t.header, &t.rows))
-                .collect::<Vec<String>>()
-                .join("\n"),
-        }
-    );
+    let problems = run.issues.report(&run.context);
     if command == Command::Check {
         for shadow in &run.shadowed {
             eprintln!(
@@ -663,6 +644,28 @@ fn reading(
         for line in crate::scap::conformance(&run.list, &run.index, datastream.as_deref())? {
             eprintln!("tect: {line}");
         }
+    }
+    if problems {
+        return Ok(ExitCode::from(REPO_ERROR));
+    }
+    if command == Command::Generate {
+        crate::write_generated(&root, &run.files)?;
+    }
+    // A terminal gets the tables and nothing else; a pipe, a redirect and
+    // `--no-tui` get the markdown a forge would render.
+    print!(
+        "{}",
+        match matches!(command, Command::Graph | Command::Coverage) && prompt.draws() {
+            false => run.stdout,
+            true => run
+                .tables
+                .iter()
+                .map(|t| crate::ui::table::render(&t.title, t.header, &t.rows))
+                .collect::<Vec<String>>()
+                .join("\n"),
+        }
+    );
+    if command == Command::Check {
         match run.images {
             0 => eprintln!("tect: no image yet; `tect create image <name>` writes one"),
             _ => eprintln!(

@@ -1,0 +1,31 @@
+Tectonic v{version}
+
+Error: nothing can be changed here; `.remote/one/sshd` is a fetched module; `tect copy module one/sshd` makes a copy this repository owns.
+
+usage: tect [--root <dir>] <command>
+
+  upgrade                replace this tect and its assets with the latest
+  create repo [name]     start a repository for your own images
+  create image [name]    add an image: its name, and what it builds on
+  create flavour [name]  add a gated module set an image also publishes
+  create module [name]   write a module, and offer to list it in an image
+  import module [name]   reference a module from a collection repo.kdl declares
+  copy module [name]     copy a collection module into this repository
+  create key <kind>      generate a key one of this repository's modules declares
+  set workflows          choose the CI this repository generates
+  set conforms [image]   choose the benchmark profile an image is measured by
+  set claims <module>    choose the benchmark rules a module claims to cover
+  check                  read every manifest and say what is wrong with it
+  generate               write the build files, and list what was written
+  build [target]         verify the build files, then build the image
+  section [image]        print the Containerfile section an image generates
+  graph                  print what provides what, and what the base carries
+  why [module]           print one module's trust read-out, byte by byte
+  coverage [image]       print who claims each rule the image conforms to
+
+Every command takes a flag for everything it needs. What no flag gave is asked
+for, and `--no-tui` asks nothing, failing and naming the flag instead.
+
+docs/commands.md is the reference. Data goes to stdout and diagnostics to
+stderr; exit 1 is the invocation, exit 2 the repository.
+==== exit 1

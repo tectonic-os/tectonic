@@ -985,6 +985,27 @@ fn flows() {
     for name in ["flow-set-claims", "flow-set-claims-again"] {
         flow(name, &claimed, None, &claims);
     }
+
+    std::fs::create_dir_all(claimed.join("modules/.remote/one/sshd")).unwrap();
+    std::fs::write(
+        claimed.join("modules/.remote/one/sshd/module.kdl"),
+        CLAIMANT,
+    )
+    .unwrap();
+    flow(
+        "flow-set-claims-fetched",
+        &claimed,
+        None,
+        &[
+            "--root",
+            ".",
+            "set",
+            "claims",
+            ".remote/one/sshd",
+            "--datastream",
+            stream.as_str(),
+        ],
+    );
     let declared = std::fs::read_to_string(claimed.join("modules/sshd/module.kdl")).unwrap();
     assert_eq!(declared.matches("satisfies ").count(), 1, "{declared}");
     // The two chosen, and the claim about a rule this profile never selects,

@@ -13,4 +13,5 @@ Tectonic v{version}
         nothing read it: `tect fetch modules` downloads it
 
 tect: 1 problem in ./example.image.kdl, ./repo.kdl
+tect: `tectonic-os` is unpinned, so a fetch from it takes whatever its ref holds then, unverified
 ==== exit 2
