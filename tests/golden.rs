@@ -1468,8 +1468,8 @@ fn coverage() {
         out.push_str(&format!("==== {heading}\n{report}{said}==== exit {code}\n"));
     }
 
-    // A profile the content does not carry, and an image measured against
-    // nothing: the two ways a declaration leaves this unanswerable.
+    // A profile the content does not carry, an image measured against nothing,
+    // and a named file that is not a datastream: every unanswerable input.
     let root = tmp().join("coverage");
     let _ = std::fs::remove_dir_all(&root);
     copy(&enforced, &root);
@@ -1490,6 +1490,19 @@ fn coverage() {
         let (report, said, code) = read_out(at, &[]);
         out.push_str(&format!("==== {heading}\n{report}{said}==== exit {code}\n"));
     }
+    let (report, said, code) = scap_run(
+        &enforced,
+        &[
+            "--root",
+            ".",
+            "coverage",
+            "--datastream",
+            "example.image.kdl",
+        ],
+    );
+    out.push_str(&format!(
+        "==== and a datastream that is not one\n{report}{said}==== exit {code}\n"
+    ));
 
     // No content to measure against is the invocation, so it ends in the usage
     // every invocation error prints and only the message is worth a golden.

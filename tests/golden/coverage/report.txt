@@ -78,6 +78,15 @@ tect: 1 problem in ./example.image.kdl, ./repo.kdl
 
 tect: 1 problem in ./image.kdl, ./repo.kdl
 ==== exit 2
+==== and a datastream that is not one
+Tectonic v{version}
+
+Error: example.image.kdl carries no XCCDF rule and no profile, so it is not SCAP content
+
+help: use an `ssg-<os>-ds.xml` file; `tect scap content` prints the path a scan uses
+
+You can find the available commands by typing 'tect' or 'tect --help'
+==== exit 1
 ==== and with nothing to measure it against
 Tectonic v{version}
 
