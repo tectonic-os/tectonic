@@ -59,7 +59,7 @@ pub fn conformance(
     datastream: Option<&Path>,
 ) -> Result<Vec<String>, String> {
     let content = match datastream {
-        Some(path) => Some(Content::read(&read(path)?)),
+        Some(path) => Some(content_of(path)?),
         None => None,
     };
     let mut out = Vec::new();
@@ -245,6 +245,19 @@ pub fn content_path(family: &str, given: Option<&Path>) -> Result<PathBuf, Strin
     content_at(CONTENT, family, given)
 }
 
+/// Reads and recognizes a SCAP datastream.
+pub fn content_of(path: &Path) -> Result<Content, String> {
+    let content = Content::read(&read(path)?);
+    if content.ids.is_empty() && content.profiles.is_empty() {
+        return Err(format!(
+            "{} carries no XCCDF rule and no profile, so it is not SCAP content\n\nhelp: use an \
+             `ssg-<os>-ds.xml` file; `tect scap content` prints the path a scan uses",
+            path.display()
+        ));
+    }
+    Ok(content)
+}
+
 fn content_at(dir: &str, family: &str, given: Option<&Path>) -> Result<PathBuf, String> {
     if let Some(path) = given {
         return Ok(path.to_path_buf());
@@ -285,7 +298,7 @@ pub fn run(root: &Path, arf: &Path, opts: &Options) -> Result<Verdict, String> {
             path => PathBuf::from(path),
         },
     };
-    let content = Content::read(&read(&datastream)?);
+    let content = content_of(&datastream)?;
     let measured = results(&read(arf)?);
     let base = match &opts.base {
         None => None,
@@ -999,6 +1012,21 @@ mod tests {
         assert!(content_at("/nowhere", "arch", None)
             .unwrap_err()
             .contains("no SSG content is known"));
+    }
+
+    #[test]
+    fn a_file_without_rules_or_profiles_is_not_scap_content() {
+        let path = fixture("tests/repos/enforced/example.image.kdl");
+        assert_eq!(
+            content_of(&path)
+                .err()
+                .expect("the image file is not SCAP content"),
+            format!(
+                "{} carries no XCCDF rule and no profile, so it is not SCAP content\n\nhelp: use \
+                 an `ssg-<os>-ds.xml` file; `tect scap content` prints the path a scan uses",
+                path.display()
+            )
+        );
     }
 
     /// The datastream-backed tier over a repository whose every source was

@@ -480,9 +480,7 @@ fn coverage(
                 .into(),
         ));
     };
-    let text = std::fs::read_to_string(path)
-        .map_err(|err| Error::Operation(format!("{}: {err}", path.display())))?;
-    let content = crate::scap::Content::read(&text);
+    let content = crate::scap::content_of(path)?;
 
     let image = match arg {
         // An argument naming no image is already an issue on the run.

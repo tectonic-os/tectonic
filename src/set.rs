@@ -282,9 +282,7 @@ impl Conforms {
 
         let family = image.base.as_ref().map_or("", |base| base.family.as_str());
         let path = crate::scap::content_path(family, datastream.as_deref())?;
-        let text =
-            std::fs::read_to_string(&path).map_err(|err| format!("{}: {err}", path.display()))?;
-        let content = Content::read(&text);
+        let content = crate::scap::content_of(&path)?;
         if content.profiles.is_empty() {
             return Err(format!(
                 "{} carries no profile to be measured against",
@@ -419,9 +417,7 @@ impl Claims {
         let summary = parse::module::summary(&root.join(&file));
         let family = summary.supports.first().map_or("", String::as_str);
         let path = crate::scap::content_path(family, datastream.as_deref())?;
-        let text =
-            std::fs::read_to_string(&path).map_err(|err| format!("{}: {err}", path.display()))?;
-        let content = Content::read(&text);
+        let content = crate::scap::content_of(&path)?;
         if content.profiles.is_empty() {
             return Err(format!("{} carries no profile to claim against", path.display()).into());
         }
