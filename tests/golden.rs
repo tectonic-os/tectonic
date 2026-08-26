@@ -1185,7 +1185,10 @@ fn flows() {
     drawn_flow(
         "flow-why-picker",
         &why,
-        &format!("'{}' --root . why", env!("CARGO_BIN_EXE_tect")),
+        &format!(
+            "stty cols 80; '{}' --root . why",
+            env!("CARGO_BIN_EXE_tect")
+        ),
         "which module:",
         &[b"\r"],
     );

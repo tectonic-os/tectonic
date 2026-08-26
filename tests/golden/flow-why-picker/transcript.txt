@@ -1,35 +1,36 @@
 which module: one
 
-# core/one
+[1mcore/one[0m
 
 Builds things
 
-## Where it is built
+[1mWhere it is built[0m
 
 example
 
-## What it exchanges
+[1mWhat it exchanges[0m
 
 Nothing: it neither provides nor requires.
 
-## What it claims
+[1mWhat it claims[0m
 
 Nothing. It declares no `satisfies`.
 
-## Where it came from
+[1mWhere it came from[0m
 
-| Content | Hash |
-| --- | --- |
-| declared | `71cf98d5efb9a591512bd530eb250ccaed9451bfff685cfd1166d092666198b2` |
+┌───────────────────────────────────────────────────────────────────────────┐
+│[1mContent  Hash                                                              [0m│
+│declared `71cf98d5efb9a591512bd530eb250ccaed9451bfff685cfd1166d092666198b2`│
+└───────────────────────────────────────────────────────────────────────────┘
 
-It was written in this repository rather than imported, so nothing upstream to compare it against.
+It was written in this repository rather than imported, so nothing upstream to
+compare it against.
 
-## What it pulls in
+[1mWhat it pulls in[0m
 
 Nothing. It declares no `asset`.
 
-## Third-party repositories
+[1mThird-party repositories[0m
 
 None. It ships no `repo` file.
-
 ==== exit 0

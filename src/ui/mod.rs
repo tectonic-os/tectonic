@@ -33,6 +33,26 @@ pub fn width() -> usize {
     }
 }
 
+pub fn parts(parts: &[crate::emit::Part]) -> String {
+    parts
+        .iter()
+        .map(|part| match part {
+            crate::emit::Part::Heading(text) => format!(
+                "{}",
+                ratatui::crossterm::style::Stylize::bold(text.as_str())
+            ),
+            crate::emit::Part::Text(text) => table::wrap(text, width()).join("\n"),
+            crate::emit::Part::Table(table) => {
+                table::render(&table.title, table.header, &table.rows)
+                    .trim_end()
+                    .to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n")
+        + "\n"
+}
+
 /// One option, and what a person needs to see to pick between it and the rest.
 pub struct Choice {
     pub label: String,

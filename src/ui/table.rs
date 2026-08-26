@@ -84,7 +84,7 @@ fn columns(header: &[&str], rows: &[(Vec<String>, bool)], room: u16) -> Vec<u16>
 /// `text` folded to `room` at spaces, and mid-word where one word is wider
 /// than the column: a cell clips what it cannot draw, and a clipped name is a
 /// wrong answer rather than a short one.
-fn wrap(text: &str, room: usize) -> Vec<String> {
+pub(crate) fn wrap(text: &str, room: usize) -> Vec<String> {
     let mut lines = vec![String::new()];
     for word in text.split_whitespace() {
         for part in pieces(word, room.max(1)) {

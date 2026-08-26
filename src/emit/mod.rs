@@ -14,6 +14,12 @@ pub mod summary;
 pub mod why;
 pub mod workflows;
 
+pub enum Part {
+    Heading(String),
+    Text(String),
+    Table(Table),
+}
+
 /// One table of a read-out, in whatever the caller renders tables with: a
 /// terminal draws it, a redirect gets the same data as markdown. Owned, and
 /// knowing nothing of the widget: that dependency runs from `ui/` to here.

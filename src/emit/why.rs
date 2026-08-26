@@ -7,6 +7,7 @@
 //! and where every byte of it came from.
 
 use crate::emit::json::Json;
+use crate::emit::{Part, Table};
 use crate::layout;
 use crate::model::image::{Image, List};
 use crate::model::module::Module;
@@ -223,145 +224,166 @@ fn listed(names: &[String]) -> String {
 }
 
 impl Why {
-    pub fn markdown(&self) -> String {
-        let mut out = format!("# {}\n\n", self.path);
+    pub fn parts(&self, terminal: bool) -> Vec<Part> {
+        let mut out = vec![Part::Heading(self.path.clone())];
         if !self.description.is_empty() {
-            let _ = writeln!(out, "{}\n", self.description);
+            out.push(Part::Text(self.description.clone()));
         }
 
-        let _ = writeln!(out, "## Where it is built\n");
-        let _ = writeln!(out, "{}\n", listed(&self.images));
+        out.push(Part::Heading("Where it is built".into()));
+        out.push(Part::Text(listed(&self.images)));
 
-        let _ = writeln!(out, "## What it exchanges\n");
+        out.push(Part::Heading("What it exchanges".into()));
         if self.provides.is_empty() && self.requires.is_empty() {
-            let _ = writeln!(out, "Nothing: it neither provides nor requires.\n");
+            out.push(Part::Text(
+                "Nothing: it neither provides nor requires.".into(),
+            ));
         } else {
-            let _ = writeln!(
-                out,
-                "| Direction | Capability | With |\n| --- | --- | --- |"
-            );
-            for (name, wanted) in &self.provides {
-                let _ = writeln!(out, "| provides | `{name}` | {} |", listed(wanted));
-            }
-            for (name, from) in &self.requires {
-                let _ = writeln!(
-                    out,
-                    "| requires | `{name}` | {} |",
-                    from.clone().unwrap_or_else(|| "nothing".into())
-                );
-            }
-            out.push('\n');
+            let rows = self
+                .provides
+                .iter()
+                .map(|(name, wanted)| {
+                    (
+                        vec!["provides".into(), format!("`{name}`"), listed(wanted)],
+                        false,
+                    )
+                })
+                .chain(self.requires.iter().map(|(name, from)| {
+                    (
+                        vec![
+                            "requires".into(),
+                            format!("`{name}`"),
+                            from.clone().unwrap_or_else(|| "nothing".into()),
+                        ],
+                        false,
+                    )
+                }))
+                .collect();
+            out.push(Part::Table(Table {
+                title: String::new(),
+                header: &["Direction", "Capability", "With"],
+                rows,
+            }));
         }
 
-        let _ = writeln!(out, "## What it claims\n");
+        out.push(Part::Heading("What it claims".into()));
         match self.satisfies.is_empty() {
-            true => {
-                let _ = writeln!(out, "Nothing. It declares no `satisfies`.\n");
-            }
+            true => out.push(Part::Text("Nothing. It declares no `satisfies`.".into())),
             false => {
-                let _ = writeln!(out, "| Benchmark | Rules |\n| --- | --- |");
-                for (benchmark, rules) in &self.satisfies {
-                    let _ = writeln!(out, "| `{benchmark}` | {} |", rules.join(", "));
-                }
-                let _ = writeln!(
-                    out,
-                    "\nA claim the tool records rather than certifies. The scan is what confirms \
-                     it.\n"
-                );
+                out.push(Part::Table(Table {
+                    title: String::new(),
+                    header: &["Benchmark", "Rules"],
+                    rows: self
+                        .satisfies
+                        .iter()
+                        .map(|(benchmark, rules)| {
+                            (vec![format!("`{benchmark}`"), rules.join(", ")], false)
+                        })
+                        .collect(),
+                }));
+                out.push(Part::Text(
+                    "A claim the tool records rather than certifies. The scan is what confirms it."
+                        .into(),
+                ));
             }
         }
 
-        let _ = writeln!(out, "## Where it came from\n");
+        out.push(Part::Heading("Where it came from".into()));
         match (&self.content, &self.built) {
-            (None, None) => {
-                let _ = writeln!(out, "Nothing hashed it.\n");
-            }
+            (None, None) => out.push(Part::Text("Nothing hashed it.".into())),
             (declared, built) => {
-                let _ = writeln!(out, "| Content | Hash |\n| --- | --- |");
-                let _ = writeln!(out, "| declared | {} |", hash(declared));
+                let mut rows = vec![(vec!["declared".into(), hash(declared)], false)];
                 if let Some(built) = built {
-                    let _ = writeln!(out, "| observed by the build | `{built}` |");
+                    rows.push((
+                        vec!["observed by the build".into(), format!("`{built}`")],
+                        false,
+                    ));
                 }
-                out.push('\n');
+                out.push(Part::Table(Table {
+                    title: String::new(),
+                    header: &["Content", "Hash"],
+                    rows,
+                }));
                 if built.is_some() && declared != built {
-                    let _ = writeln!(
-                        out,
-                        "**The two documents disagree**, which they cannot if both came from \
-                         this build.\n"
-                    );
+                    out.push(Part::Text(
+                        "**The two documents disagree**, which they cannot if both came from this build."
+                            .into(),
+                    ));
                 }
             }
         }
         match &self.imported {
-            None => {
-                let _ = writeln!(
-                    out,
-                    "It was written in this repository rather than imported, so nothing \
-                     upstream to compare it against.\n"
-                );
-            }
+            None => out.push(Part::Text(
+                "It was written in this repository rather than imported, so nothing upstream to compare it against."
+                    .into(),
+            )),
             Some((collection, pin)) => {
-                out.push_str(&evidence("Collection", &[(collection.as_str(), pin)]));
-                let _ = writeln!(
-                    out,
-                    "{}\n",
-                    match self.modified {
-                        true =>
-                            "**It has been edited since it was imported.** Forking a module \
-                                 is legitimate; what the record buys is that the fork is visible.",
-                        false => "Its content still matches what was imported.",
-                    }
-                );
+                out.extend(evidence(
+                    "Collection",
+                    &[(collection.as_str(), pin)],
+                    terminal,
+                ));
+                out.push(Part::Text(match self.modified {
+                    true => "**It has been edited since it was imported.** Forking a module is legitimate; what the record buys is that the fork is visible.".into(),
+                    false => "Its content still matches what was imported.".into(),
+                }));
             }
         }
 
-        let _ = writeln!(out, "## What it pulls in\n");
+        out.push(Part::Heading("What it pulls in".into()));
         match self.fetches.is_empty() {
-            true => {
-                let _ = writeln!(out, "Nothing. It declares no `asset`.\n");
-            }
+            true => out.push(Part::Text("Nothing. It declares no `asset`.".into())),
             false => {
                 let rows: Vec<(&str, &Fetch)> = self
                     .fetches
                     .iter()
                     .map(|pin| (pin.name.as_str(), pin))
                     .collect();
-                out.push_str(&evidence("Asset", &rows));
+                out.extend(evidence("Asset", &rows, terminal));
             }
         }
 
-        let _ = writeln!(out, "## Third-party repositories\n");
+        out.push(Part::Heading("Third-party repositories".into()));
         match &self.repo {
-            None => {
-                let _ = writeln!(out, "None. It ships no `repo` file.\n");
-            }
+            None => out.push(Part::Text("None. It ships no `repo` file.".into())),
             Some(urls) => {
-                let _ = writeln!(
-                    out,
-                    "It enables one, in `modules/{}/repo`. There is no grammar for that file, so \
-                     read it: it is shell calling the family's config manager.\n",
+                out.push(Part::Text(format!(
+                    "It enables one, in `modules/{}/repo`. There is no grammar for that file, so read it: it is shell calling the family's config manager.",
                     self.path
-                );
+                )));
                 match urls.is_empty() {
-                    true => {
-                        let _ = writeln!(
-                            out,
-                            "{}\n",
-                            match self.repo_read {
-                                true => "No URL in it.",
-                                false =>
-                                    "Not readable from here: a finished image carries the \
-                                     manifest, not the module tree.",
-                            }
-                        );
+                    true => out.push(Part::Text(match self.repo_read {
+                        true => "No URL in it.".into(),
+                        false => "Not readable from here: a finished image carries the manifest, not the module tree.".into(),
+                    })),
+                    false => out.push(Part::Table(Table {
+                        title: String::new(),
+                        header: &["URL it names"],
+                        rows: urls.iter().map(|url| (vec![url.clone()], false)).collect(),
+                    })),
+                }
+            }
+        }
+        out
+    }
+
+    pub fn markdown(&self) -> String {
+        let mut out = String::new();
+        for (at, part) in self.parts(false).iter().enumerate() {
+            match part {
+                Part::Heading(text) => {
+                    let _ = writeln!(out, "{} {text}\n", if at == 0 { "#" } else { "##" });
+                }
+                Part::Text(text) => {
+                    let _ = writeln!(out, "{text}\n");
+                }
+                Part::Table(table) => {
+                    let _ = writeln!(out, "| {} |", table.header.join(" | "));
+                    let _ = writeln!(out, "| {} |", vec!["---"; table.header.len()].join(" | "));
+                    for (cells, _) in &table.rows {
+                        let _ = writeln!(out, "| {} |", cells.join(" | "));
                     }
-                    false => {
-                        let _ = writeln!(out, "| URL it names |\n| --- |");
-                        for url in urls {
-                            let _ = writeln!(out, "| {url} |");
-                        }
-                        out.push('\n');
-                    }
+                    out.push('\n');
                 }
             }
         }
@@ -425,25 +447,48 @@ impl Why {
     }
 }
 
-/// The four evidence slots across a row, one row per pin; `first` names what
-/// the rows are.
-fn evidence(first: &str, pins: &[(&str, &Fetch)]) -> String {
+/// The four evidence slots across a row in markdown, or down rows at a terminal.
+fn evidence(first: &'static str, pins: &[(&str, &Fetch)], terminal: bool) -> Vec<Part> {
     let say = |value: &Option<String>| value.clone().unwrap_or_else(|| "not declared".into());
-    let mut out = format!(
-        "| {first} | Locator | Selector | Verifier | Tracker |\n| --- | --- | --- | --- | --- |\n"
-    );
-    for (name, pin) in pins {
-        let _ = writeln!(
-            out,
-            "| `{name}` | {} | {} | {} | {} |",
-            say(&pin.locator),
-            say(&pin.selector),
-            say(&pin.verifier),
-            pin.tracker
-        );
+    if terminal {
+        return pins
+            .iter()
+            .map(|(name, pin)| {
+                Part::Table(Table {
+                    title: format!("{first} {name}"),
+                    header: &["Field", "Value"],
+                    rows: vec![
+                        (vec!["Locator".into(), say(&pin.locator)], false),
+                        (vec!["Selector".into(), say(&pin.selector)], false),
+                        (vec!["Verifier".into(), say(&pin.verifier)], false),
+                        (vec!["Tracker".into(), pin.tracker.clone()], false),
+                    ],
+                })
+            })
+            .collect();
     }
-    out.push('\n');
-    out
+    vec![Part::Table(Table {
+        title: String::new(),
+        header: match first {
+            "Collection" => &["Collection", "Locator", "Selector", "Verifier", "Tracker"],
+            _ => &["Asset", "Locator", "Selector", "Verifier", "Tracker"],
+        },
+        rows: pins
+            .iter()
+            .map(|(name, pin)| {
+                (
+                    vec![
+                        format!("`{name}`"),
+                        say(&pin.locator),
+                        say(&pin.selector),
+                        say(&pin.verifier),
+                        pin.tracker.clone(),
+                    ],
+                    false,
+                )
+            })
+            .collect(),
+    })]
 }
 
 fn hash(value: &Option<String>) -> String {
@@ -633,7 +678,8 @@ pub fn baked(
 
 #[cfg(test)]
 mod tests {
-    use super::{display, matching};
+    use super::{display, matching, Fetch, Why};
+    use crate::emit::Part;
 
     #[test]
     fn module_names_are_unambiguous_suffixes() {
@@ -652,5 +698,30 @@ mod tests {
             display(&paths),
             ["one/hardening/coredumps", "two/coredumps", "updates"]
         );
+    }
+
+    #[test]
+    fn terminal_evidence_runs_down_two_columns() {
+        let why = Why {
+            fetches: vec![Fetch {
+                name: "archive".into(),
+                locator: Some("https://example.com/archive".into()),
+                selector: Some("v1".into()),
+                verifier: Some("abc".into()),
+                tracker: "renovate".into(),
+            }],
+            ..Why::default()
+        };
+        let table = why
+            .parts(true)
+            .into_iter()
+            .find_map(|part| match part {
+                Part::Table(table) if table.title == "Asset archive" => Some(table),
+                _ => None,
+            })
+            .expect("the asset has an evidence table");
+
+        assert_eq!(table.header, ["Field", "Value"]);
+        assert_eq!(table.rows.len(), 4);
     }
 }

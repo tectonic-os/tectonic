@@ -64,8 +64,8 @@ fn context(list: &List, root: &Path) -> String {
 pub struct Run {
     pub stdout: String,
     /// What a read-out says, as data, for a terminal to draw instead of the
-    /// markdown in `stdout`. `graph` and `coverage` fill it.
-    pub tables: Vec<emit::Table>,
+    /// markdown in `stdout`.
+    pub parts: Vec<emit::Part>,
     /// What `generate` produced, as the path each file is written at relative
     /// to the repository root, and its contents.
     pub files: Vec<(PathBuf, String)>,
@@ -307,7 +307,7 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
         verify(root, &files, &mut issues);
     }
 
-    let mut tables = Vec::new();
+    let mut parts = Vec::new();
     let stdout = match command {
         Command::Plan => emit::plan::build(&list, &resolved, &workflows).render(),
         Command::Summary => target
@@ -322,7 +322,7 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
                 let graph = emit::graph::of(&list.images[i]);
                 match command {
                     Command::Graph => {
-                        tables = graph.tables();
+                        parts = graph.parts();
                         graph.markdown()
                     }
                     _ => graph.json().render(),
@@ -342,7 +342,10 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
             Some(given) => match emit::why::matching(&emit::why::known(&list), given).as_slice() {
                 [path] => match emit::why::of(&list, path, root) {
                     Some(why) => match command {
-                        Command::Why => why.markdown(),
+                        Command::Why => {
+                            parts = why.parts(true);
+                            why.markdown()
+                        }
                         _ => why.json().render(),
                     },
                     None => unreachable!("the resolved module is listed"),
@@ -389,7 +392,7 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
 
     Run {
         stdout,
-        tables,
+        parts,
         files,
         issues,
         context,
