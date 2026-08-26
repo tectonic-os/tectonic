@@ -138,13 +138,24 @@ fn why_on_host(command: Command, arg: Option<&str>) -> Result<ExitCode, Error> {
             ))
         })?;
 
-    let Some(why) = crate::emit::why::on_host(&manifest, record.as_ref(), path) else {
-        let known = crate::emit::why::known_on_host(&manifest);
-        return Err(Error::Invocation(format!(
-            "`{path}` is not a module this image carries\n\nmodules: {}",
-            known.join(", ")
-        )));
+    let known = crate::emit::why::known_on_host(&manifest);
+    let path = match crate::emit::why::matching(&known, path).as_slice() {
+        [path] => path.clone(),
+        [] => {
+            return Err(Error::Invocation(format!(
+                "`{path}` is not a module this image carries\n\nmodules: {}",
+                crate::emit::why::display(&known).join(", ")
+            )))
+        }
+        paths => {
+            return Err(Error::Invocation(format!(
+                "`{path}` names more than one module\n\nmodules: {}",
+                paths.join(", ")
+            )))
+        }
     };
+    let why = crate::emit::why::on_host(&manifest, record.as_ref(), &path)
+        .expect("the resolved module is in the manifest");
     print!(
         "{}",
         match command {
@@ -587,17 +598,21 @@ fn reading(
     let mut chosen = None;
     let mut run = if picks {
         let loaded = crate::load(&root);
-        let (question, known) = match command {
-            Command::Coverage | Command::CoverageJson => (
-                "which image",
-                loaded.list.images.iter().map(|i| i.id.clone()).collect(),
-            ),
-            _ => ("which module", crate::emit::why::known(&loaded.list)),
+        let (question, known, shown) = match command {
+            Command::Coverage | Command::CoverageJson => {
+                let known: Vec<String> = loaded.list.images.iter().map(|i| i.id.clone()).collect();
+                ("which image", known.clone(), known)
+            }
+            _ => {
+                let known = crate::emit::why::known(&loaded.list);
+                let shown = crate::emit::why::display(&known);
+                ("which module", known, shown)
+            }
         };
         if known.is_empty() {
             crate::run_loaded(command, None, &root, loaded)
         } else {
-            let options = known
+            let options = shown
                 .iter()
                 .map(|name| crate::ui::Choice::new(name, ""))
                 .collect::<Vec<_>>();

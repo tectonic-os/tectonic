@@ -1,4 +1,4 @@
-which module: core/one
+which module: one
 
 # core/one
 

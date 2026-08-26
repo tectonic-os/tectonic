@@ -344,7 +344,7 @@ fn why(name: &str, root: &Path, module: &str) {
 
     for (command, heading) in [(Command::Why, "markdown"), (Command::WhyJson, "json")] {
         out.push_str(&format!("==== {heading}\n"));
-        out.push_str(&tect::run(command, Some(module), here).stdout);
+        out.push_str(&tect::run(command, module.rsplit('/').next(), here).stdout);
     }
 
     out.push_str("==== unknown\n");
@@ -358,7 +358,7 @@ fn why(name: &str, root: &Path, module: &str) {
     out.push_str(&host.markdown());
     out.push_str(&format!(
         "==== the names it knows\n{}\n",
-        tect::emit::why::known_on_host(&manifest).join(", ")
+        tect::emit::why::display(&tect::emit::why::known_on_host(&manifest)).join(", ")
     ));
 
     // The build record is what was observed. Two documents out of one build

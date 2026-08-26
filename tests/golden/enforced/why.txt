@@ -108,7 +108,7 @@ It enables one, in `modules/one/hello/repo`. There is no grammar for that file, 
 }
 ==== unknown
   x `nosuch` is not a module this repository lists
-  help: modules: core/consumer, one/hello
+  help: modules: consumer, hello
 
 ==== from the baked manifest, with no repository
 # one/hello
@@ -159,7 +159,7 @@ It enables one, in `modules/one/hello/repo`. There is no grammar for that file, 
 Not readable from here: a finished image carries the manifest, not the module tree.
 
 ==== the names it knows
-core/consumer, one/hello
+consumer, hello
 ==== against a build record that disagrees
 
 

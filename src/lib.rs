@@ -339,22 +339,35 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
             .map(|(path, _)| format!("{}\n", path.display()))
             .collect(),
         Command::Why | Command::WhyJson => match module_arg {
-            Some(path) => match emit::why::of(&list, path, root) {
-                Some(why) => match command {
-                    Command::Why => why.markdown(),
-                    _ => why.json().render(),
+            Some(given) => match emit::why::matching(&emit::why::known(&list), given).as_slice() {
+                [path] => match emit::why::of(&list, path, root) {
+                    Some(why) => match command {
+                        Command::Why => why.markdown(),
+                        _ => why.json().render(),
+                    },
+                    None => unreachable!("the resolved module is listed"),
                 },
-                None => {
-                    let known = emit::why::known(&list);
+                [] => {
+                    let known = emit::why::display(&emit::why::known(&list));
                     issues.push(
                         Issue::new(
-                            format!("`{path}` is not a module this repository lists"),
+                            format!("`{given}` is not a module this repository lists"),
                             &list.repo_src,
                         )
                         .help(match known.is_empty() {
                             true => "no image lists a module yet".to_string(),
                             false => format!("modules: {}", known.join(", ")),
                         }),
+                    );
+                    String::new()
+                }
+                paths => {
+                    issues.push(
+                        Issue::new(
+                            format!("`{given}` names more than one module"),
+                            &list.repo_src,
+                        )
+                        .help(format!("modules: {}", paths.join(", "))),
                     );
                     String::new()
                 }

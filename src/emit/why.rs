@@ -74,13 +74,46 @@ pub struct Why {
     pub repo_read: bool,
 }
 
+fn named(path: &str, given: &str) -> bool {
+    path == given
+        || (!given.is_empty()
+            && path
+                .strip_suffix(given)
+                .is_some_and(|prefix| prefix.ends_with('/')))
+}
+
+pub(crate) fn matching(paths: &[String], given: &str) -> Vec<String> {
+    paths
+        .iter()
+        .filter(|path| named(path, given))
+        .cloned()
+        .collect()
+}
+
+pub fn display(paths: &[String]) -> Vec<String> {
+    paths
+        .iter()
+        .map(|path| {
+            let name = path.rsplit('/').next().unwrap_or(path);
+            match paths
+                .iter()
+                .filter(|other| other.rsplit('/').next() == Some(name))
+                .count()
+            {
+                1 => name.to_string(),
+                _ => path.clone(),
+            }
+        })
+        .collect()
+}
+
 /// What the repository says about one module. None when nothing declares it.
 pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
     let module = list
         .images
         .iter()
         .flat_map(Image::modules)
-        .find(|m| m.path == path)?;
+        .find(|m| named(&m.path, path))?;
 
     let mut why = Why {
         path: module.path.clone(),
@@ -482,10 +515,11 @@ pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why
     let mut found = false;
 
     for target in targets(manifest) {
-        let Some(module) = items(target, "modules")
-            .iter()
-            .find(|module| text(module, "path").as_deref() == Some(path))
-        else {
+        let Some(module) = items(target, "modules").iter().find(|module| {
+            text(module, "path")
+                .as_deref()
+                .is_some_and(|found| named(found, path))
+        }) else {
             continue;
         };
         found = true;
@@ -595,4 +629,28 @@ pub fn baked(
         Err(_) => None,
     };
     Ok((declared, resolved))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{display, matching};
+
+    #[test]
+    fn module_names_are_unambiguous_suffixes() {
+        let paths = vec![
+            "one/hardening/coredumps".to_string(),
+            "two/coredumps".to_string(),
+            "one/updates".to_string(),
+        ];
+
+        assert_eq!(matching(&paths, "updates"), ["one/updates"]);
+        assert_eq!(
+            matching(&paths, "coredumps"),
+            ["one/hardening/coredumps", "two/coredumps"]
+        );
+        assert_eq!(
+            display(&paths),
+            ["one/hardening/coredumps", "two/coredumps", "updates"]
+        );
+    }
 }
