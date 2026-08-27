@@ -63,6 +63,7 @@ fn splice(text: &str, was: Option<crate::diag::Span>, block: &str) -> String {
 pub struct Workflows {
     chosen: Vec<&'static str>,
     at: (u32, u32),
+    publishes_scheduled: bool,
     scans_scheduled: bool,
 }
 
@@ -90,6 +91,7 @@ impl Workflows {
                 .map(|shipped| shipped.stem)
                 .collect(),
             at: list.workflows_at,
+            publishes_scheduled: list.publishes_scheduled,
             scans_scheduled: list.scans_scheduled,
         }
     }
@@ -125,7 +127,11 @@ impl Workflows {
             return Err(format!("`{}` {}", short.stem, short.needs.unmet()));
         }
 
-        let scans_scheduled = chosen.iter().any(|shipped| shipped.stem == "build")
+        let builds = chosen.iter().any(|shipped| shipped.stem == "build");
+        let publishes_scheduled =
+            builds && prompt.confirm("publish images only on scheduled builds", "Yes", "No")?;
+        let scans_scheduled = builds
+            && !publishes_scheduled
             && prompt.confirm("run image scans only on scheduled builds", "Yes", "No")?;
 
         let at = match chosen.iter().any(|shipped| shipped.at.is_some()) {
@@ -144,6 +150,7 @@ impl Workflows {
         Ok(Some(Self {
             chosen: chosen.iter().map(|shipped| shipped.stem).collect(),
             at,
+            publishes_scheduled,
             scans_scheduled,
         }))
     }
@@ -176,11 +183,15 @@ impl Workflows {
                     true => String::new(),
                     false => format!(" at=\"{}\"", parse::repo::at_text(self.at)),
                 };
+                let publish = match self.publishes_scheduled {
+                    true => " publish=\"scheduled\"",
+                    false => "",
+                };
                 let scan = match self.scans_scheduled {
                     true => " scan=\"scheduled\"",
                     false => "",
                 };
-                format!("workflows{at}{scan} {{\n{named}}}")
+                format!("workflows{at}{publish}{scan} {{\n{named}}}")
             }
         };
         splice(text, parse::repo::workflows_span(text), &block)
@@ -651,6 +662,7 @@ mod tests {
         Workflows {
             chosen: chosen.to_vec(),
             at,
+            publishes_scheduled: false,
             scans_scheduled: false,
         }
     }
@@ -672,6 +684,28 @@ mod tests {
             out,
             "name \"Example\"\n\nworkflows at=\"06:00\" {\n    build\n}\n"
         );
+    }
+
+    #[test]
+    fn cadence_properties_follow_declaration_order() {
+        let mut workflows = set(&["build"], (6, 0));
+        workflows.publishes_scheduled = true;
+        workflows.scans_scheduled = true;
+        assert_eq!(
+            workflows.spliced("name \"Example\"\n"),
+            "name \"Example\"\n\nworkflows at=\"06:00\" publish=\"scheduled\" scan=\"scheduled\" {\n    build\n}\n"
+        );
+    }
+
+    #[test]
+    fn scheduled_publishing_makes_the_scan_question_redundant() {
+        let prompt = Prompt::scripted(["1", "Yes", "06:00"].map(str::to_string).to_vec());
+        let workflows = Workflows::collect(&Basis::scaffolding(""), &[], DEFAULT_AT, &prompt)
+            .unwrap()
+            .unwrap();
+        assert!(workflows.publishes_scheduled);
+        assert!(!workflows.scans_scheduled);
+        assert_eq!(workflows.at, (6, 0));
     }
 
     /// Generating nothing is an absent block: an empty one is a diagnostic.
