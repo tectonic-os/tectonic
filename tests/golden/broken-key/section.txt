@@ -12,7 +12,7 @@ RUN mv /opt /opt.bak && mkdir /opt
 
 # ---- core/keys ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/keys,target=/ctx/modules/core/keys \
-    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
     --mount=type=bind,from=ctx,source=/generated/broken-key.d/core/keys.sh,target=/ctx/module.sh \
     --mount=type=bind,from=public-keys,source=/public,target=/ctx/keys \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
@@ -41,7 +41,7 @@ RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
 
 # ---- finalize ----
 RUN --mount=type=bind,from=ctx,source=/generated/broken-key.d/finalize.sh,target=/ctx/finalize.sh \
-    --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \

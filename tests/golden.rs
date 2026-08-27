@@ -51,9 +51,10 @@ fn capture(name: &str, root: &Path) {
     // `generate` writes nothing here: what it produced is on the run.
     let mut generated = String::new();
     for (path, body) in &tect::run(Command::Generate, None, here).files {
-        // plan.json has a golden of its own, and a workflow body is a shipped
-        // asset the emitter's own tests hold to.
+        // plan.json has a golden of its own; compiled assets need one path copy,
+        // not their identical body repeated for every fixture.
         let covered = path == std::path::Path::new("generated/plan.json")
+            || path.starts_with("generated/lib")
             || path.starts_with(tect::layout::WORKFLOW_DIR);
         match covered {
             true => generated.push_str(&format!("==== {}\n", path.display())),
@@ -1510,6 +1511,10 @@ fn golden() {
     assert!(
         !init.join("bases.kdl").exists(),
         "bases.kdl is a control asset; it must not land at a scaffolded repository root"
+    );
+    assert!(
+        !init.join("lib").exists(),
+        "lib is generated; it must not land in the editable scaffold"
     );
     for name in names {
         capture(&name, &dir.join(&name));

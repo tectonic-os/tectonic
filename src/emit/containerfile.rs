@@ -190,7 +190,7 @@ fn finalize_layer(image: &Image, identity_env: &str, root: &Path) -> String {
     let mut out = format!(
         "# ---- finalize ----\n\
          RUN --mount=type=bind,from=ctx,source=/{script},target=/ctx/finalize.sh \\\n    \
-         --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib \\\n    "
+         --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \\\n    "
     );
 
     let mut mounted: Vec<String> = Vec::new();
@@ -262,7 +262,7 @@ fn standard(entry: &Entry, module: &Module, image: &Image, script: &Path) -> Str
     let _ = write!(
         out,
         "RUN --mount=type=bind,from=ctx,source=/modules/{path},target=/ctx/modules/{path} \\\n    \
-         --mount=type=bind,from=ctx,source=/lib,target=/ctx/lib{rw} \\\n    \
+         --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib{rw} \\\n    \
          {helpers}\
          --mount=type=bind,from=ctx,source=/{script},target=/ctx/module.sh \\\n    \
          {keys}{TECT_MOUNT}\

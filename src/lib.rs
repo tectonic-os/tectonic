@@ -274,6 +274,12 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
 
     let mut files: Vec<(PathBuf, String)> = Vec::new();
     if matches!(command, Command::Generate | Command::Verify) {
+        files.extend(emit::LIBRARIES.iter().map(|(name, body)| {
+            (
+                PathBuf::from(layout::GENERATED).join("lib").join(name),
+                (*body).to_string(),
+            )
+        }));
         for (image, resolved) in list.images.iter().zip(&resolved) {
             if let Some(skeleton) = &skeleton {
                 let section = emit::containerfile::section(image, root);

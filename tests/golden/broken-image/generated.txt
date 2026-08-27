@@ -1,3 +1,10 @@
+==== generated/lib/dkms-helpers.sh
+==== generated/lib/fetch-helpers.sh
+==== generated/lib/kernel-helpers.sh
+==== generated/lib/repo-helpers.sh
+==== generated/lib/selinux-helpers.sh
+==== generated/lib/sign-helpers.sh
+==== generated/lib/wrap-helpers.sh
 ==== generated/Not An Id.d/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.

@@ -266,7 +266,6 @@ fn kind(path: &Path) -> &'static str {
         layout::REPO_FILE => "what the repo pins, and where modules come from",
         layout::MODULES => "every module this repo owns or imported",
         "README.md" => "yours to write",
-        "lib" => "shell a module's build layer sources",
         "scripts" => "what CI runs, and what you run by hand",
         "disk_config" => "how a disk or installer image is shaped",
         ".github/renovate.json5" => "keeps the pinned versions moving",

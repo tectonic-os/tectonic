@@ -64,14 +64,6 @@ example/
 ├── disk_config/          how a disk or installer image is shaped
 │   ├── + disk.toml
 │   └── + iso.template.toml
-├── lib/                  shell a module's build layer sources
-│   ├── + dkms-helpers.sh
-│   ├── + fetch-helpers.sh
-│   ├── + kernel-helpers.sh
-│   ├── + repo-helpers.sh
-│   ├── + selinux-helpers.sh
-│   ├── + sign-helpers.sh
-│   └── + wrap-helpers.sh
 ├── modules/              every module this repo owns or imported
 │   └── + .gitkeep
 ├── scripts/              what CI runs, and what you run by hand
