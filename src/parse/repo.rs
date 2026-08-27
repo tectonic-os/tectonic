@@ -74,13 +74,18 @@ pub const REPO: Node = Node::new("repo",
                            is an offset from it.",
                     say: Say::new("`{}` must be a time of day", "not a string", ""),
                      missing: Say::NONE },
+                Prop { name: "publish", kind: Kind::Str,
+                    desc: "When images publish. `scheduled` moves publishing off pushes while \
+                           keeping the daily build.",
+                    say: Say::new("`{}` must be a cadence", "not a string", "`publish=\"scheduled\"`"),
+                    missing: Say::NONE },
                 Prop { name: "scan", kind: Kind::Str,
-                    desc: "When image scans run. `scheduled` moves them off pushes while keeping \
-                           the daily measurement.",
+                    desc: "When image scans run. `scheduled` moves them off pushes; scheduled \
+                           publishing does too because scans consume published images.",
                     say: Say::new("`{}` must be a cadence", "not a string", "`scan=\"scheduled\"`"),
                     missing: Say::NONE },
             ], Say::new("unknown workflows property `{}`", "not part of the schema",
-                "a workflows block accepts `at` and `scan`"))
+                "a workflows block accepts `at`, `publish` and `scan`"))
             .children(&[
                 Node::new("", "One workflow, named by the node.")
                     .arg(Arg::None, Say::new("a workflow takes no arguments", "unexpected value",
@@ -248,6 +253,7 @@ impl List {
             images: Vec::new(),
             workflows: Vec::new(),
             workflows_at: crate::resolve::workflow::DEFAULT_AT,
+            publishes_scheduled: false,
             scans_scheduled: false,
             sources: Vec::new(),
             default_image_id: None,
@@ -592,6 +598,22 @@ impl List {
                 ),
             }
         }
+        if let Some(publish) = prop(block, "publish") {
+            match publish {
+                "scheduled" => self.publishes_scheduled = true,
+                _ => issues.push(
+                    Issue::new(format!("`{publish}` is not a publish cadence"), src)
+                        .at(
+                            prop_span(block, "publish").unwrap_or_default(),
+                            "not `scheduled`",
+                        )
+                        .help(
+                            "`workflows publish=\"scheduled\"`, to publish only on the daily \
+                             build; omit `publish` to publish on pushes too",
+                        ),
+                ),
+            }
+        }
         if let Some(scan) = prop(block, "scan") {
             match scan {
                 "scheduled" => self.scans_scheduled = true,
@@ -761,6 +783,31 @@ colour "blue"
     fn an_empty_workflows_block_is_a_block_with_nothing_in_it() {
         let found = messages("schema-version 1\nname \"Tectonic\"\nworkflows { }\n");
         assert_eq!(found, ["`workflows` has no workflows in it"]);
+    }
+
+    #[test]
+    fn publish_has_one_cadence() {
+        let read = |value: &str| {
+            let text = format!(
+                "schema-version 1\nname \"Tectonic\"\nworkflows publish=\"{value}\" {{ build }}\n"
+            );
+            let mut list = List::empty(Path::new("."));
+            let mut issues = Issues::default();
+            list.parse_file(
+                &Source::new(layout::REPO_FILE, &text),
+                &text,
+                true,
+                &mut issues,
+            );
+            (list.publishes_scheduled, issues.plain())
+        };
+        assert_eq!(read("scheduled"), (true, String::new()));
+        let (scheduled, issues) = read("push");
+        assert!(!scheduled);
+        assert!(
+            issues.contains("`push` is not a publish cadence"),
+            "{issues}"
+        );
     }
 
     #[test]

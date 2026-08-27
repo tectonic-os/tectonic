@@ -191,7 +191,8 @@ The CI `tect generate` writes into .github/workflows/, named by file stem. One t
 | Property | Value | Meaning |
 | --- | --- | --- |
 | `at=` | a string | The hour and minute the daily build runs, UTC. Every other schedule is an offset from it. |
-| `scan=` | a string | When image scans run. `scheduled` moves them off pushes while keeping the daily measurement. |
+| `publish=` | a string | When images publish. `scheduled` moves publishing off pushes while keeping the daily build. |
+| `scan=` | a string | When image scans run. `scheduled` moves them off pushes; scheduled publishing does too because scans consume published images. |
 
 | Node | Takes | Meaning |
 | --- | --- | --- |

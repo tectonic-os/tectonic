@@ -210,6 +210,8 @@ pub struct List {
     /// The hour and minute the daily build runs, UTC, which every other
     /// schedule is an offset from.
     pub workflows_at: (u32, u32),
+    /// Whether images publish only as part of the scheduled build.
+    pub publishes_scheduled: bool,
     /// Whether image scans run only as part of the scheduled build.
     pub scans_scheduled: bool,
     /// The module collections references and copies resolve against.
