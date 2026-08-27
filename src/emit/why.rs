@@ -80,27 +80,7 @@ pub struct Why {
     pub suppressed: Vec<String>,
 }
 
-fn named(path: &str, given: &str) -> bool {
-    path == given
-        || (!given.is_empty()
-            && path
-                .strip_suffix(given)
-                .is_some_and(|prefix| prefix.ends_with('/')))
-}
-
-/// Every path `given` names. An exact path wins outright, so that the full
-/// name of a module is always a way to say it — otherwise `a/x` beside
-/// `b/a/x` would leave the first one with no name a person could type.
-pub(crate) fn matching(paths: &[String], given: &str) -> Vec<String> {
-    if let Some(exact) = paths.iter().find(|path| *path == given) {
-        return vec![exact.clone()];
-    }
-    paths
-        .iter()
-        .filter(|path| named(path, given))
-        .cloned()
-        .collect()
-}
+pub(crate) use crate::resolve::name::matching;
 
 pub fn display(paths: &[String]) -> Vec<String> {
     paths
@@ -713,37 +693,21 @@ pub fn baked(
 
 #[cfg(test)]
 mod tests {
-    use super::{display, known_on_host, matching, on_host, Fetch, Why};
+    use super::{display, known_on_host, on_host, Fetch, Why};
     use crate::emit::Part;
+    use crate::resolve::name::matching;
 
     #[test]
-    fn module_names_are_unambiguous_suffixes() {
+    fn display_shortens_an_unambiguous_name() {
         let paths = vec![
             "one/hardening/coredumps".to_string(),
             "two/coredumps".to_string(),
             "one/updates".to_string(),
         ];
-
-        assert_eq!(matching(&paths, "updates"), ["one/updates"]);
-        assert_eq!(
-            matching(&paths, "coredumps"),
-            ["one/hardening/coredumps", "two/coredumps"]
-        );
         assert_eq!(
             display(&paths),
             ["one/hardening/coredumps", "two/coredumps", "updates"]
         );
-    }
-
-    /// The full path always names one module, even where it is also the tail
-    /// of another: without this the shorter of the two has no name at all.
-    #[test]
-    fn an_exact_path_beats_a_suffix() {
-        let paths = vec!["a/x".to_string(), "b/a/x".to_string()];
-
-        assert_eq!(matching(&paths, "a/x"), ["a/x"]);
-        assert_eq!(matching(&paths, "b/a/x"), ["b/a/x"]);
-        assert_eq!(matching(&paths, "x"), ["a/x", "b/a/x"]);
     }
 
     /// Resolving a name and then reading it out are two lookups, and the

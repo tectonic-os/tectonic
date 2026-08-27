@@ -1497,6 +1497,72 @@ fn flows() {
         .join("generated/example.d/four/hardening/coredumps.sh")
         .is_file());
 
+    // A typed name is a suffix of a member path at a `/` boundary, as `why`
+    // reads it: `coredumps` resolves `hardening/coredumps`, and the canonical
+    // name is what the image lists and the build runs.
+    let suffix = flow_repo_with("flow-suffix", "four");
+    flow(
+        "flow-import-suffix",
+        &suffix,
+        None,
+        &[
+            "--root",
+            ".",
+            "import",
+            "module",
+            "coredumps",
+            "--image",
+            "example",
+        ],
+    );
+    let image = std::fs::read_to_string(suffix.join("example.image.kdl")).unwrap();
+    assert!(
+        image.contains("source \"four\" {\n            module \"hardening/coredumps\"\n        }"),
+        "{image}"
+    );
+    assert!(!image.contains("module \"coredumps\""), "{image}");
+    tect(&suffix, &["--no-tui", "--root", ".", "fetch", "modules"]);
+    tect(&suffix, &["--no-tui", "--root", ".", "check"]);
+    tect(&suffix, &["--no-tui", "--root", ".", "generate"]);
+    assert!(suffix
+        .join("generated/example.d/four/hardening/coredumps.sh")
+        .is_file());
+
+    // Two collections hold a member ending in the typed name: the ask lists
+    // qualified names, and choosing one lists that one and not the other.
+    let both = flow_repo("flow-suffix-ambiguous");
+    let collections = crate_dir().join("tests/collections");
+    let mut repo = std::fs::read_to_string(both.join("repo.kdl"))
+        .unwrap()
+        .replace(&tect::init::sources(&crate_dir().join("assets")), "");
+    repo.push_str(&format!(
+        "sources {{\n    four {:?}\n    five {:?}\n}}\n",
+        collections.join("four").display(),
+        collections.join("five").display()
+    ));
+    std::fs::write(both.join("repo.kdl"), repo).unwrap();
+    flow(
+        "flow-import-suffix-ambiguous",
+        &both,
+        None,
+        &[
+            "--root",
+            ".",
+            "import",
+            "module",
+            "coredumps",
+            "--image",
+            "example",
+        ],
+    );
+    let image = std::fs::read_to_string(both.join("example.image.kdl")).unwrap();
+    assert!(
+        image.contains("source \"four\" {\n            module \"hardening/coredumps\"\n        }"),
+        "{image}"
+    );
+    assert!(!image.contains("five"), "{image}");
+    assert!(!image.contains("sandbox"), "{image}");
+
     // A name is a path of names, and a part of it that is empty or starts
     // with a dot is refused saying so.
     let (list, _, _) = tect::declarations(&nested);

@@ -14,6 +14,9 @@ use std::path::{Path, PathBuf};
 /// One collection that has the module, and where its directory is on disk.
 pub struct Found {
     pub owner: String,
+    /// The member's path below the collection root: the canonical name, which
+    /// the typed one may only be a suffix of.
+    pub name: String,
     pub dir: PathBuf,
 }
 
@@ -83,13 +86,12 @@ pub fn find(
             ));
         }
         searched.push(&collection.name);
-        let dir = tree(root, collection)?
-            .join(collection.subtree().unwrap_or(""))
-            .join(module);
-        if dir.join(layout::MODULE_FILE).is_file() {
+        let tree = tree(root, collection)?.join(collection.subtree().unwrap_or(""));
+        if tree.join(module).join(layout::MODULE_FILE).is_file() {
             found.push(Found {
                 owner: collection.name.clone(),
-                dir,
+                name: module.to_string(),
+                dir: tree.join(module),
             });
         }
     }
@@ -102,12 +104,64 @@ pub fn find(
         ));
     }
     if found.is_empty() {
+        // No member has the exact path. A typed name is also a suffix of a
+        // member path at a `/` boundary — `why`'s rule, one predicate for both
+        // — so every member of every eligible collection is a candidate. The
+        // owner filter and the unpinned refusal above already ran over every
+        // one of them, so `searched` stands.
+        for collection in sources {
+            if owner.is_some_and(|owner| owner != collection.name) {
+                continue;
+            }
+            let tree = tree(root, collection)?.join(collection.subtree().unwrap_or(""));
+            for path in crate::resolve::name::matching(&members(&tree), module) {
+                found.push(Found {
+                    owner: collection.name.clone(),
+                    dir: tree.join(&path),
+                    name: path,
+                });
+            }
+        }
+        found.sort_by(|a, b| (&a.name, &a.owner).cmp(&(&b.name, &b.owner)));
+    }
+
+    if found.is_empty() {
         return Err(format!(
             "no module called `{module}` in {}",
             searched.join(", ")
         ));
     }
     Ok(found)
+}
+
+/// Every member path below `tree`, as `catalog` walks it: directories only,
+/// dot entries passed over, and the descent stops at a directory holding
+/// `module.kdl`. The names are the paths below `tree`.
+fn members(tree: &Path) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut dirs: Vec<PathBuf> = match std::fs::read_dir(tree) {
+        Ok(dirs) => dirs.flatten().map(|entry| entry.path()).collect(),
+        Err(_) => return out,
+    };
+    while let Some(dir) = dirs.pop() {
+        let hidden = |name: &std::ffi::OsStr| name.to_string_lossy().starts_with('.');
+        if !dir.is_dir() || dir.file_name().is_some_and(hidden) {
+            continue;
+        }
+        let manifest = dir.join(layout::MODULE_FILE);
+        if !manifest.is_file() {
+            dirs.extend(
+                std::fs::read_dir(&dir)
+                    .into_iter()
+                    .flatten()
+                    .flatten()
+                    .map(|entry| entry.path()),
+            );
+            continue;
+        }
+        out.push(dir.strip_prefix(tree).unwrap_or(&dir).display().to_string());
+    }
+    out
 }
 
 /// Every module every declared collection holds, by name and then by
@@ -129,36 +183,20 @@ pub fn catalog(root: &Path, sources: &[Collection], fetch: bool) -> Result<Vec<P
             },
         };
         let tree = tree.join(collection.subtree().unwrap_or(""));
-        let mut dirs: Vec<PathBuf> = match std::fs::read_dir(&tree) {
-            Ok(dirs) => dirs.flatten().map(|entry| entry.path()).collect(),
-            Err(_) if !fetch => continue,
-            Err(err) => return Err(format!("`{}`: {}: {err}", collection.name, tree.display())),
-        };
-        while let Some(dir) = dirs.pop() {
-            let hidden = |name: &std::ffi::OsStr| name.to_string_lossy().starts_with('.');
-            if !dir.is_dir() || dir.file_name().is_some_and(hidden) {
+        if let Err(err) = std::fs::read_dir(&tree) {
+            if !fetch {
                 continue;
             }
-            let manifest = dir.join(layout::MODULE_FILE);
-            if !manifest.is_file() {
-                dirs.extend(
-                    std::fs::read_dir(&dir)
-                        .into_iter()
-                        .flatten()
-                        .flatten()
-                        .map(|entry| entry.path()),
-                );
-                continue;
-            }
+            return Err(format!("`{}`: {}: {err}", collection.name, tree.display()));
+        }
+        for name in members(&tree) {
             listed.push(Provider {
                 owner: Some(collection.name.clone()),
-                name: dir
-                    .strip_prefix(&tree)
-                    .unwrap_or(&dir)
-                    .display()
-                    .to_string(),
+                declares: crate::parse::module::summary(
+                    &tree.join(&name).join(layout::MODULE_FILE),
+                ),
+                name,
                 here: false,
-                declares: crate::parse::module::summary(&manifest),
             });
         }
     }
@@ -361,20 +399,26 @@ fn resolve(
     let at = match found.as_slice() {
         [_] => 0,
         many => {
-            let owners: Vec<String> = many.iter().map(|f| f.owner.clone()).collect();
-            let listed = owners.join(", ");
-            let options: Vec<Choice> = owners.iter().map(|owner| Choice::new(owner, "")).collect();
+            let options: Vec<Choice> = many
+                .iter()
+                .map(|f| Choice::new(format!("{}/{}", f.owner, f.name), ""))
+                .collect();
             prompt
-                .choose(&format!("`{module}` is in {listed}; which one"), &options)?
+                .choose(
+                    &format!("`{module}` names more than one module; which one"),
+                    &options,
+                )?
                 .ok_or_else(|| {
                     format!(
-                        "`{module}` is in {listed}; name which one, as `{}/{module}`",
-                        owners[0]
+                        "`{module}` names more than one module; name which one, as `{}/{}`",
+                        many[0].owner, many[0].name
                     )
                 })?
         }
     };
-    Ok((found.swap_remove(at), module))
+    let found = found.swap_remove(at);
+    let name = found.name.clone();
+    Ok((found, name))
 }
 
 /// One collection member a reference places under `.remote`, and the name an
@@ -446,11 +490,9 @@ impl Module {
             })
             .map(|qualified| {
                 let mut found = find(root, sources, &qualified, enforce)?;
-                let member = split(&qualified).1.to_string();
-                Ok(Member {
-                    from: found.swap_remove(0),
-                    name: member,
-                })
+                let from = found.swap_remove(0);
+                let name = from.name.clone();
+                Ok(Member { from, name })
             })
             .collect::<Result<Vec<Member>, String>>()?;
 
@@ -589,10 +631,9 @@ pub fn bring(
         .iter()
         .map(|qualified| {
             let mut found = find(root, sources, qualified, enforce)?;
-            Ok(Member {
-                from: found.swap_remove(0),
-                name: split(qualified).1.to_string(),
-            })
+            let from = found.swap_remove(0);
+            let name = from.name.clone();
+            Ok(Member { from, name })
         })
         .collect::<Result<Vec<Member>, String>>()?;
     Ok(Module {
@@ -866,6 +907,7 @@ mod tests {
             members: vec![Member {
                 from: Found {
                     owner: "one".into(),
+                    name: "module".into(),
                     dir: from.clone(),
                 },
                 name: "module".into(),
@@ -881,6 +923,7 @@ mod tests {
         Copy {
             from: Found {
                 owner: "one".into(),
+                name: "module".into(),
                 dir: from,
             },
             dest: PathBuf::from("modules/module"),
