@@ -95,6 +95,9 @@ mod tests {
 "#;
         let scheduled = render(BODY, None, &["no-kernel", "scheduled-publish"]);
         assert!(scheduled.contains(gate), "{scheduled}");
+        assert!(scheduled.contains(
+            "uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0\n        with:"
+        ));
 
         let pushed = render(BODY, None, &["no-kernel", "push-publish"]);
         assert!(!pushed.contains(gate), "{pushed}");
