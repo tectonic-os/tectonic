@@ -33,15 +33,18 @@ pub(crate) fn width() -> usize {
     }
     std::env::var("COLUMNS")
         .ok()
-        .and_then(|cols| cols.parse().ok())
-        .filter(|cols| *cols > 0)
+        .and_then(|cols| parse_width(&cols).map(usize::from))
         .or_else(|| {
             terminal::size()
-                .map(|(cols, _)| cols as usize)
+                .map(|(cols, _)| usize::from(cols))
                 .ok()
                 .filter(|cols| *cols > 0)
         })
         .unwrap_or(NARROWEST)
+}
+
+fn parse_width(width: &str) -> Option<u16> {
+    width.parse().ok().filter(|width| *width > 0)
 }
 
 /// Whether the terminal is wide enough that no table folds a word mid-way,
@@ -570,6 +573,13 @@ mod tests {
     use super::*;
     use ratatui::backend::TestBackend;
     use ratatui::Terminal;
+
+    #[test]
+    fn columns_width_must_be_nonzero_and_fit_the_renderer() {
+        assert_eq!(parse_width("0"), None);
+        assert_eq!(parse_width("65535"), Some(u16::MAX));
+        assert_eq!(parse_width("65536"), None);
+    }
 
     fn drawn(options: &[Choice], on: Option<&[usize]>, hint: &str, at: usize) -> String {
         let mut state = ListState::default().with_selected(Some(at));

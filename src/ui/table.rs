@@ -13,7 +13,12 @@ use std::fmt::Write as _;
 /// One table as ANSI lines: `rows` are cells in `header`'s order, each with
 /// whether what the row says is a defect, which is the only thing colour says.
 pub fn render(title: &str, header: &[&str], rows: &[(Vec<String>, bool)]) -> String {
-    draw(super::width() as u16, title, header, rows)
+    draw(
+        u16::try_from(super::width()).expect("terminal width was validated"),
+        title,
+        header,
+        rows,
+    )
 }
 
 fn draw(width: u16, title: &str, header: &[&str], rows: &[(Vec<String>, bool)]) -> String {
@@ -85,7 +90,7 @@ fn columns(header: &[&str], rows: &[(Vec<String>, bool)], room: u16) -> Vec<u16>
 /// the longest single word in it, plus the gaps between columns and the frame.
 /// Below this a table is lossless but unreadable, and the caller falls back.
 pub(crate) fn floor(header: &[&str], rows: &[(Vec<String>, bool)]) -> usize {
-    let words: usize = header
+    let words: Vec<usize> = header
         .iter()
         .enumerate()
         .map(|(at, name)| {
@@ -95,8 +100,20 @@ pub(crate) fn floor(header: &[&str], rows: &[(Vec<String>, bool)]) -> usize {
                 .max()
                 .unwrap_or(0)
         })
-        .sum();
-    words + header.len().saturating_sub(1) + 2
+        .collect();
+    let mut width = words.iter().sum::<usize>() + header.len().saturating_sub(1) + 2;
+    while let Ok(render_width) = u16::try_from(width) {
+        let allocated = columns(header, rows, render_width.saturating_sub(2));
+        if allocated
+            .iter()
+            .zip(&words)
+            .all(|(allocated, word)| usize::from(*allocated) >= *word)
+        {
+            break;
+        }
+        width += 1;
+    }
+    width
 }
 
 fn longest_word(text: &str) -> usize {
@@ -236,12 +253,37 @@ mod tests {
     }
 
     #[test]
-    fn the_floor_is_each_column_at_its_longest_word_plus_gaps_and_frame() {
-        assert_eq!(floor(&HEADER, &rows()), 16 + 10 + 1 + 2);
+    fn the_floor_is_no_less_than_the_longest_words_plus_gaps_and_frame() {
+        let width = floor(&HEADER, &rows());
+        assert!(width >= 16 + 10 + 1 + 2);
         assert_eq!(
             floor(&["Hash"], &[(vec!["a b".into(), "cd".into()], false)]),
-            4 + 0 + 2
+            4 + 2
         );
         assert_eq!(floor(&[], &[]), 2);
+    }
+
+    #[test]
+    fn a_skewed_graph_row_gets_every_longest_word_at_the_floor() {
+        let header = ["Name", "Kind", "Provided by", "Required by", "After"];
+        let rows = [(
+            vec![
+                "core/consumer".into(),
+                "file".into(),
+                String::new(),
+                "core/consumer core/provider".into(),
+                String::new(),
+            ],
+            false,
+        )];
+        let floor = floor(&header, &rows);
+        let allocated = columns(&header, &rows, u16::try_from(floor).unwrap() - 2);
+        let needed = [13, 4, 8, 13, 5];
+
+        assert!(floor > usize::from(needed.iter().sum::<u16>()) + header.len() - 1 + 2);
+        assert!(
+            allocated.iter().zip(needed).all(|(got, need)| *got >= need),
+            "floor {floor} allocated {allocated:?}"
+        );
     }
 }

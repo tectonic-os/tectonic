@@ -306,9 +306,27 @@ pub fn check_graph(image: &Image, root: &Path, index: &Index, issues: &mut Issue
     // Nothing else validates `after`, so a dangling one is said here.
     for module in image.modules() {
         for decl in &module.after {
-            if base_caps.contains_key(decl.name.as_str())
-                || offered.contains_key(decl.name.as_str())
-            {
+            if base_caps.contains_key(decl.name.as_str()) {
+                continue;
+            }
+            if let Some(providers) = offered.get(decl.name.as_str()) {
+                if let Some(provider) = providers.first() {
+                    if let Some(provider_flavour) = &provider.flavour {
+                        if module.flavour.as_ref() != Some(provider_flavour) {
+                            issues.push(
+                                Issue::new(
+                                    format!(
+                                        "`{}` builds after `{}`, which only `{}` provides and only on the `{provider_flavour}` flavour",
+                                        module.path, decl.name, provider.path
+                                    ),
+                                    &module.src,
+                                )
+                                .at(decl.span, "ineffective on every other target")
+                                .help("either gate this module to the same flavour, or move the provider out of the flavour block"),
+                            );
+                        }
+                    }
+                }
                 continue;
             }
             issues.push(
