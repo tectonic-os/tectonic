@@ -352,6 +352,15 @@ pub fn vendor(
     found: &Found,
     dest: &Path,
 ) -> Result<Vec<PathBuf>, String> {
+    // The copy is the one moment a verifiable record is guaranteed, so a tree
+    // that cannot be hashed refuses before anything is written. The source and
+    // the copy are the same files, so the two hashes are the same value.
+    let content = record::hash(&found.dir).ok_or_else(|| {
+        format!(
+            "{} cannot be hashed, so nothing can record what was copied",
+            found.dir.display()
+        )
+    })?;
     let dir = root.join(dest);
     let mut wrote: Vec<PathBuf> = crate::init::copy_tree(&found.dir, &dir)?
         .into_iter()
@@ -361,7 +370,6 @@ pub fn vendor(
         .iter()
         .find(|c| c.name == found.owner)
         .and_then(Collection::pin);
-    let content = record::hash(&dir).unwrap_or_default();
     crate::init::put(
         &dir.join(record::RECORD),
         &record::write(&found.owner, pin, &content),

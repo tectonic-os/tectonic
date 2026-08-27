@@ -88,7 +88,8 @@ pub fn check(image: &Image, shipped: &Index, issues: &mut Issues) {
 /// The collisions `check` would report that involve one of the modules just
 /// added, read off the same resolved index and build order `check` used. An
 /// import calls this the moment it has written the tree, so the person is
-/// told then rather than on the next `check`, in `check`'s own sentence.
+/// told then rather than on the next `check` — `check`'s pair and path, with
+/// the fix advice in one line.
 pub fn collisions(image: &Image, shipped: &Index, brought: &BTreeSet<String>) -> Vec<String> {
     let entries = &image.entries;
     let mut out: Vec<String> = Vec::new();
