@@ -78,28 +78,35 @@ mod tests {
         let out = render(BODY, None, &["no-kernel", "scheduled-scan"]);
         assert!(
             out.contains(
-                "    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n"
+                "    if: needs.build_push.outputs.publish == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')\n"
             ),
             "{out}"
         );
         assert!(
-            !out.contains("    if: github.event_name != 'pull_request'\n"),
+            !out.contains(
+                "    if: needs.build_push.outputs.publish == 'true' && github.event_name != 'pull_request'\n"
+            ),
             "{out}"
         );
     }
 
     #[test]
     fn scheduled_publishing_is_absent_from_pushes_but_not_dispatches() {
-        let gate = r#"          # A second GITHUB_ENV write keeps region markers out of the continuation above.
-          if [ "${{ github.event_name }}" != "schedule" ] \
+        let gate = r#"          if [ "${{ github.event_name }}" != "schedule" ] \
              && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
-            echo "PUBLISH=false" >> "${GITHUB_ENV}"
+            publish=false
           fi
 "#;
         let scheduled = render(BODY, None, &["no-kernel", "scheduled-publish"]);
         assert!(scheduled.contains(gate), "{scheduled}");
+        assert!(scheduled
+            .contains("    outputs:\n      publish: ${{ steps.prepare.outputs.publish }}\n"));
+        assert!(scheduled.contains("      - name: Prepare environment\n        id: prepare\n"));
         assert!(scheduled.contains(
-            "uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0\n        with:"
+            "          echo \"PUBLISH=${publish}\" >> \"${GITHUB_ENV}\"\n          echo \"publish=${publish}\" >> \"${GITHUB_OUTPUT}\"\n"
+        ));
+        assert!(scheduled.contains(
+            "      - name: Login to GitHub Container Registry\n        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0\n"
         ));
 
         let pushed = render(BODY, None, &["no-kernel", "push-publish"]);

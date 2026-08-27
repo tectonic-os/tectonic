@@ -1241,15 +1241,21 @@ fn flows() {
     };
     let prompted_build = generated_build(&prompted);
     let direct_build = generated_build(&direct);
+    let drawn_build = generated_build(&drawn);
     assert_eq!(prompted_build, direct_build);
     assert!(prompted_build.contains(
-        "    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n"
+        "    if: needs.build_push.outputs.publish == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')\n"
     ));
-    assert!(!prompted_build.contains("    if: github.event_name != 'pull_request'\n"));
+    assert!(!prompted_build.contains(
+        "    if: needs.build_push.outputs.publish == 'true' && github.event_name != 'pull_request'\n"
+    ));
 
     let cadence = flow_repo("flow-publish-cadence");
     let repo_path = cadence.join("repo.kdl");
     let push_build = generated_build(&cadence);
+    assert!(push_build.contains(
+        "    if: needs.build_push.outputs.publish == 'true' && github.event_name != 'pull_request'\n"
+    ));
     let repo = std::fs::read_to_string(&repo_path).unwrap();
     std::fs::write(
         &repo_path,
@@ -1257,17 +1263,17 @@ fn flows() {
     )
     .unwrap();
     let scheduled_build = generated_build(&cadence);
-    let publish_gate = r#"          # A second GITHUB_ENV write keeps region markers out of the continuation above.
-          if [ "${{ github.event_name }}" != "schedule" ] \
+    let publish_gate = r#"          if [ "${{ github.event_name }}" != "schedule" ] \
              && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
-            echo "PUBLISH=false" >> "${GITHUB_ENV}"
+            publish=false
           fi
 "#;
     assert!(scheduled_build.contains(publish_gate), "{scheduled_build}");
+    assert_eq!(drawn_build, scheduled_build);
     assert_eq!(
         scheduled_build.replace(publish_gate, "").replace(
-            "    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n",
-            "    if: github.event_name != 'pull_request'\n",
+            "    if: needs.build_push.outputs.publish == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')\n",
+            "    if: needs.build_push.outputs.publish == 'true' && github.event_name != 'pull_request'\n",
         ),
         push_build,
     );
