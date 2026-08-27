@@ -14,4 +14,5 @@ Tectonic v{version}
 
 tect: 1 problem in ./example.image.kdl, ./repo.kdl
 tect: `tectonic-os` is unpinned, so a fetch from it takes whatever its ref holds then, unverified
+tect: `tect-version` names {version} with no sha256, so the binary it fetches is whatever the release holds, unverified
 ==== exit 2

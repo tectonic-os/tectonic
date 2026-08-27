@@ -167,10 +167,19 @@ the seed of it would leave a new repository unbuildable.
 | Node | Takes | Meaning |
 | --- | --- | --- |
 | `schema-version` | a number, at most one | The schema release this repository is written against, which picks the reader. |
-| `tect-version` | a string, at most one | The tect release this repository is built with, which `scripts/tect.sh` fetches for the build. |
 | `name` | a string, exactly one | What the repository calls itself, whatever the directory holding it is called. |
 | `default-image` | a string, at most one | The image a command given no image answers about, and a build with no target builds. |
 | `pr-image` | a string, at most one | The image a pull request builds. |
+
+### `tect-version`
+
+The tect release this repository is built with, which `scripts/tect.sh` fetches for the build.
+
+*a string, at most one*
+
+| Property | Value | Meaning |
+| --- | --- | --- |
+| `sha256=` | a string | The release tarball's sha256, which `scripts/tect.sh` holds the download to. Absent, the script checks against the checksum fetched beside the tarball, which proves the download and nothing more. |
 
 ### `seed`
 

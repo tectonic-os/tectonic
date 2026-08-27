@@ -1,5 +1,6 @@
 Tectonic v{version}
 
 tect: `tectonic-os` is unpinned, so a fetch from it takes whatever its ref holds then, unverified
+tect: `tect-version` names {version} with no sha256, so the binary it fetches is whatever the release holds, unverified
 tect: 1 images, 0 modules, 0 flavours
 ==== exit 0
