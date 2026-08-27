@@ -87,6 +87,20 @@ mod tests {
     }
 
     #[test]
+    fn scheduled_publishing_is_absent_from_pushes_but_not_dispatches() {
+        let gate = r#"          if [ "${{ github.event_name }}" != "schedule" ] \
+             && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "PUBLISH=false" >> "${GITHUB_ENV}"
+          fi
+"#;
+        let scheduled = render(BODY, None, &["no-kernel", "scheduled-publish"]);
+        assert!(scheduled.contains(gate), "{scheduled}");
+
+        let pushed = render(BODY, None, &["no-kernel", "push-publish"]);
+        assert!(!pushed.contains(gate), "{pushed}");
+    }
+
+    #[test]
     fn fresh_jobs_fetch_modules_before_reading_the_plan() {
         assert!(BODY
             .contains("run: |\n          ./scripts/tect.sh fetch modules\n          selection="));

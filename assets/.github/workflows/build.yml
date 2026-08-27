@@ -296,6 +296,12 @@ jobs:
           else
             echo "PUBLISH=false" >> "${GITHUB_ENV}"
           fi
+          # tect:only scheduled-publish
+          if [ "${{ github.event_name }}" != "schedule" ] \
+             && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "PUBLISH=false" >> "${GITHUB_ENV}"
+          fi
+          # tect:end
 
       - name: Select a working container runtime
         id: runtime
