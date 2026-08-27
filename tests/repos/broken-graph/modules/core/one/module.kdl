@@ -9,3 +9,4 @@ packages {
 helpers "lib/one/shared.sh"
 requires "package-manager"
 requires-file "/usr/bin/nothing"
+after "logging"

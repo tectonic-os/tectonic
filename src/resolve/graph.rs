@@ -302,6 +302,28 @@ pub fn check_graph(image: &Image, root: &Path, index: &Index, issues: &mut Issue
             }
         }
     }
+
+    // Nothing else validates `after`, so a dangling one is said here.
+    for module in image.modules() {
+        for decl in &module.after {
+            if base_caps.contains_key(decl.name.as_str())
+                || offered.contains_key(decl.name.as_str())
+            {
+                continue;
+            }
+            issues.push(
+                Issue::new(
+                    format!(
+                        "`{}` builds after `{}`, which nothing enabled provides",
+                        module.path, decl.name
+                    ),
+                    &module.src,
+                )
+                .at(decl.span, "nothing to order after")
+                .help("an `after` orders the build without requiring anything; name a capability the base or an enabled module provides, or make it a `requires` so the missing edge is a requirement rather than an ordering"),
+            );
+        }
+    }
 }
 
 /// A fragment is inlined verbatim, so nothing the generator does can make it
