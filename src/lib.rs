@@ -280,6 +280,11 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
                 (*body).to_string(),
             )
         }));
+        files.extend(
+            emit::SCRIPTS
+                .iter()
+                .map(|(path, body)| (PathBuf::from(path), (*body).to_string())),
+        );
         for (image, resolved) in list.images.iter().zip(&resolved) {
             if let Some(skeleton) = &skeleton {
                 let section = emit::containerfile::section(image, root);
@@ -490,6 +495,13 @@ pub fn write_generated(root: &Path, files: &[(PathBuf, String)]) -> Result<(), S
         let dir = path.parent().unwrap_or(&path);
         std::fs::create_dir_all(dir).map_err(|err| format!("{}: {err}", dir.display()))?;
         std::fs::write(&path, text).map_err(|err| format!("{}: {err}", path.display()))?;
+    }
+    // CI calls the scripts directly, whatever mode the repository committed.
+    for (path, _) in emit::SCRIPTS {
+        use std::os::unix::fs::PermissionsExt;
+        let path = root.join(path);
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
+            .map_err(|err| format!("{}: {err}", path.display()))?;
     }
     Ok(())
 }

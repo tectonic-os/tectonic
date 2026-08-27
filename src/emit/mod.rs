@@ -46,6 +46,24 @@ pub(crate) const LIBRARIES: &[(&str, &str)] = &[
     ),
 ];
 
+/// The scripts every repository runs, written in place rather than under
+/// `generated/`: the generated workflows and the lint script call them at
+/// their fixed paths.
+pub(crate) const SCRIPTS: &[(&str, &str)] = &[
+    (
+        "scripts/lint.sh",
+        include_str!("../../assets/scripts/lint.sh"),
+    ),
+    (
+        "scripts/render-iso-config.sh",
+        include_str!("../../assets/scripts/render-iso-config.sh"),
+    ),
+    (
+        "scripts/tect.sh",
+        include_str!("../../assets/scripts/tect.sh"),
+    ),
+];
+
 pub enum Part {
     Heading(String),
     Text(String),

@@ -68,9 +68,6 @@ example/
 │   └── + .gitkeep
 ├── scripts/              what CI runs, and what you run by hand
 │   ├── + Containerfile.skeleton
-│   ├── + lint.sh
-│   ├── + render-iso-config.sh
-│   ├── + tect.sh
 │   └── + vm.sh
 ├── + .dockerignore
 ├── + .gitattributes

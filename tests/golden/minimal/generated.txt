@@ -5,6 +5,9 @@
 ==== generated/lib/selinux-helpers.sh
 ==== generated/lib/sign-helpers.sh
 ==== generated/lib/wrap-helpers.sh
+==== scripts/lint.sh
+==== scripts/render-iso-config.sh
+==== scripts/tect.sh
 ==== generated/minimal.d/fedora-family.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.

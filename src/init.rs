@@ -85,6 +85,14 @@ pub fn write(root: &Path, name: &str, assets: &Path) -> Result<Vec<PathBuf>, Str
     }
 
     let mut wrote = copy_tree_except(assets, root, Some("lib"))?;
+    // These generate in place, so their shipped copies are not scaffolded.
+    for (path, _) in crate::emit::SCRIPTS {
+        wrote.retain(|written| written != Path::new(path));
+        let at = root.join(path);
+        if at.exists() {
+            fs::remove_file(&at).map_err(|err| format!("{}: {err}", at.display()))?;
+        }
+    }
     // The workflows are generated from the declaration, not scaffolded.
     let shipped = root.join(layout::WORKFLOW_DIR);
     if shipped.is_dir() {
