@@ -1,0 +1,11 @@
+Tectonic v{version}
+
+`browser` requires `flatpak`, which nothing in `server` provides.
+Import `one/flatpak` as well? (Yes/No)
+Yes
+
+
+example/
+├── ~ example.image.kdl  browser added to modules
+└── ~ server.image.kdl   flatpak and browser added to modules
+==== exit 0

@@ -1252,6 +1252,70 @@ fn flows() {
         &["--root", ".", "check"],
     );
 
+    // One listing answer, and a member the offer brought is written only
+    // where it is not already listed: the first image already lists
+    // `flatpak`, so the offer is for the second alone and the write skips
+    // the first for that member alone.
+    let skip = flow_repo_sourced("flow-skip");
+    tect(
+        &skip,
+        &["--no-tui", "--root", ".", "create", "image", "Server"],
+    );
+    tect(
+        &skip,
+        &[
+            "--no-tui",
+            "--root",
+            ".",
+            "import",
+            "module",
+            "one/flatpak",
+            "--image",
+            "example",
+        ],
+    );
+    flow(
+        "flow-import-skip",
+        &skip,
+        None,
+        &[
+            "--root",
+            ".",
+            "import",
+            "module",
+            "two/browser",
+            "--image",
+            "example",
+            "--image",
+            "server",
+        ],
+    );
+    let image = std::fs::read_to_string(skip.join("example.image.kdl")).unwrap();
+    assert_eq!(image.matches("module \"flatpak\"").count(), 1, "{image}");
+    assert!(image.contains("module \"browser\""), "{image}");
+    let server = std::fs::read_to_string(skip.join("server.image.kdl")).unwrap();
+    assert!(
+        server.contains("module \"flatpak\"") && server.contains("module \"browser\""),
+        "{server}"
+    );
+    // The adapter flatpak's package group needs, which the seeded server
+    // image already lists and the unsourced one does not.
+    tect(
+        &skip,
+        &[
+            "--no-tui",
+            "--root",
+            ".",
+            "import",
+            "module",
+            "one/fedora-family",
+            "--image",
+            "example",
+        ],
+    );
+    tect(&skip, &["--no-tui", "--root", ".", "fetch", "modules"]);
+    tect(&skip, &["--no-tui", "--root", ".", "check"]);
+
     // A fresh clone: the collection `create repo` scaffolds is declared and is
     // not on this machine, and resolution never fetches. The help has to name
     // the fetch rather than conclude that nothing anywhere provides it.

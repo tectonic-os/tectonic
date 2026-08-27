@@ -545,7 +545,8 @@ impl Module {
             .iter()
             .map(|member| (member.from.owner.as_str(), member.name.as_str()))
             .collect();
-        let mut wrote: Vec<(PathBuf, Change)> = self.listing.apply_source(&listed)?;
+        let (list, _) = crate::model::image::List::load(root);
+        let mut wrote: Vec<(PathBuf, Change)> = self.listing.apply_source(&list, &listed)?;
         if let Some(workflows) = &self.workflows {
             wrote.extend(workflows.apply(root)?);
         }
@@ -634,23 +635,12 @@ fn short(
         if unmet.contains(&want) {
             continue;
         }
-        let met = images.iter().all(|image| {
-            image
-                .base
-                .iter()
-                .flat_map(|base| base.provides.iter().chain(base.provides_files.iter()))
-                .any(|decl| decl.name == *want)
-                || image.entries.iter().any(|entry| {
-                    index
-                        .at(&entry.dir())
-                        .is_some_and(|held| held.declares.provides.contains(want))
-                })
-        });
+        let any = images.iter().any(|image| !image_has(image, want, &index));
         // A provider the repository owns needs a line rather than an import,
         // which is what the unsatisfied-`requires` help already says.
-        let Some(provider) = (match met {
-            true => None,
-            false => index.of(want).into_iter().find(|held| held.owner.is_some()),
+        let Some(provider) = (match any {
+            false => None,
+            true => index.of(want).into_iter().find(|held| held.owner.is_some()),
         }) else {
             continue;
         };
@@ -663,6 +653,13 @@ fn short(
     if bring.is_empty() {
         return Ok(Vec::new());
     }
+
+    // The images at least one of the unmet wants has no provider in.
+    let lacking: Vec<&crate::model::image::Image> = images
+        .iter()
+        .copied()
+        .filter(|image| unmet.iter().any(|want| !image_has(image, want, &index)))
+        .collect();
 
     let question = format!(
         "{} {} {}, which nothing in {} provides.\nImport {} as well?",
@@ -683,7 +680,7 @@ fn short(
                 .collect::<Vec<_>>()
         ),
         said(
-            &images
+            &lacking
                 .iter()
                 .map(|image| format!("`{}`", image.id))
                 .collect::<Vec<_>>()
@@ -694,6 +691,25 @@ fn short(
         true => Ok(bring),
         false => Ok(Vec::new()),
     }
+}
+
+/// Whether an image already has a provider for `want`: the base declares it,
+/// or an entry the image lists provides it.
+fn image_has(
+    image: &crate::model::image::Image,
+    want: &str,
+    index: &crate::provider::Index,
+) -> bool {
+    image
+        .base
+        .iter()
+        .flat_map(|base| base.provides.iter().chain(base.provides_files.iter()))
+        .any(|decl| decl.name == want)
+        || image.entries.iter().any(|entry| {
+            index
+                .at(&entry.dir())
+                .is_some_and(|held| held.declares.provides.iter().any(|has| has == want))
+        })
 }
 
 /// Which profile the set's claims would have the images it is listed in
@@ -920,7 +936,8 @@ impl Copy {
             .into_iter()
             .map(|path| (path, Change::Created))
             .collect();
-        wrote.extend(self.listing.apply(&self.name)?);
+        let (list, _) = crate::model::image::List::load(root);
+        wrote.extend(self.listing.apply(&list, &self.name)?);
         report(root, &wrote);
         Ok(())
     }

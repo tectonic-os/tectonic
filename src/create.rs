@@ -604,7 +604,8 @@ impl Module {
         }
         crate::init::put(&self.file, &self.text)?;
         let mut wrote = vec![(under(root, &self.file), Change::Created)];
-        wrote.extend(self.listing.apply(&self.path)?);
+        let (list, _) = crate::model::image::List::load(root);
+        wrote.extend(self.listing.apply(&list, &self.path)?);
         Ok(wrote)
     }
 }
@@ -775,10 +776,7 @@ impl Listing {
         let Self::In(listed) = self else {
             return Ok(());
         };
-        let dir = match source {
-            Some(owner) => format!("{}/{owner}/{name}", crate::model::remote::REMOTE_DIR),
-            None => name.to_string(),
-        };
+        let dir = dir_of(name, source);
         let target = |image: &crate::model::image::Image, flavour: &Option<String>| {
             crate::model::image::Target {
                 image: image.id.clone(),
@@ -788,15 +786,7 @@ impl Listing {
             }
         };
         for into in listed {
-            let Some(image) = list.images.iter().find(|image| image.name == into.image) else {
-                continue;
-            };
-            let Some(held) = image.entries.iter().find(|entry| {
-                entry.dir() == dir
-                    && (into.flavour.is_none()
-                        || entry.flavour.is_none()
-                        || entry.flavour == into.flavour)
-            }) else {
+            let Some((image, held)) = holds(list, into, &dir) else {
                 continue;
             };
             let (at, into) = (target(image, &held.flavour), target(image, &into.flavour));
@@ -809,10 +799,14 @@ impl Listing {
     }
 
     /// The image files the module got a line in, which is nothing where no
-    /// image took it. Appending is the only thing this does, so every one of
-    /// them is an update.
-    pub fn apply(&self, path: &str) -> Result<Vec<(PathBuf, Change)>, String> {
-        self.apply_declaration(&[(path, None)])
+    /// image took it. Appending is the only thing this does, and an image that
+    /// already lists it is skipped, so every file named is an update.
+    pub fn apply(
+        &self,
+        list: &crate::model::image::List,
+        path: &str,
+    ) -> Result<Vec<(PathBuf, Change)>, String> {
+        self.apply_declaration(list, &[(path, None)])
     }
 
     pub fn cancelled(&self) -> bool {
@@ -835,17 +829,24 @@ impl Listing {
     }
 
     /// One answer applied to a set: every member gets its line in every image
-    /// the answer named, in the order they are given.
-    pub fn apply_source(&self, members: &[(&str, &str)]) -> Result<Vec<(PathBuf, Change)>, String> {
+    /// the answer named, in the order they are given. A member an image
+    /// already lists is skipped there alone, since the offer that brought it
+    /// may have been for the other images only.
+    pub fn apply_source(
+        &self,
+        list: &crate::model::image::List,
+        members: &[(&str, &str)],
+    ) -> Result<Vec<(PathBuf, Change)>, String> {
         let declarations: Vec<(&str, Option<&str>)> = members
             .iter()
             .map(|(source, name)| (*name, Some(*source)))
             .collect();
-        self.apply_declaration(&declarations)
+        self.apply_declaration(list, &declarations)
     }
 
     fn apply_declaration(
         &self,
+        list: &crate::model::image::List,
         declarations: &[(&str, Option<&str>)],
     ) -> Result<Vec<(PathBuf, Change)>, String> {
         match self {
@@ -866,33 +867,65 @@ impl Listing {
             }
             Self::In(listed) => {
                 let mut wrote: Vec<(PathBuf, Change)> = Vec::new();
-                let added = format!(
-                    "{} added to modules",
-                    crate::import::said(
-                        &declarations
-                            .iter()
-                            .map(|(name, _)| (*name).to_string())
-                            .collect::<Vec<_>>()
-                    )
-                );
                 for target in listed {
+                    let mut taken: Vec<String> = Vec::new();
                     for (name, source) in declarations {
+                        if holds(list, target, &dir_of(name, *source)).is_some() {
+                            continue;
+                        }
                         append(
                             &target.file,
                             &target.image,
                             &listed_in(target.flavour.as_deref(), *source),
                             &leaf(name),
                         )?;
+                        taken.push((*name).to_string());
                     }
-                    // Two flavours of one image are two lines in one file.
-                    if !wrote.iter().any(|(file, _)| *file == target.file) {
-                        wrote.push((target.file.clone(), Change::Updated(added.clone())));
+                    // Two flavours of one image are two lines in one file, and
+                    // a member the file already lists is not said to be new.
+                    if !taken.is_empty() && !wrote.iter().any(|(file, _)| *file == target.file) {
+                        wrote.push((
+                            target.file.clone(),
+                            Change::Updated(format!(
+                                "{} added to modules",
+                                crate::import::said(&taken)
+                            )),
+                        ));
                     }
                 }
                 Ok(wrote)
             }
         }
     }
+}
+
+/// Where a declaration lives relative to `modules/`, which is what an image
+/// entry records: a referenced member under `.remote`, an owned module at its
+/// path.
+fn dir_of(name: &str, source: Option<&str>) -> String {
+    match source {
+        Some(owner) => format!("{}/{owner}/{name}", crate::model::remote::REMOTE_DIR),
+        None => name.to_string(),
+    }
+}
+
+/// What the image already lists at `dir`, where the way `into` names it
+/// counts it: an ungated entry is in every flavour, so only an overlap is a
+/// duplicate.
+fn holds<'a>(
+    list: &'a crate::model::image::List,
+    into: &Listed,
+    dir: &str,
+) -> Option<(
+    &'a crate::model::image::Image,
+    &'a crate::model::image::Entry,
+)> {
+    let image = list.images.iter().find(|image| image.name == into.image)?;
+    let entry = image.entries.iter().find(|entry| {
+        entry.dir() == dir
+            && (into.flavour.is_none() || entry.flavour.is_none() || entry.flavour == into.flavour)
+    })?;
+    Some((image, entry))
 }
 
 /// The declaration a module gets, which is one line whatever wraps it.
