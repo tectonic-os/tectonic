@@ -536,21 +536,24 @@ fn no_default(root: &Path) {
     }
 }
 
-/// What a flow is allowed to find: `git`, which `create repo` runs, and
-/// whichever `gh` the branch under test wants. Nothing else on this machine is
-/// on it, so nothing a flow offers to exec reaches the network.
+/// What a flow is allowed to find: `git`, which `create repo` runs, `sha256sum`,
+/// which `copy module` hashes with, and whichever `gh` the branch under test
+/// wants. Nothing else on this machine is on it, so nothing a flow offers to
+/// exec reaches the network.
 fn bin(name: &str, gh: Option<&str>) -> PathBuf {
     use std::os::unix::fs::PermissionsExt;
     let dir = tmp().join(format!("{name}-bin"));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    let git = std::env::var("PATH")
-        .unwrap_or_default()
-        .split(':')
-        .map(|at| Path::new(at).join("git"))
-        .find(|at| at.is_file())
-        .expect("git on PATH");
-    std::os::unix::fs::symlink(git, dir.join("git")).unwrap();
+    let paths = std::env::var("PATH").unwrap_or_default();
+    for tool in ["git", "sha256sum"] {
+        let at = paths
+            .split(':')
+            .map(|at| Path::new(at).join(tool))
+            .find(|at| at.is_file())
+            .unwrap_or_else(|| panic!("{tool} on PATH"));
+        std::os::unix::fs::symlink(at, dir.join(tool)).unwrap();
+    }
     if let Some(script) = gh {
         let at = dir.join("gh");
         std::fs::write(&at, script).unwrap();
@@ -1492,6 +1495,42 @@ fn flows() {
     tect(&nested, &["--no-tui", "--root", ".", "generate"]);
     assert!(nested
         .join("generated/example.d/four/hardening/coredumps.sh")
+        .is_file());
+
+    // A name is a path of names, and a part of it that is empty or starts
+    // with a dot is refused saying so.
+    let (list, _, _) = tect::declarations(&nested);
+    let refused = tect::import::find(&nested, &list.sources, "four/hardening//coredumps", false)
+        .err()
+        .expect("an empty part of a path is refused");
+    assert_eq!(
+        refused,
+        "`four/hardening//coredumps` is not a module: a module is named by a path of names, \
+         as `<path>`, or `<owner>/<path>` to name one collection, and no part of it may be \
+         empty or start with a dot"
+    );
+
+    // The same nested member, copied rather than referenced: it vendors to
+    // the same depth it is named at, which the scanner and the checks walk.
+    let copied_nested = flow_repo_with("flow-copy-nested", "four");
+    flow(
+        "flow-copy-nested",
+        &copied_nested,
+        None,
+        &["--root", ".", "copy", "module"],
+    );
+    assert!(copied_nested
+        .join("modules/hardening/coredumps/provenance.kdl")
+        .is_file());
+    let image = std::fs::read_to_string(copied_nested.join("example.image.kdl")).unwrap();
+    assert!(
+        image.contains("    modules {\n        module \"hardening/coredumps\"\n    }"),
+        "{image}"
+    );
+    tect(&copied_nested, &["--no-tui", "--root", ".", "check"]);
+    tect(&copied_nested, &["--no-tui", "--root", ".", "generate"]);
+    assert!(copied_nested
+        .join("generated/example.d/hardening/coredumps.sh")
         .is_file());
 
     let root = flow_repo_sourced("flow-copy");

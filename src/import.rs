@@ -52,7 +52,9 @@ pub fn find(
         .any(|part| part.is_empty() || part.starts_with('.'))
     {
         return Err(format!(
-            "`{name}` is not a module: `<name>`, or `<owner>/<name>` when two collections have it"
+            "`{name}` is not a module: a module is named by a path of names, as `<path>`, or \
+             `<owner>/<path>` to name one collection, and no part of it may be empty or start \
+             with a dot"
         ));
     }
     if sources.is_empty() {
