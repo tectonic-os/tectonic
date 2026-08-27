@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 mapfile -t scripts < <(
-    find scripts lib modules -path modules/.remote -prune -o \
+    find scripts generated/lib modules -path modules/.remote -prune -o \
         -name '*.sh' -type f -print
     find modules -path modules/.remote -prune -o -path '*/files/*' -type f \
         \( -path '*/libexec/*' -o -path '*/system-generators/*' \) -print
