@@ -74,6 +74,13 @@ mod tests {
     }
 
     #[test]
+    fn a_checksum_fixup_says_which_commit_the_later_jobs_build() {
+        assert!(BODY.contains(
+            "echo \"Checksum fixup commit $(git rev-parse --short HEAD); later jobs build the amended tree.\" >> \"$GITHUB_STEP_SUMMARY\""
+        ));
+    }
+
+    #[test]
     fn a_scheduled_scan_is_absent_from_pushes() {
         let out = render(BODY, None, &["no-kernel", "scheduled-scan"]);
         assert!(

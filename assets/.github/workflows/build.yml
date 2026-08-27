@@ -164,6 +164,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -am "$message"
           git push origin "HEAD:${BRANCH}"
+          echo "Checksum fixup commit $(git rev-parse --short HEAD); later jobs build the amended tree." >> "$GITHUB_STEP_SUMMARY"
           echo "ref=${BRANCH}" >> "$GITHUB_OUTPUT"
 
   lint:
