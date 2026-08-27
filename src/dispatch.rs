@@ -344,6 +344,8 @@ pub fn dispatch(
                 &crate::resolve::workflow::Basis::of(&list),
                 &on,
                 list.workflows_at,
+                list.publishes_scheduled,
+                list.scans_scheduled,
                 prompt,
             )?
             else {

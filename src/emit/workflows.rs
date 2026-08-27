@@ -77,7 +77,9 @@ mod tests {
     fn a_scheduled_scan_is_absent_from_pushes() {
         let out = render(BODY, None, &["no-kernel", "scheduled-scan"]);
         assert!(
-            out.contains("    if: github.event_name == 'schedule'\n"),
+            out.contains(
+                "    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n"
+            ),
             "{out}"
         );
         assert!(
@@ -88,7 +90,8 @@ mod tests {
 
     #[test]
     fn scheduled_publishing_is_absent_from_pushes_but_not_dispatches() {
-        let gate = r#"          if [ "${{ github.event_name }}" != "schedule" ] \
+        let gate = r#"          # A second GITHUB_ENV write keeps region markers out of the continuation above.
+          if [ "${{ github.event_name }}" != "schedule" ] \
              && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
             echo "PUBLISH=false" >> "${GITHUB_ENV}"
           fi
@@ -131,7 +134,7 @@ mod tests {
         for shipped in crate::resolve::workflow::SHIPPED {
             for facts in [
                 &["kernel", "push-scan"][..],
-                &["no-kernel", "scheduled-scan"][..],
+                &["no-kernel", "scheduled-publish", "scheduled-scan"][..],
             ] {
                 for schedule in [None, Some("0 5 * * 1")] {
                     let out = render(shipped.body, schedule, facts);

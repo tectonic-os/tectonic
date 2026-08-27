@@ -102,6 +102,8 @@ impl Workflows {
         basis: &Basis,
         on: &[&str],
         at: (u32, u32),
+        publishes_current: bool,
+        scans_current: bool,
         prompt: &Prompt,
     ) -> Result<Option<Self>, String> {
         let options: Vec<Choice> = SHIPPED
@@ -128,11 +130,23 @@ impl Workflows {
         }
 
         let builds = chosen.iter().any(|shipped| shipped.stem == "build");
-        let publishes_scheduled =
-            builds && prompt.confirm("publish images only on scheduled builds", "Yes", "No")?;
-        let scans_scheduled = builds
-            && !publishes_scheduled
-            && prompt.confirm("run image scans only on scheduled builds", "Yes", "No")?;
+        let publishes_scheduled = builds
+            && prompt.confirm_current(
+                "publish images only on scheduled builds",
+                "Yes",
+                "No",
+                publishes_current,
+            )?;
+        let scans_scheduled = match (builds, publishes_scheduled) {
+            (false, _) => false,
+            (true, true) => scans_current,
+            (true, false) => prompt.confirm_current(
+                "run image scans only on scheduled builds",
+                "Yes",
+                "No",
+                scans_current,
+            )?,
+        };
 
         let at = match chosen.iter().any(|shipped| shipped.at.is_some()) {
             false => at,
@@ -700,12 +714,53 @@ mod tests {
     #[test]
     fn scheduled_publishing_makes_the_scan_question_redundant() {
         let prompt = Prompt::scripted(["1", "Yes", "06:00"].map(str::to_string).to_vec());
-        let workflows = Workflows::collect(&Basis::scaffolding(""), &[], DEFAULT_AT, &prompt)
-            .unwrap()
-            .unwrap();
+        let workflows = Workflows::collect(
+            &Basis::scaffolding(""),
+            &[],
+            DEFAULT_AT,
+            false,
+            false,
+            &prompt,
+        )
+        .unwrap()
+        .unwrap();
         assert!(workflows.publishes_scheduled);
         assert!(!workflows.scans_scheduled);
         assert_eq!(workflows.at, (6, 0));
+    }
+
+    #[test]
+    fn existing_scheduled_cadences_survive_accepting_scheduled_publishing() {
+        let prompt = Prompt::scripted(["", "Yes", "06:00"].map(str::to_string).to_vec());
+        let workflows = Workflows::collect(
+            &Basis::scaffolding(""),
+            &["build"],
+            DEFAULT_AT,
+            true,
+            true,
+            &prompt,
+        )
+        .unwrap()
+        .unwrap();
+        assert!(workflows.publishes_scheduled);
+        assert!(workflows.scans_scheduled);
+    }
+
+    #[test]
+    fn declining_scheduled_publishing_preserves_the_current_scan_cadence() {
+        let prompt = Prompt::scripted(["", "No", "", "06:00"].map(str::to_string).to_vec());
+        let workflows = Workflows::collect(
+            &Basis::scaffolding(""),
+            &["build"],
+            DEFAULT_AT,
+            true,
+            true,
+            &prompt,
+        )
+        .unwrap()
+        .unwrap();
+        assert!(!workflows.publishes_scheduled);
+        assert!(workflows.scans_scheduled);
     }
 
     /// Generating nothing is an absent block: an empty one is a diagnostic.

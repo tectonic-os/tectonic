@@ -297,6 +297,7 @@ jobs:
             echo "PUBLISH=false" >> "${GITHUB_ENV}"
           fi
           # tect:only scheduled-publish
+          # A second GITHUB_ENV write keeps region markers out of the continuation above.
           if [ "${{ github.event_name }}" != "schedule" ] \
              && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
             echo "PUBLISH=false" >> "${GITHUB_ENV}"
@@ -675,7 +676,7 @@ jobs:
     if: github.event_name != 'pull_request'
     # tect:end
     # tect:only scheduled-scan
-    if: github.event_name == 'schedule'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     # tect:end
 
     strategy:

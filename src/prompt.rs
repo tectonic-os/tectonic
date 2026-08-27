@@ -164,13 +164,31 @@ impl Prompt {
         if !self.ask {
             return Ok(false);
         }
+        self.confirm_current(question, yes, no, true)
+    }
+
+    /// A confirmation editing an existing answer, which opens on and defaults
+    /// to that answer rather than always opening on yes.
+    pub fn confirm_current(
+        &self,
+        question: &str,
+        yes: &str,
+        no: &str,
+        current: bool,
+    ) -> Result<bool, String> {
+        if !self.ask {
+            return Ok(current);
+        }
         if self.draw {
-            let chosen = crate::ui::confirm(question, yes, no)?;
+            let chosen = crate::ui::confirm_current(question, yes, no, current)?;
             println!("{question}: {}\n", if chosen { yes } else { no });
             return Ok(chosen);
         }
         let question = format!("{question} ({yes}/{no})");
         let answer = self.read(&question, &format!("{question}\n"))?;
+        if answer.is_empty() {
+            return Ok(current);
+        }
         let first = |word: &str| word.chars().next().map(|c| c.to_ascii_lowercase());
         Ok(first(&answer) != first(no))
     }

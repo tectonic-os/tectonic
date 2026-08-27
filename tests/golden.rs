@@ -1110,6 +1110,26 @@ fn flows() {
     let prompted_repo = std::fs::read_to_string(prompted.join("repo.kdl")).unwrap();
     assert!(prompted_repo.contains(declaration), "{prompted_repo}");
 
+    let drawn = flow_repo("flow-set-workflows-drawn");
+    let repo_path = drawn.join("repo.kdl");
+    let repo = std::fs::read_to_string(&repo_path).unwrap().replace(
+        "workflows {",
+        "workflows publish=\"scheduled\" scan=\"scheduled\" {",
+    );
+    std::fs::write(&repo_path, repo).unwrap();
+    drawn_flow(
+        "flow-set-workflows-drawn",
+        &drawn,
+        &format!("'{}' --root . set workflows", env!("CARGO_BIN_EXE_tect")),
+        "the CI to generate:",
+        &[b"\x1b[B\x1b[B\x1b[B\x1b[B\x1b[B\x1b[B\r", b"\r", b"\r"],
+    );
+    let repo = std::fs::read_to_string(&repo_path).unwrap();
+    assert!(
+        repo.contains("workflows publish=\"scheduled\" scan=\"scheduled\" {"),
+        "{repo}"
+    );
+
     let direct = flow_repo("flow-cadence-direct");
     let repo_path = direct.join("repo.kdl");
     let mut direct_repo = std::fs::read_to_string(&repo_path).unwrap();
@@ -1134,7 +1154,9 @@ fn flows() {
     let prompted_build = generated_build(&prompted);
     let direct_build = generated_build(&direct);
     assert_eq!(prompted_build, direct_build);
-    assert!(prompted_build.contains("    if: github.event_name == 'schedule'\n"));
+    assert!(prompted_build.contains(
+        "    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n"
+    ));
     assert!(!prompted_build.contains("    if: github.event_name != 'pull_request'\n"));
 
     let cadence = flow_repo("flow-publish-cadence");
@@ -1147,7 +1169,8 @@ fn flows() {
     )
     .unwrap();
     let scheduled_build = generated_build(&cadence);
-    let publish_gate = r#"          if [ "${{ github.event_name }}" != "schedule" ] \
+    let publish_gate = r#"          # A second GITHUB_ENV write keeps region markers out of the continuation above.
+          if [ "${{ github.event_name }}" != "schedule" ] \
              && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
             echo "PUBLISH=false" >> "${GITHUB_ENV}"
           fi
@@ -1155,7 +1178,7 @@ fn flows() {
     assert!(scheduled_build.contains(publish_gate), "{scheduled_build}");
     assert_eq!(
         scheduled_build.replace(publish_gate, "").replace(
-            "    if: github.event_name == 'schedule'\n",
+            "    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n",
             "    if: github.event_name != 'pull_request'\n",
         ),
         push_build,
