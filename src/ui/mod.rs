@@ -37,10 +37,9 @@ pub fn parts(parts: &[crate::emit::Part]) -> String {
     parts
         .iter()
         .map(|part| match part {
-            crate::emit::Part::Heading(text) => format!(
-                "{}",
-                ratatui::crossterm::style::Stylize::bold(text.as_str())
-            ),
+            crate::emit::Part::Heading(text) => {
+                ratatui::crossterm::style::Stylize::bold(text.as_str()).to_string()
+            }
             crate::emit::Part::Text(text) => table::wrap(text, width()).join("\n"),
             crate::emit::Part::Table(table) => {
                 table::render(&table.title, table.header, &table.rows)

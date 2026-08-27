@@ -1,0 +1,52 @@
+==== a module the base suppresses
+# apps/flatpak
+
+Installs flatpak and enables the remotes an image asks for
+
+## Where it is built
+
+Nowhere. suppressed lists it and builds no layer for it: everything it provides, that base already ships.
+
+## What it exchanges
+
+| Direction | Capability | With |
+| --- | --- | --- |
+| provides | `flatpak` | apps/browser |
+
+## What it claims
+
+| Benchmark | Rules |
+| --- | --- |
+| `cis-fedora` | 9.9.9.9 |
+
+A claim the tool records rather than certifies. The scan is what confirms it.
+
+## Where it came from
+
+| Content | Hash |
+| --- | --- |
+| declared | `f86ab0bde98e71158432e4f9d66377f98faaf5db4065748208a5fcf70fe701ae` |
+
+It was written in this repository rather than imported, so nothing upstream to compare it against.
+
+## What it pulls in
+
+Nothing. It declares no `asset`.
+
+## Third-party repositories
+
+None. It ships no `repo` file.
+
+==== and the same module in an image that does build it
+# apps/flatpak
+
+Installs flatpak and enables the remotes an image asks for
+
+## Where it is built
+
+also. suppressed lists it and builds no layer for it: everything it provides, that base already ships.
+
+==== and one whose manifest never loaded
+`apps/flatpak` is listed but was not read
+  help: the problem reading it is above
+

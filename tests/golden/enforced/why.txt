@@ -55,6 +55,7 @@ It enables one, in `modules/one/hello/repo`. There is no grammar for that file, 
   "images": [
     "enforced"
   ],
+  "suppressed": [],
   "provides": [
     {
       "capability": "hello",
