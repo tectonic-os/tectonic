@@ -20,17 +20,38 @@ const NARROWEST: usize = 80;
 
 /// Whether anything drawn is being watched, which is what decides both colour
 /// and whether a read-out is a table or the markdown a file would hold.
-pub fn colour() -> bool {
+pub(crate) fn colour() -> bool {
     std::io::stdout().is_terminal()
 }
 
 /// Asked of the terminal only where the output is one, so a redirected run and
-/// a piped one draw the same thing whatever is behind them.
-pub fn width() -> usize {
-    match colour() {
-        true => terminal::size().map_or(NARROWEST, |(cols, _)| cols as usize),
-        false => NARROWEST,
+/// a piped one draw the same thing whatever is behind them. `COLUMNS` names a
+/// width the terminal will not say, and a width of nothing is the narrowest.
+pub(crate) fn width() -> usize {
+    if !colour() {
+        return NARROWEST;
     }
+    std::env::var("COLUMNS")
+        .ok()
+        .and_then(|cols| cols.parse().ok())
+        .filter(|cols| *cols > 0)
+        .or_else(|| {
+            terminal::size()
+                .map(|(cols, _)| cols as usize)
+                .ok()
+                .filter(|cols| *cols > 0)
+        })
+        .unwrap_or(NARROWEST)
+}
+
+/// Whether the terminal is wide enough that no table folds a word mid-way,
+/// which is the point at which a read-out falls back to its markdown.
+pub(crate) fn fits(parts: &[crate::emit::Part]) -> bool {
+    let room = width();
+    parts.iter().all(|part| match part {
+        crate::emit::Part::Table(table) => room >= table::floor(table.header, &table.rows),
+        _ => true,
+    })
 }
 
 pub fn parts(parts: &[crate::emit::Part]) -> String {

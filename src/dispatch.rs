@@ -156,10 +156,11 @@ fn why_on_host(command: Command, arg: Option<&str>, prompt: &Prompt) -> Result<E
     };
     let why = crate::emit::why::on_host(&manifest, record.as_ref(), &path)
         .expect("the resolved module is in the manifest");
+    let parts = why.parts(true);
     print!(
         "{}",
         match command {
-            Command::Why if prompt.draws() => crate::ui::parts(&why.parts(true)),
+            Command::Why if prompt.draws() && crate::ui::fits(&parts) => crate::ui::parts(&parts),
             Command::Why => why.markdown(),
             _ => why.json().render(),
         }
@@ -675,11 +676,14 @@ fn reading(
     if command == Command::Generate {
         crate::write_generated(&root, &run.files)?;
     }
-    // A terminal gets the read-out and nothing else; a pipe, a redirect and
-    // `--no-tui` get the markdown a forge would render.
+    // A terminal gets the read-out and nothing else, and only while it is wide
+    // enough that no table folds a word mid-way; a pipe, a redirect, `--no-tui`
+    // and a too-narrow terminal get the markdown a forge would render.
     print!(
         "{}",
-        match matches!(command, Command::Graph | Command::Why | Command::Coverage) && prompt.draws()
+        match matches!(command, Command::Graph | Command::Why | Command::Coverage)
+            && prompt.draws()
+            && crate::ui::fits(&run.parts)
         {
             false => run.stdout,
             true => crate::ui::parts(&run.parts),

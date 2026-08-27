@@ -9,7 +9,7 @@ what time the daily build runs, UTC [12:30]:
 
 
 example/
-└── [38;5;11m~[39m repo.kdl
+└── [38;5;11m~[39m repo.kdl  the workflows it generates
 
 next, in .:
   tect generate
