@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   release:
@@ -34,6 +36,11 @@ jobs:
           tar -czf "$asset" --transform "s|^${bin%/tect}/||" "$bin" assets
           sha256sum "$asset" | cut -d' ' -f1 > "${asset}.sha256"
           echo "asset=${asset}" >> "$GITHUB_OUTPUT"
+
+      - name: Attest the tarball
+        uses: actions/attest-build-provenance@bd77c077858b8d561b7a36cbe48ef4cc642ca39d # v2.2.2
+        with:
+          subject-path: ${{ steps.pkg.outputs.asset }}
 
       - name: Create release
         env:
