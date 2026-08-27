@@ -557,6 +557,12 @@ impl Module {
         for conforms in &self.conforms {
             wrote.extend(conforms.apply(root)?);
         }
+        let brought: Vec<String> = self
+            .members
+            .iter()
+            .map(|member| format!("{REMOTE_DIR}/{}/{}", member.from.owner, member.name))
+            .collect();
+        collisions(root, &brought);
         Ok(wrote)
     }
 
@@ -712,6 +718,19 @@ fn image_has(
                 .at(&entry.dir())
                 .is_some_and(|held| held.declares.provides.iter().any(|has| has == want))
         })
+}
+
+/// The collisions the import just wrote, said now so a red `check` does not
+/// have to deliver them. Read off a fresh resolve of the written tree — the
+/// same one the next `check` makes — so the two cannot disagree.
+fn collisions(root: &Path, brought: &[String]) {
+    let brought: std::collections::BTreeSet<String> = brought.iter().cloned().collect();
+    let loaded = crate::load(root);
+    for (image, resolved) in loaded.list.images.iter().zip(&loaded.resolved) {
+        for line in crate::resolve::overlay::collisions(image, &resolved.shipped, &brought) {
+            println!("{line}");
+        }
+    }
 }
 
 /// Which profile the set's claims would have the images it is listed in
@@ -940,6 +959,14 @@ impl Copy {
             .collect();
         let (list, _) = crate::model::image::List::load(root);
         wrote.extend(self.listing.apply(&list, &self.name)?);
+        collisions(
+            root,
+            &[self
+                .dest
+                .strip_prefix(layout::MODULES)
+                .map(|path| path.display().to_string())
+                .unwrap_or_default()],
+        );
         report(root, &wrote);
         Ok(())
     }

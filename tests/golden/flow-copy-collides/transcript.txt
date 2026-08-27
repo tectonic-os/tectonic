@@ -1,0 +1,16 @@
+Tectonic v{version}
+
+`flatpak` overwrites `/usr/share/example/remotes.list`, which `editor` also ships — declare `overrides "/usr/share/example/remotes.list"` in `flatpak` to take the replacement, or rename one of the two
+
+example/
+├── modules/                  every module this repo owns or imported
+│   └── flatpak/
+│       ├── files/            what it lays into the image
+│       │   └── usr/
+│       │       └── share/
+│       │           └── example/
+│       │               └── + remotes.list
+│       ├── + module.kdl      what the module installs, places and provides
+│       └── + provenance.kdl  where it was imported from, and its hash
+└── ~ example.image.kdl       flatpak added to modules
+==== exit 0
