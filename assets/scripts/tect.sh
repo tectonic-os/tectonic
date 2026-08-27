@@ -8,11 +8,26 @@ die() {
 }
 
 # One declared value out of the manifest, and nothing derived from it.
-version="$(sed -n 's/^tect-version "\([^"]*\)".*$/\1/p' repo.kdl)"
-[ -n "$version" ] || die "repo.kdl declares no tect-version"
-sha256="$(sed -n 's/^tect-version "[^"]*" sha256="\([^"]*\)"$/\1/p' repo.kdl)"
+line="$(sed -n '/^[[:space:]]*tect-version[[:space:]]/p' repo.kdl)"
+if [[ "$line" =~ ^[[:space:]]*tect-version[[:space:]]+\"([^\"]+)\"(.*)$ ]]; then
+    version="${BASH_REMATCH[1]}"
+    rest="${BASH_REMATCH[2]%%//*}"
+else
+    die "repo.kdl declares no readable tect-version"
+fi
 
-bin="${TECT_BIN:-out/tect-${version}}"
+sha256=""
+if [[ "$rest" =~ (^|[[:space:]])sha256[[:space:]]*= ]]; then
+    if [[ "$rest" =~ (^|[[:space:]])sha256[[:space:]]*=[[:space:]]*\"([^\"]*)\" ]]; then
+        sha256="${BASH_REMATCH[2]}"
+    else
+        die "repo.kdl declares no readable sha256 for tect-version"
+    fi
+    [[ "$sha256" =~ ^[0-9a-f]{64}$ ]] \
+        || die "repo.kdl declares a malformed sha256 for tect-version"
+fi
+
+bin="${TECT_BIN:-out/tect-${version}${sha256:+-${sha256}}}"
 
 if [ ! -x "$bin" ]; then
     asset="tect-v${version}-x86_64-linux-musl.tar.gz"

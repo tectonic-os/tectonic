@@ -6,7 +6,9 @@ use crate::model::image::{List, Seed, Workflow, SCHEMA_VERSION, TECT_VERSION};
 use crate::parse::image::IMAGE;
 use crate::parse::remote::{parse_collection, COLLECTION};
 use crate::parse::schema::{check_doc, Arg, Kind, Node, Prop, Say};
-use crate::parse::{bool_arg, child, int_arg, kids, prop, prop_span, string_arg, syntax_issue};
+use crate::parse::{
+    bool_arg, check_sha256, child, int_arg, kids, prop, prop_span, string_arg, syntax_issue,
+};
 use kdl::{KdlDocument, KdlNode};
 use std::path::Path;
 
@@ -390,6 +392,17 @@ impl List {
                     self.schema_version_seen = true;
                     self.schema_version = int_arg(node).map(|_| SCHEMA_VERSION);
                 }
+                (true, "tect-version") => {
+                    if let Some(sha256) = prop(node, "sha256") {
+                        check_sha256(
+                            sha256,
+                            "`tect-version`",
+                            prop_span(node, "sha256").unwrap_or_default(),
+                            src,
+                            issues,
+                        );
+                    }
+                }
                 (true, "name") => {
                     self.name = string_arg(node).unwrap_or_default().to_string();
                     self.id = self.name.to_lowercase().replace(' ', "-");
@@ -757,13 +770,37 @@ mod tests {
         let hash = "a".repeat(64);
         let declared = root(
             "sha",
-            &format!("schema-version 1\ntect-version \"{TECT_VERSION}\" sha256=\"{hash}\"\n"),
+            &format!(
+                "schema-version 1\n  tect-version \"{TECT_VERSION}\" sha256=\"{hash}\"   // pinned\n"
+            ),
         );
         assert_eq!(pinned_unverified(&declared), None);
         let bare = root("bare", "schema-version 1\ntect-version \"0.0.1\"\n");
         assert_eq!(pinned_unverified(&bare).as_deref(), Some("0.0.1"));
         let none = root("none", "schema-version 1\n");
         assert_eq!(pinned_unverified(&none), None);
+    }
+
+    #[test]
+    fn malformed_tect_hashes_are_issues() {
+        for sha256 in ["", "bad"] {
+            let text = format!(
+                "schema-version 1\ntect-version \"{TECT_VERSION}\" sha256=\"{sha256}\"\nname \"Example\"\n"
+            );
+            let mut list = List::empty(Path::new("."));
+            let mut issues = Issues::default();
+            list.parse_file(
+                &Source::new(layout::REPO_FILE, &text),
+                &text,
+                true,
+                &mut issues,
+            );
+            let found = issues.plain();
+            assert!(
+                found.contains("`tect-version` has a malformed sha256"),
+                "{found}"
+            );
+        }
     }
 
     fn messages(text: &str) -> Vec<String> {

@@ -17,6 +17,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
+      - name: Verify tag matches package version
+        run: |
+          set -euo pipefail
+          version="$(cargo metadata --no-deps --format-version 1 \
+            | jq -er '.packages[] | select(.name == "tect") | .version')"
+          [ "${GITHUB_REF_NAME}" = "v${version}" ] \
+            || { echo "tag ${GITHUB_REF_NAME} does not match package version ${version}" >&2; exit 1; }
+
       - name: Build
         run: |
           set -euo pipefail
