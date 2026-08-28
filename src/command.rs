@@ -589,16 +589,29 @@ pub fn on_host() -> Vec<&'static Spec> {
     COMMANDS.iter().filter(|spec| spec.host).collect()
 }
 
-/// `rows` as a picker draws them. Outside a repository the second column says
-/// why a command is there and will not run, rather than the list being
-/// shorter.
-pub fn choices(rows: &[&Spec], here: &Context) -> Vec<Choice> {
-    rows.iter()
-        .map(|spec| match spec.runs_in(here) {
-            false => Choice::new(spec.label(), "needs a repository"),
-            true => Choice::new(spec.label(), spec.about),
-        })
-        .collect()
+/// The rows a picker offers here, and the choices that draw them.
+///
+/// It used to keep every row and put `needs a repository` where the `about`
+/// went, so the list would not be shorter. That reasoning holds for a
+/// reference and not for a menu: `usage` is the surface a person learns from
+/// and it still lists everything, grouped by where it runs, while a picker is
+/// a question about what to do *now*. A row it cannot answer with is neither
+/// runnable nor readable, which is worse than either offering it whole or
+/// leaving it out.
+///
+/// One function returns both, because a filtered list and an index into it
+/// cannot be built apart without eventually disagreeing.
+pub fn choices<'a>(rows: &[&'a Spec], here: &Context) -> (Vec<&'a Spec>, Vec<Choice>) {
+    let kept: Vec<&Spec> = rows
+        .iter()
+        .copied()
+        .filter(|spec| spec.runs_in(here))
+        .collect();
+    let drawn = kept
+        .iter()
+        .map(|spec| Choice::new(spec.label(), spec.about))
+        .collect();
+    (kept, drawn)
 }
 
 const HEAD: &str = "usage: tect [--root <dir>] <command>\n";
@@ -755,6 +768,18 @@ mod tests {
         }
         assert!(why.runs_in(&Context::Host) && !check.runs_in(&Context::Host));
         assert!(upgrade.runs_in(&Context::Loose) && !why.runs_in(&Context::Loose));
+
+        // A picker offers what runs and keeps every description; the help
+        // keeps every row and groups them.
+        let (rows, drawn) = choices(&listed(), &Context::Loose);
+        assert!(rows.iter().all(|spec| spec.family == Family::Anywhere));
+        assert_eq!(rows.len(), drawn.len());
+        assert!(drawn
+            .iter()
+            .all(|choice| choice.detail != "needs a repository"));
+        let (rows, _) = choices(&listed(), &Context::Host);
+        let verbs: Vec<Verb> = rows.iter().map(|spec| spec.verb).collect();
+        assert!(verbs.contains(&Verb::Why) && !verbs.contains(&Verb::Check));
 
         let host = usage(&Context::Host);
         let (answers, rest) = host

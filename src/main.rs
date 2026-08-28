@@ -120,11 +120,16 @@ fn main() -> ExitCode {
 /// or a verb alone where every form of it takes a noun. `scap` and `fetch` are
 /// neither, since a picker of their nouns would hide the half that takes an
 /// argument instead.
-fn picking(words: &[&str], prompt: &Prompt) -> bool {
+fn picking(words: &[&str], prompt: &Prompt, here: &Context) -> bool {
     prompt.draws()
         && match words {
             [] => true,
-            [word] => command::all_nouns(word),
+            // A picker with nothing in it teaches less than the refusal
+            // naming what the verb takes.
+            [word] => {
+                command::all_nouns(word)
+                    && command::nouns(word).iter().any(|spec| spec.runs_in(here))
+            }
             _ => false,
         }
 }
@@ -183,13 +188,14 @@ fn run() -> Result<ExitCode, Error> {
         banner(false);
         print!("{}", command::usage(&here));
         return Ok(ExitCode::SUCCESS);
-    } else if picking(&words, &prompt) {
-        let rows = match words.first() {
+    } else if picking(&words, &prompt, &here) {
+        let listed = match words.first() {
             Some(word) => command::nouns(word),
             None => command::listed(),
         };
+        let (rows, options) = command::choices(&listed, &here);
         banner(false);
-        match tect::ui::select(copy::WHICH_COMMAND, &command::choices(&rows, &here))? {
+        match tect::ui::select(copy::WHICH_COMMAND, &options)? {
             Some(at) => (rows[at], &[]),
             None => return Ok(ExitCode::SUCCESS),
         }
