@@ -141,7 +141,9 @@ pub const MODULE: Node = Node::new("module",
             .props(&[], Say::new("`{}` is not an `overrides` property",
                 "only `provides-file` declares a lifetime", "")),
         Node::new("mode", "An octal file mode applied to one path in this module's overlay.")
-            .arg(Arg::Strs, Say::NONE)
+            .arg(Arg::StrPair("path, then octal mode"),
+                Say::new("`mode` needs one path and one octal file mode", "incomplete",
+                    "`mode \"/etc/example.conf\" \"0644\"`"))
             .unique(Say::new("mode for `{}` is declared twice", "already declared above", ""))
             .props(&[], Say::new("`{}` is not a `mode` property", "not part of the schema",
                 "`mode \"/etc/example.conf\" \"0440\"`")),
@@ -245,6 +247,24 @@ fn priority(node: &KdlNode) -> Option<u32> {
 /// its diagnostic rather than a second one here.
 fn bad_priority(node: &KdlNode) -> bool {
     prop_span(node, "priority").is_some() && priority(node).is_none()
+}
+
+fn regular_overlay_file(root: &Path, path: &str) -> bool {
+    let mut at = root.to_path_buf();
+    let mut parts = path.trim_start_matches('/').split('/').peekable();
+    while let Some(part) = parts.next() {
+        at.push(part);
+        let Ok(metadata) = at.symlink_metadata() else {
+            return false;
+        };
+        if match parts.peek() {
+            Some(_) => !metadata.is_dir(),
+            None => !metadata.is_file(),
+        } {
+            return false;
+        }
+    }
+    true
 }
 
 impl Module {
@@ -493,6 +513,12 @@ impl Module {
                         .assets
                         .iter()
                         .map(|a| ("asset", a.name.as_str(), a.span)),
+                )
+                .chain(
+                    module
+                        .modes
+                        .iter()
+                        .map(|m| ("mode", m.path.as_str(), m.span)),
                 );
             for (kind, name, span) in dropped {
                 issues.push(
@@ -504,7 +530,7 @@ impl Module {
                         src,
                     )
                     .at(span, "nowhere to land")
-                    .help("`standard-layer #false` makes the fragment the whole layer, so it has to spell out its own mounts, args and env; drop one or the other"),
+                    .help("`standard-layer #false` makes the fragment the whole layer, so it has to carry this itself; drop one or the other"),
                 );
             }
         }
@@ -598,26 +624,12 @@ impl Module {
             .filter(|entry| entry.name().is_none())
             .collect();
         if args.len() != 2 {
-            issues.push(
-                Issue::new("`mode` needs one path and one octal file mode", src)
-                    .at(node.name().span(), "incomplete")
-                    .help("`mode \"/etc/example.conf\" \"0644\"`"),
-            );
             return;
         }
         let Some(path) = args[0].value().as_string() else {
-            issues.push(
-                Issue::new("a mode path has to be a string", src)
-                    .at(args[0].span(), "not a string"),
-            );
             return;
         };
         let Some(given) = args[1].value().as_string() else {
-            issues.push(
-                Issue::new("a file mode has to be an octal string", src)
-                    .at(args[1].span(), "not a string")
-                    .help("quote it: `\"0440\"`"),
-            );
             return;
         };
 
@@ -660,8 +672,7 @@ impl Module {
             }
         };
 
-        let overlay = dir.join(layout::OVERLAY).join(path.trim_start_matches('/'));
-        if overlay.symlink_metadata().is_err() || overlay.is_dir() {
+        if !regular_overlay_file(&dir.join(layout::OVERLAY), path) {
             issues.push(
                 Issue::new(
                     format!(
@@ -678,6 +689,7 @@ impl Module {
         self.modes.push(FileMode {
             path: path.to_string(),
             mode,
+            span: args[0].span().into(),
         });
     }
 
@@ -1163,6 +1175,7 @@ description "twice"
 provides
 requires-file "/usr/bin/one" build-only=#true
 provides-file "/usr/bin/two" build-only="yes" lifetime="long"
+mode "/etc/one"
 secret
 allow-verify "man-page-missing" unit=1 scope="image"
 collects "justfile.inc" into="/etc/one" priority=90000 mode="append"
@@ -1191,6 +1204,7 @@ satisfies
                 "`build-only` is not a `requires-file` property",
                 "`build-only` takes #true or #false",
                 "unknown `provides-file` property `lifetime`",
+                "`mode` needs one path and one octal file mode",
                 "`secret` needs a name",
                 "`unit` must be a string",
                 "unknown `allow-verify` property `scope`",
@@ -1209,6 +1223,47 @@ satisfies
                 "`satisfies` is declared twice",
             ]
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn modes_need_a_regular_overlay_file_and_a_standard_layer() {
+        use std::os::unix::fs::symlink;
+
+        let root = std::env::temp_dir().join(format!("tect-mode-{}", std::process::id()));
+        let module = layout::module(&root, "one");
+        let files = module.join(layout::OVERLAY).join("etc");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&files).unwrap();
+        std::fs::write(files.join("regular.conf"), "regular\n").unwrap();
+        symlink("regular.conf", files.join("link.conf")).unwrap();
+        std::fs::write(module.join("Containerfile.inc"), "RUN true\n").unwrap();
+
+        let mut issues = Issues::default();
+        Module::parse(
+            "one",
+            "one",
+            &root,
+            r#"
+description "mode checks"
+supports "fedora"
+mode "/etc/link.conf" "0440"
+mode "/etc/regular.conf" "0440"
+fragment standard-layer=#false
+"#
+            .to_string(),
+            &mut issues,
+        );
+        let found = issues.plain();
+        assert!(
+            found.contains("declares a mode for a file it does not ship"),
+            "{found}"
+        );
+        assert!(
+            found.contains("declares `mode \"/etc/regular.conf\"` with no standard layer"),
+            "{found}"
+        );
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     /// `supports` and `packages` walk every family the tool recognises, and

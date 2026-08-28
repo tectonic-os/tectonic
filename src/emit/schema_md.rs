@@ -53,6 +53,7 @@ fn shape(node: &Node) -> Vec<String> {
         Arg::Bool => facts.push("`#true` or `#false`".into()),
         Arg::Int => facts.push("a number".into()),
         Arg::Strs => facts.push("one or more strings".into()),
+        Arg::StrPair(roles) => facts.push(format!("two strings: {roles}")),
         Arg::One(set) => facts.push(closed(set)),
     }
     match (!node.missing.text.is_empty(), node.once) {
