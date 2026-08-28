@@ -31,7 +31,12 @@ fi
 
 source /ctx/lib/family.sh
 
+export COPR_EXAMPLE_TOOLS='copr:copr.fedorainfracloud.org:example:tools'
+enable_copr 'example/tools'
+
 TECT_ENABLE_REPO='updates-testing' install_packages 'fastfetch'
+
+TECT_ENABLE_REPO='copr:copr.fedorainfracloud.org:example:tools' install_packages 'example-tool'
 
 install_groups 'core'
 ==== generated/minimal.d/finalize.sh

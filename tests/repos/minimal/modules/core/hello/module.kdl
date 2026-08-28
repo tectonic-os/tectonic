@@ -2,8 +2,11 @@ description "The smallest module a repository can hold"
 
 supports "fedora"
 
+copr "example/tools"
+
 packages {
     fedora "fastfetch" enablerepo="updates-testing"
+    fedora "example-tool" enablerepo="example/tools"
 }
 
 package-groups {

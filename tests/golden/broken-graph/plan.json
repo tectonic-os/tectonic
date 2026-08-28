@@ -72,6 +72,7 @@
                 }
               ],
               "groups": [],
+              "coprs": [],
               "provenance": {
                 "content": "b20dd7feb60952319947739a49a2dc482d0996c0755d31dd7278abd3b13f082c",
                 "repo": false,
@@ -95,6 +96,7 @@
               "requires": [],
               "packages": [],
               "groups": [],
+              "coprs": [],
               "provenance": {
                 "content": "8be1a54ebdf5472ed5728519b398d412875d6d634edf7a562f3f5f9059d3e091",
                 "repo": false,
@@ -117,6 +119,7 @@
               "requires": [],
               "packages": [],
               "groups": [],
+              "coprs": [],
               "provenance": {
                 "content": "d7ef24cdb7af81e387e3ce6a1e452aa7339f04da38b34409749b79bb34fae00c",
                 "repo": false,

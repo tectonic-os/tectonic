@@ -32,5 +32,5 @@ Nothing. It declares no `asset`.
 
 [1mThird-party repositories[0m
 
-None. It ships no `repo` file.
+None. It declares no `copr` and ships no `repo` file.
 ==== exit 0

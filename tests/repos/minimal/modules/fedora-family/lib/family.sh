@@ -15,3 +15,8 @@ install_groups() {
     fi
     dnf5 group install -y "${args[@]}" "$@"
 }
+
+enable_copr() {
+    dnf5 -y copr enable "$1"
+    dnf5 -y copr disable "$1"
+}

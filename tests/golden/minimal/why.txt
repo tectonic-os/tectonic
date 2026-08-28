@@ -16,6 +16,7 @@ Nothing: it neither provides nor requires.
 | Family | Packages | Enabled repository |
 | --- | --- | --- |
 | `fedora` | `fastfetch` | `updates-testing` |
+| `fedora` | `example-tool` | `copr:copr.fedorainfracloud.org:example:tools` |
 
 | Family | Groups | Enabled repository |
 | --- | --- | --- |
@@ -29,7 +30,7 @@ Nothing. It declares no `satisfies`.
 
 | Content | Hash |
 | --- | --- |
-| declared | `4a76d0540ec5ee5786527c05a17d22ca61c9b04ac44182850273295a3d0f2fc9` |
+| declared | `c3919ebbddd564e121c6feab4bb1bc7985249ca05d2f4d75ad625c28f03dc74f` |
 
 It was written in this repository rather than imported, so nothing upstream to compare it against.
 
@@ -38,6 +39,12 @@ It was written in this repository rather than imported, so nothing upstream to c
 Nothing. It declares no `asset`.
 
 ## Third-party repositories
+
+It enables these COPR repositories, each disabled again so it is on for the install and not in the shipped image.
+
+| COPR | URL |
+| --- | --- |
+| example/tools | https://copr.fedorainfracloud.org/coprs/example/tools/ |
 
 It enables one, in `modules/core/hello/repo`. There is no grammar for that file, so read it: it is shell calling the family's config manager.
 
@@ -62,6 +69,13 @@ It enables one, in `modules/core/hello/repo`. There is no grammar for that file,
         "fastfetch"
       ],
       "enablerepo": "updates-testing"
+    },
+    {
+      "family": "fedora",
+      "names": [
+        "example-tool"
+      ],
+      "enablerepo": "copr:copr.fedorainfracloud.org:example:tools"
     }
   ],
   "groups": [
@@ -73,8 +87,14 @@ It enables one, in `modules/core/hello/repo`. There is no grammar for that file,
       "enablerepo": null
     }
   ],
+  "coprs": [
+    {
+      "id": "example/tools",
+      "url": "https://copr.fedorainfracloud.org/coprs/example/tools/"
+    }
+  ],
   "satisfies": [],
-  "content": "4a76d0540ec5ee5786527c05a17d22ca61c9b04ac44182850273295a3d0f2fc9",
+  "content": "c3919ebbddd564e121c6feab4bb1bc7985249ca05d2f4d75ad625c28f03dc74f",
   "built": null,
   "imported": null,
   "modified": false,
@@ -105,6 +125,7 @@ Nothing: it neither provides nor requires.
 | Family | Packages | Enabled repository |
 | --- | --- | --- |
 | `fedora` | `fastfetch` | `updates-testing` |
+| `fedora` | `example-tool` | `copr:copr.fedorainfracloud.org:example:tools` |
 
 | Family | Groups | Enabled repository |
 | --- | --- | --- |
@@ -118,7 +139,7 @@ Nothing. It declares no `satisfies`.
 
 | Content | Hash |
 | --- | --- |
-| declared | `4a76d0540ec5ee5786527c05a17d22ca61c9b04ac44182850273295a3d0f2fc9` |
+| declared | `c3919ebbddd564e121c6feab4bb1bc7985249ca05d2f4d75ad625c28f03dc74f` |
 
 It was written in this repository rather than imported, so nothing upstream to compare it against.
 
@@ -127,6 +148,12 @@ It was written in this repository rather than imported, so nothing upstream to c
 Nothing. It declares no `asset`.
 
 ## Third-party repositories
+
+It enables these COPR repositories, each disabled again so it is on for the install and not in the shipped image.
+
+| COPR | URL |
+| --- | --- |
+| example/tools | https://copr.fedorainfracloud.org/coprs/example/tools/ |
 
 It enables one, in `modules/core/hello/repo`. There is no grammar for that file, so read it: it is shell calling the family's config manager.
 
@@ -139,7 +166,7 @@ hello, fedora-family
 
 | Content | Hash |
 | --- | --- |
-| declared | `4a76d0540ec5ee5786527c05a17d22ca61c9b04ac44182850273295a3d0f2fc9` |
+| declared | `c3919ebbddd564e121c6feab4bb1bc7985249ca05d2f4d75ad625c28f03dc74f` |
 | observed by the build | `not what was declared` |
 
 **The two documents disagree**, which they cannot if both came from this build.

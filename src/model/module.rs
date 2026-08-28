@@ -16,6 +16,47 @@ pub struct PackageGroup {
     pub span: Span,
 }
 
+/// A COPR repository this module enables for its own installs. Only the two
+/// path segments are declared; every name dnf is told is derived from them.
+pub struct Copr {
+    pub owner: String,
+    pub project: String,
+    pub span: Span,
+}
+
+impl Copr {
+    /// What `dnf5 copr enable` takes, and what an `enablerepo` names it by.
+    pub fn name(&self) -> String {
+        format!("{}/{}", self.owner, self.project)
+    }
+
+    pub fn url(&self) -> String {
+        format!(
+            "https://copr.fedorainfracloud.org/coprs/{}/{}/",
+            self.owner, self.project
+        )
+    }
+
+    /// What the layer calls the selector, for a module whose install is
+    /// conditional and so cannot be declared in `packages`.
+    pub fn env_name(&self) -> String {
+        format!(
+            "COPR_{}",
+            self.name()
+                .to_uppercase()
+                .replace(['/', '-', '.', '+'], "_")
+        )
+    }
+
+    /// The repository id dnf gives it, left disabled so it is enabled for one
+    /// install rather than for the shipped image.
+    pub fn selector(&self) -> String {
+        format!(
+            "copr:copr.fedorainfracloud.org:{}:{}",
+            self.owner, self.project
+        )
+    }
+}
 /// A benchmark and the rules within it this module claims to satisfy. The
 /// tool records the claim; a later phase verifies it with `oscap`.
 pub struct Coverage {
@@ -126,6 +167,10 @@ pub struct Module {
     /// Package groups keyed to base family, installed after the ordinary
     /// packages and before module.sh runs.
     pub groups: Vec<PackageGroup>,
+    /// COPR repositories this module declares for its package installs.
+    /// COPR repositories made reachable before anything is installed. Fedora
+    /// only, since COPR is a Fedora build service.
+    pub coprs: Vec<Copr>,
     /// Files mounted by basename into /ctx/lib in every standard module layer.
     pub helpers: Vec<Decl>,
     pub satisfies: Vec<Coverage>,

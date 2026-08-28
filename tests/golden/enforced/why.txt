@@ -67,6 +67,7 @@ It enables one, in `modules/one/hello/repo`. There is no grammar for that file, 
   "requires": [],
   "packages": [],
   "groups": [],
+  "coprs": [],
   "satisfies": [
     {
       "benchmark": "cis-fedora",

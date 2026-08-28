@@ -79,6 +79,7 @@
               "requires": [],
               "packages": [],
               "groups": [],
+              "coprs": [],
               "provenance": {
                 "content": "143d40b94ab50b255daf037b1ffc7a31b7c7760e934213fe72cca5a5b1fa1670",
                 "repo": true,
@@ -129,6 +130,7 @@
               ],
               "packages": [],
               "groups": [],
+              "coprs": [],
               "provenance": {
                 "content": "dee9185a44234404aca6a47d6ff19a59fba26569fd92dff259b8dd9749422b9a",
                 "repo": false,

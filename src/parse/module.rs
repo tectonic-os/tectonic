@@ -4,7 +4,8 @@ use crate::diag::{Issue, Issues, Source, Span};
 use crate::layout;
 use crate::model::image::{Entry, Image, List};
 use crate::model::module::{
-    Collect, Contribution, Coverage, Decl, FileMode, Key, Module, PackageGroup, VerifyException,
+    Collect, Contribution, Copr, Coverage, Decl, FileMode, Key, Module, PackageGroup,
+    VerifyException,
 };
 use crate::model::remote::REMOTE_DIR;
 use crate::parse::disk::Disk;
@@ -240,6 +241,13 @@ pub const MODULE: Node = Node::new("module",
                     ], Say::new("unknown property `{}` in package-groups block", "not part of the schema",
                         "a family entry in `package-groups` accepts `enablerepo`")),
             ], Say::NONE),
+        Node::new("copr", "A COPR repository this module enables for its own installs, as owner/project. Fedora only.")
+            .arg(Arg::Str, Say::new("`copr` needs one owner/project string", "nothing named",
+                "`copr \"owner/project\"`"))
+            .unique(Say::new("copr `{}` is declared twice", "already declared above", ""))
+            .props(&[], Say::new("`{}` is not a `copr` property", "not part of the schema",
+                "`copr \"owner/project\"`")),
+
         Node::new("satisfies", "The benchmarks and rules this module claims to harden, as an audit declaration the tool records rather than certifies.")
             .once("a module makes one claim set; two blocks split it")
             .children(&[
@@ -249,6 +257,15 @@ pub const MODULE: Node = Node::new("module",
             ], Say::NONE),
     ], Say::new("unknown node `{}`", "not part of the schema",
         "docs/schema.md documents every node a manifest may hold"));
+
+/// `owner/project` split into its two segments, or None when it is not that.
+/// The one place a COPR name is read, so `copr` and an `enablerepo` naming one
+/// cannot disagree about the shape.
+fn copr_parts(value: &str) -> Option<(&str, &str)> {
+    let (owner, project) = value.split_once('/')?;
+    let both_safe = bad_token(owner).is_none() && bad_token(project).is_none();
+    both_safe.then_some((owner, project))
+}
 
 /// The family-keyed name lists `packages` and `package-groups` both hold: one
 /// child per base family, the names as positional arguments, and an optional
@@ -331,7 +348,9 @@ fn family_names(
                         .help("only Fedora groups take `enablerepo`; a Debian or Ubuntu group installs from the base image's configured sources"),
                 );
             } else if let Some(repo) = prop(child, "enablerepo").filter(|v| !v.is_empty()) {
-                match bad_token(repo) {
+                // `owner/project` names one of this module's `copr` nodes and
+                // is turned into the selector below, once every node is read.
+                match bad_token(repo).filter(|_| copr_parts(repo).is_none()) {
                     Some(problem) => issues.push(
                         Issue::new(format!("repo ID `{repo}` {problem}"), src)
                             .at(span, "would not survive the RUN line")
@@ -483,6 +502,7 @@ impl Module {
             assets: Vec::new(),
             packages: Vec::new(),
             groups: Vec::new(),
+            coprs: Vec::new(),
             helpers: Vec::new(),
             satisfies: Vec::new(),
             resolved: Vec::new(),
@@ -578,6 +598,7 @@ impl Module {
                 }
                 "packages" => module.parse_packages(node, src, issues),
                 "package-groups" => module.parse_package_groups(node, src, issues),
+                "copr" => module.parse_copr(node, src, issues),
                 "satisfies" => module.parse_satisfies(node, src, issues),
                 _ => {}
             }
@@ -610,6 +631,30 @@ impl Module {
             }
         }
 
+        // An `enablerepo` naming a COPR is a reference to a `copr` node, which
+        // may be read after it: the selector is derived once both are in.
+        let coprs: Vec<(String, String)> = module
+            .coprs
+            .iter()
+            .map(|copr| (copr.name(), copr.selector()))
+            .collect();
+        for batch in module.packages.iter_mut().chain(&mut module.groups) {
+            let Some(named) = batch.enablerepo.as_deref().filter(|v| v.contains('/')) else {
+                continue;
+            };
+            match coprs.iter().find(|(name, _)| name == named) {
+                Some((_, selector)) => batch.enablerepo = Some(selector.clone()),
+                None => issues.push(
+                    Issue::new(
+                        format!("`enablerepo` names COPR `{named}`, which is not declared here"),
+                        src,
+                    )
+                    .at(batch.span, "no `copr` for it")
+                    .help(format!("add `copr \"{named}\"`; a repository is reachable because the module says so, not because an install names it")),
+                ),
+            }
+        }
+
         if module.description.is_empty() {
             issues.push(
                 Issue::new(format!("`{}` declares no description", path), src)
@@ -639,6 +684,10 @@ impl Module {
                         .modes
                         .iter()
                         .map(|m| ("mode", m.path.as_str(), m.span)),
+                )
+                .chain(
+                    std::iter::zip(&coprs, &module.coprs)
+                        .map(|((name, _), copr)| ("copr", name.as_str(), copr.span)),
                 );
             for (kind, name, span) in dropped {
                 issues.push(
@@ -1007,6 +1056,28 @@ impl Module {
             .extend(family_names(node, src, issues, "package", "7zip", false));
     }
 
+    /// `copr "owner/project"` The two path segments, which is all a COPR is;
+    /// the repository id, its URL and the selector an install enables are
+    /// derived from them and never declared.
+    fn parse_copr(&mut self, node: &KdlNode, src: &Source, issues: &mut Issues) {
+        let Some(value) = string_arg(node) else {
+            return;
+        };
+        let Some((owner, project)) = copr_parts(value) else {
+            issues.push(
+                Issue::new(format!("`{value}` is not a COPR owner/project"), src)
+                    .at(node.name().span(), "not two usable path segments")
+                    .help(format!("`copr \"owner/project\"`; {TOKEN_HELP}")),
+            );
+            return;
+        };
+        self.coprs.push(Copr {
+            owner: owner.to_string(),
+            project: project.to_string(),
+            span: node.name().span().into(),
+        });
+    }
+
     /// `package-groups { fedora "kde-desktop" }` The same shape as `packages`,
     /// installed by the family adapter's group verb rather than its package one.
     fn parse_package_groups(&mut self, node: &KdlNode, src: &Source, issues: &mut Issues) {
@@ -1350,6 +1421,73 @@ package-groups {
                 .filter_map(|line| line.strip_prefix("  x "))
                 .collect::<Vec<_>>(),
             ["`package-groups` is Fedora-only, not `debian`"]
+        );
+    }
+
+    /// A COPR is two path segments and nothing else, so anything the RUN line
+    /// or the URL could not carry is refused where it is written.
+    #[test]
+    fn a_copr_needs_two_usable_path_segments() {
+        let mut issues = Issues::default();
+        Module::parse(
+            "coprs",
+            "coprs",
+            Path::new("."),
+            r#"
+description "coprs"
+supports "fedora"
+copr "noslash"
+copr "/project"
+copr "owner/"
+copr "owner/project/extra"
+copr "owner/pro ject"
+"#
+            .to_string(),
+            &mut issues,
+        );
+        assert_eq!(
+            issues
+                .plain()
+                .lines()
+                .filter_map(|line| line.strip_prefix("  x "))
+                .collect::<Vec<_>>(),
+            [
+                "`noslash` is not a COPR owner/project",
+                "`/project` is not a COPR owner/project",
+                "`owner/` is not a COPR owner/project",
+                "`owner/project/extra` is not a COPR owner/project",
+                "`owner/pro ject` is not a COPR owner/project",
+            ]
+        );
+    }
+
+    /// An `enablerepo` naming a COPR is a reference, so the module has to
+    /// declare the repository it reaches into rather than assume it.
+    #[test]
+    fn an_enablerepo_naming_a_copr_needs_the_declaration() {
+        let mut issues = Issues::default();
+        Module::parse(
+            "coprs",
+            "coprs",
+            Path::new("."),
+            r#"
+description "coprs"
+supports "fedora"
+copr "owner/project"
+packages {
+    fedora "thing" enablerepo="other/project"
+}
+"#
+            .to_string(),
+            &mut issues,
+        );
+        assert_eq!(
+            issues
+                .plain()
+                .lines()
+                .filter_map(|line| line.strip_prefix("  x "))
+                .collect::<Vec<_>>(),
+            ["`enablerepo` names COPR `other/project`, which is not declared here"]
         );
     }
 

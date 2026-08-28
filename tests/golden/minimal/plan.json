@@ -63,8 +63,9 @@
               "requires": [],
               "packages": [],
               "groups": [],
+              "coprs": [],
               "provenance": {
-                "content": "7cd25d10a40660150fe5dbcc5e32abdeea6bc4606e8d575d3d666d325a983cb2",
+                "content": "bed8965fb074912261ce21afc90ec0a365c4655bf5e0be032fc1b71064d65838",
                 "repo": false,
                 "pin": null,
                 "imported": null
@@ -88,6 +89,13 @@
                     "fastfetch"
                   ],
                   "enablerepo": "updates-testing"
+                },
+                {
+                  "family": "fedora",
+                  "names": [
+                    "example-tool"
+                  ],
+                  "enablerepo": "copr:copr.fedorainfracloud.org:example:tools"
                 }
               ],
               "groups": [
@@ -99,8 +107,14 @@
                   "enablerepo": null
                 }
               ],
+              "coprs": [
+                {
+                  "id": "example/tools",
+                  "url": "https://copr.fedorainfracloud.org/coprs/example/tools/"
+                }
+              ],
               "provenance": {
-                "content": "4a76d0540ec5ee5786527c05a17d22ca61c9b04ac44182850273295a3d0f2fc9",
+                "content": "c3919ebbddd564e121c6feab4bb1bc7985249ca05d2f4d75ad625c28f03dc74f",
                 "repo": true,
                 "pin": null,
                 "imported": null

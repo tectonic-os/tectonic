@@ -145,11 +145,12 @@ pub fn check_graph(image: &Image, root: &Path, index: &Index, issues: &mut Issue
         .filter(|f| !f.is_empty());
     if let Some(base_family) = base_family {
         let needs_adapter = image.modules().any(|module| {
-            module
-                .packages
-                .iter()
-                .chain(&module.groups)
-                .any(|group| group.family == base_family)
+            (base_family == "fedora" && !module.coprs.is_empty())
+                || module
+                    .packages
+                    .iter()
+                    .chain(&module.groups)
+                    .any(|group| group.family == base_family)
         });
         let has_adapter = offered.get("build-environment").is_some_and(|providers| {
             providers

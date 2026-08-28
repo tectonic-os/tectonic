@@ -41,7 +41,7 @@ Nothing. It declares no `asset`.
 
 ## Third-party repositories
 
-None. It ships no `repo` file.
+None. It declares no `copr` and ships no `repo` file.
 
 ==== and the same module in an image that does build it
 # apps/flatpak

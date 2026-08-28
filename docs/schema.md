@@ -546,6 +546,7 @@ Also holds [`option`](#option), [`variant`](#variant) and [`asset`](#asset).
 | `secret` | one or more strings | A build secret this module's layer mounts. |
 | `arg` | one or more strings | A build argument this module's layer reads. |
 | `helpers` | one or more strings | Files from this module mounted by basename into /ctx/lib in every module layer. |
+| `copr` | a string, one per name | A COPR repository this module enables for its own installs, as owner/project. Fedora only. |
 
 ### `provides-file`
 

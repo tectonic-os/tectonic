@@ -3,7 +3,7 @@
 
 use crate::layout;
 use crate::model::image::{Entry, Image};
-use crate::model::module::Module;
+use crate::model::module::{Copr, Module};
 use crate::model::options::{env_name, OptType};
 use crate::resolve::collect::Collection;
 use std::fmt::Write as _;
@@ -114,13 +114,29 @@ fn script(
         }
     }
 
-    if module
-        .packages
-        .iter()
-        .chain(&module.groups)
-        .any(|group| group.family == base_family)
+    // COPR is a Fedora build service, so the declaration is only reachable on
+    // a Fedora base. The layer is handed the derived names and derives none.
+    let coprs: Vec<&Copr> = match base_family {
+        "fedora" => module.coprs.iter().collect(),
+        _ => Vec::new(),
+    };
+    if !coprs.is_empty()
+        || module
+            .packages
+            .iter()
+            .chain(&module.groups)
+            .any(|group| group.family == base_family)
     {
         out.push_str("\nsource /ctx/lib/family.sh\n");
+    }
+    for copr in coprs {
+        let _ = write!(
+            out,
+            "\nexport {}={}\nenable_copr {}\n",
+            copr.env_name(),
+            shell(&copr.selector()),
+            shell(&copr.name())
+        );
     }
     for (helper, declared) in [
         ("install_packages", &module.packages),
