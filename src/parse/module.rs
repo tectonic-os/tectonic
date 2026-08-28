@@ -672,9 +672,6 @@ impl Module {
             }
         };
 
-        if self.modes.iter().any(|decl| decl.path == path) {
-            return;
-        }
         let overlay = dir.join(layout::OVERLAY).join(path.trim_start_matches('/'));
         if overlay.symlink_metadata().is_err() || overlay.is_dir() {
             issues.push(
