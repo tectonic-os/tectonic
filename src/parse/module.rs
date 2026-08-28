@@ -410,6 +410,7 @@ impl Module {
                 }
                 "option" => {
                     if let Some(opt) = options::parse_option(node, src, issues) {
+                        // A duplicate is a schema issue; keeping the first leaves the read-outs at one.
                         if !module.options.iter().any(|o| o.name == opt.name) {
                             module.options.push(opt);
                         }
