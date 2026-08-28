@@ -75,7 +75,8 @@ example/
 ├── + desktop.image.kdl
 └── + repo.kdl
 
-next, in example:
+next:
+  cd example
   tect generate
   git add -A && git commit
   install gh from https://github.com/cli/cli

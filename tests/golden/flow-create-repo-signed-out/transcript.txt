@@ -76,7 +76,8 @@ example/
 ├── + desktop.image.kdl
 └── + repo.kdl
 
-next, in example:
+next:
+  cd example
   tect generate
   git add -A && git commit
   gh repo create someone/example --source=. --push

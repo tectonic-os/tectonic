@@ -73,7 +73,8 @@ example/
 ├── + desktop.image.kdl
 └── + repo.kdl
 
-next, in example:
+next:
+  cd example
   tect generate
   git add -A && git commit
   git remote add origin https://forge.example.org/someone/example && git push -u origin main

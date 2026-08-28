@@ -160,20 +160,19 @@ pub fn run() -> Result<(), String> {
 
     let running = crate::model::image::TECT_VERSION;
     let here = std::env::current_exe().map_err(|err| format!("this binary: {err}"))?;
-    println!("tect: running {running}, at {}", here.display());
-
     let latest = latest()?;
-    println!("tect: the latest release is {latest}");
+    // The path is what is about to be replaced, so it stands only where
+    // something is.
     match parts(running).cmp(&parts(&latest)) {
         Ordering::Equal => {
-            println!("tect: already current, so nothing moves");
+            println!("tect: {running} is the latest release");
             return Ok(());
         }
         Ordering::Greater => {
-            println!("tect: this build is ahead of the latest release, so nothing moves");
+            println!("tect: {running} is ahead of the latest release, {latest}");
             return Ok(());
         }
-        Ordering::Less => {}
+        Ordering::Less => println!("tect: running {running}, at {}", here.display()),
     }
 
     let euid = unsafe { libc::geteuid() };
