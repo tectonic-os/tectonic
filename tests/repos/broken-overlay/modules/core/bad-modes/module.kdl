@@ -1,0 +1,10 @@
+description "Every way a file mode declaration can be wrong"
+
+supports "fedora"
+
+mode "etc/relative.conf" "0440"
+mode "/etc/non-octal.conf" "0880"
+mode "/etc/out-of-range.conf" "10000"
+mode "/etc/duplicate.conf" "0440"
+mode "/etc/duplicate.conf" "0600"
+mode "/etc/missing.conf" "0440"

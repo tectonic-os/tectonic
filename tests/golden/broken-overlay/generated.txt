@@ -26,6 +26,7 @@ MODDIR=/ctx/modules/core/second
 export MODDIR
 
 cp -rT /ctx/modules/core/second/files /
+chmod '0440' -- '/etc/sudoers.d/99-hardening'
 ==== generated/broken-overlay.d/core/third.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.

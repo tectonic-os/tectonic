@@ -60,7 +60,7 @@
               "provides": [],
               "requires": [],
               "provenance": {
-                "content": "6cc757a4eb3ca7bdab86bb771c3055d7986dd220b8529908a6942dd0f7a95a09",
+                "content": "3e96523dde94c02cb92c548169efa2308b04dd40980a33e7441fe0a57a246e99",
                 "repo": false,
                 "pin": null,
                 "imported": null
@@ -78,7 +78,7 @@
               "provides": [],
               "requires": [],
               "provenance": {
-                "content": "7d290b773836957433e05dc3c4ed42d01c2a8a9566a01a94aa8207b728cee3c2",
+                "content": "dbba256e0e1b9a1c1af7aaa3258a53ddaa9cfcd1f6585d4c5c8a21f9f3c33a9b",
                 "repo": false,
                 "pin": null,
                 "imported": null
@@ -111,11 +111,11 @@
           "assets": [],
           "provides_files": {},
           "overlay_files": {
-            "/usr/lib/clash.conf": "core/second"
+            "/etc/sudoers.d/99-hardening": "core/second"
           },
           "overlay_overridden": [
             {
-              "path": "/usr/lib/clash.conf",
+              "path": "/etc/sudoers.d/99-hardening",
               "module": "core/first",
               "by": "core/second"
             }

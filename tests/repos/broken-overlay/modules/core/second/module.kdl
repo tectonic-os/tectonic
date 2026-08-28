@@ -1,3 +1,5 @@
 description "Ships the same path without saying so"
 
 supports "fedora"
+
+mode "/etc/sudoers.d/99-hardening" "0440"

@@ -542,6 +542,7 @@ Also holds [`option`](#option), [`variant`](#variant) and [`asset`](#asset).
 | `after` | one or more strings | A module this one builds after without requiring anything of it. |
 | `requires-file` | one or more strings | An absolute path some other module has to ship. |
 | `overrides` | one or more strings | An absolute path this module replaces deliberately. |
+| `mode` | one or more strings, one per name | An octal file mode applied to one path in this module's overlay. |
 | `secret` | one or more strings | A build secret this module's layer mounts. |
 | `arg` | one or more strings | A build argument this module's layer reads. |
 | `helpers` | one or more strings | Files from this module mounted by basename into /ctx/lib in every module layer. |

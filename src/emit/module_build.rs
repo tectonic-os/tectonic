@@ -150,6 +150,14 @@ fn script(
 
     if on_disk.join(layout::OVERLAY).is_dir() {
         let _ = write!(out, "\ncp -rT {dir}/files /\n");
+        for declared in &module.modes {
+            let _ = writeln!(
+                out,
+                "chmod '{}' -- {}",
+                format_args!("{:04o}", declared.mode),
+                shell(&declared.path)
+            );
+        }
     }
 
     for key in &module.keys {

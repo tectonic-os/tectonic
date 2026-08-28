@@ -4,7 +4,7 @@ use crate::diag::{Issue, Issues, Source, Span};
 use crate::layout;
 use crate::model::image::{Entry, Image, List};
 use crate::model::module::{
-    Collect, Contribution, Coverage, Decl, Key, Module, PackageGroup, VerifyException,
+    Collect, Contribution, Coverage, Decl, FileMode, Key, Module, PackageGroup, VerifyException,
 };
 use crate::model::remote::REMOTE_DIR;
 use crate::parse::disk::Disk;
@@ -140,6 +140,9 @@ pub const MODULE: Node = Node::new("module",
             .arg(Arg::Strs, Say::NONE)
             .props(&[], Say::new("`{}` is not an `overrides` property",
                 "only `provides-file` declares a lifetime", "")),
+        Node::new("mode", "An octal file mode applied to one path in this module's overlay.")
+            .arg(Arg::Strs, Say::NONE)
+            .unique(Say::new("mode for `{}` is declared twice", "already declared above", "")),
 
         KEY,
 
@@ -331,6 +334,7 @@ impl Module {
             flavour: None,
             collects: Vec::new(),
             contributes: Vec::new(),
+            modes: Vec::new(),
             keys: Vec::new(),
             secrets: Vec::new(),
             args: Vec::new(),
@@ -367,6 +371,7 @@ impl Module {
                 kind @ ("provides-file" | "requires-file" | "overrides") => {
                     module.parse_paths(kind, node, src, issues)
                 }
+                "mode" => module.parse_mode(node, &dir, src, issues),
                 kind @ ("secret" | "arg") => {
                     for name in string_args(node) {
                         let decl = Decl {
@@ -592,6 +597,101 @@ impl Module {
                 _ => self.overrides.push(decl),
             }
         }
+    }
+
+    /// `mode "/etc/example.conf" "0644"` A chmod mode for one shipped overlay
+    /// file. The path stays separate from `provides-file`, which is a contract.
+    fn parse_mode(&mut self, node: &KdlNode, dir: &Path, src: &Source, issues: &mut Issues) {
+        let args: Vec<_> = node
+            .entries()
+            .iter()
+            .filter(|entry| entry.name().is_none())
+            .collect();
+        if args.len() != 2 {
+            issues.push(
+                Issue::new("`mode` needs one path and one octal file mode", src)
+                    .at(node.name().span(), "incomplete")
+                    .help("`mode \"/etc/example.conf\" \"0644\"`"),
+            );
+            return;
+        }
+        let Some(path) = args[0].value().as_string() else {
+            issues.push(
+                Issue::new("a mode path has to be a string", src)
+                    .at(args[0].span(), "not a string"),
+            );
+            return;
+        };
+        let Some(given) = args[1].value().as_string() else {
+            issues.push(
+                Issue::new("a file mode has to be an octal string", src)
+                    .at(args[1].span(), "not a string")
+                    .help("quote it: `\"0440\"`"),
+            );
+            return;
+        };
+
+        if path == "/"
+            || !path.starts_with('/')
+            || path
+                .split('/')
+                .skip(1)
+                .any(|part| part.is_empty() || matches!(part, "." | ".."))
+        {
+            issues.push(
+                Issue::new(
+                    format!("`{path}` is not a normal absolute overlay path"),
+                    src,
+                )
+                .at(args[0].span(), "not a file path under `files/`")
+                .help(
+                    "name the path exactly as it lands in the image, such as `/etc/example.conf`",
+                ),
+            );
+            return;
+        }
+
+        if !given.bytes().all(|byte| (b'0'..=b'7').contains(&byte)) {
+            issues.push(
+                Issue::new(format!("`{given}` is not an octal file mode"), src)
+                    .at(args[1].span(), "use only digits 0 through 7")
+                    .help("a chmod file mode such as `0440`"),
+            );
+            return;
+        }
+        let mode = match u32::from_str_radix(given, 8) {
+            Ok(mode) if mode <= 0o7777 => mode,
+            _ => {
+                issues.push(
+                    Issue::new(format!("file mode `{given}` is out of range"), src)
+                        .at(args[1].span(), "greater than 07777"),
+                );
+                return;
+            }
+        };
+
+        if self.modes.iter().any(|decl| decl.path == path) {
+            return;
+        }
+        let overlay = dir.join(layout::OVERLAY).join(path.trim_start_matches('/'));
+        if overlay.symlink_metadata().is_err() || overlay.is_dir() {
+            issues.push(
+                Issue::new(
+                    format!(
+                        "`{}` declares a mode for a file it does not ship",
+                        self.path
+                    ),
+                    src,
+                )
+                .at(args[0].span(), format!("{path} is missing from `files/`"))
+                .help("shipping the overlay file is what makes its mode meaningful"),
+            );
+            return;
+        }
+        self.modes.push(FileMode {
+            path: path.to_string(),
+            mode,
+        });
     }
 
     /// `allow-verify "man-page-missing" unit="x.service"` One known diagnostic

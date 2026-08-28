@@ -46,6 +46,12 @@ pub struct Contribution {
     pub span: Span,
 }
 
+/// A mode applied after this module's files/ overlay is copied into the image.
+pub struct FileMode {
+    pub path: String,
+    pub mode: u32,
+}
+
 /// A key `tect create key` generates for this module: which of the generators
 /// the tool has makes it, where the public half goes in the image, and what the
 /// private half is called under keys/private/.
@@ -100,6 +106,7 @@ pub struct Module {
     pub flavour: Option<String>,
     pub collects: Vec<Collect>,
     pub contributes: Vec<Contribution>,
+    pub modes: Vec<FileMode>,
     /// Keys this module declares. Each one's `public` is a contract path,
     /// derived rather than declared a second time.
     pub keys: Vec<Key>,
