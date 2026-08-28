@@ -17,6 +17,9 @@ pub const REPO_ERROR: u8 = 2;
 /// Why a command did not run. Usage answers an invocation and says nothing
 /// about an operation that failed part way, so only the first prints it.
 pub enum Error {
+    /// The words are not a command, which is the one failure the whole command
+    /// list answers.
+    Usage(String),
     Invocation(String),
     Operation(String),
 }
@@ -24,7 +27,7 @@ pub enum Error {
 impl Error {
     pub fn message(&self) -> &str {
         match self {
-            Self::Invocation(message) | Self::Operation(message) => message,
+            Self::Usage(message) | Self::Invocation(message) | Self::Operation(message) => message,
         }
     }
 }

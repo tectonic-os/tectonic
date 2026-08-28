@@ -2005,12 +2005,9 @@ fn coverage() {
         "==== and a datastream that is not one\n{report}{said}==== exit {code}\n"
     ));
 
-    // No content to measure against is the invocation, so it ends in the usage
-    // every invocation error prints and only the message is worth a golden.
     let (_, said, code) = scap_run(&enforced, &["--root", ".", "coverage"]);
     out.push_str(&format!(
-        "==== and with nothing to measure it against\n{}==== exit {code}\n",
-        said.split("usage:").next().unwrap_or_default()
+        "==== and with nothing to measure it against\n{said}==== exit {code}\n"
     ));
 
     compare("coverage", "report.txt", &out);

@@ -96,7 +96,7 @@ fn main() -> ExitCode {
         Ok(code) => code,
         Err(error) => {
             banner(true);
-            let invocation = matches!(error, Error::Invocation(_));
+            let unknown = matches!(error, Error::Usage(_));
             let message = error.message();
             // A message that is already a sentence, or a block of them, keeps
             // its own punctuation.
@@ -105,7 +105,7 @@ fn main() -> ExitCode {
                 false => ".",
             };
             eprintln!("Error: {message}{stop}\n");
-            match invocation {
+            match unknown {
                 true => eprint!("{}", command::usage()),
                 false => eprintln!("{COMMANDS}"),
             }
@@ -192,7 +192,7 @@ fn run() -> Result<ExitCode, Error> {
         eprint!("{}", command::usage());
         return Ok(ExitCode::from(USAGE_ERROR));
     } else {
-        command::resolve(&words).map_err(Error::Invocation)?
+        command::resolve(&words).map_err(Error::Usage)?
     };
 
     args.only(spec)?;
