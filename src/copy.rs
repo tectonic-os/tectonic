@@ -60,6 +60,13 @@ pub fn list_in(target: &str) -> String {
 pub const IMPORT_REQUIRED: &str = "Import what these modules require?";
 pub const IMPORT_CLAIMING: &str = "Import the modules claiming these rules?";
 
+/// What a list says above itself about an answer it cleared. `unmet` is the
+/// same reason the row carries beside itself; this line exists because a row
+/// going quietly from `[x]` to a dim `[ ]` is a change nothing announced.
+pub fn cleared(named: &str, unmet: &str) -> String {
+    format!("{named} {unmet} and was cleared")
+}
+
 /// The workflows themselves stand above this, since nothing else names them:
 /// the tree afterwards says only that `repo.kdl` gained workflows.
 pub const GENERATE_WORKFLOWS: &str = "Generate the workflows this makes runnable?";

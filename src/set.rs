@@ -121,13 +121,23 @@ impl Workflows {
                     .iter()
                     .map(|shipped| match shipped.met(basis) {
                         true => Choice::new(shipped.stem, shipped.about),
-                        false => Choice::new(shipped.stem, shipped.needs.unmet()),
+                        false => Choice::new(shipped.stem, shipped.needs.unmet()).unavailable(),
                     })
                     .collect();
+                // An edited base, or a declaration written before one changed,
+                // can put a chosen workflow out of reach. It is cleared rather
+                // than carried into a refusal that would cost every other
+                // answer with it, and the clearing is said rather than silent.
+                for shipped in SHIPPED
+                    .iter()
+                    .filter(|shipped| on.contains(&shipped.stem) && !shipped.met(basis))
+                {
+                    println!("{}", copy::cleared(shipped.stem, shipped.needs.unmet()));
+                }
                 let held: Vec<usize> = SHIPPED
                     .iter()
                     .enumerate()
-                    .filter(|(_, shipped)| on.contains(&shipped.stem))
+                    .filter(|(_, shipped)| on.contains(&shipped.stem) && shipped.met(basis))
                     .map(|(at, _)| at)
                     .collect();
 
@@ -198,17 +208,9 @@ impl Workflows {
         from: Field,
         prompt: &Prompt,
     ) -> Result<Option<Self>, String> {
-        // An edited base can put a workflow out of reach. An answer that no
-        // longer exists is dropped rather than carried into a refusal, which
-        // would cost every other answer along with it.
-        let held: Vec<&str> = SHIPPED
-            .iter()
-            .filter(|shipped| self.chosen.contains(&shipped.stem) && shipped.met(basis))
-            .map(|shipped| shipped.stem)
-            .collect();
         Self::collect(
             basis,
-            &held,
+            &self.chosen,
             self.at,
             self.publishes_scheduled,
             self.scans_scheduled,
@@ -806,11 +808,12 @@ mod tests {
         assert_eq!(again.at, (7, 30));
     }
 
-    /// An edited base can put a workflow out of reach. Carrying it into the
-    /// list only to refuse it would cost every other answer with it, which is
-    /// the whole cost the review screen exists to remove.
+    /// An edited base can put a workflow out of reach, and so can a
+    /// declaration written before one changed. Carrying it into the list only
+    /// to refuse it would cost every other answer with it; it opens cleared,
+    /// dim and unpickable instead, with a line above saying so.
     #[test]
-    fn a_workflow_the_new_base_cannot_run_is_dropped_rather_than_refused() {
+    fn a_workflow_the_basis_cannot_run_opens_cleared_rather_than_refused() {
         let held = set(&["build", "build-disk"], DEFAULT_AT);
         // The list kept as offered, both cadences, and the time.
         let prompt = Prompt::scripted(["", "No", "No", "06:00"].map(str::to_string).to_vec());

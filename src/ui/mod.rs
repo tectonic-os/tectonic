@@ -89,6 +89,10 @@ pub struct Choice {
     /// contradicting it, and which a question taking several answers draws as
     /// a collapsed tree. Nothing reads it and `parent` both.
     pub group: String,
+    /// Whether it can be picked at all. One that cannot is drawn dim and
+    /// refuses the key that would pick it, rather than being left out: what it
+    /// needs is the reason it is worth showing.
+    pub available: bool,
 }
 
 impl Choice {
@@ -98,7 +102,14 @@ impl Choice {
             detail: detail.into(),
             parent: None,
             group: String::new(),
+            available: true,
         }
+    }
+
+    /// Shown, and not pickable. The detail beside it says why.
+    pub fn unavailable(mut self) -> Self {
+        self.available = false;
+        self
     }
 
     pub fn under(mut self, parent: usize) -> Self {
@@ -240,7 +251,10 @@ fn pick<B: Backend>(
             .map_err(|err| err.to_string())?;
         let Some(key) = read()? else { continue };
         match key {
-            KeyCode::Enter => return Ok(state.selected()),
+            KeyCode::Enter => match state.selected() {
+                Some(at) if !available(options, at) => {}
+                chosen => return Ok(chosen),
+            },
             KeyCode::Esc | KeyCode::Char('q') => return Ok(None),
             code => {
                 move_by(code, &mut state);
@@ -280,13 +294,18 @@ fn toggle<B: Backend>(
         match key {
             KeyCode::Enter => return Ok(Answer::Chosen(on)),
             KeyCode::Char(' ') => match state.selected() {
-                Some(at) if at < options.len() => flip(&mut on, at, options),
+                Some(at) if available(options, at) => flip(&mut on, at, options),
                 _ => {}
             },
             KeyCode::Esc | KeyCode::Char('q') => return Ok(Answer::Cancelled),
             code => move_by(code, &mut state),
         }
     }
+}
+
+/// Whether the row at `at` is one there is, and one that can be picked.
+fn available(options: &[Choice], at: usize) -> bool {
+    options.get(at).is_some_and(|choice| choice.available)
 }
 
 /// Turning a row on clears the parent it contradicts and every child of it.
@@ -368,10 +387,16 @@ fn draw(
                 Some(on) if on.contains(&at) => "[x] ",
                 Some(_) => "[ ] ",
             };
+            // A row that cannot be picked is dim whole, so it reads as absent
+            // from the answer while still saying what it needs.
+            let row = match choice.available {
+                true => Style::new(),
+                false => Style::new().dim(),
+            };
             ListItem::new(Line::from(vec![
-                Span::raw(mark),
-                Span::raw(branch(options, at)),
-                Span::raw(&choice.label),
+                Span::styled(mark, row),
+                Span::styled(branch(options, at), row),
+                Span::styled(&choice.label, row),
                 Span::raw("  "),
                 Span::styled(&choice.detail, Style::new().dim()),
             ]))
