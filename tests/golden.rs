@@ -363,7 +363,7 @@ fn why(name: &str, root: &Path, module: &str) {
     out.push_str(&host.markdown());
     out.push_str(&format!(
         "==== the names it knows\n{}\n",
-        tect::emit::why::display(&tect::emit::why::known_on_host(&manifest)).join(", ")
+        tect::emit::why::display(&tect::emit::why::known_on_host(&manifest, None)).join(", ")
     ));
 
     // The build record is what was observed. Two documents out of one build

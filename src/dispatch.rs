@@ -142,7 +142,7 @@ fn why_on_host(command: Command, arg: Option<&str>, prompt: &Prompt) -> Result<E
             ))
         })?;
 
-    let known = crate::emit::why::known_on_host(&manifest);
+    let known = crate::emit::why::known_on_host(&manifest, record.as_ref());
     let path = match crate::emit::why::matching(&known, path).as_slice() {
         [path] => path.clone(),
         [] => {
@@ -159,7 +159,7 @@ fn why_on_host(command: Command, arg: Option<&str>, prompt: &Prompt) -> Result<E
         }
     };
     let why = crate::emit::why::on_host(&manifest, record.as_ref(), &path)
-        .expect("the resolved module is in the manifest");
+        .expect("the resolved module is one this image carries");
     let parts = why.parts(true);
     print!(
         "{}",

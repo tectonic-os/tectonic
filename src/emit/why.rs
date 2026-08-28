@@ -97,6 +97,25 @@ pub struct Why {
     /// another image builds, so this is beside `images` rather than instead of
     /// it. Always empty on a host: a baked manifest holds what was built.
     pub suppressed: Vec<String>,
+    /// Which targets a host answer was read across. A repository reading is
+    /// about every image by design and says nothing.
+    pub scope: Scope,
+}
+
+/// What a baked answer covers. A built image is one target, and the manifest
+/// baked into it holds every target the repository declares, so an unscoped
+/// answer describes modules the running image does not carry.
+#[derive(Default, PartialEq)]
+pub enum Scope {
+    /// A repository reading.
+    #[default]
+    Repository,
+    /// The target the build record says this image was built as.
+    Built(String),
+    /// The record was absent or named no target, so every baked target was
+    /// read. This is the old answer, kept so an image built before the record
+    /// carried a target degrades rather than refuses.
+    EveryTarget,
 }
 
 pub(crate) use crate::resolve::name::matching;
@@ -295,6 +314,13 @@ impl Why {
                 listed(&self.suppressed),
             ),
         }));
+        if self.scope == Scope::EveryTarget {
+            out.push(Part::Text(
+                "The build record names no target, so this is read across every target the baked \
+                 manifest holds and may describe an image other than the one running."
+                    .into(),
+            ));
+        }
 
         out.push(Part::Heading("What it exchanges".into()));
         if self.provides.is_empty() && self.requires.is_empty() {
@@ -675,17 +701,42 @@ fn targets(manifest: &Json) -> Vec<&Json> {
         .collect()
 }
 
+/// The targets a host answer is read across, and which case that is. The
+/// manifest is the whole repository's, so only the target the record names is
+/// running here; anything else describes an image that is not this one.
+pub fn built_as<'a>(manifest: &'a Json, record: Option<&Json>) -> (Vec<&'a Json>, Scope) {
+    let every = targets(manifest);
+    let at = match record.and_then(|record| text(record, "target")) {
+        Some(name) => every
+            .iter()
+            .position(|target| text(target, "name").as_deref() == Some(name.as_str())),
+        // One target is the whole repository, so an image built before the
+        // record carried a target can only be that one, and nothing widens.
+        None if every.len() == 1 => Some(0),
+        None => None,
+    };
+    match at {
+        Some(at) => {
+            let scope = Scope::Built(text(every[at], "name").unwrap_or_default());
+            (vec![every[at]], scope)
+        }
+        None => (every, Scope::EveryTarget),
+    }
+}
+
 /// The same read-out with no repository at all: the manifest is what the image
 /// declares it is made of, the build record what the build resolved. Both are
 /// baked, so an image answers for itself.
 pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why> {
+    let (targets, scope) = built_as(manifest, record);
     let mut why = Why {
         path: path.to_string(),
+        scope,
         ..Why::default()
     };
     let mut found = false;
 
-    for target in targets(manifest) {
+    for target in targets {
         // By the whole path, as `of` is: `matching` already chose which module
         // was meant, and a suffix match here could pick a different one.
         let Some(module) = items(target, "modules")
@@ -795,9 +846,11 @@ pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why
     Some(why)
 }
 
-/// Every module the baked manifest names, for a `why` given one it does not.
-pub fn known_on_host(manifest: &Json) -> Vec<String> {
-    let mut out: Vec<String> = targets(manifest)
+/// Every module this image carries, for a `why` given one it does not. Scoped
+/// the same way the read-out is, so a name it offers is one `on_host` answers.
+pub fn known_on_host(manifest: &Json, record: Option<&Json>) -> Vec<String> {
+    let mut out: Vec<String> = built_as(manifest, record)
+        .0
         .iter()
         .flat_map(|target| items(target, "modules"))
         .filter_map(|module| text(module, "path"))
@@ -824,9 +877,62 @@ pub fn baked(
 
 #[cfg(test)]
 mod tests {
-    use super::{display, known_on_host, on_host, Fetch, Why};
+    use super::{display, known_on_host, on_host, Fetch, Scope, Why};
     use crate::emit::Part;
     use crate::resolve::name::matching;
+
+    /// A booted image is one target, and the manifest baked into it holds
+    /// every target the repository declares. The record says which one is
+    /// running; without it the whole manifest is the only honest answer, and
+    /// the read-out has to say so rather than sound certain.
+    #[test]
+    fn a_host_answer_is_scoped_to_the_target_the_record_names() {
+        let manifest = crate::emit::json::Json::parse(
+            r#"{"images": [{"targets": [
+                {"name": "desktop", "published": "desktop", "modules": [
+                    {"path": "apps/kde", "provides": ["desktop"]}
+                ]},
+                {"name": "desktop/dx", "published": "desktop-dx", "modules": [
+                    {"path": "apps/kde", "provides": ["desktop"]},
+                    {"path": "apps/vscodium", "requires": ["desktop"]}
+                ]}
+            ]}]}"#,
+        )
+        .expect("the manifest is a document");
+        let record = |target: &str| {
+            crate::emit::json::Json::parse(&format!(r#"{{"target": "{target}"}}"#))
+                .expect("the record is a document")
+        };
+
+        let ungated = record("desktop");
+        assert_eq!(known_on_host(&manifest, Some(&ungated)), ["apps/kde"]);
+        let why = on_host(&manifest, Some(&ungated), "apps/kde").expect("the image carries it");
+        assert_eq!(why.images, ["desktop"]);
+        // The other target's module wants it; this one has nobody to want it.
+        assert_eq!(why.provides, [("desktop".to_string(), Vec::new())]);
+        assert!(why.scope == Scope::Built("desktop".into()));
+        assert!(on_host(&manifest, Some(&ungated), "apps/vscodium").is_none());
+
+        // The gated target is a different image and answers differently.
+        let gated = record("desktop/dx");
+        let why = on_host(&manifest, Some(&gated), "apps/kde").expect("the image carries it");
+        assert_eq!(why.images, ["desktop-dx"]);
+        assert_eq!(
+            why.provides,
+            [("desktop".to_string(), vec!["apps/vscodium".to_string()])]
+        );
+
+        // No record, and no target in one that has none: the old answer, said
+        // to be the old answer.
+        for record in [None, Some(&crate::emit::json::Json::parse("{}").unwrap())] {
+            let why = on_host(&manifest, record, "apps/kde").expect("the manifest names it");
+            assert_eq!(why.images, ["desktop", "desktop-dx"]);
+            assert!(why.scope == Scope::EveryTarget);
+            assert!(why
+                .markdown()
+                .contains("may describe an image other than the one running"));
+        }
+    }
 
     #[test]
     fn display_shortens_an_unambiguous_name() {
@@ -853,7 +959,7 @@ mod tests {
             ]}]}]}"#,
         )
         .expect("the manifest is a document");
-        let known = known_on_host(&manifest);
+        let known = known_on_host(&manifest, None);
 
         for given in ["a/x", "b/a/x"] {
             let resolved = matching(&known, given);
