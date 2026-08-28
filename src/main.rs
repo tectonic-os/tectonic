@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tect::command::{self, Spec, Verb};
+use tect::command::{self, Context, Spec, Verb};
 use tect::copy;
 use tect::dispatch::{self, Error, USAGE_ERROR};
 use tect::model::image::TECT_VERSION;
@@ -106,7 +106,9 @@ fn main() -> ExitCode {
             };
             eprintln!("Error: {message}{stop}\n");
             match unknown {
-                true => eprint!("{}", command::usage()),
+                // The words were not a command, so nothing has resolved a
+                // place yet; the surface is still what it is where this ran.
+                true => eprint!("{}", command::usage(&Context::of(None))),
                 false => eprintln!("{COMMANDS}"),
             }
             ExitCode::from(USAGE_ERROR)
@@ -172,10 +174,14 @@ fn run() -> Result<ExitCode, Error> {
         no_cache_from,
     };
 
+    // Where this is running, asked once and passed to everything that renders
+    // the surface or opens a repository.
+    let here = Context::of(flags.root.as_deref());
+
     let words: Vec<&str> = args.words.iter().map(String::as_str).collect();
     let (spec, rest): (&Spec, &[&str]) = if matches!(words.first(), Some(&"-h") | Some(&"--help")) {
         banner(false);
-        print!("{}", command::usage());
+        print!("{}", command::usage(&here));
         return Ok(ExitCode::SUCCESS);
     } else if picking(&words, &prompt) {
         let rows = match words.first() {
@@ -183,13 +189,13 @@ fn run() -> Result<ExitCode, Error> {
             None => command::listed(),
         };
         banner(false);
-        match tect::ui::select(copy::WHICH_COMMAND, &command::choices(&rows))? {
+        match tect::ui::select(copy::WHICH_COMMAND, &command::choices(&rows, &here))? {
             Some(at) => (rows[at], &[]),
             None => return Ok(ExitCode::SUCCESS),
         }
     } else if words.is_empty() {
         banner(true);
-        eprint!("{}", command::usage());
+        eprint!("{}", command::usage(&here));
         return Ok(ExitCode::from(USAGE_ERROR));
     } else {
         command::resolve(&words).map_err(Error::Usage)?
@@ -210,5 +216,5 @@ fn run() -> Result<ExitCode, Error> {
         banner(false);
     }
 
-    dispatch::dispatch(spec, rest, flags, &prompt)
+    dispatch::dispatch(spec, rest, flags, &prompt, &here)
 }

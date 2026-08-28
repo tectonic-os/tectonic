@@ -1,7 +1,7 @@
 //! What each row of the command table does, which is everything the binary
 //! is not allowed to decide for itself.
 
-use crate::command::{Spec, Verb};
+use crate::command::{self, Context, Spec, Verb};
 use crate::copy;
 use crate::prompt::Prompt;
 use crate::Command;
@@ -78,29 +78,43 @@ fn one_name(rest: &[&str], spec: &Spec) -> Result<Option<String>, Error> {
     }
 }
 
-/// `--root`, else the nearest directory at or above here holding a repo.kdl,
-/// named the way `--root .` names one: every path a command prints hangs off
-/// this, and a person reads `modules/x` rather than where their home is.
-fn repo_root(given: Option<PathBuf>) -> Result<PathBuf, Error> {
-    let root = match given {
-        Some(root) => root,
-        None => {
-            let here = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-            let found = crate::find_root(&here).ok_or_else(|| {
-                Error::Invocation(format!(
-                    "no repo.kdl in {} or any parent directory",
-                    here.display()
-                ))
-            })?;
-            match here.strip_prefix(&found).map(|d| d.components().count()) {
-                Ok(0) => PathBuf::from("."),
-                Ok(up) => (0..up).map(|_| "..").collect(),
-                Err(_) => found,
-            }
+/// The repository the run is in. `Context` already asked where this is; this
+/// is the one place that turns *not a repository* into a refusal, so it is
+/// also the one place that can name what does run here instead.
+fn repo_root(here: &Context) -> Result<PathBuf, Error> {
+    let root = match here {
+        Context::Repo(root) => root.clone(),
+        Context::Host => {
+            return Err(Error::Invocation(format!(
+                "this is a tectonic image and not a repository, so there is no source tree to \
+                 read\n\nhelp: {} off the documents the build baked",
+                answers()
+            )))
+        }
+        Context::Loose => {
+            return Err(Error::Invocation(format!(
+                "no repo.kdl in {} or any parent directory",
+                std::env::current_dir()
+                    .unwrap_or_else(|_| PathBuf::from("."))
+                    .display()
+            )))
         }
     };
     note_pin(&root);
     Ok(root)
+}
+
+/// What a booted image can answer, for the refusal above.
+fn answers() -> String {
+    let rows: Vec<String> = command::on_host()
+        .iter()
+        .map(|spec| format!("`tect {}`", spec.label()))
+        .collect();
+    match rows.split_last() {
+        Some((last, [])) => format!("{last} answers"),
+        Some((last, rest)) => format!("{} and {last} answer", rest.join(", ")),
+        None => "nothing answers".to_string(),
+    }
 }
 
 /// Whether the pin notice is already on stderr, since `repo_root` answers more
@@ -175,17 +189,15 @@ fn why_on_host(command: Command, arg: Option<&str>, prompt: &Prompt) -> Result<E
 /// The repository, or `None` when this release may not work in it and said so.
 /// A command that writes is refused here; everything that reads one is refused
 /// where it loads it.
-fn open(given: Option<PathBuf>) -> Result<Option<PathBuf>, Error> {
-    let root = repo_root(given)?;
+fn open(here: &Context) -> Result<Option<PathBuf>, Error> {
+    let root = repo_root(here)?;
     let refused =
         crate::compatible(&root).report(&root.join(crate::layout::REPO_FILE).display().to_string());
     Ok((!refused).then_some(root))
 }
 
-fn collection_repo(
-    given: Option<PathBuf>,
-) -> Result<Option<(PathBuf, crate::model::image::List)>, Error> {
-    let root = repo_root(given)?;
+fn collection_repo(here: &Context) -> Result<Option<(PathBuf, crate::model::image::List)>, Error> {
+    let root = repo_root(here)?;
     let (list, issues, context) = crate::declarations(&root);
     Ok((!issues.report(&context)).then_some((root, list)))
 }
@@ -196,8 +208,11 @@ pub fn dispatch(
     rest: &[&str],
     flags: Flags,
     prompt: &Prompt,
+    here: &Context,
 ) -> Result<ExitCode, Error> {
     let Flags {
+        // `--root` is already folded into `here`; `create repo` may write
+        // where there is no repository, so it takes the raw flag.
         root: root_arg,
         owner,
         host,
@@ -244,7 +259,7 @@ pub fn dispatch(
         }
         Verb::CreateImage => {
             let name = one_name(rest, spec)?;
-            let Some(root) = open(root_arg)? else {
+            let Some(root) = open(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
             // Every image in a repository shares its URL, so the id in one is
@@ -273,7 +288,7 @@ pub fn dispatch(
         }
         Verb::CreateFlavour => {
             let name = one_name(rest, spec)?;
-            let Some(root) = open(root_arg)? else {
+            let Some(root) = open(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
             let wrote =
@@ -283,7 +298,7 @@ pub fn dispatch(
         }
         Verb::CreateModule => {
             let name = one_name(rest, spec)?;
-            let Some(root) = open(root_arg)? else {
+            let Some(root) = open(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
             let wrote = crate::create::Module::collect(&root, name, pkgs, with, images, prompt)?
@@ -293,7 +308,7 @@ pub fn dispatch(
         }
         Verb::CreateKey => {
             let kind = one_name(rest, spec)?;
-            let Some(root) = open(root_arg)? else {
+            let Some(root) = open(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
             crate::key::Key::collect(&root, kind, module_arg, cn, prompt)?.apply(&root)?;
@@ -301,7 +316,7 @@ pub fn dispatch(
         }
         Verb::ImportModule => {
             let name = one_name(rest, spec)?;
-            let Some((root, list)) = collection_repo(root_arg)? else {
+            let Some((root, list)) = collection_repo(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
             crate::import::Module::collect(
@@ -318,7 +333,7 @@ pub fn dispatch(
         }
         Verb::CopyModule => {
             let name = one_name(rest, spec)?;
-            let Some((root, list)) = collection_repo(root_arg)? else {
+            let Some((root, list)) = collection_repo(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
             crate::import::Copy::collect(
@@ -339,7 +354,7 @@ pub fn dispatch(
                     spec.name()
                 )));
             }
-            let Some(root) = open(root_arg)? else {
+            let Some(root) = open(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
             if !prompt.asks() {
@@ -369,7 +384,7 @@ pub fn dispatch(
         }
         Verb::SetConforms => {
             let name = one_name(rest, spec)?;
-            let Some(root) = open(root_arg)? else {
+            let Some(root) = open(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
             if !prompt.asks() {
@@ -386,7 +401,7 @@ pub fn dispatch(
             let named = one_name(rest, spec)?.ok_or_else(|| {
                 Error::Invocation(format!("`{}` takes the module to claim for", spec.name()))
             })?;
-            let Some(root) = open(root_arg)? else {
+            let Some(root) = open(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
             if !prompt.asks() {
@@ -400,7 +415,7 @@ pub fn dispatch(
             Ok(ExitCode::SUCCESS)
         }
         Verb::FetchModules => {
-            let root = repo_root(root_arg)?;
+            let root = repo_root(here)?;
             let (list, issues, context) = crate::declarations(&root);
             if issues.report(&context) {
                 return Ok(ExitCode::from(REPO_ERROR));
@@ -421,16 +436,16 @@ pub fn dispatch(
                 no_cache_from,
                 cache_to,
             };
-            Ok(match crate::build::run(&repo_root(root_arg)?, &opts)? {
+            Ok(match crate::build::run(&repo_root(here)?, &opts)? {
                 crate::build::Stopped::Repository => ExitCode::from(REPO_ERROR),
             })
         }
         Verb::RegistryNamespace => {
-            println!("{}", crate::registry::namespace(&repo_root(root_arg)?)?);
+            println!("{}", crate::registry::namespace(&repo_root(here)?)?);
             Ok(ExitCode::SUCCESS)
         }
         Verb::RegistryRef => {
-            let root = repo_root(root_arg)?;
+            let root = repo_root(here)?;
             let (list, issues, context) = crate::declarations(&root);
             if issues.report(&context) {
                 return Ok(ExitCode::from(REPO_ERROR));
@@ -442,7 +457,7 @@ pub fn dispatch(
             Ok(ExitCode::SUCCESS)
         }
         Verb::ScapContent => Ok(
-            match crate::scap::content(&repo_root(root_arg)?, target.as_deref())? {
+            match crate::scap::content(&repo_root(here)?, target.as_deref())? {
                 crate::scap::Verdict::Clean => ExitCode::SUCCESS,
                 crate::scap::Verdict::Wrong => ExitCode::from(REPO_ERROR),
             },
@@ -460,7 +475,7 @@ pub fn dispatch(
                 base: base_scan,
             };
             Ok(
-                match crate::scap::run(&repo_root(root_arg)?, Path::new(arf), &opts)? {
+                match crate::scap::run(&repo_root(here)?, Path::new(arf), &opts)? {
                     crate::scap::Verdict::Clean => ExitCode::SUCCESS,
                     crate::scap::Verdict::Wrong => ExitCode::from(REPO_ERROR),
                 },
@@ -483,7 +498,7 @@ pub fn dispatch(
             crate::runtime::fetch(rest)?;
             Ok(ExitCode::SUCCESS)
         }
-        _ => reading(spec, rest, format.as_deref(), root_arg, datastream, prompt),
+        _ => reading(spec, rest, format.as_deref(), datastream, prompt, here),
     }
 }
 
@@ -553,9 +568,9 @@ fn reading(
     spec: &Spec,
     rest: &[&str],
     format: Option<&str>,
-    root_arg: Option<PathBuf>,
     datastream: Option<PathBuf>,
     prompt: &Prompt,
+    here: &Context,
 ) -> Result<ExitCode, Error> {
     let command = spec.verb.reads().expect("a command run reads");
     let command = match (command, format) {
@@ -595,13 +610,13 @@ fn reading(
         ));
     }
 
-    // `why` is the one command a live host runs, where the image carries the
-    // two documents and there is no repository at all.
-    if matches!(command, Command::Why | Command::WhyJson) && repo_root(root_arg.clone()).is_err() {
+    // On a host the two baked documents are the whole of what there is to
+    // read, and the table's `host` column says which commands answer off them.
+    if *here == Context::Host && spec.host {
         return why_on_host(command, arg, prompt);
     }
 
-    let root = repo_root(root_arg)?;
+    let root = repo_root(here)?;
     // The two read-outs about one thing: what is named is picked from what
     // there is, where there is a terminal to pick on.
     let picks = matches!(
