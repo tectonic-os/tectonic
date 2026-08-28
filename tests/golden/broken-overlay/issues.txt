@@ -1,10 +1,10 @@
   x mode for `/etc/duplicate.conf` is declared twice
-    ,-[./modules/core/bad-modes/module.kdl:9:1]
-  8 | mode "/etc/duplicate.conf" "0440"
-  9 | mode "/etc/duplicate.conf" "0600"
+    ,-[./modules/core/bad-modes/module.kdl:10:1]
+  9 | mode "/etc/duplicate.conf" "0440"
+ 10 | mode "/etc/duplicate.conf" "0600"
     : ^^|^
     :   `-- already declared above
- 10 | mode "/etc/missing.conf" "0440"
+ 11 | mode "/etc/missing.conf" "0440"
     `----
 
   x `etc/relative.conf` is not a normal absolute overlay path
@@ -34,13 +34,23 @@
  7 | mode "/etc/out-of-range.conf" "10000"
    :                               ^^^|^^^
    :                                  `-- greater than 07777
- 8 | mode "/etc/duplicate.conf" "0440"
+ 8 | mode "/etc/empty.conf" ""
    `----
 
+  x `` is not an octal file mode
+   ,-[./modules/core/bad-modes/module.kdl:8:24]
+ 7 | mode "/etc/out-of-range.conf" "10000"
+ 8 | mode "/etc/empty.conf" ""
+   :                        ^|
+   :                         `-- use only digits 0 through 7
+ 9 | mode "/etc/duplicate.conf" "0440"
+   `----
+  help: a chmod file mode such as `0440`
+
   x `core/bad-modes` declares a mode for a file it does not ship
-    ,-[./modules/core/bad-modes/module.kdl:10:6]
-  9 | mode "/etc/duplicate.conf" "0600"
- 10 | mode "/etc/missing.conf" "0440"
+    ,-[./modules/core/bad-modes/module.kdl:11:6]
+ 10 | mode "/etc/duplicate.conf" "0600"
+ 11 | mode "/etc/missing.conf" "0440"
     :      ^^^^^^^^^|^^^^^^^^^
     :               `-- /etc/missing.conf is missing from `files/`
     `----
