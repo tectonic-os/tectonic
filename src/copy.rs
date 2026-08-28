@@ -115,6 +115,31 @@ pub const TOGGLE: &str = "space toggles, enter confirms, esc cancels";
 pub const EITHER: &str = "up and down to move, enter to answer";
 /// No `j` and `k` here: every printable key is the filter being typed.
 pub const NEST: &str = "filter, space toggles, ←/→ opens, enter confirms";
+pub const REVIEW_KEYS: &str = "enter to change a field, Create to write, esc cancels";
+
+// The review screen `create repo` draws over its collected answers before
+// anything is written. Every row is a piece of configuration, said as what the
+// repository will have rather than as the question that reached it.
+
+pub const REVIEW: &str = "Review what will be created";
+pub const CREATE: &str = "Create";
+/// A gate answered No is still a row, so nothing collected disappears from the
+/// screen and every decision stays reachable.
+pub const NONE: &str = "none";
+pub const ROW_NAME: &str = "name";
+pub const ROW_PROVIDER: &str = "provider";
+pub const ROW_REMOTE: &str = "github repo";
+pub const ROW_IMAGE: &str = "image";
+pub const ROW_BASE: &str = "base";
+pub const ROW_WORKFLOWS: &str = "workflows";
+pub const ROW_PUBLISH: &str = "publish";
+pub const ROW_SCANS: &str = "image scans";
+pub const ROW_DAILY: &str = "daily build";
+pub const REMOTE_MADE: &str = "created on push";
+pub const REMOTE_NOT: &str = "not created";
+pub const ON_EVERY_PUSH: &str = "on every push";
+pub const ON_EVERY_BUILD: &str = "on every build";
+pub const ON_SCHEDULED: &str = "on scheduled builds only";
 
 #[cfg(test)]
 mod tests {

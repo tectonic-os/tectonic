@@ -5,6 +5,7 @@
 //! these rather than calling the command.
 
 use crate::copy;
+use crate::create::Field;
 use crate::dispatch::Error;
 use crate::prompt::Prompt;
 use crate::resolve::workflow::{Basis, Shipped, DEFAULT_AT, SHIPPED};
@@ -99,50 +100,72 @@ impl Workflows {
 
     /// `on` is what is already true. Answering with nothing is a repository
     /// that generates no CI, and leaving is `None`.
+    /// `from` is the review screen's re-entry point, which a caller with no
+    /// review screen answers with `Field::Workflows`: ask all three.
     pub fn collect(
         basis: &Basis,
         on: &[&str],
         at: (u32, u32),
         publishes_current: bool,
         scans_current: bool,
+        from: Field,
         prompt: &Prompt,
     ) -> Result<Option<Self>, String> {
-        let options: Vec<Choice> = SHIPPED
-            .iter()
-            .map(|shipped| match shipped.met(basis) {
-                true => Choice::new(shipped.stem, shipped.about),
-                false => Choice::new(shipped.stem, shipped.needs.unmet()),
-            })
-            .collect();
-        let held: Vec<usize> = SHIPPED
-            .iter()
-            .enumerate()
-            .filter(|(_, shipped)| on.contains(&shipped.stem))
-            .map(|(at, _)| at)
-            .collect();
+        let chosen: Vec<&'static Shipped> = match from > Field::Workflows {
+            true => SHIPPED
+                .iter()
+                .filter(|shipped| on.contains(&shipped.stem))
+                .collect(),
+            false => {
+                let options: Vec<Choice> = SHIPPED
+                    .iter()
+                    .map(|shipped| match shipped.met(basis) {
+                        true => Choice::new(shipped.stem, shipped.about),
+                        false => Choice::new(shipped.stem, shipped.needs.unmet()),
+                    })
+                    .collect();
+                let held: Vec<usize> = SHIPPED
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, shipped)| on.contains(&shipped.stem))
+                    .map(|(at, _)| at)
+                    .collect();
 
-        let Answer::Chosen(chosen) = prompt.choose_many(copy::WORKFLOWS, &options, &held)? else {
-            return Ok(None);
+                let Answer::Chosen(chosen) =
+                    prompt.choose_many(copy::WORKFLOWS, &options, &held)?
+                else {
+                    return Ok(None);
+                };
+                chosen.iter().map(|at| &SHIPPED[*at]).collect()
+            }
         };
-        let chosen: Vec<&'static Shipped> = chosen.iter().map(|at| &SHIPPED[*at]).collect();
         if let Some(short) = chosen.iter().find(|shipped| !shipped.met(basis)) {
             return Err(format!("`{}` {}", short.stem, short.needs.unmet()));
         }
 
         let builds = chosen.iter().any(|shipped| shipped.stem == "build");
         let publishes_scheduled = builds
-            && prompt.confirm_current(
-                copy::PUBLISH_SCHEDULED,
-                copy::YES,
-                copy::NO,
-                publishes_current,
-            )?;
+            && match from > Field::Publish {
+                true => publishes_current,
+                false => prompt.confirm_current(
+                    copy::PUBLISH_SCHEDULED,
+                    copy::YES,
+                    copy::NO,
+                    publishes_current,
+                )?,
+            };
         let scans_scheduled = match (builds, publishes_scheduled) {
             (false, _) => false,
             (true, true) => scans_current,
-            (true, false) => {
-                prompt.confirm_current(copy::SCAN_SCHEDULED, copy::YES, copy::NO, scans_current)?
-            }
+            (true, false) => match from > Field::Scans {
+                true => scans_current,
+                false => prompt.confirm_current(
+                    copy::SCAN_SCHEDULED,
+                    copy::YES,
+                    copy::NO,
+                    scans_current,
+                )?,
+            },
         };
 
         let at = match chosen.iter().any(|shipped| shipped.at.is_some()) {
@@ -164,6 +187,71 @@ impl Workflows {
             publishes_scheduled,
             scans_scheduled,
         }))
+    }
+
+    /// The same questions asked again, opening on the answers already held.
+    /// `basis` is passed rather than kept, because an edited base changes the
+    /// family and so changes which workflows are reachable at all.
+    pub fn again(
+        &self,
+        basis: &Basis,
+        from: Field,
+        prompt: &Prompt,
+    ) -> Result<Option<Self>, String> {
+        Self::collect(
+            basis,
+            &self.chosen,
+            self.at,
+            self.publishes_scheduled,
+            self.scans_scheduled,
+            from,
+            prompt,
+        )
+    }
+
+    /// The review screen's rows for the CI, said as the settings repo.kdl will
+    /// hold rather than as the questions that reached them. A row is here only
+    /// where the question behind it was reachable: no `build`, no cadence.
+    pub fn rows(&self) -> Vec<(Field, &'static str, String)> {
+        let mut rows = vec![(
+            Field::Workflows,
+            copy::ROW_WORKFLOWS,
+            match self.chosen.is_empty() {
+                true => copy::NONE.to_string(),
+                false => self.chosen.join(", "),
+            },
+        )];
+        if !self.chosen.contains(&"build") {
+            return rows;
+        }
+        rows.push((
+            Field::Publish,
+            copy::ROW_PUBLISH,
+            match self.publishes_scheduled {
+                true => copy::ON_SCHEDULED,
+                false => copy::ON_EVERY_PUSH,
+            }
+            .to_string(),
+        ));
+        if !self.publishes_scheduled {
+            rows.push((
+                Field::Scans,
+                copy::ROW_SCANS,
+                match self.scans_scheduled {
+                    true => copy::ON_SCHEDULED,
+                    false => copy::ON_EVERY_BUILD,
+                }
+                .to_string(),
+            ));
+        }
+        if self
+            .chosen
+            .iter()
+            .any(|stem| SHIPPED.iter().any(|s| s.stem == *stem && s.at.is_some()))
+        {
+            rows.push((Field::Daily, copy::ROW_DAILY, parse::repo::at_text(self.at)));
+        }
+        rows
     }
 
     /// The block written into repo.kdl, replacing the one that was there.
@@ -692,6 +780,53 @@ mod tests {
         );
     }
 
+    /// The one thing that is wrong if `collect` is re-entered at the wrong
+    /// point: a question above the edited row asked again spends the answer
+    /// meant for the one below it, and this run has exactly one to spend.
+    #[test]
+    fn re_entering_at_a_field_asks_it_and_nothing_above_it() {
+        let mut held = set(&["build"], DEFAULT_AT);
+        held.scans_scheduled = true;
+        let prompt = Prompt::scripted(["07:30"].map(str::to_string).to_vec());
+        let again = held
+            .again(&Basis::scaffolding(""), Field::Daily, &prompt)
+            .unwrap()
+            .unwrap();
+        assert_eq!(again.chosen, ["build"]);
+        assert!(!again.publishes_scheduled);
+        assert!(again.scans_scheduled);
+        assert_eq!(again.at, (7, 30));
+    }
+
+    /// A row for a question that was never reachable has nothing to re-enter.
+    #[test]
+    fn a_cadence_is_a_row_only_where_its_question_was_asked() {
+        let labels = |workflows: &Workflows| -> Vec<&str> {
+            workflows
+                .rows()
+                .iter()
+                .map(|(_, label, _)| *label)
+                .collect()
+        };
+        let mut workflows = set(&["build"], DEFAULT_AT);
+        assert_eq!(
+            labels(&workflows),
+            [
+                copy::ROW_WORKFLOWS,
+                copy::ROW_PUBLISH,
+                copy::ROW_SCANS,
+                copy::ROW_DAILY
+            ]
+        );
+        workflows.publishes_scheduled = true;
+        assert!(!labels(&workflows).contains(&copy::ROW_SCANS));
+        assert_eq!(labels(&set(&[], DEFAULT_AT)), [copy::ROW_WORKFLOWS]);
+        assert_eq!(
+            labels(&set(&["build-disk"], DEFAULT_AT)),
+            [copy::ROW_WORKFLOWS]
+        );
+    }
+
     #[test]
     fn scheduled_publishing_makes_the_scan_question_redundant() {
         let prompt = Prompt::scripted(["1", "Yes", "06:00"].map(str::to_string).to_vec());
@@ -701,6 +836,7 @@ mod tests {
             DEFAULT_AT,
             false,
             false,
+            Field::Workflows,
             &prompt,
         )
         .unwrap()
@@ -719,6 +855,7 @@ mod tests {
             DEFAULT_AT,
             true,
             true,
+            Field::Workflows,
             &prompt,
         )
         .unwrap()
@@ -736,6 +873,7 @@ mod tests {
             DEFAULT_AT,
             true,
             true,
+            Field::Workflows,
             &prompt,
         )
         .unwrap()

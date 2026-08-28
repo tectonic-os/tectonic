@@ -5,7 +5,7 @@
 pub mod table;
 pub mod tree;
 
-use crate::copy::{EITHER, NEST, PICK, TOGGLE};
+use crate::copy::{CREATE, EITHER, NEST, PICK, REVIEW_KEYS, TOGGLE};
 
 use ratatui::backend::Backend;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
@@ -127,8 +127,18 @@ const VISIBLE: usize = 8;
 
 /// One of `options`, or none.
 pub fn select(question: &str, options: &[Choice]) -> Result<Option<usize>, String> {
+    select_current(question, options, 0)
+}
+
+/// The same, editing an existing answer: it opens on `at` rather than on the
+/// first row, so a question asked again is not navigated again.
+pub fn select_current(
+    question: &str,
+    options: &[Choice],
+    at: usize,
+) -> Result<Option<usize>, String> {
     inline(height(options.len()), |terminal| {
-        pick(terminal, question, options, PICK, 0)
+        pick(terminal, question, options, PICK, at)
     })
 }
 
@@ -160,6 +170,32 @@ pub fn multi(question: &str, options: &[Choice], on: &[usize]) -> Result<Answer,
     inline(height(options.len()), |terminal| {
         toggle(terminal, question, options, on)
     })
+}
+
+/// The answers a command has collected, one row per piece of configuration,
+/// with `Create` under them. `Some(rows.len())` is `Create`, anything smaller
+/// is the row to ask again, and `None` is a cancel.
+///
+/// It sizes to its rows rather than to `VISIBLE`, which exists for lists
+/// nothing bounds. This one is bounded by the questions the command has, which
+/// is known and small, so `Create` cannot scroll off.
+pub fn review(question: &str, rows: &[(String, String)]) -> Result<Option<usize>, String> {
+    let width = rows
+        .iter()
+        .map(|(label, _)| label.chars().count())
+        .max()
+        .unwrap_or(0);
+    let mut options: Vec<Choice> = rows
+        .iter()
+        .map(|(label, value)| Choice::new(format!("{label:<width$}"), value))
+        .collect();
+    options.push(Choice::new("", ""));
+    options.push(Choice::new(CREATE, ""));
+    let chosen = inline((options.len() + 2) as u16, |terminal| {
+        pick(terminal, question, &options, REVIEW_KEYS, 0)
+    })?;
+    // The spacer is never landed on, so anything past the last row is `Create`.
+    Ok(chosen.map(|at| at.min(rows.len())))
 }
 
 /// The lines a question takes: its rows, whatever they are, under the question
@@ -206,7 +242,24 @@ fn pick<B: Backend>(
         match key {
             KeyCode::Enter => return Ok(state.selected()),
             KeyCode::Esc | KeyCode::Char('q') => return Ok(None),
-            code => move_by(code, &mut state),
+            code => {
+                move_by(code, &mut state);
+                skip_spacers(code, options, &mut state);
+            }
+        }
+    }
+}
+
+/// A row with no label is a spacer, which the cursor passes over in whichever
+/// direction it was sent rather than landing on. Only the review screen has
+/// one, and it is what puts a blank line above `Create`.
+fn skip_spacers(code: KeyCode, options: &[Choice], state: &mut ListState) {
+    for _ in 0..options.len() {
+        match state.selected() {
+            Some(at) if options.get(at).is_some_and(|row| row.label.is_empty()) => {
+                move_by(code, state)
+            }
+            _ => return,
         }
     }
 }

@@ -197,19 +197,45 @@ impl Prompt {
     /// a terminal, a numbered list to answer by number or by name where it is
     /// not.
     pub fn choose(&self, question: &str, options: &[Choice]) -> Result<Option<usize>, String> {
+        self.pick_one(question, options, None)
+    }
+
+    /// The same, editing an existing answer: it opens on that answer, marks it
+    /// in the numbered list, and takes an empty answer as keeping it.
+    pub fn choose_current(
+        &self,
+        question: &str,
+        options: &[Choice],
+        current: usize,
+    ) -> Result<Option<usize>, String> {
+        self.pick_one(question, options, Some(current))
+    }
+
+    /// `current` is the answer already held, which is what nobody to ask is
+    /// answered with and what an empty answer keeps. A question opening on
+    /// nothing has none, and an empty answer to that one is not an answer.
+    fn pick_one(
+        &self,
+        question: &str,
+        options: &[Choice],
+        current: Option<usize>,
+    ) -> Result<Option<usize>, String> {
         if !self.ask || options.is_empty() {
-            return Ok(None);
+            return Ok(current);
         }
         if self.draw {
-            let chosen = crate::ui::select(question, options)?;
+            let chosen = crate::ui::select_current(question, options, current.unwrap_or(0))?;
             if let Some(index) = chosen {
                 println!("{question}: {}\n", options[index].label);
             }
             return Ok(chosen);
         }
-        self.numbered(options, &[]);
+        self.numbered(options, current.as_slice());
         let question = format!("{question} [{}, 0 for none]", range(options));
         let answer = self.read(&question, &format!("{question}: "))?;
+        if let (true, Some(current)) = (answer.is_empty(), current) {
+            return Ok(Some(current));
+        }
         match answer.parse::<usize>() {
             Ok(0) => Ok(None),
             Ok(number) if number <= options.len() => Ok(Some(number - 1)),

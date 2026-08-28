@@ -202,6 +202,8 @@ fn create_image_surfaces_an_unreadable_runtime_catalog() {
         "Example",
         None,
         "a name argument",
+        tect::create::Field::Image,
+        None,
         &tect::prompt::Prompt::silent(),
     )
     .err()

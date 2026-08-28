@@ -42,6 +42,39 @@ pub fn named_after_root(root: &Path) -> Option<String> {
         .map(|name| name.to_string_lossy().into_owned())
 }
 
+/// A row of the review screen, and so a point `Repo::collect` can be re-entered
+/// at. The order is the order the questions are asked in: re-entering at a
+/// field asks it and everything after it.
+///
+/// A row re-enters at its gate, not at its first field, which is what makes a
+/// collapsed gate reversible in both directions — `provider` re-asks whether
+/// there is one at all, so it can become `none`, and `none` can become one.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Field {
+    Name,
+    Provider,
+    Remote,
+    Image,
+    Base,
+    Workflows,
+    Publish,
+    Scans,
+    Daily,
+}
+
+/// What the flags gave, which only the first pass reads. A field asked again
+/// opens on the answer it has rather than on the flag that seeded it; the root
+/// is the exception, since nothing else says where the tree goes.
+#[derive(Default)]
+struct Given {
+    name: Option<String>,
+    host: Option<String>,
+    owner: Option<String>,
+    image: Option<String>,
+    base: Option<String>,
+    root: Option<PathBuf>,
+}
+
 /// The tree, the git repository, an image in it, then the remote, which is
 /// optional and last: each step adds to what the one before it wrote.
 pub struct Repo {
@@ -70,90 +103,209 @@ impl Repo {
         base: Option<String>,
         root_arg: Option<PathBuf>,
         prompt: &Prompt,
+    ) -> Result<Option<Self>, String> {
+        let mut given = Given {
+            name,
+            host,
+            owner,
+            image: image_name,
+            base,
+            root: root_arg,
+        };
+        let mut repo = Self::ask(Field::Name, &given, None, prompt)?;
+        // The flags were the first pass's. A field asked again opens on the
+        // answer it has, not on the flag that seeded it; only the root a flag
+        // named survives, since nothing else says where the tree goes.
+        given = Given {
+            root: given.root.take(),
+            ..Given::default()
+        };
+        while prompt.draws() {
+            let rows = repo.rows();
+            let drawn: Vec<(String, String)> = rows
+                .iter()
+                .map(|(_, label, value)| (label.to_string(), value.clone()))
+                .collect();
+            match crate::ui::review(copy::REVIEW, &drawn)? {
+                // Nothing was written, so leaving is a leaving rather than a
+                // failure, the way every other widget's is.
+                None => return Ok(None),
+                Some(at) if at == rows.len() => break,
+                Some(at) => repo = Self::ask(rows[at].0, &given, Some(&repo), prompt)?,
+            }
+        }
+        Ok(Some(repo))
+    }
+
+    /// Ask from `from` onward, keeping every answer before it. The procedure is
+    /// the order and the gating, so re-entering it at a point is the only
+    /// re-collection that cannot disagree with the first pass: what comes after
+    /// an edited answer opens on its previous answer where that still exists,
+    /// and is dropped where it no longer does.
+    fn ask(
+        from: Field,
+        given: &Given,
+        prev: Option<&Self>,
+        prompt: &Prompt,
     ) -> Result<Self, String> {
-        let name = prompt.line(
-            name.or_else(|| root_arg.as_deref().and_then(named_after_root)),
-            copy::REPO_NAME,
-            "a name argument",
-            "",
-            None,
-        )?;
+        let name = match prev {
+            Some(prev) if from > Field::Name => prev.name.clone(),
+            _ => prompt.line(
+                given
+                    .name
+                    .clone()
+                    .or_else(|| given.root.as_deref().and_then(named_after_root)),
+                copy::REPO_NAME,
+                "a name argument",
+                "",
+                prev.map(|prev| prev.name.as_str()),
+            )?,
+        };
         let id = crate::init::id(&name)?;
-        let root = root_arg.unwrap_or_else(|| PathBuf::from(&id));
+        let root = given.root.clone().unwrap_or_else(|| PathBuf::from(&id));
         refuse_nesting(&root)?;
         let assets = crate::init::assets()?;
-        println!("Creating {id}...\n");
+        if prev.is_none() {
+            println!("Creating {id}...\n");
+        }
 
-        let configure = host.is_some()
-            || owner.is_some()
-            || prompt.confirm(copy::SCHEDULED, copy::YES, copy::NO)?;
-        let host = match (configure, host) {
-            (true, None) => choose_host(prompt)?,
-            (_, given) => given.unwrap_or_else(|| HOST.to_string()),
-        };
-        let owner = match configure {
-            true => Some(prompt.line(
-                owner,
-                &copy::username(&host),
-                "`--owner`",
-                &format!("{host}/"),
-                None,
-            )?),
-            false => None,
+        let (host, owner) = match prev {
+            Some(prev) if from > Field::Provider => (prev.host.clone(), prev.owner.clone()),
+            _ => {
+                // One decision, one row, one entry point: the gate is asked
+                // first, so `provider` can become `none` and back again.
+                let configure = given.host.is_some()
+                    || given.owner.is_some()
+                    || match prev {
+                        None => prompt.confirm(copy::SCHEDULED, copy::YES, copy::NO)?,
+                        Some(prev) => prompt.confirm_current(
+                            copy::SCHEDULED,
+                            copy::YES,
+                            copy::NO,
+                            prev.owner.is_some(),
+                        )?,
+                    };
+                let host = match (configure, given.host.clone()) {
+                    (true, None) => choose_host(prev.map(|prev| prev.host.as_str()), prompt)?,
+                    (_, given) => given.unwrap_or_else(|| HOST.to_string()),
+                };
+                let owner = match configure {
+                    true => Some(prompt.line(
+                        given.owner.clone(),
+                        &copy::username(&host),
+                        "`--owner`",
+                        &format!("{host}/"),
+                        prev.and_then(|prev| prev.owner.as_deref()),
+                    )?),
+                    false => None,
+                };
+                (host, owner)
+            }
         };
         let mut remote = false;
         let mut install_gh = false;
-        // `gh` is github's, so the offer to create the repository is too, and
-        // it is what closes the block the origin line opens.
-        let offering = host == HOST && prompt.asks();
         if let Some(named) = &owner {
-            println!("Added {host}/{named}/{id} as the origin repo");
-            if !offering {
-                println!();
-            }
-            if offering && prompt.confirm(copy::CREATE_REMOTE, copy::YES, copy::SKIP)? {
-                match (gh_installed(), gh_logged_in()) {
-                    (false, _) => {
-                        install_gh = prompt.confirm(copy::NO_GH, copy::YES, copy::SKIP_REMOTE)?
+            match prev {
+                Some(prev) if from > Field::Remote => {
+                    remote = prev.remote;
+                    install_gh = prev.install_gh;
+                }
+                _ => {
+                    // `gh` is github's, so the offer to create the repository is
+                    // too, and it is what closes the block the origin line opens.
+                    let offering = host == HOST && prompt.asks();
+                    // The origin line belongs to the question above it, which a
+                    // re-entry at this row did not ask.
+                    if from <= Field::Provider {
+                        println!("Added {host}/{named}/{id} as the origin repo");
+                        if !offering {
+                            println!();
+                        }
                     }
-                    (true, false) => println!(
-                        "You will need to login with user '{named}' to create the repo on Github.\n\
-                         You can log in with the following command:\n\
-                         gh auth login\n"
-                    ),
-                    (true, true) => remote = true,
+                    let asked = match (offering, prev) {
+                        (false, _) => false,
+                        (true, None) => {
+                            prompt.confirm(copy::CREATE_REMOTE, copy::YES, copy::SKIP)?
+                        }
+                        (true, Some(prev)) => prompt.confirm_current(
+                            copy::CREATE_REMOTE,
+                            copy::YES,
+                            copy::SKIP,
+                            prev.remote,
+                        )?,
+                    };
+                    if asked {
+                        match (gh_installed(), gh_logged_in()) {
+                            (false, _) => {
+                                install_gh =
+                                    prompt.confirm(copy::NO_GH, copy::YES, copy::SKIP_REMOTE)?
+                            }
+                            (true, false) => println!(
+                                "You will need to login with user '{named}' to create the repo on Github.\n\
+                                 You can log in with the following command:\n\
+                                 gh auth login\n"
+                            ),
+                            (true, true) => remote = true,
+                        }
+                    }
                 }
             }
         }
-        let image =
-            match image_name.is_some() || prompt.confirm(copy::IMAGES, copy::YES, copy::NO)? {
-                true => Some(Image::collect(
-                    &root,
-                    image_name,
-                    base,
-                    &name,
-                    owner
-                        .as_deref()
-                        .map(|owner| format!("{}/{id}", origin(&host, owner))),
-                    "`--image`",
-                    prompt,
-                )?),
-                false => None,
-            };
-        let workflows = match configure {
+        let url = owner
+            .as_deref()
+            .map(|owner| format!("{}/{id}", origin(&host, owner)));
+        let held = prev.and_then(|prev| prev.image.as_ref());
+        let image = match prev {
+            Some(prev) if from > Field::Base => prev.image.clone(),
+            _ => {
+                // The `base` row is inside the image, so re-entering at it does
+                // not re-ask whether there is one.
+                let wanted = given.image.is_some()
+                    || from == Field::Base
+                    || match prev {
+                        None => prompt.confirm(copy::IMAGES, copy::YES, copy::NO)?,
+                        Some(prev) => prompt.confirm_current(
+                            copy::IMAGES,
+                            copy::YES,
+                            copy::NO,
+                            prev.image.is_some(),
+                        )?,
+                    };
+                match wanted {
+                    true => Some(Image::collect(
+                        &root,
+                        given.image.clone(),
+                        given.base.clone(),
+                        &name,
+                        url,
+                        "`--image`",
+                        from,
+                        held,
+                        prompt,
+                    )?),
+                    false => None,
+                }
+            }
+        };
+        let workflows = match owner.is_some() {
             false => None,
             true => {
+                // The family the base belongs to is what makes a workflow row
+                // reachable, so an edited base re-words the rows below it.
                 let family = image.as_ref().map_or("", |image| image.family.as_str());
                 let basis = crate::resolve::workflow::Basis::scaffolding(family);
-                let every = crate::set::Workflows::every(&basis);
-                crate::set::Workflows::collect(
-                    &basis,
-                    &every,
-                    crate::resolve::workflow::DEFAULT_AT,
-                    false,
-                    false,
-                    prompt,
-                )?
+                match prev.and_then(|prev| prev.workflows.as_ref()) {
+                    Some(held) => held.again(&basis, from, prompt)?,
+                    None => crate::set::Workflows::collect(
+                        &basis,
+                        &crate::set::Workflows::every(&basis),
+                        crate::resolve::workflow::DEFAULT_AT,
+                        false,
+                        false,
+                        from,
+                        prompt,
+                    )?,
+                }
             }
         };
         Ok(Self {
@@ -168,6 +320,56 @@ impl Repo {
             remote,
             install_gh,
         })
+    }
+
+    /// One row per piece of configuration, and nothing per question.
+    ///
+    /// A gate answered Yes is not a row — `provider github.com/someone` is the
+    /// decision and the Yes is only how it was reached — and a gate answered No
+    /// is one row saying `none`, which is what the repository will have and
+    /// what re-enters the gate. Nothing collected disappears from the screen.
+    fn rows(&self) -> Vec<(Field, &'static str, String)> {
+        let mut rows = vec![
+            (Field::Name, copy::ROW_NAME, self.name.clone()),
+            (
+                Field::Provider,
+                copy::ROW_PROVIDER,
+                match &self.owner {
+                    Some(owner) => format!("{}/{owner}", self.host),
+                    None => copy::NONE.to_string(),
+                },
+            ),
+        ];
+        // An action rather than a setting, said as what will happen: nothing
+        // else on the screen says a remote will be made.
+        if self.owner.is_some() && self.host == HOST {
+            rows.push((
+                Field::Remote,
+                copy::ROW_REMOTE,
+                match self.remote {
+                    true => copy::REMOTE_MADE,
+                    false => copy::REMOTE_NOT,
+                }
+                .to_string(),
+            ));
+        }
+        match &self.image {
+            Some(image) => {
+                rows.push((Field::Image, copy::ROW_IMAGE, image.name.clone()));
+                rows.push((Field::Base, copy::ROW_BASE, image.base.clone()));
+            }
+            None => rows.push((Field::Image, copy::ROW_IMAGE, copy::NONE.to_string())),
+        }
+        match (&self.workflows, self.owner.is_some()) {
+            (Some(workflows), _) => rows.extend(workflows.rows()),
+            (None, true) => rows.push((
+                Field::Workflows,
+                copy::ROW_WORKFLOWS,
+                copy::NONE.to_string(),
+            )),
+            (None, false) => {}
+        }
+        rows
     }
 
     pub fn apply(&self) -> Result<(), String> {
@@ -242,21 +444,47 @@ fn under(root: &Path, path: &Path) -> PathBuf {
 
 /// Where the repository is hosted. The catalog is the two forges the workflows
 /// the tool ships know how to run under.
-fn choose_host(prompt: &Prompt) -> Result<String, String> {
+fn choose_host(current: Option<&str>, prompt: &Prompt) -> Result<String, String> {
     let options = [
         Choice::new(HOST, copy::HOST_GITHUB),
         Choice::new("forgejo", copy::HOST_FORGEJO),
     ];
-    match prompt.choose(copy::REPO_HOST, &options)? {
+    let at = current.map(|held| usize::from(held != HOST));
+    match ask_one(prompt, copy::REPO_HOST, &options, at)? {
         Some(0) | None => Ok(HOST.to_string()),
-        _ => prompt.line(None, copy::FORGEJO_ADDRESS, "`--host`", "", None),
+        _ => prompt.line(
+            None,
+            copy::FORGEJO_ADDRESS,
+            "`--host`",
+            "",
+            current.filter(|held| *held != HOST),
+        ),
+    }
+}
+
+/// A question with an answer already held opens on it; one asked for the first
+/// time opens where it always did.
+fn ask_one(
+    prompt: &Prompt,
+    question: &str,
+    options: &[Choice],
+    at: Option<usize>,
+) -> Result<Option<usize>, String> {
+    match at {
+        Some(at) => prompt.choose_current(question, options, at),
+        None => prompt.choose(question, options),
     }
 }
 
 /// One image, in `<image-id>.image.kdl` at the repository root.
+#[derive(Clone)]
 pub struct Image {
     file: PathBuf,
     text: String,
+    /// What it is called and what it is built on, which are the two rows the
+    /// review screen draws for it and the two answers asking it again opens on.
+    pub name: String,
+    pub base: String,
     /// What the chosen base belongs to, which decides what CI can run here.
     pub family: String,
     /// The image a second one takes the fallback away from, named in repo.kdl
@@ -275,15 +503,21 @@ impl Image {
         repo: &str,
         url: Option<String>,
         flag: &str,
+        from: Field,
+        prev: Option<&Self>,
         prompt: &Prompt,
     ) -> Result<Self, String> {
-        let name = prompt.line(
-            name,
-            copy::IMAGE_NAME,
-            flag,
-            "",
-            crate::init::id(repo).is_ok().then_some(repo),
-        )?;
+        let name = match prev {
+            Some(prev) if from > Field::Image => prev.name.clone(),
+            _ => prompt.line(
+                name,
+                copy::IMAGE_NAME,
+                flag,
+                "",
+                prev.map(|prev| prev.name.as_str())
+                    .or_else(|| crate::init::id(repo).is_ok().then_some(repo)),
+            )?,
+        };
         let id = crate::init::id(&name)?;
         let file = root.join(format!("{id}{}", layout::IMAGE_SUFFIX));
         if file.exists() {
@@ -305,7 +539,7 @@ impl Image {
         }
         let base = match base {
             Some(given) => given,
-            None => choose_base(&bases, prompt)?,
+            None => choose_base(&bases, prev.map(|prev| prev.base.as_str()), prompt)?,
         };
         let family = match crate::base::find(&bases, &base) {
             Some(known) => known.family.clone(),
@@ -331,6 +565,8 @@ impl Image {
         Ok(Self {
             text,
             file,
+            name,
+            base,
             family,
             names_default,
         })
@@ -474,12 +710,17 @@ impl Flavour {
 
 /// One of the bases the catalog holds, or one typed in: an unknown base is not
 /// an error, it is a base nothing can say anything about.
-fn choose_base(bases: &[crate::base::Base], prompt: &Prompt) -> Result<String, String> {
+fn choose_base(
+    bases: &[crate::base::Base],
+    current: Option<&str>,
+    prompt: &Prompt,
+) -> Result<String, String> {
     let options: Vec<Choice> = bases
         .iter()
         .map(|base| Choice::new(&base.image, &base.about))
         .collect();
-    match prompt.choose(copy::IMAGE_BASE, &options)? {
+    let at = current.and_then(|held| bases.iter().position(|base| base.image == held));
+    match ask_one(prompt, copy::IMAGE_BASE, &options, at)? {
         Some(chosen) => Ok(bases[chosen].image.clone()),
         None => prompt.text(
             None,
