@@ -90,24 +90,8 @@ fn script(
         }
     }
 
-    if module.packages.iter().any(|g| g.family == base_family) {
-        out.push_str("\nsource /ctx/lib/family.sh\n");
-    }
-    for group in module.packages.iter().filter(|g| g.family == base_family) {
-        let packages = group
-            .packages
-            .iter()
-            .map(|package| shell(package))
-            .collect::<Vec<_>>()
-            .join(" ");
-        let repo = group
-            .enablerepo
-            .as_ref()
-            .map(|repo| format!("TECT_ENABLE_REPO={} ", shell(repo)))
-            .unwrap_or_default();
-        let _ = write!(out, "\n{repo}install_packages {packages}\n");
-    }
-
+    // The repo a module declares is sourced before its packages, so an
+    // `enablerepo` names a repository that exists by the time it is enabled.
     // The guard is `dnf5 config-manager`'s layout. A deb family writes its
     // repo somewhere else, so the module's own `repo` file runs unguarded
     // there and is what has to be idempotent.
@@ -128,6 +112,24 @@ fn script(
                 let _ = write!(out, "\nsource {dir}/repo\n");
             }
         }
+    }
+
+    if module.packages.iter().any(|g| g.family == base_family) {
+        out.push_str("\nsource /ctx/lib/family.sh\n");
+    }
+    for group in module.packages.iter().filter(|g| g.family == base_family) {
+        let packages = group
+            .packages
+            .iter()
+            .map(|package| shell(package))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let repo = group
+            .enablerepo
+            .as_ref()
+            .map(|repo| format!("TECT_ENABLE_REPO={} ", shell(repo)))
+            .unwrap_or_default();
+        let _ = write!(out, "\n{repo}install_packages {packages}\n");
     }
 
     if on_disk.join("module.sh").is_file() {

@@ -516,19 +516,6 @@ impl Module {
             );
         }
 
-        if dir.join("repo").is_file() {
-            for group in &module.packages {
-                issues.push(
-                    Issue::new(
-                        format!("`{}` declares both a `repo` file and `packages`", path),
-                        src,
-                    )
-                    .at(group.span, "installed before the repo file is sourced")
-                    .help("the generated build script sources `repo` after installing these, so call the family's package manager in module.sh instead"),
-                );
-            }
-        }
-
         crate::provenance::check_fetch(&module, &dir, issues);
 
         Some(module)

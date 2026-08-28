@@ -23,6 +23,12 @@ set -euxo pipefail
 MODDIR=/ctx/modules/core/hello
 export MODDIR
 
+if [ -f /etc/yum.repos.d/updates-testing.repo ]; then
+    echo "repo updates-testing is already configured"
+else
+    source /ctx/modules/core/hello/repo
+fi
+
 source /ctx/lib/family.sh
 
 TECT_ENABLE_REPO='updates-testing' install_packages 'fastfetch'
