@@ -100,6 +100,9 @@ pub struct Why {
     /// Which targets a host answer was read across. A repository reading is
     /// about every image by design and says nothing.
     pub scope: Scope,
+    /// On a host, the repository this image was built from and the commit it
+    /// was at. Empty for a repository reading, which is already in the tree.
+    pub source: Option<(String, String)>,
 }
 
 /// What a baked answer covers. A built image is one target, and the manifest
@@ -314,6 +317,17 @@ impl Why {
                 listed(&self.suppressed),
             ),
         }));
+        if let Some((url, commit)) = &self.source {
+            let short: String = commit.chars().take(7).collect();
+            out.push(Part::Text(format!("Built from {url} at `{short}`.")));
+            // The module tree is deliberately not in the finished image, so
+            // comparing this machine against its declarations means fetching
+            // them.
+            out.push(Part::Text(format!(
+                "`git clone {url} && git -C {} checkout {commit}`",
+                clone_dir(url)
+            )));
+        }
         if self.scope == Scope::EveryTarget {
             out.push(Part::Text(
                 "The build record names no target, so this is read across every target the baked \
@@ -643,6 +657,16 @@ fn evidence(header: &'static [&'static str], pins: &[(&str, &Fetch)], terminal: 
     })]
 }
 
+/// The directory `git clone <url>` makes, which the rest of the line has to
+/// change into.
+fn clone_dir(url: &str) -> &str {
+    url.trim_end_matches('/')
+        .rsplit('/')
+        .next()
+        .unwrap_or("repo")
+        .trim_end_matches(".git")
+}
+
 fn hash(value: &Option<String>) -> String {
     match value {
         Some(hash) => format!("`{hash}`"),
@@ -714,7 +738,7 @@ pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why
     };
     let mut found = false;
 
-    for target in targets {
+    for target in &targets {
         // By the whole path, as `of` is: `matching` already chose which module
         // was meant, and a suffix match here could pick a different one.
         let Some(module) = items(target, "modules")
@@ -814,6 +838,18 @@ pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why
         return None;
     }
 
+    // Where this machine came from. **This is not the seeding refusal**: that
+    // forbids deriving *declarations* back out of *resolved output*, and this
+    // fetches the real declarations rather than reconstructing them. It is
+    // also why there is no verb — the line below is copy-pasteable exactly
+    // where it is wanted.
+    if let ([target], Some(record)) = (targets.as_slice(), record) {
+        why.source = image_of(manifest, target)
+            .and_then(|image| text(image, "url"))
+            .filter(|url| !url.is_empty())
+            .zip(text(record, "source_commit"));
+    }
+
     // What the build observed, where the manifest only says what was declared.
     if let Some(record) = record {
         why.built = items(record, "modules")
@@ -866,11 +902,12 @@ mod tests {
     #[test]
     fn a_host_answer_is_scoped_to_the_target_the_record_names() {
         let manifest = crate::emit::json::Json::parse(
-            r#"{"images": [{"targets": [
-                {"name": "desktop", "published": "desktop", "modules": [
+            r#"{"images": [{"id": "desktop", "url": "https://example.com/os/desktop",
+              "targets": [
+                {"name": "desktop", "image": "desktop", "published": "desktop", "modules": [
                     {"path": "apps/kde", "provides": ["desktop"]}
                 ]},
-                {"name": "desktop/dx", "published": "desktop-dx", "modules": [
+                {"name": "desktop/dx", "image": "desktop", "published": "desktop-dx", "modules": [
                     {"path": "apps/kde", "provides": ["desktop"]},
                     {"path": "apps/vscodium", "requires": ["desktop"]}
                 ]}
@@ -898,6 +935,27 @@ mod tests {
         assert_eq!(
             why.provides,
             [("desktop".to_string(), vec!["apps/vscodium".to_string()])]
+        );
+
+        // The module tree is not in a finished image, so the read-out prints
+        // the clone that fetches the real declarations rather than a verb
+        // that would reconstruct them.
+        let record = crate::emit::json::Json::parse(
+            r#"{"target": "desktop", "source_commit": "1f2bb19aa"}"#,
+        )
+        .expect("the record is a document");
+        let built = on_host(&manifest, Some(&record), "apps/kde")
+            .expect("the image carries it")
+            .markdown();
+        assert!(
+            built.contains("Built from https://example.com/os/desktop at `1f2bb19`"),
+            "{built}"
+        );
+        assert!(
+            built.contains(
+                "`git clone https://example.com/os/desktop && git -C desktop checkout 1f2bb19aa`"
+            ),
+            "{built}"
         );
 
         // No record, and no target in one that has none: the old answer, said
