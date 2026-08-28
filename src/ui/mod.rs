@@ -559,9 +559,14 @@ fn nested(
         .collect();
     let shown = items.len();
     frame.render_stateful_widget(List::new(items).highlight_symbol("> "), body, state);
+    // No `filter:` label: the hint says what typing does, and the ten columns
+    // it cost were the tail of the hint at the narrowest terminal.
     frame.render_widget(
         Line::from(vec![
-            Span::raw(format!("filter: {filter}  ")),
+            Span::raw(match filter.is_empty() {
+                true => String::new(),
+                false => format!("{filter}  "),
+            }),
             Span::styled(hint(NEST, state, body.height, shown), Style::new().dim()),
         ]),
         foot,
@@ -630,6 +635,32 @@ mod tests {
         let drawn = drawn(&options, None, EITHER, 0);
         assert!(drawn.contains("> Yes"), "{drawn}");
         assert!(!drawn.contains('['), "{drawn}");
+    }
+
+    /// The narrowest terminal the tool draws for. A hint cut in half is the
+    /// same defect the questions had.
+    #[test]
+    fn every_hint_fits_the_narrowest_terminal() {
+        let mut state = ListState::default().with_selected(Some(0));
+        for hint in [PICK, TOGGLE, EITHER] {
+            let mut terminal = Terminal::new(TestBackend::new(60, 4)).unwrap();
+            terminal
+                .draw(|frame| {
+                    draw(
+                        frame,
+                        "which module",
+                        &[Choice::new("gaming", "")],
+                        None,
+                        hint,
+                        &mut state,
+                    )
+                })
+                .unwrap();
+            let drawn = terminal.backend().to_string();
+            assert!(drawn.contains(hint), "{drawn}");
+        }
+        let drawn = nest_drawn_at(60, &rules(), &[true; 7], &[], "", 0);
+        assert!(drawn.contains(NEST), "{drawn}");
     }
 
     #[test]
@@ -701,11 +732,22 @@ mod tests {
         filter: &str,
         at: usize,
     ) -> String {
+        nest_drawn_at(60, options, open, on, filter, at)
+    }
+
+    fn nest_drawn_at(
+        width: u16,
+        options: &[Choice],
+        open: &[bool],
+        on: &[usize],
+        filter: &str,
+        at: usize,
+    ) -> String {
         let nodes = nodes(options);
         let rows = shown(&nodes, options, open, filter);
         let mut state = ListState::default().with_selected(Some(at));
         let height = rows.len() as u16 + 5;
-        let mut terminal = Terminal::new(TestBackend::new(60, height)).unwrap();
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
         terminal
             .draw(|frame| {
                 nested(
@@ -794,6 +836,6 @@ mod tests {
         assert!(drawn.contains("> [x]     1.1.2 nodev"), "{drawn}");
         assert!(drawn.contains("[-]   \u{25be} 1.1"), "{drawn}");
         assert!(drawn.contains("no device files there"), "{drawn}");
-        assert!(drawn.contains("filter:   type to filter"), "{drawn}");
+        assert!(drawn.contains(NEST), "{drawn}");
     }
 }

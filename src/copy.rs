@@ -114,7 +114,7 @@ pub const PICK: &str = "up and down to move, enter to choose, esc cancels";
 pub const TOGGLE: &str = "space toggles, enter confirms, esc cancels";
 pub const EITHER: &str = "up and down to move, enter to answer";
 /// No `j` and `k` here: every printable key is the filter being typed.
-pub const NEST: &str = "type to filter, space toggles, ←/→ opens, enter confirms";
+pub const NEST: &str = "filter, space toggles, ←/→ opens, enter confirms";
 
 #[cfg(test)]
 mod tests {
