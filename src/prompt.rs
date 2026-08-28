@@ -202,6 +202,10 @@ impl Prompt {
 
     /// The same, editing an existing answer: it opens on that answer, marks it
     /// in the numbered list, and takes an empty answer as keeping it.
+    ///
+    /// `set conforms`'s profile question and `set claims`'s image question edit
+    /// declarations that already exist and should open on them; both still call
+    /// `choose`.
     pub fn choose_current(
         &self,
         question: &str,
