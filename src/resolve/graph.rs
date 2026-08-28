@@ -148,6 +148,7 @@ pub fn check_graph(image: &Image, root: &Path, index: &Index, issues: &mut Issue
             module
                 .packages
                 .iter()
+                .chain(&module.groups)
                 .any(|group| group.family == base_family)
         });
         let has_adapter = offered.get("build-environment").is_some_and(|providers| {

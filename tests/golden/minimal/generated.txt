@@ -32,6 +32,8 @@ fi
 source /ctx/lib/family.sh
 
 TECT_ENABLE_REPO='updates-testing' install_packages 'fastfetch'
+
+install_groups 'core'
 ==== generated/minimal.d/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.

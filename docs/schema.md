@@ -644,6 +644,20 @@ One base family, and the packages to install on it.
 | --- | --- | --- |
 | `enablerepo=` | a string | A repository enabled for this install and disabled otherwise. Fedora only. |
 
+### `package-groups`
+
+The package groups this module installs, listed per base family. Fedora only.
+
+#### `<name>`
+
+One base family, and the groups to install on it.
+
+*one or more strings*
+
+| Property | Value | Meaning |
+| --- | --- | --- |
+| `enablerepo=` | a string | A repository enabled for this install and disabled otherwise. |
+
 ### `satisfies`
 
 The benchmarks and rules this module claims to harden, as an audit declaration the tool records rather than certifies.

@@ -45,6 +45,18 @@ impl Fetch {
     }
 }
 
+/// One family-keyed name list, as `plan.json` and `why --format json` both
+/// spell it.
+fn batches(declared: &[(String, Vec<String>, Option<String>)]) -> Json {
+    Json::array(declared.iter().map(|(family, names, repo)| {
+        Json::object([
+            ("family", Json::string(family)),
+            ("names", Json::strings(names.clone())),
+            ("enablerepo", Json::optional(repo.clone())),
+        ])
+    }))
+}
+
 /// Everything the read-out says, gathered before anything is rendered so the
 /// two readings meet here rather than in the output.
 #[derive(Default)]
@@ -60,6 +72,8 @@ pub struct Why {
     pub requires: Vec<(String, Option<String>)>,
     /// Family, package names, and the repository enabled for that install.
     pub packages: Vec<(String, Vec<String>, Option<String>)>,
+    /// The same, for the package groups the family adapter installs.
+    pub groups: Vec<(String, Vec<String>, Option<String>)>,
     pub satisfies: Vec<(String, Vec<String>)>,
     pub content: Option<String>,
     /// The collection it was imported from, and the pin that collection had.
@@ -160,18 +174,19 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
             why.suppressed.push(image.id.clone());
         }
         if listed || suppressed {
-            for group in module
-                .packages
-                .iter()
-                .filter(|group| group.family == family)
-            {
-                let declared = (
-                    group.family.clone(),
-                    group.packages.clone(),
-                    group.enablerepo.clone(),
-                );
-                if !why.packages.contains(&declared) {
-                    why.packages.push(declared);
+            for (into, batches) in [
+                (&mut why.packages, &module.packages),
+                (&mut why.groups, &module.groups),
+            ] {
+                for batch in batches.iter().filter(|batch| batch.family == family) {
+                    let declared = (
+                        batch.family.clone(),
+                        batch.packages.clone(),
+                        batch.enablerepo.clone(),
+                    );
+                    if !into.contains(&declared) {
+                        into.push(declared);
+                    }
                 }
             }
         }
@@ -303,32 +318,42 @@ impl Why {
             }));
         }
 
-        if !self.packages.is_empty() {
+        if !self.packages.is_empty() || !self.groups.is_empty() {
             out.push(Part::Heading("What it declares to install".into()));
-            out.push(Part::Table(Table {
-                title: String::new(),
-                header: &["Family", "Packages", "Enabled repository"],
-                rows: self
-                    .packages
-                    .iter()
-                    .map(|(family, packages, repo)| {
-                        (
-                            vec![
-                                format!("`{family}`"),
-                                packages
-                                    .iter()
-                                    .map(|package| format!("`{package}`"))
-                                    .collect::<Vec<_>>()
-                                    .join(", "),
-                                repo.as_ref()
-                                    .map(|repo| format!("`{repo}`"))
-                                    .unwrap_or_else(|| "default".into()),
-                            ],
-                            false,
-                        )
-                    })
-                    .collect(),
-            }));
+            for (header, declared) in [
+                (
+                    &["Family", "Packages", "Enabled repository"],
+                    &self.packages,
+                ),
+                (&["Family", "Groups", "Enabled repository"], &self.groups),
+            ] {
+                if declared.is_empty() {
+                    continue;
+                }
+                out.push(Part::Table(Table {
+                    title: String::new(),
+                    header: header.as_slice(),
+                    rows: declared
+                        .iter()
+                        .map(|(family, names, repo)| {
+                            (
+                                vec![
+                                    format!("`{family}`"),
+                                    names
+                                        .iter()
+                                        .map(|name| format!("`{name}`"))
+                                        .collect::<Vec<_>>()
+                                        .join(", "),
+                                    repo.as_ref()
+                                        .map(|repo| format!("`{repo}`"))
+                                        .unwrap_or_else(|| "default".into()),
+                                ],
+                                false,
+                            )
+                        })
+                        .collect(),
+                }));
+            }
         }
 
         out.push(Part::Heading("What it claims".into()));
@@ -475,16 +500,8 @@ impl Why {
                     ])
                 })),
             ),
-            (
-                "packages",
-                Json::array(self.packages.iter().map(|(family, packages, repo)| {
-                    Json::object([
-                        ("family", Json::string(family)),
-                        ("names", Json::strings(packages.clone())),
-                        ("enablerepo", Json::optional(repo.clone())),
-                    ])
-                })),
-            ),
+            ("packages", batches(&self.packages)),
+            ("groups", batches(&self.groups)),
             (
                 "satisfies",
                 Json::array(self.satisfies.iter().map(|(benchmark, rules)| {
@@ -669,13 +686,15 @@ pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why
                 why.requires.push((name, from));
             }
         }
-        for group in items(module, "packages") {
-            let Some(family) = text(group, "family") else {
-                continue;
-            };
-            let declared = (family, strings(group, "names"), text(group, "enablerepo"));
-            if !why.packages.contains(&declared) {
-                why.packages.push(declared);
+        for (into, field) in [(&mut why.packages, "packages"), (&mut why.groups, "groups")] {
+            for batch in items(module, field) {
+                let Some(family) = text(batch, "family") else {
+                    continue;
+                };
+                let declared = (family, strings(batch, "names"), text(batch, "enablerepo"));
+                if !into.contains(&declared) {
+                    into.push(declared);
+                }
             }
         }
         for claim in items(module, "satisfies") {

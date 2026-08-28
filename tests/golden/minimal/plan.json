@@ -62,8 +62,9 @@
               ],
               "requires": [],
               "packages": [],
+              "groups": [],
               "provenance": {
-                "content": "5c6f954af6de4efc68c5525e8a65e941dff618e34ac7cb721cf0abb9f85e1364",
+                "content": "7cd25d10a40660150fe5dbcc5e32abdeea6bc4606e8d575d3d666d325a983cb2",
                 "repo": false,
                 "pin": null,
                 "imported": null
@@ -89,8 +90,17 @@
                   "enablerepo": "updates-testing"
                 }
               ],
+              "groups": [
+                {
+                  "family": "fedora",
+                  "names": [
+                    "core"
+                  ],
+                  "enablerepo": null
+                }
+              ],
               "provenance": {
-                "content": "411bdc7dde15833a9e241d175d50efed008f56d3e9202686b07ec1a8365b9622",
+                "content": "4a76d0540ec5ee5786527c05a17d22ca61c9b04ac44182850273295a3d0f2fc9",
                 "repo": true,
                 "pin": null,
                 "imported": null

@@ -62,6 +62,7 @@
               ],
               "requires": [],
               "packages": [],
+              "groups": [],
               "provenance": {
                 "content": "d0aef64747bab757d5abe18e45642c433f89d89fedefa3ff470157d222d2bb48",
                 "repo": false,
@@ -90,6 +91,7 @@
                   "enablerepo": null
                 }
               ],
+              "groups": [],
               "provenance": {
                 "content": "bc71ee256b11752cba5dec1bd1034ccae9850624f24370f1ac8509b2aa3bbc1f",
                 "repo": false,
@@ -157,6 +159,7 @@
               ],
               "requires": [],
               "packages": [],
+              "groups": [],
               "provenance": {
                 "content": "d0aef64747bab757d5abe18e45642c433f89d89fedefa3ff470157d222d2bb48",
                 "repo": false,
@@ -185,6 +188,7 @@
                   "enablerepo": null
                 }
               ],
+              "groups": [],
               "provenance": {
                 "content": "bc71ee256b11752cba5dec1bd1034ccae9850624f24370f1ac8509b2aa3bbc1f",
                 "repo": false,

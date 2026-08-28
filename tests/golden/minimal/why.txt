@@ -17,6 +17,10 @@ Nothing: it neither provides nor requires.
 | --- | --- | --- |
 | `fedora` | `fastfetch` | `updates-testing` |
 
+| Family | Groups | Enabled repository |
+| --- | --- | --- |
+| `fedora` | `core` | default |
+
 ## What it claims
 
 Nothing. It declares no `satisfies`.
@@ -25,7 +29,7 @@ Nothing. It declares no `satisfies`.
 
 | Content | Hash |
 | --- | --- |
-| declared | `411bdc7dde15833a9e241d175d50efed008f56d3e9202686b07ec1a8365b9622` |
+| declared | `4a76d0540ec5ee5786527c05a17d22ca61c9b04ac44182850273295a3d0f2fc9` |
 
 It was written in this repository rather than imported, so nothing upstream to compare it against.
 
@@ -60,8 +64,17 @@ It enables one, in `modules/core/hello/repo`. There is no grammar for that file,
       "enablerepo": "updates-testing"
     }
   ],
+  "groups": [
+    {
+      "family": "fedora",
+      "names": [
+        "core"
+      ],
+      "enablerepo": null
+    }
+  ],
   "satisfies": [],
-  "content": "411bdc7dde15833a9e241d175d50efed008f56d3e9202686b07ec1a8365b9622",
+  "content": "4a76d0540ec5ee5786527c05a17d22ca61c9b04ac44182850273295a3d0f2fc9",
   "built": null,
   "imported": null,
   "modified": false,
@@ -93,6 +106,10 @@ Nothing: it neither provides nor requires.
 | --- | --- | --- |
 | `fedora` | `fastfetch` | `updates-testing` |
 
+| Family | Groups | Enabled repository |
+| --- | --- | --- |
+| `fedora` | `core` | default |
+
 ## What it claims
 
 Nothing. It declares no `satisfies`.
@@ -101,7 +118,7 @@ Nothing. It declares no `satisfies`.
 
 | Content | Hash |
 | --- | --- |
-| declared | `411bdc7dde15833a9e241d175d50efed008f56d3e9202686b07ec1a8365b9622` |
+| declared | `4a76d0540ec5ee5786527c05a17d22ca61c9b04ac44182850273295a3d0f2fc9` |
 
 It was written in this repository rather than imported, so nothing upstream to compare it against.
 
@@ -122,7 +139,7 @@ hello, fedora-family
 
 | Content | Hash |
 | --- | --- |
-| declared | `411bdc7dde15833a9e241d175d50efed008f56d3e9202686b07ec1a8365b9622` |
+| declared | `4a76d0540ec5ee5786527c05a17d22ca61c9b04ac44182850273295a3d0f2fc9` |
 | observed by the build | `not what was declared` |
 
 **The two documents disagree**, which they cannot if both came from this build.

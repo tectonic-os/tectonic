@@ -5,8 +5,9 @@ use crate::model::asset::Asset;
 use crate::model::options::{Opt, Variant};
 use crate::provenance::record::Record;
 
-/// A batch of packages keyed to a base family, with an optional repo to enable
-/// for just this install.
+/// A batch of names keyed to a base family, with an optional repo to enable
+/// for just this install. Ordinary packages and package groups have the same
+/// shape and differ only in the helper the layer calls.
 #[derive(Debug)]
 pub struct PackageGroup {
     pub family: String,
@@ -122,6 +123,9 @@ pub struct Module {
     /// Packages keyed to base family, installed by the generator before
     /// module.sh runs.
     pub packages: Vec<PackageGroup>,
+    /// Package groups keyed to base family, installed after the ordinary
+    /// packages and before module.sh runs.
+    pub groups: Vec<PackageGroup>,
     /// Files mounted by basename into /ctx/lib in every standard module layer.
     pub helpers: Vec<Decl>,
     pub satisfies: Vec<Coverage>,

@@ -78,6 +78,7 @@
               ],
               "requires": [],
               "packages": [],
+              "groups": [],
               "provenance": {
                 "content": "5c6f954af6de4efc68c5525e8a65e941dff618e34ac7cb721cf0abb9f85e1364",
                 "repo": false,
@@ -105,6 +106,7 @@
                   "enablerepo": null
                 }
               ],
+              "groups": [],
               "provenance": {
                 "content": "5e07652a052642f48a2ed4254583c3d2a255a61307560603b8da6bfbec66d840",
                 "repo": false,

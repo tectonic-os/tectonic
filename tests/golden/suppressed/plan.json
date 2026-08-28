@@ -65,6 +65,7 @@
                 "flatpak"
               ],
               "packages": [],
+              "groups": [],
               "provenance": {
                 "content": "6b5011cea8d1b0778c71ed6de4797852d7ab9cb42da35597dc41a0411318d43d",
                 "repo": false,
@@ -99,6 +100,7 @@
                   "enablerepo": null
                 }
               ],
+              "groups": [],
               "provenance": {
                 "content": "f86ab0bde98e71158432e4f9d66377f98faaf5db4065748208a5fcf70fe701ae",
                 "repo": false,

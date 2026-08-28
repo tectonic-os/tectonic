@@ -227,6 +227,19 @@ pub const MODULE: Node = Node::new("module",
                     ], Say::new("unknown property `{}` in packages block", "not part of the schema",
                         "a family entry in `packages` accepts `enablerepo`")),
             ], Say::NONE),
+
+        Node::new("package-groups", "The package groups this module installs, listed per base family. Fedora only.")
+            .children(&[
+                Node::new("", "One base family, and the groups to install on it.")
+                    .arg(Arg::Strs, Say::NONE)
+                    .props(&[
+                        Prop { name: "enablerepo", kind: Kind::Str,
+                            desc: "A repository enabled for this install and disabled otherwise.",
+                            say: Say::NONE,
+                            missing: Say::NONE },
+                    ], Say::new("unknown property `{}` in package-groups block", "not part of the schema",
+                        "a family entry in `package-groups` accepts `enablerepo`")),
+            ], Say::NONE),
         Node::new("satisfies", "The benchmarks and rules this module claims to harden, as an audit declaration the tool records rather than certifies.")
             .once("a module makes one claim set; two blocks split it")
             .children(&[
@@ -236,6 +249,111 @@ pub const MODULE: Node = Node::new("module",
             ], Say::NONE),
     ], Say::new("unknown node `{}`", "not part of the schema",
         "docs/schema.md documents every node a manifest may hold"));
+
+/// The family-keyed name lists `packages` and `package-groups` both hold: one
+/// child per base family, the names as positional arguments, and an optional
+/// repository enabled for that install alone.
+fn family_names(
+    node: &KdlNode,
+    src: &Source,
+    issues: &mut Issues,
+    noun: &str,
+    sample: &str,
+    fedora_only: bool,
+) -> Vec<PackageGroup> {
+    let block = node.name().value();
+    let Some(children) = node.children() else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for child in children.nodes() {
+        let family = child.name().value().to_string();
+        if family.is_empty() {
+            issues.push(
+                Issue::new(format!("a family name is required inside `{block}`"), src)
+                    .at(child.name().span(), "empty name")
+                    .help(format!("`{block} {{ fedora \"{sample}\" }}`")),
+            );
+            continue;
+        }
+        if !FAMILIES.contains(&family.as_str()) {
+            issues.push(
+                Issue::new(format!("unknown base family `{family}`"), src)
+                    .at(
+                        child.name().span(),
+                        "not a family this repository builds on",
+                    )
+                    .help(format!("known families: {}", FAMILIES.join(", "))),
+            );
+            continue;
+        }
+        if fedora_only && family != "fedora" {
+            issues.push(
+                Issue::new(format!("`{block}` is Fedora-only, not `{family}`"), src)
+                    .at(child.name().span(), "no group installer on this family")
+                    .help("only the Fedora adapter installs package groups"),
+            );
+            continue;
+        }
+        let mut names: Vec<String> = Vec::new();
+        for arg in child.entries().iter().filter(|e| e.name().is_none()) {
+            let Some(value) = arg.value().as_string() else {
+                issues.push(
+                    Issue::new(format!("a {noun} name has to be a string"), src)
+                        .at(arg.span(), "not a string")
+                        .help(format!("quote it: `fedora \"{sample}\"`")),
+                );
+                continue;
+            };
+            if let Some(problem) = bad_token(value) {
+                issues.push(
+                    Issue::new(format!("{noun} name `{value}` {problem}"), src)
+                        .at(arg.span(), "would not survive the RUN line")
+                        .help(TOKEN_HELP),
+                );
+                continue;
+            }
+            names.push(value.to_string());
+        }
+        if names.is_empty() {
+            issues.push(
+                Issue::new(format!("`{family}` has no {noun}s listed"), src)
+                    .at(child.name().span(), "nothing to install"),
+            );
+            continue;
+        }
+        let mut enablerepo: Option<String> = None;
+        if let Some(span) = prop_span(child, "enablerepo") {
+            if family != "fedora" {
+                issues.push(
+                    Issue::new(format!("`enablerepo` is Fedora-only, not `{family}`"), src)
+                        .at(span, "no repo to enable on this family")
+                        .help("only Fedora groups take `enablerepo`; a Debian or Ubuntu group installs from the base image's configured sources"),
+                );
+            } else if let Some(repo) = prop(child, "enablerepo").filter(|v| !v.is_empty()) {
+                match bad_token(repo) {
+                    Some(problem) => issues.push(
+                        Issue::new(format!("repo ID `{repo}` {problem}"), src)
+                            .at(span, "would not survive the RUN line")
+                            .help(TOKEN_HELP),
+                    ),
+                    None => enablerepo = Some(repo.to_string()),
+                }
+            } else {
+                issues.push(
+                    Issue::new("`enablerepo` needs a repo ID string", src).at(span, "not a string"),
+                );
+            }
+        }
+        out.push(PackageGroup {
+            family,
+            packages: names,
+            enablerepo,
+            span: child.name().span().into(),
+        });
+    }
+    out
+}
 
 /// A declared `priority=`, which the schema table holds to its range. `None`
 /// where one is declared is what the table already reported.
@@ -364,6 +482,7 @@ impl Module {
             variants: Vec::new(),
             assets: Vec::new(),
             packages: Vec::new(),
+            groups: Vec::new(),
             helpers: Vec::new(),
             satisfies: Vec::new(),
             resolved: Vec::new(),
@@ -458,6 +577,7 @@ impl Module {
                     }
                 }
                 "packages" => module.parse_packages(node, src, issues),
+                "package-groups" => module.parse_package_groups(node, src, issues),
                 "satisfies" => module.parse_satisfies(node, src, issues),
                 _ => {}
             }
@@ -883,88 +1003,21 @@ impl Module {
     /// `packages { fedora "pkg1" "pkg2" }` Each child node names a base family
     /// and carries the package names as positional arguments.
     fn parse_packages(&mut self, node: &KdlNode, src: &Source, issues: &mut Issues) {
-        let Some(children) = node.children() else {
-            return;
-        };
-        for child in children.nodes() {
-            let family = child.name().value().to_string();
-            if family.is_empty() {
-                issues.push(
-                    Issue::new("a family name is required inside `packages`", src)
-                        .at(child.name().span(), "empty name")
-                        .help("`packages { fedora \"pkg1\" \"pkg2\" }`"),
-                );
-                continue;
-            }
-            if !FAMILIES.contains(&family.as_str()) {
-                issues.push(
-                    Issue::new(format!("unknown base family `{family}`"), src)
-                        .at(
-                            child.name().span(),
-                            "not a family this repository builds on",
-                        )
-                        .help(format!("known families: {}", FAMILIES.join(", "))),
-                );
-                continue;
-            }
-            let mut packages: Vec<String> = Vec::new();
-            for arg in child.entries().iter().filter(|e| e.name().is_none()) {
-                let Some(value) = arg.value().as_string() else {
-                    issues.push(
-                        Issue::new("a package name has to be a string", src)
-                            .at(arg.span(), "not a string")
-                            .help("quote it: `fedora \"7zip\"`"),
-                    );
-                    continue;
-                };
-                if let Some(problem) = bad_token(value) {
-                    issues.push(
-                        Issue::new(format!("package name `{value}` {problem}"), src)
-                            .at(arg.span(), "would not survive the RUN line")
-                            .help(TOKEN_HELP),
-                    );
-                    continue;
-                }
-                packages.push(value.to_string());
-            }
-            if packages.is_empty() {
-                issues.push(
-                    Issue::new(format!("`{family}` has no packages listed"), src)
-                        .at(child.name().span(), "nothing to install"),
-                );
-                continue;
-            }
-            let mut enablerepo: Option<String> = None;
-            if let Some(span) = prop_span(child, "enablerepo") {
-                if family != "fedora" {
-                    issues.push(
-                        Issue::new(format!("`enablerepo` is Fedora-only, not `{family}`"), src)
-                            .at(span, "no repo to enable on this family")
-                            .help("only Fedora groups take `enablerepo`; a Debian or Ubuntu group installs from the base image's configured sources"),
-                    );
-                } else if let Some(repo) = prop(child, "enablerepo").filter(|v| !v.is_empty()) {
-                    match bad_token(repo) {
-                        Some(problem) => issues.push(
-                            Issue::new(format!("repo ID `{repo}` {problem}"), src)
-                                .at(span, "would not survive the RUN line")
-                                .help(TOKEN_HELP),
-                        ),
-                        None => enablerepo = Some(repo.to_string()),
-                    }
-                } else {
-                    issues.push(
-                        Issue::new("`enablerepo` needs a repo ID string", src)
-                            .at(span, "not a string"),
-                    );
-                }
-            }
-            self.packages.push(PackageGroup {
-                family,
-                packages,
-                enablerepo,
-                span: child.name().span().into(),
-            });
-        }
+        self.packages
+            .extend(family_names(node, src, issues, "package", "7zip", false));
+    }
+
+    /// `package-groups { fedora "kde-desktop" }` The same shape as `packages`,
+    /// installed by the family adapter's group verb rather than its package one.
+    fn parse_package_groups(&mut self, node: &KdlNode, src: &Source, issues: &mut Issues) {
+        self.groups.extend(family_names(
+            node,
+            src,
+            issues,
+            "package group",
+            "kde-desktop",
+            true,
+        ));
     }
 
     /// `satisfies { cis-fedora "1.1.1.1" }` Each child names a benchmark and
@@ -1185,6 +1238,9 @@ fragment
 packages {
     fedora "one" enablerepo="two" weak=#true
 }
+package-groups {
+    fedora "one" weak=#true
+}
 drives "a truck"
 satisfies {
     "" "1.1.1.1"
@@ -1217,6 +1273,7 @@ satisfies
                 "unknown fragment property `placement`",
                 "`fragment` is declared twice",
                 "unknown property `weak` in packages block",
+                "unknown property `weak` in package-groups block",
                 "unknown node `drives`",
                 "`cis-fedora` has no rules listed",
                 "benchmark `cis-fedora` is declared twice",
@@ -1264,6 +1321,36 @@ fragment standard-layer=#false
             "{found}"
         );
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// A package group is the Fedora adapter's verb, so no other family may
+    /// declare one at all.
+    #[test]
+    fn package_groups_are_fedora_only() {
+        let mut issues = Issues::default();
+        Module::parse(
+            "groups",
+            "groups",
+            Path::new("."),
+            r#"
+description "package groups"
+supports "fedora" "debian"
+package-groups {
+    fedora "kde-desktop"
+    debian "kde-desktop"
+}
+"#
+            .to_string(),
+            &mut issues,
+        );
+        assert_eq!(
+            issues
+                .plain()
+                .lines()
+                .filter_map(|line| line.strip_prefix("  x "))
+                .collect::<Vec<_>>(),
+            ["`package-groups` is Fedora-only, not `debian`"]
+        );
     }
 
     /// `supports` and `packages` walk every family the tool recognises, and

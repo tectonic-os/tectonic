@@ -5,3 +5,7 @@ supports "fedora"
 packages {
     fedora "fastfetch" enablerepo="updates-testing"
 }
+
+package-groups {
+    fedora "core"
+}

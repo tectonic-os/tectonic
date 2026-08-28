@@ -114,22 +114,32 @@ fn script(
         }
     }
 
-    if module.packages.iter().any(|g| g.family == base_family) {
+    if module
+        .packages
+        .iter()
+        .chain(&module.groups)
+        .any(|group| group.family == base_family)
+    {
         out.push_str("\nsource /ctx/lib/family.sh\n");
     }
-    for group in module.packages.iter().filter(|g| g.family == base_family) {
-        let packages = group
-            .packages
-            .iter()
-            .map(|package| shell(package))
-            .collect::<Vec<_>>()
-            .join(" ");
-        let repo = group
-            .enablerepo
-            .as_ref()
-            .map(|repo| format!("TECT_ENABLE_REPO={} ", shell(repo)))
-            .unwrap_or_default();
-        let _ = write!(out, "\n{repo}install_packages {packages}\n");
+    for (helper, declared) in [
+        ("install_packages", &module.packages),
+        ("install_groups", &module.groups),
+    ] {
+        for batch in declared.iter().filter(|g| g.family == base_family) {
+            let names = batch
+                .packages
+                .iter()
+                .map(|name| shell(name))
+                .collect::<Vec<_>>()
+                .join(" ");
+            let repo = batch
+                .enablerepo
+                .as_ref()
+                .map(|repo| format!("TECT_ENABLE_REPO={} ", shell(repo)))
+                .unwrap_or_default();
+            let _ = write!(out, "\n{repo}{helper} {names}\n");
+        }
     }
 
     if on_disk.join("module.sh").is_file() {
