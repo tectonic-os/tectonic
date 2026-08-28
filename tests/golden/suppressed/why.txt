@@ -13,6 +13,12 @@ Nowhere. suppressed lists it and builds no layer for it: everything it provides,
 | --- | --- | --- |
 | provides | `flatpak` | apps/browser |
 
+## What it declares to install
+
+| Family | Packages | Enabled repository |
+| --- | --- | --- |
+| `fedora` | `flatpak` | default |
+
 ## What it claims
 
 | Benchmark | Rules |

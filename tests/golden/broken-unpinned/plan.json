@@ -75,6 +75,7 @@
               "options": {},
               "provides": [],
               "requires": [],
+              "packages": [],
               "provenance": {
                 "content": null,
                 "repo": false,

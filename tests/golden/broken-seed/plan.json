@@ -73,6 +73,7 @@
               "options": {},
               "provides": [],
               "requires": [],
+              "packages": [],
               "provenance": {
                 "content": "23c660d4b7f0ebd664ab2c3d6571db7946eb1298d7e879e7e45b4ca5ae02de98",
                 "repo": false,
@@ -91,6 +92,7 @@
               "options": {},
               "provides": [],
               "requires": [],
+              "packages": [],
               "provenance": {
                 "content": "892be2a37e9809e4ddd11f8a3a112be4c7af0d39756e7a32576cea9acaa9a30b",
                 "repo": false,

@@ -61,6 +61,7 @@
                 "build-environment"
               ],
               "requires": [],
+              "packages": [],
               "provenance": {
                 "content": "5c6f954af6de4efc68c5525e8a65e941dff618e34ac7cb721cf0abb9f85e1364",
                 "repo": false,
@@ -79,6 +80,15 @@
               "options": {},
               "provides": [],
               "requires": [],
+              "packages": [
+                {
+                  "family": "fedora",
+                  "names": [
+                    "fastfetch"
+                  ],
+                  "enablerepo": "updates-testing"
+                }
+              ],
               "provenance": {
                 "content": "411bdc7dde15833a9e241d175d50efed008f56d3e9202686b07ec1a8365b9622",
                 "repo": true,

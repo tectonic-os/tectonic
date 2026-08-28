@@ -62,6 +62,7 @@
               },
               "provides": [],
               "requires": [],
+              "packages": [],
               "provenance": {
                 "content": "89fe9645e4750fd20f710d9f1dcf585913dbd7c73730cfa54a535fe7bc390a11",
                 "repo": false,

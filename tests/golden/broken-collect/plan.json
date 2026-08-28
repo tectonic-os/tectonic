@@ -59,6 +59,7 @@
               "options": {},
               "provides": [],
               "requires": [],
+              "packages": [],
               "provenance": {
                 "content": "48e1e5fa3c4a12fa82d1fc5a8c241ed07924604fe8c33160e75f15bdac8d09d9",
                 "repo": false,
@@ -77,6 +78,7 @@
               "options": {},
               "provides": [],
               "requires": [],
+              "packages": [],
               "provenance": {
                 "content": "123d9b5e495fe3f9a2e060c29d6d0002fb7d20078491b9fec36073d659253c13",
                 "repo": false,
@@ -95,6 +97,7 @@
               "options": {},
               "provides": [],
               "requires": [],
+              "packages": [],
               "provenance": {
                 "content": "c976a7300da31fd7b4fb56f1eb99fdd3bde567f1d773cb290250213dc3547f2a",
                 "repo": false,

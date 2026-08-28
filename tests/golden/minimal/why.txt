@@ -1,0 +1,131 @@
+==== markdown
+# core/hello
+
+The smallest module a repository can hold
+
+## Where it is built
+
+minimal
+
+## What it exchanges
+
+Nothing: it neither provides nor requires.
+
+## What it declares to install
+
+| Family | Packages | Enabled repository |
+| --- | --- | --- |
+| `fedora` | `fastfetch` | `updates-testing` |
+
+## What it claims
+
+Nothing. It declares no `satisfies`.
+
+## Where it came from
+
+| Content | Hash |
+| --- | --- |
+| declared | `411bdc7dde15833a9e241d175d50efed008f56d3e9202686b07ec1a8365b9622` |
+
+It was written in this repository rather than imported, so nothing upstream to compare it against.
+
+## What it pulls in
+
+Nothing. It declares no `asset`.
+
+## Third-party repositories
+
+It enables one, in `modules/core/hello/repo`. There is no grammar for that file, so read it: it is shell calling the family's config manager.
+
+| URL it names |
+| --- |
+| https://example.invalid/updates-testing.repo |
+
+==== json
+{
+  "module": "core/hello",
+  "description": "The smallest module a repository can hold",
+  "images": [
+    "minimal"
+  ],
+  "suppressed": [],
+  "provides": [],
+  "requires": [],
+  "packages": [
+    {
+      "family": "fedora",
+      "names": [
+        "fastfetch"
+      ],
+      "enablerepo": "updates-testing"
+    }
+  ],
+  "satisfies": [],
+  "content": "411bdc7dde15833a9e241d175d50efed008f56d3e9202686b07ec1a8365b9622",
+  "built": null,
+  "imported": null,
+  "modified": false,
+  "fetches": [],
+  "repo": [
+    "https://example.invalid/updates-testing.repo"
+  ]
+}
+==== unknown
+  x `nosuch` is not a module this repository lists
+  help: modules: hello, fedora-family
+
+==== from the baked manifest, with no repository
+# core/hello
+
+The smallest module a repository can hold
+
+## Where it is built
+
+minimal
+
+## What it exchanges
+
+Nothing: it neither provides nor requires.
+
+## What it declares to install
+
+| Family | Packages | Enabled repository |
+| --- | --- | --- |
+| `fedora` | `fastfetch` | `updates-testing` |
+
+## What it claims
+
+Nothing. It declares no `satisfies`.
+
+## Where it came from
+
+| Content | Hash |
+| --- | --- |
+| declared | `411bdc7dde15833a9e241d175d50efed008f56d3e9202686b07ec1a8365b9622` |
+
+It was written in this repository rather than imported, so nothing upstream to compare it against.
+
+## What it pulls in
+
+Nothing. It declares no `asset`.
+
+## Third-party repositories
+
+It enables one, in `modules/core/hello/repo`. There is no grammar for that file, so read it: it is shell calling the family's config manager.
+
+Not readable from here: a finished image carries the manifest, not the module tree.
+
+==== the names it knows
+hello, fedora-family
+==== against a build record that disagrees
+
+
+| Content | Hash |
+| --- | --- |
+| declared | `411bdc7dde15833a9e241d175d50efed008f56d3e9202686b07ec1a8365b9622` |
+| observed by the build | `not what was declared` |
+
+**The two documents disagree**, which they cannot if both came from this build.
+
+It was written in this repository rather than imported, so nothing upstream to compare it against.
+

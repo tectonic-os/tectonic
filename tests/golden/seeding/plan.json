@@ -88,6 +88,7 @@
                 "build-environment"
               ],
               "requires": [],
+              "packages": [],
               "provenance": {
                 "content": "5c6f954af6de4efc68c5525e8a65e941dff618e34ac7cb721cf0abb9f85e1364",
                 "repo": false,
@@ -106,6 +107,15 @@
               "options": {},
               "provides": [],
               "requires": [],
+              "packages": [
+                {
+                  "family": "fedora",
+                  "names": [
+                    "fastfetch"
+                  ],
+                  "enablerepo": null
+                }
+              ],
               "provenance": {
                 "content": "987959e7e222f7d6449d7a973aebd8b0c409357e4d67f78ad0d6feb421053ad8",
                 "repo": false,
@@ -129,6 +139,15 @@
                 "flatpak"
               ],
               "requires": [],
+              "packages": [
+                {
+                  "family": "fedora",
+                  "names": [
+                    "flatpak"
+                  ],
+                  "enablerepo": null
+                }
+              ],
               "provenance": {
                 "content": "669ec9f26e62b112f7d7c790552d0ef16ceb1f04b9d3547cc263c175015182f4",
                 "repo": false,
@@ -188,6 +207,7 @@
                 "build-environment"
               ],
               "requires": [],
+              "packages": [],
               "provenance": {
                 "content": "5c6f954af6de4efc68c5525e8a65e941dff618e34ac7cb721cf0abb9f85e1364",
                 "repo": false,
@@ -206,6 +226,15 @@
               "options": {},
               "provides": [],
               "requires": [],
+              "packages": [
+                {
+                  "family": "fedora",
+                  "names": [
+                    "fastfetch"
+                  ],
+                  "enablerepo": null
+                }
+              ],
               "provenance": {
                 "content": "987959e7e222f7d6449d7a973aebd8b0c409357e4d67f78ad0d6feb421053ad8",
                 "repo": false,
@@ -229,6 +258,15 @@
                 "flatpak"
               ],
               "requires": [],
+              "packages": [
+                {
+                  "family": "fedora",
+                  "names": [
+                    "flatpak"
+                  ],
+                  "enablerepo": null
+                }
+              ],
               "provenance": {
                 "content": "669ec9f26e62b112f7d7c790552d0ef16ceb1f04b9d3547cc263c175015182f4",
                 "repo": false,
@@ -256,6 +294,15 @@
               "options": {},
               "provides": [],
               "requires": [],
+              "packages": [
+                {
+                  "family": "fedora",
+                  "names": [
+                    "akmod-nvidia"
+                  ],
+                  "enablerepo": null
+                }
+              ],
               "provenance": {
                 "content": "678c23e20ae43a4a23e082356550942d582907b1d22514cfed2276972158408c",
                 "repo": false,
