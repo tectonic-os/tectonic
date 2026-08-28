@@ -166,6 +166,7 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
         ),
         format!("ASSET_RESOLUTIONS={}", resolutions.join(" ")),
         format!("SOURCE_COMMIT={source_commit}"),
+        format!("BUILD_BACKEND={backend}"),
         format!("AUDIT_ENFORCE={}", list.audit_enforce),
     ];
     if let Some(base) = &image.base {

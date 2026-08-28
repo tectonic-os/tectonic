@@ -108,6 +108,9 @@ fn record(env: &dyn Fn(&str) -> Option<String>) -> Json {
         ("image", Json::optional(env("IMAGE_ID"))),
         ("version", Json::optional(env("IMAGE_VERSION"))),
         ("tect", Json::string(env!("CARGO_PKG_VERSION"))),
+        // Which of buildx and buildah produced this. Nothing else in the
+        // image can say, and the two do not always agree on what they make.
+        ("backend", Json::optional(env("BUILD_BACKEND"))),
         ("source_commit", Json::optional(env("SOURCE_COMMIT"))),
         (
             "base",
@@ -184,6 +187,7 @@ mod tests {
                 "TARGET" => "example-desktop",
                 "IMAGE_ID" => "example",
                 "SOURCE_COMMIT" => "deadbeef",
+                "BUILD_BACKEND" => "buildah",
                 "MODULE_HASHES" => "core/hello|aaa apps/browser|bbb",
                 "ASSET_RESOLUTIONS" => "mods/xone|xone|B7|3484f60",
                 _ => return None,
@@ -195,6 +199,7 @@ mod tests {
         assert!(out.contains("\"resolved\": \"quay.io/fedora/fedora-bootc:44@sha256:abc\""));
         assert!(out.contains("\"declared\": \"quay.io/fedora/fedora-bootc:44\""));
         assert!(out.contains("\"target\": \"example-desktop\""));
+        assert!(out.contains("\"backend\": \"buildah\""));
         assert!(out.contains("\"path\": \"apps/browser\""));
         assert!(out.contains("\"selector\": \"B7\""));
         // Nothing was declared, so the record says so rather than staying silent.
