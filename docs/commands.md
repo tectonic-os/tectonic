@@ -5,15 +5,33 @@ and the ones that need a repository. The two families at the end of this file �
 runs against, and what runs inside a build layer — are the contract rather than
 the help, and are not in that list.
 
-`tect` with nothing after it opens a picker of the same list where the output
-is a terminal, and prints the list where it is not. A verb with no noun —
-`tect create`, `tect copy`, `tect import`, `tect registry`, `tect set` — opens a picker of
-its nouns.
+`tect` with nothing after it opens a picker where the output is a terminal, and
+prints the list where it is not. A verb with no noun — `tect create`, `tect
+copy`, `tect import`, `tect registry`, `tect set` — opens a picker of its
+nouns. **The picker offers what runs where it was typed**, with each row's own
+description; the help above keeps every row and groups them by where they run.
 Leaving a picker is not an error: it exits 0 having done nothing.
 
 The repository is the nearest directory at or above the working directory
 holding a `repo.kdl`, or `--root <dir>`. Data goes to stdout, diagnostics to
 stderr. Exit 1 is the invocation, exit 2 the repository.
+
+## On a booted image
+
+A built image carries `/usr/share/tectonic/manifest.json` — what it declares it
+is made of — and `/usr/share/tectonic/build.json`, what the build resolved. With
+no `repo.kdl` anywhere above, `why`, `summary`, `scap content` and `plan`
+answer off those two and need no checkout. A repository wins whenever there is
+one, because it is the more specific answer and it has the source.
+
+Everything else needs the source tree and says so, naming what does answer here.
+
+**Every host answer is scoped to the target the record says this image was
+built as.** The manifest holds every target the repository declares, so an
+unscoped answer would describe an image that is not this one; a `summary` or
+`scap content` naming a different target is refused. A record that names no
+target falls back to reading across all of them and says in the output that it
+did.
 
 `docs/schema.md` is the reference for what the manifests hold.
 
@@ -603,10 +621,12 @@ whether it enables a third-party package repository.
 
 #### Notes:
 - It answers two ways from one renderer. In a repository it reads the resolved
-  plan. With no `repo.kdl` anywhere above it, it reads
-  `/usr/share/tectonic/manifest.json` and `/usr/share/tectonic/build.json`
-  instead, which every built image carries, so a live host can ask what it is
-  running and where that came from.
+  plan; on a booted image it reads the two baked documents, scoped to the
+  target the record names.
+- On a booted image it also prints the repository the image was built from and
+  the commit it was at, with the `git clone` that reaches them. The module tree
+  is deliberately not in the finished image, so comparing this machine against
+  its declarations means fetching them rather than reconstructing them.
 - A module edited since it was imported is said so plainly and is not an error.
   Forking one is legitimate; what the record buys is that the fork is visible
   rather than silent. `audit { enforce #true }` is what makes it fail.
