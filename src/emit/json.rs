@@ -366,3 +366,36 @@ fn utf8_width(byte: u8) -> usize {
         _ => 4,
     }
 }
+
+/// Reading a document back, which the manifest and the build record an image
+/// carries are the only cases of: everything else here writes one.
+pub fn field<'a>(value: &'a Json, key: &str) -> Option<&'a Json> {
+    match value {
+        Json::Object(fields) => fields.iter().find(|(name, _)| name == key).map(|(_, v)| v),
+        _ => None,
+    }
+}
+
+pub fn text(value: &Json, key: &str) -> Option<String> {
+    match field(value, key) {
+        Some(Json::String(found)) => Some(found.clone()),
+        _ => None,
+    }
+}
+
+pub fn items<'a>(value: &'a Json, key: &str) -> &'a [Json] {
+    match field(value, key) {
+        Some(Json::Array(found)) => found,
+        _ => &[],
+    }
+}
+
+pub fn strings(value: &Json, key: &str) -> Vec<String> {
+    items(value, key)
+        .iter()
+        .filter_map(|item| match item {
+            Json::String(found) => Some(found.clone()),
+            _ => None,
+        })
+        .collect()
+}

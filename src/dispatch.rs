@@ -138,16 +138,70 @@ fn note_pin(root: &Path) {
     }
 }
 
-/// `why` off the baked documents: the manifest is what the image declares it is
-/// made of, the build record what the build resolved. Neither needs a checkout.
-fn why_on_host(command: Command, arg: Option<&str>, prompt: &Prompt) -> Result<ExitCode, Error> {
+/// A host answers for the image that is running and for nothing else, so a
+/// target it is given is taken only when it is that one.
+fn this_target(named: Option<&str>, scope: &crate::emit::why::Scope) -> Result<(), Error> {
+    use crate::emit::why::Scope;
+    let Some(named) = named else {
+        return Ok(());
+    };
+    match scope {
+        Scope::Built(name) if name == named => Ok(()),
+        Scope::Built(name) => Err(Error::Invocation(format!(
+            "this image was built as `{name}`, so it cannot answer for `{named}`"
+        ))),
+        _ => Err(Error::Invocation(format!(
+            "the build record does not name a target, so this image cannot answer for `{named}` \
+             rather than for itself"
+        ))),
+    }
+}
+
+/// The refusal when the record named no target and the manifest holds more
+/// than one, so there is no honest answer to give.
+fn unscoped(spec: &Spec) -> String {
+    format!(
+        "the build record does not name a target and the baked manifest holds more than one, so \
+         `{}` cannot say which of them is running\n\nhelp: `tect why <module>` still answers, \
+         and says that it read across all of them",
+        spec.name()
+    )
+}
+
+/// What a booted image answers, off the two documents the build baked: the
+/// manifest is what it declares it is made of, the record what the build
+/// resolved. Neither needs a checkout, and both describe the whole repository,
+/// so everything here is scoped to the target the record names — a host
+/// read-out that answers across targets describes an image that is not this
+/// one.
+fn on_host(
+    spec: &Spec,
+    rest: &[&str],
+    format: Option<&str>,
+    target: Option<&str>,
+    prompt: &Prompt,
+) -> Result<ExitCode, Error> {
+    use crate::emit::why::{built_as, image_of};
     use crate::provenance::build::{MANIFEST, RECORD};
 
-    let Some(path) = arg else {
-        return Err(Error::Invocation(
-            "`why` needs a module: `tect why <module>`".into(),
-        ));
+    let unwanted = || {
+        Error::Invocation(format!(
+            "`{}` does not take {}",
+            spec.name(),
+            rest.join(" ")
+        ))
     };
+    // The manifest as it stands, before anything reads a field out of it.
+    if spec.verb == Verb::Plan {
+        if !matches!(rest, [] | ["--json"]) {
+            return Err(unwanted());
+        }
+        let raw = std::fs::read_to_string(MANIFEST)
+            .map_err(|err| Error::Invocation(format!("{MANIFEST}: {err}")))?;
+        print!("{raw}");
+        return Ok(ExitCode::SUCCESS);
+    }
+
     let (manifest, record) = crate::emit::why::baked(Path::new(MANIFEST), Path::new(RECORD))
         .map_err(|err| {
             Error::Invocation(format!(
@@ -155,32 +209,94 @@ fn why_on_host(command: Command, arg: Option<&str>, prompt: &Prompt) -> Result<E
                  answer from"
             ))
         })?;
+    let (targets, scope) = built_as(&manifest, record.as_ref());
 
-    let known = crate::emit::why::known_on_host(&manifest, record.as_ref());
-    let path = match crate::emit::why::matching(&known, path).as_slice() {
+    if spec.verb == Verb::Why {
+        return why_on_host(&manifest, record.as_ref(), rest, format, prompt);
+    }
+
+    // `summary` names its target as an argument and `scap content` as a flag;
+    // either way a host takes it only when it is the one that is running.
+    this_target(
+        match (spec.verb, rest) {
+            (Verb::ScapContent, []) => target,
+            (Verb::Summary, []) => None,
+            (Verb::Summary, [named]) => Some(*named),
+            _ => return Err(unwanted()),
+        },
+        &scope,
+    )?;
+    let [target] = targets.as_slice() else {
+        return Err(Error::Invocation(unscoped(spec)));
+    };
+    match spec.verb {
+        Verb::Summary => {
+            print!("{}", crate::emit::summary::on_host(target));
+            Ok(ExitCode::SUCCESS)
+        }
+        Verb::ScapContent => {
+            let image = image_of(&manifest, target).ok_or_else(|| {
+                Error::Invocation("the manifest names no image for this target".to_string())
+            })?;
+            Ok(match crate::scap::content_on_host(image)? {
+                crate::scap::Verdict::Clean => ExitCode::SUCCESS,
+                crate::scap::Verdict::Wrong => ExitCode::from(REPO_ERROR),
+            })
+        }
+        verb => unreachable!("{verb:?} is not answered on a host"),
+    }
+}
+
+/// The per-module trust read-out off the baked documents. `known_on_host` is
+/// scoped the same way `on_host` is, so a name it resolves is one the image
+/// carries and the read-out cannot come back empty.
+fn why_on_host(
+    manifest: &crate::emit::json::Json,
+    record: Option<&crate::emit::json::Json>,
+    rest: &[&str],
+    format: Option<&str>,
+    prompt: &Prompt,
+) -> Result<ExitCode, Error> {
+    let json = match format {
+        Some("json") => true,
+        None | Some("md") => false,
+        Some(other) => {
+            return Err(Error::Invocation(format!(
+                "`--format` is md or json, not `{other}`"
+            )))
+        }
+    };
+    let [given] = rest else {
+        return Err(Error::Invocation(
+            "`why` needs a module: `tect why <module>`".into(),
+        ));
+    };
+
+    let known = crate::emit::why::known_on_host(manifest, record);
+    let path = match crate::emit::why::matching(&known, given).as_slice() {
         [path] => path.clone(),
         [] => {
             return Err(Error::Invocation(format!(
-                "`{path}` is not a module this image carries\n\nmodules: {}",
+                "`{given}` is not a module this image carries\n\nmodules: {}",
                 crate::emit::why::display(&known).join(", ")
             )))
         }
         paths => {
             return Err(Error::Invocation(format!(
-                "`{path}` names more than one module\n\nmodules: {}",
+                "`{given}` names more than one module\n\nmodules: {}",
                 paths.join(", ")
             )))
         }
     };
-    let why = crate::emit::why::on_host(&manifest, record.as_ref(), &path)
+    let why = crate::emit::why::on_host(manifest, record, &path)
         .expect("the resolved module is one this image carries");
     let parts = why.parts(true);
     print!(
         "{}",
-        match command {
-            Command::Why if prompt.draws() && crate::ui::fits(&parts) => crate::ui::parts(&parts),
-            Command::Why => why.markdown(),
-            _ => why.json().render(),
+        match json {
+            true => why.json().render(),
+            false if prompt.draws() && crate::ui::fits(&parts) => crate::ui::parts(&parts),
+            false => why.markdown(),
         }
     );
     Ok(ExitCode::SUCCESS)
@@ -235,6 +351,11 @@ pub fn dispatch(
         cache_to,
         no_cache_from,
     } = flags;
+    // On a host the two baked documents are the whole of what there is to
+    // read, and the table's `host` column says which commands answer off them.
+    if *here == Context::Host && spec.host {
+        return on_host(spec, rest, format.as_deref(), target.as_deref(), prompt);
+    }
     match spec.verb {
         Verb::Upgrade => {
             if let [word, ..] = rest {
@@ -612,9 +733,6 @@ fn reading(
 
     // On a host the two baked documents are the whole of what there is to
     // read, and the table's `host` column says which commands answer off them.
-    if *here == Context::Host && spec.host {
-        return why_on_host(command, arg, prompt);
-    }
 
     let root = repo_root(here)?;
     // The two read-outs about one thing: what is named is picked from what

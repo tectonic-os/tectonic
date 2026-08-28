@@ -6,7 +6,7 @@
 //! lists this module, what it exchanges with the rest of them, what it claims,
 //! and where every byte of it came from.
 
-use crate::emit::json::Json;
+use crate::emit::json::{field, items, strings, text, Json};
 use crate::emit::{Part, Table};
 use crate::layout;
 use crate::model::image::{Image, List};
@@ -652,37 +652,6 @@ fn hash(value: &Option<String>) -> String {
 
 // ---- on a live host ------------------------------------------------------
 
-fn field<'a>(value: &'a Json, key: &str) -> Option<&'a Json> {
-    match value {
-        Json::Object(fields) => fields.iter().find(|(name, _)| name == key).map(|(_, v)| v),
-        _ => None,
-    }
-}
-
-fn text(value: &Json, key: &str) -> Option<String> {
-    match field(value, key) {
-        Some(Json::String(found)) => Some(found.clone()),
-        _ => None,
-    }
-}
-
-fn items<'a>(value: &'a Json, key: &str) -> &'a [Json] {
-    match field(value, key) {
-        Some(Json::Array(found)) => found,
-        _ => &[],
-    }
-}
-
-fn strings(value: &Json, key: &str) -> Vec<String> {
-    items(value, key)
-        .iter()
-        .filter_map(|item| match item {
-            Json::String(found) => Some(found.clone()),
-            _ => None,
-        })
-        .collect()
-}
-
 fn pin_of(value: &Json, name: &str) -> Fetch {
     Fetch {
         name: name.to_string(),
@@ -722,6 +691,15 @@ pub fn built_as<'a>(manifest: &'a Json, record: Option<&Json>) -> (Vec<&'a Json>
         }
         None => (every, Scope::EveryTarget),
     }
+}
+
+/// The manifest entry for the image a target belongs to: `conforms` and the
+/// base family are the image's, where the modules are the target's.
+pub fn image_of<'a>(manifest: &'a Json, target: &Json) -> Option<&'a Json> {
+    let id = text(target, "image")?;
+    items(manifest, "images")
+        .iter()
+        .find(|image| text(image, "id").as_deref() == Some(id.as_str()))
 }
 
 /// The same read-out with no repository at all: the manifest is what the image

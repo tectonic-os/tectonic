@@ -389,6 +389,43 @@ fn why(name: &str, root: &Path, module: &str) {
     compare(name, "why.txt", &out);
 }
 
+/// `summary`, both readings. The repository's comes off the resolved plan and
+/// the host's off the manifest that plan bakes into the image, so for one
+/// target the two have to be the same document. Every fixture target is
+/// walked, since a flavour gate and a suppressed module are what a second
+/// renderer gets wrong.
+fn summary_on_host(root: &Path) {
+    std::env::set_current_dir(root).expect("fixture root exists");
+    let here = Path::new(".");
+    let manifest = tect::emit::json::Json::parse(&tect::run(Command::Plan, None, here).stdout)
+        .expect("the plan is a document");
+
+    let (every, _) = tect::emit::why::built_as(&manifest, None);
+    assert!(!every.is_empty(), "{} publishes nothing", root.display());
+    for target in every {
+        let record = tect::emit::json::Json::parse(&format!(
+            "{{\"target\": {:?}}}",
+            tect::emit::json::text(target, "name").expect("a target is named")
+        ))
+        .expect("the record is a document");
+        let (scoped, _) = tect::emit::why::built_as(&manifest, Some(&record));
+        let [scoped] = scoped.as_slice() else {
+            panic!("the record names exactly one target");
+        };
+        assert_eq!(
+            tect::run(
+                Command::Summary,
+                tect::emit::json::text(target, "name").as_deref(),
+                here
+            )
+            .stdout,
+            tect::emit::summary::on_host(scoped),
+            "{} disagrees with itself",
+            root.display()
+        );
+    }
+}
+
 /// The two names `why` resolves but cannot read out of the plan: a module the
 /// base suppresses, which is listed and never built, and one whose manifest
 /// never loaded. Both used to resolve to exactly one path and then panic.
@@ -1892,6 +1929,15 @@ fn golden() {
     why("enforced", &dir.join("enforced"), "one/hello");
     why("minimal", &dir.join("minimal"), "core/hello");
     why_unbuilt(&dir.join("suppressed"));
+    for name in [
+        "minimal",
+        "multi-image",
+        "suppressed",
+        "collecting",
+        "pinned",
+    ] {
+        summary_on_host(&dir.join(name));
+    }
     capture("init", &init);
     verify("init", &init);
     let created = init_repo("create");
