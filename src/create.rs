@@ -221,40 +221,13 @@ pub fn report(root: &Path, wrote: &[(PathBuf, Change)]) {
     crate::ui::tree::print(&id, wrote, describe);
 }
 
-/// What a line in the tree says: the edit where the file already existed, and
-/// what the file is for where it was written whole. A `~` restating a file kind
-/// says what the path says.
-fn describe(path: &Path, change: Option<&Change>) -> String {
+/// What a line in the tree says: what a later step added to a file that was
+/// already there, and nothing for one this run wrote whole. What a kind of
+/// file is for is a documentation job, not a column beside every name.
+fn describe(_path: &Path, change: Option<&Change>) -> String {
     match change {
-        Some(Change::Updated(edit)) if !edit.is_empty() => edit.clone(),
-        _ => kind(path).to_string(),
-    }
-}
-
-/// What one short phrase per kind of file says it is for, empty for a file
-/// that speaks for itself. UI copy, written once and read forever.
-fn kind(path: &Path) -> &'static str {
-    let name = path.file_name().unwrap_or_default().to_string_lossy();
-    if layout::is_image_file(&name) {
-        return "an image: its base, and the modules it lists";
-    }
-    if path.starts_with(layout::MODULES) && path.components().count() > 1 {
-        return match name.as_ref() {
-            layout::MODULE_FILE => "what the module installs, places and provides",
-            layout::RECORD_FILE => "where it was imported from, and its hash",
-            layout::OVERLAY => "what it lays into the image",
-            "module.sh" => "the shell its build layer runs",
-            _ => "",
-        };
-    }
-    match path.to_string_lossy().as_ref() {
-        layout::REPO_FILE => "what the repo pins, and where modules come from",
-        layout::MODULES => "every module this repo owns or imported",
-        "README.md" => "yours to write",
-        "scripts" => "what CI runs, and what you run by hand",
-        "disk_config" => "how a disk or installer image is shaped",
-        ".github/renovate.json5" => "keeps the pinned versions moving",
-        _ => "",
+        Some(Change::Updated(edit)) => edit.clone(),
+        _ => String::new(),
     }
 }
 

@@ -1,16 +1,9 @@
 //! What a command wrote, drawn where it wrote it.
 
-use super::{colour, width};
+use super::colour;
 use ratatui::crossterm::style::Stylize;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-
-/// The gap between the longest branch and the descriptions beside it.
-const GAP: usize = 2;
-
-/// A description cut shorter than this is dropped instead: less of a phrase
-/// than this says nothing.
-const LEAST: usize = 12;
 
 /// How a written file appears in the tree: a new one, or one a later step took
 /// further and what that step added to it, which a path cannot say.
@@ -44,8 +37,8 @@ struct Node {
 }
 
 /// The tree of what a command wrote, hung off its root: `label` is the name
-/// the repository reads from its own tree, and `describe` says what one of the
-/// lines is — empty for a file that speaks for itself.
+/// the repository reads from its own tree, and `describe` says what a later
+/// step added to a file that was already there — empty for everything else.
 pub fn print(
     label: &str,
     wrote: &[(PathBuf, Change)],
@@ -53,24 +46,21 @@ pub fn print(
 ) {
     let mut lines = Vec::new();
     walk(&of(wrote), Path::new(""), "", describe, &mut lines);
-
-    let column = lines
-        .iter()
-        .filter(|(_, _, desc)| !desc.is_empty())
-        .map(|(plain, _, _)| plain.chars().count() + GAP)
-        .max()
-        .unwrap_or(0);
-    let room = width().saturating_sub(column);
-
     println!("\n{label}/");
-    for (plain, shown, desc) in &lines {
-        match fit(desc, room) {
-            "" => println!("{shown}"),
-            desc => println!(
-                "{shown}{}{desc}",
-                " ".repeat(column - plain.chars().count())
-            ),
+    for (shown, said) in &lines {
+        match said.is_empty() {
+            true => println!("{shown}"),
+            false => println!("{shown}  {}", phrase(said)),
         }
+    }
+}
+
+/// What an edit says it did, never aligned to a column: a column is what a
+/// file with nothing to say made ragged.
+fn phrase(said: &str) -> String {
+    match colour() {
+        false => said.to_string(),
+        true => said.dim().to_string(),
     }
 }
 
@@ -104,7 +94,7 @@ fn walk(
     at: &Path,
     prefix: &str,
     describe: fn(&Path, Option<&Change>) -> String,
-    out: &mut Vec<(String, String, String)>,
+    out: &mut Vec<(String, String)>,
 ) {
     let mut names: Vec<&String> = node.children.keys().collect();
     names.sort_by_key(|name| !node.children[*name].dir);
@@ -116,44 +106,15 @@ fn walk(
         };
         let path = at.join(name);
         let prefix_shown = format!("{prefix}{branch}");
-        let (plain, shown) = match child.dir {
-            true => {
-                let base = format!("{prefix_shown}{name}/");
-                (base.clone(), base)
-            }
+        let shown = match child.dir {
+            true => format!("{prefix_shown}{name}/"),
             false => {
                 let change = child.change.clone().unwrap_or(Change::Created);
-                let bare = match change {
-                    Change::Created => "+ ",
-                    Change::Updated(_) => "~ ",
-                };
-                (
-                    format!("{prefix_shown}{bare}{name}"),
-                    format!("{prefix_shown}{}{name}", mark(&change)),
-                )
+                format!("{prefix_shown}{}{name}", mark(&change))
             }
         };
-        out.push((plain, shown, describe(&path, child.change.as_ref())));
+        out.push((shown, describe(&path, child.change.as_ref())));
         walk(child, &path, &format!("{prefix}{carry}"), describe, out);
-    }
-}
-
-/// `desc` cut to `room` at a word boundary, and empty where too little of it
-/// survives to be worth reading. Never folded: a wrapped tree stops lining up,
-/// and the shape is the point.
-fn fit(desc: &str, room: usize) -> &str {
-    if desc.chars().count() <= room {
-        return desc;
-    }
-    let cut = desc
-        .char_indices()
-        .take(room + 1)
-        .filter(|(_, c)| *c == ' ')
-        .last()
-        .map_or(0, |(at, _)| at);
-    match cut >= LEAST {
-        true => &desc[..cut],
-        false => "",
     }
 }
 
@@ -161,18 +122,11 @@ fn fit(desc: &str, room: usize) -> &str {
 mod tests {
     use super::*;
 
-    fn phrase(path: &Path, change: Option<&Change>) -> String {
-        if let Some(Change::Updated(edit)) = change {
-            if !edit.is_empty() {
-                return edit.clone();
-            }
+    fn said(_path: &Path, change: Option<&Change>) -> String {
+        match change {
+            Some(Change::Updated(edit)) => edit.clone(),
+            _ => String::new(),
         }
-        match path.to_string_lossy().as_ref() {
-            "modules" => "every module the repo holds",
-            "repo.kdl" => "what the repo pins",
-            _ => "",
-        }
-        .to_string()
     }
 
     fn drawn(wrote: &[(&str, Change)]) -> Vec<(String, String)> {
@@ -181,11 +135,8 @@ mod tests {
             .map(|(path, change)| (PathBuf::from(path), change.clone()))
             .collect();
         let mut lines = Vec::new();
-        walk(&of(&wrote), Path::new(""), "", phrase, &mut lines);
+        walk(&of(&wrote), Path::new(""), "", said, &mut lines);
         lines
-            .into_iter()
-            .map(|(plain, _, desc)| (plain, desc))
-            .collect()
     }
 
     #[test]
@@ -209,20 +160,10 @@ mod tests {
                 "└── ~ repo.kdl",
             ]
         );
-        assert_eq!(lines[0].1, "every module the repo holds");
-        // An edit says what it was; one with nothing to say falls back to what
-        // the file is.
+        // Only an edit says anything; a file a command wrote whole is its name.
+        assert_eq!(lines[0].1, "");
         assert_eq!(lines[2].1, "rewritten by hand");
         assert_eq!(lines[3].1, "");
-        assert_eq!(lines[4].1, "what the repo pins");
-    }
-
-    #[test]
-    fn a_description_is_cut_at_a_word_and_dropped_before_it_says_nothing() {
-        assert_eq!(fit("what the repo pins", 18), "what the repo pins");
-        assert_eq!(fit("what the repo pins", 17), "what the repo");
-        assert_eq!(fit("what the repo pins", 13), "what the repo");
-        assert_eq!(fit("what the repo pins", 12), "");
-        assert_eq!(fit("what the repo pins", 0), "");
+        assert_eq!(lines[4].1, "");
     }
 }

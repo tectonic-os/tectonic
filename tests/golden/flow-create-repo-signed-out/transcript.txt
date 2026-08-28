@@ -59,22 +59,22 @@ initialised a git repository in example
 
 example/
 ├── .github/
-│   └── + renovate.json5  keeps the pinned versions moving
-├── disk_config/          how a disk or installer image is shaped
+│   └── + renovate.json5
+├── disk_config/
 │   ├── + disk.toml
 │   └── + iso.template.toml
-├── modules/              every module this repo owns or imported
+├── modules/
 │   └── + .gitkeep
-├── scripts/              what CI runs, and what you run by hand
+├── scripts/
 │   ├── + Containerfile.skeleton
 │   └── + vm.sh
 ├── + .dockerignore
 ├── + .gitattributes
 ├── + .gitignore
 ├── + .shellcheckrc
-├── + README.md           yours to write
-├── + desktop.image.kdl   an image: its base, and the modules it lists
-└── + repo.kdl            what the repo pins, and where modules come from
+├── + README.md
+├── + desktop.image.kdl
+└── + repo.kdl
 
 next, in example:
   tect generate

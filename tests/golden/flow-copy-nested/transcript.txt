@@ -8,10 +8,10 @@ Yes
 
 
 example/
-├── modules/                      every module this repo owns or imported
+├── modules/
 │   └── hardening/
 │       └── coredumps/
-│           ├── + module.kdl      what the module installs, places and provides
-│           └── + provenance.kdl  where it was imported from, and its hash
-└── ~ example.image.kdl           hardening/coredumps added to modules
+│           ├── + module.kdl
+│           └── + provenance.kdl
+└── ~ example.image.kdl  hardening/coredumps added to modules
 ==== exit 0

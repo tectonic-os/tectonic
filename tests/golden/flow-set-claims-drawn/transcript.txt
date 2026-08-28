@@ -2,7 +2,7 @@ Which rules does `sshd` claim?: 1.1.1.1  Install AIDE  package_aide_installed
 
 
 example/
-└── modules/              every module this repo owns or imported
+└── modules/
     └── sshd/
-        └── [38;5;11m~[39m module.kdl  claiming one rule of `standard`
+        └── [38;5;11m~[39m module.kdl  [2mclaiming one rule of `standard`[0m
 ==== exit 0

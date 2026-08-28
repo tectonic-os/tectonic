@@ -12,8 +12,8 @@ Yes
 
 
 example/
-├── modules/              every module this repo owns or imported
+├── modules/
 │   └── my-editor/
-│       └── + module.kdl  what the module installs, places and provides
-└── ~ example.image.kdl   my-editor added to modules
+│       └── + module.kdl
+└── ~ example.image.kdl  my-editor added to modules
 ==== exit 0

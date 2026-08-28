@@ -11,5 +11,5 @@ Yes
 
 example/
 ├── ~ example.image.kdl  custom-kernel added to modules
-└── ~ repo.kdl           the workflows it generates
+└── ~ repo.kdl  the workflows it generates
 ==== exit 0

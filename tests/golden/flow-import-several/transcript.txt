@@ -22,5 +22,5 @@ Yes
 
 example/
 ├── ~ example.image.kdl  flatpak, browser and custom-kernel added to modules
-└── ~ repo.kdl           the workflows it generates
+└── ~ repo.kdl  the workflows it generates
 ==== exit 0

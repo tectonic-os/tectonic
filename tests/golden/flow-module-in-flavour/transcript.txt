@@ -11,8 +11,8 @@ Which images list it? [1-2, several, 0 for none]: 2
 
 
 example/
-├── modules/              every module this repo owns or imported
+├── modules/
 │   └── dev-tools/
-│       └── + module.kdl  what the module installs, places and provides
-└── ~ example.image.kdl   dev-tools added to modules
+│       └── + module.kdl
+└── ~ example.image.kdl  dev-tools added to modules
 ==== exit 0
