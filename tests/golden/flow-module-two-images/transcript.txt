@@ -2,14 +2,14 @@ Tectonic v{version}
 
 module name: My Editor
 
-does it install packages (Yes/No)
+Does this module install packages? (Yes/No)
 yes
 
 package names, separated by spaces []: nano vim
 
   1) example  Example
   2) server  Server
-list it in images [1-2, several, 0 for none]: 1 2
+Which images list it? [1-2, several, 0 for none]: 1 2
 
 
 example/

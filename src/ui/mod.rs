@@ -5,13 +5,15 @@
 pub mod table;
 pub mod tree;
 
+use crate::copy::{EITHER, NEST, PICK, TOGGLE};
+
 use ratatui::backend::Backend;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::crossterm::terminal;
 use ratatui::layout::{Constraint, Layout};
 use ratatui::style::{Style, Stylize};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{List, ListItem, ListState};
+use ratatui::widgets::{List, ListItem, ListState, Paragraph};
 use ratatui::{DefaultTerminal, Frame, TerminalOptions, Viewport};
 use std::io::IsTerminal;
 
@@ -123,16 +125,6 @@ pub enum Answer {
 /// How many options are on screen at once; the rest scroll under them.
 const VISIBLE: usize = 8;
 
-const PICK: &str = "up and down to move, enter to choose, esc cancels";
-const TOGGLE: &str =
-    "up and down to move, enter or space to toggle, enter on done to confirm, esc cancels";
-const EITHER: &str = "up and down to move, enter to answer";
-/// No `j` and `k` here: every printable key is the filter being typed.
-const NEST: &str = "type to filter, space toggles, enter opens, esc backs out";
-
-/// The row past the last option, and the only way to submit.
-const DONE: &str = "done";
-
 /// One of `options`, or none.
 pub fn select(question: &str, options: &[Choice]) -> Result<Option<usize>, String> {
     inline(height(options.len()), |terminal| {
@@ -160,12 +152,12 @@ pub fn confirm_current(question: &str, yes: &str, no: &str, current: bool) -> Re
 /// nor reachable as a flat list.
 pub fn multi(question: &str, options: &[Choice], on: &[usize]) -> Result<Answer, String> {
     if options.iter().any(|choice| !choice.group.is_empty()) {
-        let rows = nodes(options).len() + 1;
-        return inline(height(rows) + 1, |terminal| {
+        let rows = nodes(options).len();
+        return inline(height(rows) + 2, |terminal| {
             nest(terminal, question, options, on)
         });
     }
-    inline(height(options.len() + 1), |terminal| {
+    inline(height(options.len()), |terminal| {
         toggle(terminal, question, options, on)
     })
 }
@@ -225,7 +217,6 @@ fn toggle<B: Backend>(
     options: &[Choice],
     held: &[usize],
 ) -> Result<Answer, String> {
-    let done = options.len();
     let mut state = ListState::default().with_selected(Some(0));
     let mut on: Vec<usize> = held.to_vec();
     loop {
@@ -234,9 +225,9 @@ fn toggle<B: Backend>(
             .map_err(|err| err.to_string())?;
         let Some(key) = read()? else { continue };
         match key {
-            KeyCode::Enter if state.selected() == Some(done) => return Ok(Answer::Chosen(on)),
-            KeyCode::Enter | KeyCode::Char(' ') => match state.selected() {
-                Some(at) if at < done => flip(&mut on, at, options),
+            KeyCode::Enter => return Ok(Answer::Chosen(on)),
+            KeyCode::Char(' ') => match state.selected() {
+                Some(at) if at < options.len() => flip(&mut on, at, options),
                 _ => {}
             },
             KeyCode::Esc | KeyCode::Char('q') => return Ok(Answer::Cancelled),
@@ -303,7 +294,7 @@ fn draw(
     question: &str,
     options: &[Choice],
     on: Option<&[usize]>,
-    hint: &str,
+    hint_text: &str,
     state: &mut ListState,
 ) {
     let [head, body, foot] = Layout::vertical([
@@ -314,9 +305,8 @@ fn draw(
     .areas(frame.area());
 
     frame.render_widget(Line::from(question.bold().cyan()), head);
-    frame.render_widget(Line::from(hint.dim()), foot);
 
-    let mut items: Vec<ListItem> = options
+    let items: Vec<ListItem> = options
         .iter()
         .enumerate()
         .map(|(at, choice)| {
@@ -334,10 +324,22 @@ fn draw(
             ]))
         })
         .collect();
-    if on.is_some() {
-        items.push(ListItem::new(Line::from(DONE.bold())));
-    }
+    let rows = items.len();
     frame.render_stateful_widget(List::new(items).highlight_symbol("> "), body, state);
+    frame.render_widget(
+        Line::from(hint(hint_text, state, body.height, rows).dim()),
+        foot,
+    );
+}
+
+/// The hint, and how far down a list longer than the window this is. Nothing
+/// else says there are rows under the last one on screen.
+fn hint(hint: &str, state: &ListState, height: u16, rows: usize) -> String {
+    let seen = (state.offset() + usize::from(height)).min(rows);
+    match seen < rows || state.offset() > 0 {
+        true => format!("{hint}  {seen} of {rows}"),
+        false => hint.to_string(),
+    }
 }
 
 /// One row of the tree: an option, or a branch holding the rows after it that
@@ -468,10 +470,6 @@ fn nest<B: Backend>(
     let mut state = ListState::default().with_selected(Some(0));
     loop {
         let rows = shown(&tree, options, &open, &filter);
-        let done = rows.len();
-        if state.selected().unwrap_or(0) > done {
-            state.select(Some(done));
-        }
         terminal
             .draw(|frame| {
                 nested(
@@ -480,9 +478,9 @@ fn nest<B: Backend>(
             })
             .map_err(|err| err.to_string())?;
         let Some(key) = read()? else { continue };
-        let row = state.selected().filter(|at| *at < done).map(|at| rows[at]);
+        let row = state.selected().and_then(|at| rows.get(at)).copied();
         match key {
-            KeyCode::Enter if state.selected() == Some(done) => {
+            KeyCode::Enter => {
                 on.sort_unstable();
                 return Ok(Answer::Chosen(on));
             }
@@ -491,15 +489,14 @@ fn nest<B: Backend>(
             KeyCode::Backspace => {
                 filter.pop();
             }
-            KeyCode::Enter | KeyCode::Char(' ') | KeyCode::Left | KeyCode::Right => {
+            KeyCode::Char(' ') | KeyCode::Left | KeyCode::Right => {
                 if let Some(at) = row {
                     match (tree[at].at.is_some(), key) {
                         (true, KeyCode::Left | KeyCode::Right) => {}
                         (true, _) => check(&mut on, &tree, at),
                         (false, KeyCode::Char(' ')) => check(&mut on, &tree, at),
                         (false, KeyCode::Left) => open[at] = false,
-                        (false, KeyCode::Right) => open[at] = true,
-                        (false, _) => open[at] = !open[at],
+                        (false, _) => open[at] = true,
                     }
                 }
             }
@@ -527,7 +524,7 @@ fn nested(
     let [head, body, detail, foot] = Layout::vertical([
         Constraint::Length(1),
         Constraint::Min(1),
-        Constraint::Length(1),
+        Constraint::Length(2),
         Constraint::Length(1),
     ])
     .areas(frame.area());
@@ -538,16 +535,12 @@ fn nested(
         .and_then(|at| rows.get(at))
         .and_then(|at| nodes[*at].at)
         .map_or("", |at| options[at].detail.as_str());
-    frame.render_widget(Line::from(under.dim()), detail);
     frame.render_widget(
-        Line::from(vec![
-            Span::raw(format!("filter: {filter}  ")),
-            Span::styled(NEST, Style::new().dim()),
-        ]),
-        foot,
+        Paragraph::new(table::wrap(under, usize::from(detail.width)).join("\n")).dim(),
+        detail,
     );
 
-    let mut items: Vec<ListItem> = rows
+    let items: Vec<ListItem> = rows
         .iter()
         .map(|at| {
             let node = &nodes[*at];
@@ -564,8 +557,15 @@ fn nested(
             ]))
         })
         .collect();
-    items.push(ListItem::new(Line::from(DONE.bold())));
+    let shown = items.len();
     frame.render_stateful_widget(List::new(items).highlight_symbol("> "), body, state);
+    frame.render_widget(
+        Line::from(vec![
+            Span::raw(format!("filter: {filter}  ")),
+            Span::styled(hint(NEST, state, body.height, shown), Style::new().dim()),
+        ]),
+        foot,
+    );
 }
 
 #[cfg(test)]
@@ -633,12 +633,12 @@ mod tests {
     }
 
     #[test]
-    fn the_confirm_row_is_the_last_row_of_a_question_taking_several() {
-        let options = [Choice::new("gaming", "")];
-        let several = drawn(&options, Some(&[]), TOGGLE, 1);
-        assert!(several.contains(&format!("> {DONE}")), "{several}");
-        let one = drawn(&options, None, PICK, 0);
-        assert!(!one.contains(DONE), "{one}");
+    fn a_list_longer_than_the_window_says_how_far_down_it_is() {
+        let short = ListState::default();
+        assert_eq!(hint(PICK, &short, 8, 3), PICK);
+        assert_eq!(hint(PICK, &short, 8, 21), format!("{PICK}  8 of 21"));
+        let scrolled = ListState::default().with_offset(13);
+        assert_eq!(hint(PICK, &scrolled, 8, 21), format!("{PICK}  21 of 21"));
     }
 
     #[test]
@@ -704,7 +704,7 @@ mod tests {
         let nodes = nodes(options);
         let rows = shown(&nodes, options, open, filter);
         let mut state = ListState::default().with_selected(Some(at));
-        let height = rows.len() as u16 + 4;
+        let height = rows.len() as u16 + 5;
         let mut terminal = Terminal::new(TestBackend::new(60, height)).unwrap();
         terminal
             .draw(|frame| {

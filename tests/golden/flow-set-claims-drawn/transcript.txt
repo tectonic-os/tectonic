@@ -1,4 +1,4 @@
-which rules `sshd` claims: 1.1.1.1  Install AIDE  package_aide_installed
+Which rules does `sshd` claim?: 1.1.1.1  Install AIDE  package_aide_installed
 
 
 example/

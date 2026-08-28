@@ -2,7 +2,7 @@ A `conforms` turns the scan on: every build measures `example` against the profi
 
   1) standard  Standard System Security Profile for Fedora
   2) ospp  Protection Profile for General Purpose Operating Systems
-which profile [1-2, 0 for none]: 2
+Which profile? [1-2, 0 for none]: 2
 
 
 example/

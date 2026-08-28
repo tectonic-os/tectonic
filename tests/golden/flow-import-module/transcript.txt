@@ -6,9 +6,9 @@ Tectonic v{version}
   4) one/fedora-family  dnf5 and its plugins, which every fedora build layer reaches for
   5) one/flatpak  Flatpak client and a daily update timer
   6) one/signature-policy  Sigstore signature verification for the image's own updates
-which modules [1-6, several, 0 for none]: 1
+Which modules? [1-6, several, 0 for none]: 1
 
-list it in example (Yes/No)
+List it in example? (Yes/No)
 Yes
 
 

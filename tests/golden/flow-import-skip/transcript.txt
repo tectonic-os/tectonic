@@ -1,7 +1,6 @@
 Tectonic v{version}
 
-`browser` requires `flatpak`, which nothing in `server` provides.
-Import `one/flatpak` as well? (Yes/No)
+Import what these modules require? (Yes/No)
 Yes
 
 

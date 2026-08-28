@@ -2,7 +2,7 @@ Tectonic v{version}
 
 module name: Other
 
-Error: nothing left in TECT_ANSWERS to answer `does it install packages (Yes/No)` with.
+Error: nothing left in TECT_ANSWERS to answer `Does this module install packages? (Yes/No)` with.
 
 You can find the available commands by typing 'tect' or 'tect --help'
 ==== exit 1

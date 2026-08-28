@@ -2,12 +2,12 @@ Tectonic v{version}
 
 module name: dev-tools
 
-does it install packages (Yes/No)
+Does this module install packages? (Yes/No)
 No
 
   1) example  Example
   2) example/dx
-list it in images [1-2, several, 0 for none]: 2
+Which images list it? [1-2, several, 0 for none]: 2
 
 
 example/

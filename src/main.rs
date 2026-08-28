@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tect::command::{self, Spec, Verb};
+use tect::copy;
 use tect::dispatch::{self, Error, USAGE_ERROR};
 use tect::model::image::TECT_VERSION;
 use tect::prompt::Prompt;
@@ -182,7 +183,7 @@ fn run() -> Result<ExitCode, Error> {
             None => command::listed(),
         };
         banner(false);
-        match tect::ui::select("which command", &command::choices(&rows))? {
+        match tect::ui::select(copy::WHICH_COMMAND, &command::choices(&rows))? {
             Some(at) => (rows[at], &[]),
             None => return Ok(ExitCode::SUCCESS),
         }

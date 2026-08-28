@@ -5,6 +5,7 @@
 //! Each of them collects every answer first and writes afterwards, which is why
 //! no `apply` takes a `Prompt`.
 
+use crate::copy;
 use crate::diag::Issues;
 use crate::layout;
 use crate::prompt::Prompt;
@@ -17,18 +18,6 @@ use std::process::{Command, Stdio};
 /// read into the origin and the image URLs and nowhere else: nothing in the
 /// tool learns about a second forge.
 pub const HOST: &str = "github.com";
-
-const SCHEDULED: &str = "This repo is designed to run scheduled builds of the repo's images via\n\
-     Github or Forgejo actions.\n\
-     Would you like to configure this now?";
-
-const NO_GH: &str = "To create a repo from Tectonic requires the Github CLI tool 'gh' installed.\n\
-     Would you like to install it now?";
-
-const IMAGES: &str =
-    "Tectonic defines images through kdl files. These image files define the base\n\
-     image and modules to be included in the built image.\n\
-     Would you like to create an image file now?";
 
 const GH_INSTALL: &str = "install gh from https://github.com/cli/cli";
 
@@ -84,7 +73,7 @@ impl Repo {
     ) -> Result<Self, String> {
         let name = prompt.line(
             name.or_else(|| root_arg.as_deref().and_then(named_after_root)),
-            "What will the repo be called?",
+            copy::REPO_NAME,
             "a name argument",
             "",
             None,
@@ -95,8 +84,9 @@ impl Repo {
         let assets = crate::init::assets()?;
         println!("Creating {id}...\n");
 
-        let configure =
-            host.is_some() || owner.is_some() || prompt.confirm(SCHEDULED, "Yes", "No")?;
+        let configure = host.is_some()
+            || owner.is_some()
+            || prompt.confirm(copy::SCHEDULED, copy::YES, copy::NO)?;
         let host = match (configure, host) {
             (true, None) => choose_host(prompt)?,
             (_, given) => given.unwrap_or_else(|| HOST.to_string()),
@@ -104,7 +94,7 @@ impl Repo {
         let owner = match configure {
             true => Some(prompt.line(
                 owner,
-                &username(&host),
+                &copy::username(&host),
                 "`--owner`",
                 &format!("{host}/"),
                 None,
@@ -121,16 +111,10 @@ impl Repo {
             if !offering {
                 println!();
             }
-            if offering
-                && prompt.confirm(
-                    "Would you like to create this repo on Github now?",
-                    "Yes",
-                    "Skip",
-                )?
-            {
+            if offering && prompt.confirm(copy::CREATE_REMOTE, copy::YES, copy::SKIP)? {
                 match (gh_installed(), gh_logged_in()) {
                     (false, _) => {
-                        install_gh = prompt.confirm(NO_GH, "Yes", "Skip Github repo creation")?
+                        install_gh = prompt.confirm(copy::NO_GH, copy::YES, copy::SKIP_REMOTE)?
                     }
                     (true, false) => println!(
                         "You will need to login with user '{named}' to create the repo on Github.\n\
@@ -141,20 +125,21 @@ impl Repo {
                 }
             }
         }
-        let image = match image_name.is_some() || prompt.confirm(IMAGES, "Yes", "No")? {
-            true => Some(Image::collect(
-                &root,
-                image_name,
-                base,
-                &name,
-                owner
-                    .as_deref()
-                    .map(|owner| format!("{}/{id}", origin(&host, owner))),
-                "`--image`",
-                prompt,
-            )?),
-            false => None,
-        };
+        let image =
+            match image_name.is_some() || prompt.confirm(copy::IMAGES, copy::YES, copy::NO)? {
+                true => Some(Image::collect(
+                    &root,
+                    image_name,
+                    base,
+                    &name,
+                    owner
+                        .as_deref()
+                        .map(|owner| format!("{}/{id}", origin(&host, owner))),
+                    "`--image`",
+                    prompt,
+                )?),
+                false => None,
+            };
         let workflows = match configure {
             false => None,
             true => {
@@ -282,27 +267,12 @@ fn under(root: &Path, path: &Path) -> PathBuf {
 /// the tool ships know how to run under.
 fn choose_host(prompt: &Prompt) -> Result<String, String> {
     let options = [
-        Choice::new(HOST, "Github, and the workflows Tectonic ships"),
-        Choice::new("forgejo", "a Forgejo instance, whose address you give"),
+        Choice::new(HOST, copy::HOST_GITHUB),
+        Choice::new("forgejo", copy::HOST_FORGEJO),
     ];
-    match prompt.choose("Where will the repo be hosted?", &options)? {
+    match prompt.choose(copy::REPO_HOST, &options)? {
         Some(0) | None => Ok(HOST.to_string()),
-        _ => prompt.line(
-            None,
-            "What is the address of the Forgejo instance?",
-            "`--host`",
-            "",
-            None,
-        ),
-    }
-}
-
-/// Github is asked for by name, and every other host by its address, which is
-/// all the tool knows about one.
-fn username(host: &str) -> String {
-    match host {
-        HOST => "What is your github username?".to_string(),
-        host => format!("What is your username on {host}?"),
+        _ => prompt.line(None, copy::FORGEJO_ADDRESS, "`--host`", "", None),
     }
 }
 
@@ -332,7 +302,7 @@ impl Image {
     ) -> Result<Self, String> {
         let name = prompt.line(
             name,
-            "What will the image be called?",
+            copy::IMAGE_NAME,
             flag,
             "",
             crate::init::id(repo).is_ok().then_some(repo),
@@ -364,7 +334,7 @@ impl Image {
             Some(known) => known.family.clone(),
             None => prompt.text(
                 None,
-                "base family",
+                copy::BASE_FAMILY,
                 "`--base`, naming a base the catalog knows",
                 bases.first().map(|base| base.family.as_str()),
             )?,
@@ -442,7 +412,7 @@ impl Flavour {
         images: Vec<String>,
         prompt: &Prompt,
     ) -> Result<Self, String> {
-        let name = prompt.text(name, "flavour name", "a name argument", None)?;
+        let name = prompt.text(name, copy::FLAVOUR_NAME, "a name argument", None)?;
 
         if !crate::model::image::is_name(&name) {
             return Err(format!(
@@ -473,7 +443,7 @@ impl Flavour {
                         false => Choice::new(&image.id, &image.name),
                     })
                     .collect();
-                match prompt.choose("which image publishes it", &options)? {
+                match prompt.choose(copy::FLAVOUR_IMAGE, &options)? {
                     Some(at) => at,
                     None => return Err(
                         "give `--image`, since nothing can be asked here: which image publishes it"
@@ -532,11 +502,11 @@ fn choose_base(bases: &[crate::base::Base], prompt: &Prompt) -> Result<String, S
         .iter()
         .map(|base| Choice::new(&base.image, &base.about))
         .collect();
-    match prompt.choose("What is the base image for this image?", &options)? {
+    match prompt.choose(copy::IMAGE_BASE, &options)? {
         Some(chosen) => Ok(bases[chosen].image.clone()),
         None => prompt.text(
             None,
-            "base image",
+            copy::BASE_IMAGE,
             "`--base`",
             bases.first().map(|base| base.image.as_str()),
         ),
@@ -561,7 +531,7 @@ impl Module {
         images: Vec<String>,
         prompt: &Prompt,
     ) -> Result<Self, String> {
-        let name = prompt.text(name, "module name", "a name argument", None)?;
+        let name = prompt.text(name, copy::MODULE_NAME, "a name argument", None)?;
         let path = name
             .split('/')
             .map(crate::init::id)
@@ -573,14 +543,9 @@ impl Module {
         }
 
         let pkgs =
-            match pkgs.is_empty() && prompt.confirm("does it install packages", "Yes", "No")? {
+            match pkgs.is_empty() && prompt.confirm(copy::MODULE_PACKAGES, copy::YES, copy::NO)? {
                 true => prompt
-                    .text(
-                        None,
-                        "package names, separated by spaces",
-                        "`--pkg`",
-                        Some(""),
-                    )?
+                    .text(None, copy::PACKAGE_NAMES, "`--pkg`", Some(""))?
                     .split_whitespace()
                     .map(str::to_string)
                     .collect(),
@@ -974,7 +939,7 @@ fn ask(
     prompt: &Prompt,
 ) -> Result<crate::ui::Answer, String> {
     if let [only] = targets {
-        let listed = prompt.confirm(&format!("list it in {only}"), "Yes", "No")?;
+        let listed = prompt.confirm(&copy::list_in(&only.to_string()), copy::YES, copy::NO)?;
         return Ok(crate::ui::Answer::Chosen(match listed {
             true => vec![0],
             false => Vec::new(),
@@ -999,7 +964,7 @@ fn ask(
             });
         rows.push(Choice::new(label, named));
     }
-    prompt.choose_many("list it in images", &rows, &[])
+    prompt.choose_many(copy::LIST_IN_IMAGES, &rows, &[])
 }
 
 /// The blocks a module declaration sits inside, outermost first.

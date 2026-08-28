@@ -2,6 +2,7 @@
 //! is not allowed to decide for itself.
 
 use crate::command::{Spec, Verb};
+use crate::copy;
 use crate::prompt::Prompt;
 use crate::Command;
 use std::path::{Path, PathBuf};
@@ -605,12 +606,12 @@ fn reading(
         let (question, known, shown) = match command {
             Command::Coverage | Command::CoverageJson => {
                 let known: Vec<String> = loaded.list.images.iter().map(|i| i.id.clone()).collect();
-                ("which image", known.clone(), known)
+                (copy::WHICH_IMAGE, known.clone(), known)
             }
             _ => {
                 let known = crate::emit::why::known(&loaded.list);
                 let shown = crate::emit::why::display(&known);
-                ("which module", known, shown)
+                (copy::WHICH_MODULE, known, shown)
             }
         };
         if known.is_empty() {

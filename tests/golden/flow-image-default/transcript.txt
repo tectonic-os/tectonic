@@ -5,14 +5,10 @@ Example
 
 Creating example...
 
-This repo is designed to run scheduled builds of the repo's images via
-Github or Forgejo actions.
-Would you like to configure this now? (Yes/No)
+Sync this repo to a provider? (Yes/No)
 No
 
-Tectonic defines images through kdl files. These image files define the base
-image and modules to be included in the built image.
-Would you like to create an image file now? (Yes/No)
+Define an image now? (Yes/No)
 Yes
 
 What will the image be called? [Example]

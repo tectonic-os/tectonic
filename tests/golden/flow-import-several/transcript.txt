@@ -6,18 +6,17 @@ Tectonic v{version}
   4) one/fedora-family  dnf5 and its plugins, which every fedora build layer reaches for
   5) one/flatpak  Flatpak client and a daily update timer
   6) one/signature-policy  Sigstore signature verification for the image's own updates
-which modules [1-6, several, 0 for none]: 2 3
+Which modules? [1-6, several, 0 for none]: 2 3
 
-list it in example (Yes/No)
+List it in example? (Yes/No)
 Yes
 
-`browser` and `custom-kernel` require `flatpak`, which nothing in `example` provides.
-Import `one/flatpak` as well? (Yes/No)
+Import what these modules require? (Yes/No)
 Yes
 
-`browser` and `custom-kernel` make CI runnable that this repo does not generate:
 `kernel-freshness` tracks the kernel a module pins, and proposes a bump
-Generate it now? (Yes/No)
+
+Generate the workflows this makes runnable? (Yes/No)
 Yes
 
 

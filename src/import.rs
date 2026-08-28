@@ -1,6 +1,7 @@
 //! `import module` references one collection member from an image; `copy
 //! module` vendors one into the repository.
 
+use crate::copy;
 use crate::create::{report, Change, Listing};
 use crate::dispatch::Error;
 use crate::layout;
@@ -225,7 +226,7 @@ pub fn choose(
     prompt: &Prompt,
 ) -> Result<String, String> {
     let (listed, options) = offered(root, sources)?;
-    match prompt.choose("which module", &options)? {
+    match prompt.choose(copy::WHICH_MODULE, &options)? {
         Some(chosen) => Ok(listed[chosen].qualified()),
         None => Err(unchosen(command)),
     }
@@ -241,7 +242,7 @@ fn choose_several(
     prompt: &Prompt,
 ) -> Result<Vec<String>, String> {
     let (listed, options) = offered(root, sources)?;
-    let chosen = match prompt.choose_many("which modules", &options, &[])? {
+    let chosen = match prompt.choose_many(copy::WHICH_MODULES, &options, &[])? {
         crate::ui::Answer::Chosen(chosen) => chosen,
         crate::ui::Answer::Cancelled => Vec::new(),
     };
@@ -485,7 +486,7 @@ impl Module {
         }
         let named: Vec<String> = picked.iter().map(|(_, name)| name.clone()).collect();
 
-        let also = short(root, sources, &list, &listing, &named, &declares, prompt)?
+        let also = short(root, sources, &list, &listing, &declares, prompt)?
             .into_iter()
             .filter(|qualified| {
                 !picked
@@ -518,18 +519,9 @@ impl Module {
                     .iter()
                     .map(|s| format!("`{}` {}", s.stem, s.about))
                     .collect();
-                let question = format!(
-                    "{} {} CI runnable that this repo does not generate:\n{}\n\
-                     Generate it now?",
-                    said(&quoted(&picked)),
-                    match picked.len() {
-                        1 => "makes",
-                        _ => "make",
-                    },
-                    rows.join("\n")
-                );
+                println!("{}\n", rows.join("\n"));
                 prompt
-                    .confirm(&question, "Yes", "No")?
+                    .confirm(copy::GENERATE_WORKFLOWS, copy::YES, copy::NO)?
                     .then(|| crate::set::Workflows::adding(&list, &named))
             }
         };
@@ -657,7 +649,6 @@ fn short(
     sources: &[Collection],
     list: &crate::model::image::List,
     listing: &Listing,
-    named: &[String],
     declares: &[crate::parse::module::Summary],
     prompt: &Prompt,
 ) -> Result<Vec<String>, String> {
@@ -714,47 +705,7 @@ fn short(
         return Ok(Vec::new());
     }
 
-    // The images at least one of the unmet wants has no provider in.
-    let lacking: Vec<(&crate::model::image::Image, Option<&str>)> = targets
-        .iter()
-        .copied()
-        .filter(|(image, flavour)| {
-            unmet
-                .iter()
-                .any(|want| !image_has(image, *flavour, want, &index))
-        })
-        .collect();
-
-    let question = format!(
-        "{} {} {}, which nothing in {} provides.\nImport {} as well?",
-        said(
-            &named
-                .iter()
-                .map(|name| format!("`{name}`"))
-                .collect::<Vec<_>>()
-        ),
-        match named.len() {
-            1 => "requires",
-            _ => "require",
-        },
-        said(
-            &unmet
-                .iter()
-                .map(|want| format!("`{want}`"))
-                .collect::<Vec<_>>()
-        ),
-        said(
-            &lacking
-                .iter()
-                .map(|(image, flavour)| match flavour {
-                    Some(flavour) => format!("`{}/{flavour}`", image.id),
-                    None => format!("`{}`", image.id),
-                })
-                .collect::<Vec<_>>()
-        ),
-        said(&bring.iter().map(|at| format!("`{at}`")).collect::<Vec<_>>()),
-    );
-    match prompt.confirm(&question, "Yes", "No")? {
+    match prompt.confirm(copy::IMPORT_REQUIRED, copy::YES, copy::NO)? {
         true => Ok(bring),
         false => Ok(Vec::new()),
     }
@@ -888,7 +839,7 @@ fn measured(
         .iter()
         .map(|profile| Choice::new(profile.name(), &profile.title))
         .collect();
-    let Some(chosen) = prompt.choose("which profile", &options)? else {
+    let Some(chosen) = prompt.choose(copy::WHICH_PROFILE, &options)? else {
         return Ok(Vec::new());
     };
     Ok(images
@@ -897,11 +848,6 @@ fn measured(
             crate::set::Conforms::declaring(image, profiles[chosen].name(), brought.to_vec())
         })
         .collect())
-}
-
-/// A set of members as a sentence names them.
-fn quoted(picked: &[(Found, String)]) -> Vec<String> {
-    picked.iter().map(|(_, name)| format!("`{name}`")).collect()
 }
 
 /// A list as a sentence reads it.

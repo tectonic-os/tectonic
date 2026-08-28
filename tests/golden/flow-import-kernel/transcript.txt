@@ -1,11 +1,11 @@
 Tectonic v{version}
 
-list it in example (Yes/No)
+List it in example? (Yes/No)
 Yes
 
-`custom-kernel` makes CI runnable that this repo does not generate:
 `kernel-freshness` tracks the kernel a module pins, and proposes a bump
-Generate it now? (Yes/No)
+
+Generate the workflows this makes runnable? (Yes/No)
 Yes
 
 

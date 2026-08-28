@@ -2,10 +2,9 @@ A `conforms` turns the scan on: every build measures `example` against the profi
 
   1) standard  Standard System Security Profile for Fedora
   2) ospp  Protection Profile for General Purpose Operating Systems
-which profile [1-2, 0 for none]: 1
+Which profile? [1-2, 0 for none]: 1
 
-`three/sshd` claims 1 of the 3 rules `standard` selects that nothing `example` lists claims.
-Import it as well? (Yes/No)
+Import the modules claiming these rules? (Yes/No)
 Yes
 
 

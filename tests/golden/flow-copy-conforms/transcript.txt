@@ -1,6 +1,6 @@
 Tectonic v{version}
 
-list it in example (Yes/No)
+List it in example? (Yes/No)
 Yes
 
 

@@ -5,9 +5,7 @@ Example
 
 Creating example...
 
-This repo is designed to run scheduled builds of the repo's images via
-Github or Forgejo actions.
-Would you like to configure this now? (Yes/No)
+Sync this repo to a provider? (Yes/No)
 Yes
 
   1) github.com  Github, and the workflows Tectonic ships
@@ -21,13 +19,10 @@ Added github.com/someone/example as the origin repo
 Would you like to create this repo on Github now? (Yes/Skip)
 Yes
 
-To create a repo from Tectonic requires the Github CLI tool 'gh' installed.
-Would you like to install it now? (Yes/Skip Github repo creation)
+Install the Github CLI now? (Yes/Skip Github repo creation)
 Yes
 
-Tectonic defines images through kdl files. These image files define the base
-image and modules to be included in the built image.
-Would you like to create an image file now? (Yes/No)
+Define an image now? (Yes/No)
 Yes
 
 What will the image be called? [Example]
@@ -49,12 +44,12 @@ What is the base image for this image? [1-8, 0 for none]: 1
   4) [x] cleanup-registry  prunes old versions of the images off the registry
   5) [ ] kernel-freshness  needs a module taking a KERNEL arg
   6) [x] smoke-test  installs the image to a disk and boots it under qemu
-the CI to generate [1-6, several, 0 for none]: 
+Which workflows? [1-6, several, 0 for none]: 
 
-publish images only on scheduled builds (Yes/No)
+Publish images only on scheduled builds? (Yes/No)
 No
 
-run image scans only on scheduled builds (Yes/No)
+Run image scans only on scheduled builds? (Yes/No)
 No
 
 what time the daily build runs, UTC [12:30]: 12:30

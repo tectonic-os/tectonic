@@ -4,6 +4,7 @@
 //! Collect-then-apply like every other flow, so `create repo` holds one of
 //! these rather than calling the command.
 
+use crate::copy;
 use crate::dispatch::Error;
 use crate::prompt::Prompt;
 use crate::resolve::workflow::{Basis, Shipped, DEFAULT_AT, SHIPPED};
@@ -120,8 +121,7 @@ impl Workflows {
             .map(|(at, _)| at)
             .collect();
 
-        let Answer::Chosen(chosen) = prompt.choose_many("the CI to generate", &options, &held)?
-        else {
+        let Answer::Chosen(chosen) = prompt.choose_many(copy::WORKFLOWS, &options, &held)? else {
             return Ok(None);
         };
         let chosen: Vec<&'static Shipped> = chosen.iter().map(|at| &SHIPPED[*at]).collect();
@@ -132,20 +132,17 @@ impl Workflows {
         let builds = chosen.iter().any(|shipped| shipped.stem == "build");
         let publishes_scheduled = builds
             && prompt.confirm_current(
-                "publish images only on scheduled builds",
-                "Yes",
-                "No",
+                copy::PUBLISH_SCHEDULED,
+                copy::YES,
+                copy::NO,
                 publishes_current,
             )?;
         let scans_scheduled = match (builds, publishes_scheduled) {
             (false, _) => false,
             (true, true) => scans_current,
-            (true, false) => prompt.confirm_current(
-                "run image scans only on scheduled builds",
-                "Yes",
-                "No",
-                scans_current,
-            )?,
+            (true, false) => {
+                prompt.confirm_current(copy::SCAN_SCHEDULED, copy::YES, copy::NO, scans_current)?
+            }
         };
 
         let at = match chosen.iter().any(|shipped| shipped.at.is_some()) {
@@ -153,7 +150,7 @@ impl Workflows {
             true => {
                 let asked = prompt.text(
                     None,
-                    "what time the daily build runs, UTC",
+                    copy::DAILY_AT,
                     BY_HAND,
                     Some(&parse::repo::at_text(at)),
                 )?;
@@ -297,7 +294,7 @@ impl Conforms {
                         false => Choice::new(&image.id, &image.name),
                     })
                     .collect();
-                match prompt.choose("which image is measured", &options)? {
+                match prompt.choose(copy::MEASURED_IMAGE, &options)? {
                     Some(at) => at,
                     None => return Ok(None),
                 }
@@ -322,7 +319,7 @@ impl Conforms {
             .iter()
             .map(|profile| Choice::new(profile.name(), &profile.title))
             .collect();
-        let Some(chosen) = prompt.choose("which profile", &options)? else {
+        let Some(chosen) = prompt.choose(copy::WHICH_PROFILE, &options)? else {
             return Ok(None);
         };
         let profile = &content.profiles[chosen];
@@ -459,7 +456,7 @@ impl Claims {
             .iter()
             .map(|profile| Choice::new(profile.name(), &profile.title))
             .collect();
-        let Some(chosen) = prompt.choose("which profile", &options)? else {
+        let Some(chosen) = prompt.choose(copy::WHICH_PROFILE, &options)? else {
             return Ok(None);
         };
         let profile = &content.profiles[chosen];
@@ -519,7 +516,7 @@ impl Claims {
             .collect();
 
         let Answer::Chosen(chosen) =
-            prompt.choose_many(&format!("which rules `{named}` claims"), &options, &on)?
+            prompt.choose_many(&copy::claimed_rules(named), &options, &on)?
         else {
             return Ok(None);
         };
@@ -604,23 +601,7 @@ fn offer(
     if named.is_empty() {
         return Ok(Vec::new());
     }
-    let question = format!(
-        "{} {} {} of the {} rules `{}` selects that nothing `{}` lists claims.\nImport {} as well?",
-        crate::import::said(&named.iter().map(|at| format!("`{at}`")).collect::<Vec<_>>()),
-        match named.len() {
-            1 => "claims",
-            _ => "claim",
-        },
-        owed.covered.len(),
-        owed.open.len(),
-        profile.name(),
-        image.id,
-        match named.len() {
-            1 => "it",
-            _ => "them",
-        },
-    );
-    match prompt.confirm(&question, "Yes", "No")? {
+    match prompt.confirm(copy::IMPORT_CLAIMING, copy::YES, copy::NO)? {
         true => Ok(named),
         false => Ok(Vec::new()),
     }

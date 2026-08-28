@@ -1,7 +1,7 @@
 Tectonic v{version}
 
   1) secureboot
-which key [1, 0 for none]: 0
+Which key? [1, 0 for none]: 0
 
 Error: `tect create key <kind>` names which key; this repository declares secureboot.
 

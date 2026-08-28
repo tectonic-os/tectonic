@@ -1,9 +1,9 @@
-the CI to generate: build, build-disk, base-sig-probe, cleanup-registry, smoke-test
+Which workflows?: build, build-disk, base-sig-probe, cleanup-registry, smoke-test
 
 [6n
 
 
-[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hpublish images only on scheduled builds: Yes
+[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hPublish images only on scheduled builds?: Yes
 
 what time the daily build runs, UTC [12:30]: 
 

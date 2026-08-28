@@ -2,6 +2,7 @@
 //! generates it come out of the module declaring it; the generators, and the
 //! text that follows one, are the tool's.
 
+use crate::copy;
 use crate::layout;
 use crate::model::module::Key as Declared;
 use crate::model::remote::REMOTE_DIR;
@@ -132,7 +133,7 @@ fn which(disk: &Disk, prompt: &Prompt) -> Result<String, String> {
     }
     let options: Vec<Choice> = kinds.iter().map(|kind| Choice::new(*kind, "")).collect();
     prompt
-        .choose("which key", &options)?
+        .choose(copy::WHICH_KEY, &options)?
         .map(|at| kinds[at].clone())
         .ok_or_else(|| {
             format!(
@@ -165,10 +166,7 @@ fn provider(
             let listed = many.join(", ");
             let options: Vec<Choice> = many.iter().map(|dir| Choice::new(*dir, "")).collect();
             prompt
-                .choose(
-                    &format!("{listed} all declare the {kind} key; which one"),
-                    &options,
-                )?
+                .choose(&copy::key_provider(kind), &options)?
                 .ok_or_else(|| {
                     format!("the {kind} key is declared by {listed}; name one with `--module`")
                 })
@@ -230,7 +228,7 @@ fn common_name(root: &Path, given: Option<String>, prompt: &Prompt) -> Result<St
     let named = crate::create::named_after_root(root).unwrap_or_else(|| "tectonic".to_string());
     let cn = prompt.text(
         given,
-        "common name, which is what the enrolment prompt shows",
+        copy::KEY_CN,
         "`--cn`",
         Some(&format!("{named} Secure Boot")),
     )?;

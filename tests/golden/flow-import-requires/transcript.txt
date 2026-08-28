@@ -1,10 +1,9 @@
 Tectonic v{version}
 
-list it in example (Yes/No)
+List it in example? (Yes/No)
 Yes
 
-`browser` requires `flatpak`, which nothing in `example` provides.
-Import `one/flatpak` as well? (Yes/No)
+Import what these modules require? (Yes/No)
 Yes
 
 
