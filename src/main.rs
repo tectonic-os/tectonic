@@ -131,6 +131,10 @@ fn run() -> Result<ExitCode, Error> {
         words: std::env::args().skip(1).collect(),
         given: Vec::new(),
     };
+    if args.words == ["--version"] {
+        println!("Tectonic v{TECT_VERSION}");
+        return Ok(ExitCode::SUCCESS);
+    }
     let prompt = Prompt::new(args.switch("no-tui"));
     let cache_to = args.switch("cache-to");
     let no_cache_from = args.switch("no-cache-from");
