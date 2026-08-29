@@ -45,6 +45,7 @@
           "image": "server",
           "flavour": null,
           "published": "server",
+          "conforms": "",
           "default": false,
           "pr": false,
           "siblings": [],
@@ -100,7 +101,7 @@
       "description": "",
       "keywords": [],
       "logo_url": "",
-      "conforms": "",
+      "conforms": "standard",
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
@@ -129,6 +130,7 @@
           "image": "workstation",
           "flavour": null,
           "published": "workstation",
+          "conforms": "standard",
           "default": false,
           "pr": false,
           "siblings": [
@@ -186,6 +188,7 @@
           "image": "workstation",
           "flavour": "base",
           "published": "workstation-base",
+          "conforms": "",
           "default": true,
           "pr": true,
           "siblings": [
@@ -243,6 +246,7 @@
           "image": "workstation",
           "flavour": "dev",
           "published": "workstation-dev",
+          "conforms": "cusp_fedora",
           "default": false,
           "pr": false,
           "siblings": [

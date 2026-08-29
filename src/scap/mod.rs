@@ -45,12 +45,14 @@ pub fn content(root: &Path, named: Option<&str>) -> Result<Verdict, String> {
     Ok(Verdict::Clean)
 }
 
-/// The same answer with no repository at all: `conforms` and the base family
-/// come off the manifest entry for the image that is running. Same gate as
-/// above — an image declaring no `conforms` is measured against nothing, and
-/// the blank line says so.
-pub fn content_on_host(image: &Json) -> Result<Verdict, String> {
-    let path = match json::text(image, "conforms").unwrap_or_default().is_empty() {
+/// The same answer with no repository at all: the `conforms` comes off the
+/// running target and the base family off the image it belongs to. Same gate
+/// as above — a target measured against nothing says so with a blank line.
+pub fn content_on_host(image: &Json, target: &Json) -> Result<Verdict, String> {
+    let path = match json::text(target, "conforms")
+        .unwrap_or_default()
+        .is_empty()
+    {
         true => String::new(),
         false => installed(
             CONTENT,
@@ -241,8 +243,11 @@ fn open(root: &Path, named: Option<&str>) -> Option<(List, Vec<crate::resolve::R
 
 fn datastream(list: &List, named: Option<&str>) -> Result<String, String> {
     let name = target(list, named)?;
-    let (image, _, _) = of_target(list, &name).ok_or(unknown(&name))?;
-    if image.conforms.is_empty() {
+    let (image, flavour, _) = of_target(list, &name).ok_or(unknown(&name))?;
+    if image
+        .conforms_of(flavour.as_deref().unwrap_or(NO_FLAVOUR))
+        .is_empty()
+    {
         return Ok(String::new());
     }
     Ok(installed(

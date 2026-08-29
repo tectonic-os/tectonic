@@ -64,7 +64,7 @@ pub const IMAGE: Node = Node::new("image",
             .arg(Arg::Strs, Say::NONE),
         Node::new("logo-url", "A URL to the image's logo, in its OCI labels.")
             .arg(Arg::Str, NEEDS_VALUE).once(""),
-        Node::new("conforms", "The benchmark profile a scan measures this image against, reported rather than enforced.")
+        Node::new("conforms", "The benchmark profile a scan measures the ungated target against, reported rather than enforced.")
             .arg(Arg::Str, NEEDS_VALUE).once(""),
 
         Node::new("base", "The image every layer builds on, and what building on it may assume.")
@@ -116,8 +116,13 @@ pub const IMAGE: Node = Node::new("image",
                                    default.",
                             say: Say::new("`{}` must be #true or #false", "not a boolean", ""),
                             missing: Say::NONE },
+                        Prop { name: "conforms", kind: Kind::Str,
+                            desc: "The benchmark profile a scan measures this flavour against; \
+                                   the image's `conforms` measures the ungated target alone.",
+                            say: Say::new("`{}` must be a profile name", "not a string", ""),
+                            missing: Say::NONE },
                     ], Say::new("unknown flavour property `{}`", "not part of the schema",
-                        "a flavour accepts `default` and `pr-build`")),
+                        "a flavour accepts `default`, `pr-build` and `conforms`")),
             ], Say::NONE),
 
         Node::new("modules",
@@ -303,6 +308,7 @@ impl Image {
                 name: node.name().value().to_string(),
                 default: flag(node, "default"),
                 pr_build: flag(node, "pr-build"),
+                conforms: prop(node, "conforms").unwrap_or_default().to_string(),
                 span: node.name().span().into(),
             };
 

@@ -85,16 +85,38 @@ mod tests {
         let out = render(BODY, None, &["no-kernel", "scheduled-scan"]);
         assert!(
             out.contains(
-                "    if: needs.build_push.outputs.publish == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')\n"
+                "    if: needs.build_push.outputs.publish == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && needs.compute-matrix.outputs.scanned != '[]'\n"
             ),
             "{out}"
         );
         assert!(
             !out.contains(
-                "    if: needs.build_push.outputs.publish == 'true' && github.event_name != 'pull_request'\n"
+                "    if: needs.build_push.outputs.publish == 'true' && github.event_name != 'pull_request' && needs.compute-matrix.outputs.scanned != '[]'\n"
             ),
             "{out}"
         );
+    }
+
+    /// A scan costs a full pull, install and eval per target, so the matrix is
+    /// what declared a `conforms` rather than everything that was built.
+    #[test]
+    fn only_a_target_asking_to_be_measured_is_scanned() {
+        assert!(BODY.contains("target: ${{ fromJson(needs.compute-matrix.outputs.scanned) }}"));
+        assert!(BODY.contains("select(.conforms != \"\") | .name"));
+        // Every scan `if` turns an empty matrix away, which is an error rather
+        // than a skipped job.
+        for facts in [
+            &["no-kernel", "push-scan"][..],
+            &["no-kernel", "scheduled-scan"][..],
+        ] {
+            let out = render(BODY, None, facts);
+            assert_eq!(
+                out.matches("needs.compute-matrix.outputs.scanned != '[]'")
+                    .count(),
+                1,
+                "{out}"
+            );
+        }
     }
 
     #[test]

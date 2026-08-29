@@ -48,6 +48,7 @@
           "image": "suppressed",
           "flavour": null,
           "published": "suppressed",
+          "conforms": "",
           "default": true,
           "pr": true,
           "siblings": [],

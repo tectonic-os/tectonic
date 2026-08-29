@@ -1,5 +1,6 @@
 image {
     name "Workstation"
+    conforms "standard"
 
     base "quay.io/fedora/fedora-bootc:44" {
         family "fedora"
@@ -8,7 +9,7 @@ image {
 
     flavours {
         base default=#true
-        dev
+        dev conforms="cusp_fedora"
     }
 
     modules {

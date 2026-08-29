@@ -45,6 +45,7 @@
           "image": "broken-collect",
           "flavour": null,
           "published": "broken-collect",
+          "conforms": "",
           "default": true,
           "pr": true,
           "siblings": [],

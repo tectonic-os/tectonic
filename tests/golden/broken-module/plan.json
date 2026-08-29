@@ -45,6 +45,7 @@
           "image": "broken-module",
           "flavour": null,
           "published": "broken-module",
+          "conforms": "",
           "default": true,
           "pr": true,
           "siblings": [],

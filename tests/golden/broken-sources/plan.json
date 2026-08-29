@@ -45,6 +45,7 @@
           "image": "broken-sources",
           "flavour": null,
           "published": "broken-sources",
+          "conforms": "",
           "default": true,
           "pr": true,
           "siblings": [],

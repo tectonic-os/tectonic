@@ -45,6 +45,7 @@
           "image": "broken-overlay",
           "flavour": null,
           "published": "broken-overlay",
+          "conforms": "",
           "default": true,
           "pr": true,
           "siblings": [],

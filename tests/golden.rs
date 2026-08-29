@@ -1284,17 +1284,17 @@ fn flows() {
     let drawn_build = generated_build(&drawn);
     assert_eq!(prompted_build, direct_build);
     assert!(prompted_build.contains(
-        "    if: needs.build_push.outputs.publish == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')\n"
+        "    if: needs.build_push.outputs.publish == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && needs.compute-matrix.outputs.scanned != '[]'\n"
     ));
     assert!(!prompted_build.contains(
-        "    if: needs.build_push.outputs.publish == 'true' && github.event_name != 'pull_request'\n"
+        "    if: needs.build_push.outputs.publish == 'true' && github.event_name != 'pull_request' && needs.compute-matrix.outputs.scanned != '[]'\n"
     ));
 
     let cadence = flow_repo("flow-publish-cadence");
     let repo_path = cadence.join("repo.kdl");
     let push_build = generated_build(&cadence);
     assert!(push_build.contains(
-        "    if: needs.build_push.outputs.publish == 'true' && github.event_name != 'pull_request'\n"
+        "    if: needs.build_push.outputs.publish == 'true' && github.event_name != 'pull_request' && needs.compute-matrix.outputs.scanned != '[]'\n"
     ));
     let repo = std::fs::read_to_string(&repo_path).unwrap();
     std::fs::write(
@@ -1312,8 +1312,8 @@ fn flows() {
     assert_eq!(drawn_build, scheduled_build);
     assert_eq!(
         scheduled_build.replace(publish_gate, "").replace(
-            "    if: needs.build_push.outputs.publish == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')\n",
-            "    if: needs.build_push.outputs.publish == 'true' && github.event_name != 'pull_request'\n",
+            "    if: needs.build_push.outputs.publish == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && needs.compute-matrix.outputs.scanned != '[]'\n",
+            "    if: needs.build_push.outputs.publish == 'true' && github.event_name != 'pull_request' && needs.compute-matrix.outputs.scanned != '[]'\n",
         ),
         push_build,
     );

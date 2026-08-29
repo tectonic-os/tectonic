@@ -238,7 +238,7 @@ fn on_host(
             let image = image_of(&manifest, target).ok_or_else(|| {
                 Error::Invocation("the manifest names no image for this target".to_string())
             })?;
-            Ok(match crate::scap::content_on_host(image)? {
+            Ok(match crate::scap::content_on_host(image, target)? {
                 crate::scap::Verdict::Clean => ExitCode::SUCCESS,
                 crate::scap::Verdict::Wrong => ExitCode::from(REPO_ERROR),
             })

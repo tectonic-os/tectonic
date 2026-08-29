@@ -61,6 +61,7 @@
           "image": "broken-pin",
           "flavour": null,
           "published": "broken-pin",
+          "conforms": "",
           "default": true,
           "pr": true,
           "siblings": [],

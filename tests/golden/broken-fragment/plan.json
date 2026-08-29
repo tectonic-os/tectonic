@@ -51,6 +51,7 @@
           "image": "broken-fragment",
           "flavour": null,
           "published": "broken-fragment",
+          "conforms": "",
           "default": true,
           "pr": true,
           "siblings": [
@@ -98,6 +99,7 @@
           "image": "broken-fragment",
           "flavour": "dev",
           "published": "broken-fragment-dev",
+          "conforms": "",
           "default": false,
           "pr": false,
           "siblings": [

@@ -45,6 +45,7 @@
           "image": "minimal",
           "flavour": null,
           "published": "minimal",
+          "conforms": "",
           "default": true,
           "pr": true,
           "siblings": [],

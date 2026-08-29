@@ -45,6 +45,7 @@
           "image": "server",
           "flavour": null,
           "published": "server",
+          "conforms": "",
           "default": false,
           "pr": false,
           "siblings": [],
@@ -129,6 +130,7 @@
           "image": "workstation",
           "flavour": null,
           "published": "workstation",
+          "conforms": "",
           "default": false,
           "pr": false,
           "siblings": [
@@ -186,6 +188,7 @@
           "image": "workstation",
           "flavour": "base",
           "published": "workstation-base",
+          "conforms": "",
           "default": false,
           "pr": false,
           "siblings": [
@@ -243,6 +246,7 @@
           "image": "workstation",
           "flavour": "dev",
           "published": "workstation-dev",
+          "conforms": "",
           "default": false,
           "pr": false,
           "siblings": [

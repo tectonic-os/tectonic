@@ -45,6 +45,7 @@
           "image": "collecting",
           "flavour": null,
           "published": "collecting",
+          "conforms": "",
           "default": true,
           "pr": true,
           "siblings": [],

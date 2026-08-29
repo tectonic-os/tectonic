@@ -37,6 +37,7 @@
           "image": "Not An Id",
           "flavour": null,
           "published": "Not An Id",
+          "conforms": "",
           "default": true,
           "pr": true,
           "siblings": [],

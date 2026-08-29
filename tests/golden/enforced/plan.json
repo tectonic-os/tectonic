@@ -61,6 +61,7 @@
           "image": "enforced",
           "flavour": null,
           "published": "enforced",
+          "conforms": "standard",
           "default": true,
           "pr": true,
           "siblings": [],

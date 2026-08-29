@@ -61,6 +61,7 @@
           "image": "broken-unpinned",
           "flavour": null,
           "published": "broken-unpinned",
+          "conforms": "",
           "default": true,
           "pr": true,
           "siblings": [],

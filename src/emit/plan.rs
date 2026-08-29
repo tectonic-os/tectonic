@@ -190,6 +190,7 @@ fn target(list: &List, image: &Image, resolved: &Resolved, target: &Target) -> J
             },
         ),
         ("published", Json::string(target.published())),
+        ("conforms", Json::string(image.conforms_of(flavour))),
         (
             "default",
             Json::Bool(

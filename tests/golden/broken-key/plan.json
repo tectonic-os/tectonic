@@ -45,6 +45,7 @@
           "image": "broken-key",
           "flavour": null,
           "published": "broken-key",
+          "conforms": "",
           "default": true,
           "pr": true,
           "siblings": [],

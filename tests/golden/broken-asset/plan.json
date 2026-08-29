@@ -76,6 +76,7 @@
           "image": "broken-asset",
           "flavour": null,
           "published": "broken-asset",
+          "conforms": "",
           "default": true,
           "pr": true,
           "siblings": [],

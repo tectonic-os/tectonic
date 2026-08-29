@@ -109,6 +109,11 @@ pub struct Flavour {
     pub name: String,
     pub default: bool,
     pub pr_build: bool,
+    /// The profile a scan measures this flavour's target against. A flavour is
+    /// a different image from the set it extends and is not guaranteed to
+    /// score the way that set did, so it asks for its own measurement or gets
+    /// none.
+    pub conforms: String,
     pub span: Span,
 }
 
@@ -242,6 +247,20 @@ impl Image {
     /// The manifests this image's entries resolved to, in build order.
     pub fn modules(&self) -> impl Iterator<Item = &Module> {
         self.entries.iter().filter_map(|e| e.module.as_ref())
+    }
+
+    /// What a scan measures one of this image's targets against: the image's
+    /// own `conforms` is the ungated target's alone, and every other target
+    /// declares its own or is not measured.
+    pub fn conforms_of(&self, flavour: &str) -> &str {
+        match flavour {
+            NO_FLAVOUR => &self.conforms,
+            name => self
+                .flavours
+                .iter()
+                .find(|f| f.name == name)
+                .map_or("", |f| f.conforms.as_str()),
+        }
     }
 
     pub fn default_flavour(&self) -> Option<&str> {

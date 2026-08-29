@@ -61,6 +61,7 @@
           "image": "pinned",
           "flavour": null,
           "published": "pinned",
+          "conforms": "",
           "default": true,
           "pr": true,
           "siblings": [],

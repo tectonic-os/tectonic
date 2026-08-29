@@ -46,6 +46,7 @@
           "image": "signing",
           "flavour": null,
           "published": "signing",
+          "conforms": "",
           "default": true,
           "pr": true,
           "siblings": [],

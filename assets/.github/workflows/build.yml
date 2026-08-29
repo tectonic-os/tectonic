@@ -234,6 +234,7 @@ jobs:
       contents: read
     outputs:
       targets: ${{ steps.set.outputs.targets }}
+      scanned: ${{ steps.set.outputs.scanned }}
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -247,8 +248,14 @@ jobs:
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             selection='[.pr_target]'
           fi
-          targets="$(./scripts/tect.sh plan --json | jq -c "$selection")"
-          echo "targets=${targets}" >> "$GITHUB_OUTPUT"
+          plan="$(./scripts/tect.sh plan --json)"
+          {
+            echo "targets=$(jq -c "$selection" <<< "$plan")"
+            # Every target the declaration asks to be measured, and no other.
+            # A scan is a full pull, install and eval per target, and a
+            # flavour inherits no `conforms` from the image it extends.
+            echo "scanned=$(jq -c '[.images[].targets[] | select(.conforms != "") | .name]' <<< "$plan")"
+          } >> "$GITHUB_OUTPUT"
 
   build_push:
     needs: [checksums, compute-matrix]
@@ -693,16 +700,18 @@ jobs:
     needs: [checksums, compute-matrix, build_push]
     name: Scan the claims (${{ matrix.target }})
     runs-on: ubuntu-24.04
+    # An empty matrix is an error rather than a skip, so a repository
+    # measuring nothing has to be turned away before the strategy is read.
     # tect:only push-scan
-    if: needs.build_push.outputs.publish == 'true' && github.event_name != 'pull_request'
+    if: needs.build_push.outputs.publish == 'true' && github.event_name != 'pull_request' && needs.compute-matrix.outputs.scanned != '[]'
     # tect:end
     # tect:only scheduled-scan
-    if: needs.build_push.outputs.publish == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    if: needs.build_push.outputs.publish == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && needs.compute-matrix.outputs.scanned != '[]'
     # tect:end
 
     strategy:
       matrix:
-        target: ${{ fromJson(needs.compute-matrix.outputs.targets) }}
+        target: ${{ fromJson(needs.compute-matrix.outputs.scanned) }}
       fail-fast: false
 
     permissions:

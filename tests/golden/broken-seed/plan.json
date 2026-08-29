@@ -59,6 +59,7 @@
           "image": "example",
           "flavour": null,
           "published": "example",
+          "conforms": "",
           "default": true,
           "pr": true,
           "siblings": [],

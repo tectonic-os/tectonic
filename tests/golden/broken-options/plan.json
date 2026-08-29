@@ -45,6 +45,7 @@
           "image": "broken-options",
           "flavour": null,
           "published": "broken-options",
+          "conforms": "",
           "default": true,
           "pr": true,
           "siblings": [],
