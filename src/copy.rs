@@ -99,6 +99,14 @@ pub fn key_provider(kind: &str) -> String {
     format!("Which module's {kind} key?")
 }
 
+// The disk a virtual machine boots
+
+pub const WHICH_DISK: &str = "Which kind of disk image?";
+pub const DISK_QCOW2: &str = "a qemu disk, under out/qcow2/";
+pub const DISK_RAW: &str = "a raw disk, under out/raw/";
+pub const DISK_ISO: &str = "an installer iso, under out/bootiso/";
+pub const NO_ISO_SPAWN: &str = "systemd-vmspawn cannot boot an iso";
+
 // The command surface
 
 pub const WHICH_COMMAND: &str = "Which command?";

@@ -7,8 +7,8 @@ the help, and are not in that list.
 
 `tect` with nothing after it opens a picker where the output is a terminal, and
 prints the list where it is not. A verb with no noun — `tect create`, `tect
-copy`, `tect import`, `tect registry`, `tect set` — opens a picker of its
-nouns. **The picker offers what runs where it was typed**, with each row's own
+copy`, `tect import`, `tect registry`, `tect set`, `tect vm` — opens a picker of
+its nouns. **The picker offers what runs where it was typed**, with each row's own
 description; the help above keeps every row and groups them by where they run.
 Leaving a picker is not an error: it exits 0 having done nothing.
 
@@ -470,6 +470,33 @@ named.
 - `$LABELS` adds OCI labels the way `$TAGS` adds tags, and `$IMAGE_VERSION` is
   stamped into the image, defaulting to today in UTC.
 - Nothing is regenerated here. A build proves the committed files are current.
+
+### `vm build|run|spawn <type>`
+
+Turns the container image into a disk and boots it. `<type>` is `qcow2`, `raw`
+or `iso`, asked for where there is a terminal to ask on. `build` converts,
+`run` boots under qemu and converts first where the disk is missing, and
+`spawn` boots it with systemd-vmspawn, which cannot boot an installer iso.
+
+#### Flags:
+    --target <t>          what a rebuild builds, and what an iso installs
+    --image <ref>         the container image to convert, without its tag
+    --tag <tag>           its tag, else $DEFAULT_TAG, else latest
+    --ram <size>          memory for the virtual machine
+    --rebuild             build the container image first
+
+#### Notes:
+- This is `scripts/vm.sh`, which `generate` writes and this execs. The terminal
+  is the script's: it asks for sudo and boots a machine onto it, and nothing
+  here captures or reimplements any of that. Every default is the script's too,
+  so a flag not passed is not restated in Rust.
+- The disk is the image builder's default size, and the command says so on
+  every run that is not an iso. The root filesystem `disk_config/disk.toml`
+  declares sits in a block the builder does not apply.
+- It reads the image out of rootful podman, so it asks for sudo and copies the
+  image into root's store with `podman image scp` where it is not there.
+- Building a disk is fedora-only: the image builder cannot build one from an
+  image carrying no SELinux policy.
 
 ### `section [image]`
 

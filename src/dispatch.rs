@@ -56,6 +56,7 @@ pub struct Flags {
     pub base_scan: Option<PathBuf>,
     pub tags: Vec<String>,
     pub kernel: Option<String>,
+    pub ram: Option<String>,
     pub backend: Option<String>,
     pub oci_output: Option<String>,
     pub secrets: Vec<String>,
@@ -63,6 +64,7 @@ pub struct Flags {
     pub with: Vec<(String, String)>,
     pub cache_to: bool,
     pub no_cache_from: bool,
+    pub rebuild: bool,
 }
 
 /// The optional name a `create` takes, and nothing else.
@@ -343,6 +345,7 @@ pub fn dispatch(
         base_scan,
         tags,
         kernel,
+        ram,
         backend,
         oci_output,
         secrets,
@@ -350,6 +353,7 @@ pub fn dispatch(
         with,
         cache_to,
         no_cache_from,
+        rebuild,
     } = flags;
     // On a host the two baked documents are the whole of what there is to
     // read, and the table's `host` column says which commands answer off them.
@@ -560,6 +564,19 @@ pub fn dispatch(
             Ok(match crate::build::run(&repo_root(here)?, &opts)? {
                 crate::build::Stopped::Repository => ExitCode::from(REPO_ERROR),
             })
+        }
+        // The disk path is the repository's own script, run as it stands.
+        Verb::VmBuild | Verb::VmRun | Verb::VmSpawn => {
+            let root = repo_root(here)?;
+            let opts = crate::vm::Options {
+                target,
+                image: images.last().cloned(),
+                tag: tags.last().cloned(),
+                ram,
+                rebuild,
+            };
+            crate::vm::run(&root, spec, one_name(rest, spec)?.as_deref(), &opts, prompt)?;
+            Ok(ExitCode::SUCCESS)
         }
         Verb::RegistryNamespace => {
             println!("{}", crate::registry::namespace(&repo_root(here)?)?);

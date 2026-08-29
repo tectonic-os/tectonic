@@ -22,6 +22,9 @@ pub enum Verb {
     Check,
     Generate,
     Build,
+    VmBuild,
+    VmRun,
+    VmSpawn,
     Section,
     Graph,
     Why,
@@ -58,6 +61,9 @@ pub const ALL: &[Verb] = &[
     Verb::Check,
     Verb::Generate,
     Verb::Build,
+    Verb::VmBuild,
+    Verb::VmRun,
+    Verb::VmSpawn,
     Verb::Section,
     Verb::Graph,
     Verb::Why,
@@ -155,6 +161,8 @@ impl Spec {
 }
 
 const ROOT: &[&str] = &["root"];
+/// `vm.sh`'s own flags, under the names the rest of the surface uses.
+const VM: &[&str] = &["root", "target", "image", "tag", "ram"];
 
 pub const COMMANDS: &[Spec] = &[
     Spec {
@@ -304,6 +312,36 @@ pub const COMMANDS: &[Spec] = &[
             "oci-output",
             "secret",
         ],
+    },
+    Spec {
+        verb: Verb::VmBuild,
+        word: "vm",
+        noun: "build",
+        arg: "<type>",
+        about: "convert the built image into a qcow2, raw or iso",
+        family: Family::Repo,
+        host: false,
+        takes: VM,
+    },
+    Spec {
+        verb: Verb::VmRun,
+        word: "vm",
+        noun: "run",
+        arg: "<type>",
+        about: "boot that disk under qemu, building it if missing",
+        family: Family::Repo,
+        host: false,
+        takes: VM,
+    },
+    Spec {
+        verb: Verb::VmSpawn,
+        word: "vm",
+        noun: "spawn",
+        arg: "<type>",
+        about: "boot a qcow2 or raw disk with systemd-vmspawn",
+        family: Family::Repo,
+        host: false,
+        takes: VM,
     },
     Spec {
         verb: Verb::Section,
@@ -798,7 +836,7 @@ mod tests {
 
     #[test]
     fn only_a_verb_every_form_of_which_takes_a_noun_is_a_list() {
-        for word in ["create", "import", "registry", "set"] {
+        for word in ["create", "import", "registry", "set", "vm"] {
             assert!(all_nouns(word), "{word}");
         }
         for word in ["scap", "fetch", "check", "build", "nonsense"] {
