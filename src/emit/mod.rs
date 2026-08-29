@@ -47,8 +47,8 @@ pub(crate) const LIBRARIES: &[(&str, &str)] = &[
 ];
 
 /// The scripts every repository runs, written in place rather than under
-/// `generated/`: the generated workflows and the lint script call them at
-/// their fixed paths.
+/// `generated/`: the generated workflows, the lint script and `tect vm` call
+/// them at their fixed paths.
 pub(crate) const SCRIPTS: &[(&str, &str)] = &[
     (
         "scripts/lint.sh",
@@ -62,6 +62,7 @@ pub(crate) const SCRIPTS: &[(&str, &str)] = &[
         "scripts/tect.sh",
         include_str!("../../assets/scripts/tect.sh"),
     ),
+    ("scripts/vm.sh", include_str!("../../assets/scripts/vm.sh")),
 ];
 
 #[cfg(test)]

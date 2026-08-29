@@ -8,6 +8,7 @@
 ==== scripts/lint.sh
 ==== scripts/render-iso-config.sh
 ==== scripts/tect.sh
+==== scripts/vm.sh
 ==== generated/broken-fragment.d/core/early.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.

@@ -8,6 +8,7 @@
 ==== scripts/lint.sh
 ==== scripts/render-iso-config.sh
 ==== scripts/tect.sh
+==== scripts/vm.sh
 ==== generated/broken-fetch.d/core/grabber.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.

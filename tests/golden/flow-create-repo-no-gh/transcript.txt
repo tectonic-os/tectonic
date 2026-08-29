@@ -65,8 +65,7 @@ example/
 ├── modules/
 │   └── + .gitkeep
 ├── scripts/
-│   ├── + Containerfile.skeleton
-│   └── + vm.sh
+│   └── + Containerfile.skeleton
 ├── + .dockerignore
 ├── + .gitattributes
 ├── + .gitignore
