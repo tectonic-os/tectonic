@@ -120,6 +120,37 @@ mod tests {
         assert!(!pushed.contains(gate), "{pushed}");
     }
 
+    /// A weekly cron cannot say which publication broke the boot, so a
+    /// repository that publishes on a schedule hangs the smoke test off the
+    /// build run that published instead.
+    #[test]
+    fn a_scheduled_publisher_smoke_tests_the_run_that_published() {
+        let body = crate::resolve::workflow::find("smoke-test").unwrap().body;
+
+        // The units are read before the state is judged, or a degraded run
+        // exits without naming the unit that degraded it.
+        assert!(
+            body.find("systemctl --failed --no-legend") < body.find("expected running"),
+            "{body}"
+        );
+
+        let scheduled = render(
+            body,
+            Some("0 18 * * 1"),
+            &["no-kernel", "scheduled-publish"],
+        );
+        assert!(scheduled.contains("  workflow_run:\n"), "{scheduled}");
+        assert!(!scheduled.contains("cron"), "{scheduled}");
+        assert!(
+            scheduled.contains("github.event.workflow_run.conclusion == 'success'"),
+            "{scheduled}"
+        );
+
+        let pushed = render(body, Some("0 18 * * 1"), &["no-kernel", "push-publish"]);
+        assert!(pushed.contains("    - cron: '0 18 * * 1'\n"), "{pushed}");
+        assert!(!pushed.contains("workflow_run"), "{pushed}");
+    }
+
     #[test]
     fn fresh_jobs_fetch_modules_before_reading_the_plan() {
         assert!(BODY
@@ -153,7 +184,9 @@ mod tests {
                 for schedule in [None, Some("0 5 * * 1")] {
                     let out = render(shipped.body, schedule, facts);
                     assert!(!out.contains("tect:"), "{}\n{out}", shipped.stem);
-                    if schedule.is_some() && shipped.at.is_some() {
+                    // Only where the rendering kept a schedule at all: a
+                    // region may drop the one line the row is claiming.
+                    if schedule.is_some() && out.contains("- cron: '") {
                         assert!(
                             out.contains("    - cron: '0 5 * * 1'\n"),
                             "{}\n{out}",
