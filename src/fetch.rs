@@ -421,4 +421,64 @@ mod tests {
         assert!(!root.join("owner/half-removed").exists());
         std::fs::remove_dir_all(&root).unwrap();
     }
+    /// A file the collection deleted is gone from the tree the next fetch
+    /// places, rather than surviving into a `plan.json` CI will disagree with.
+    #[test]
+    fn a_deleted_file_does_not_survive_the_next_fetch() {
+        let root = std::env::temp_dir().join(format!("tect-fetch-stale.{}", std::process::id()));
+        let collection = root.join("collection");
+        // Named apart from the other tests' archives: `runtime::scratch` names
+        // its download by the URL's last segment and this process's id, so two
+        // tests fetching `collection.tar.gz` at once are one scratch file.
+        let archive = root.join("stale.tar.gz");
+        let _ = std::fs::remove_dir_all(&root);
+        crate::init::put(
+            &collection.join("hello/module.kdl"),
+            "description \"Says hello\"\n\nsupports \"fedora\"\n",
+        )
+        .unwrap();
+        crate::init::put(&collection.join("hello/files/gone.conf"), "old\n").unwrap();
+        let pack = || {
+            assert!(std::process::Command::new("tar")
+                .arg("-czf")
+                .arg(&archive)
+                .arg("-C")
+                .arg(&root)
+                .arg("collection")
+                .status()
+                .unwrap()
+                .success());
+        };
+        pack();
+        crate::init::put(
+            &root.join("repo.kdl"),
+            &format!(
+                "schema-version 1\nname \"Example\"\nsources {{\n    one {{\n        pin {{\n            unpinned \"test\"\n            version \"main\"\n            url \"file://{}\"\n        }}\n    }}\n}}\n",
+                archive.display()
+            ),
+        )
+        .unwrap();
+        crate::init::put(
+            &root.join("image.kdl"),
+            "image {\n    name \"Example\"\n    base \"example.invalid/image\" { family \"fedora\" }\n    modules { source \"one\" { module \"hello\" } }\n}\n",
+        )
+        .unwrap();
+        let (list, issues, _) = crate::declarations(&root);
+        assert!(issues.is_empty(), "{}", issues.plain());
+        super::modules(&root, &list).unwrap();
+        assert!(root
+            .join("modules/.remote/one/hello/files/gone.conf")
+            .is_file());
+
+        std::fs::remove_file(collection.join("hello/files/gone.conf")).unwrap();
+        pack();
+        let said = super::modules(&root, &list).unwrap();
+        assert!(
+            !root
+                .join("modules/.remote/one/hello/files/gone.conf")
+                .exists(),
+            "stale file survived: {said:?}"
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
 }

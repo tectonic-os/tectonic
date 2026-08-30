@@ -161,16 +161,48 @@ fn members(tree: &Path) -> Vec<String> {
     out
 }
 
+/// A `module.kdl` the walk never reaches, because it sits below a directory
+/// that already holds one, paired with the member holding it. Descending would
+/// make a member's own subdirectory ambiguous, so the walk is right to stop;
+/// what is wrong is that nothing says the thing below it is invisible.
+fn nested(tree: &Path) -> Vec<(String, String)> {
+    let mut out: Vec<(String, String)> = Vec::new();
+    for member in members(tree) {
+        let mut dirs: Vec<PathBuf> = vec![tree.join(&member)];
+        while let Some(dir) = dirs.pop() {
+            for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
+                let path = entry.path();
+                if !path.is_dir() || entry.file_name().to_string_lossy().starts_with('.') {
+                    continue;
+                }
+                if path.join(layout::MODULE_FILE).is_file() {
+                    let under = path.strip_prefix(tree).unwrap_or(&path);
+                    out.push((member.clone(), under.display().to_string()));
+                }
+                dirs.push(path);
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
 /// Every module every declared collection holds, by name and then by
-/// collection. `fetch` decides whether a collection that is not on this
-/// machine is downloaded to answer or passed over.
+/// collection, and a line for every `module.kdl` the walk could not reach.
+/// `fetch` decides whether a collection that is not on this machine is
+/// downloaded to answer or passed over.
 ///
 /// The walk goes as deep as `Disk::scan`'s, so a member the collection groups
 /// under a directory is named by its path and is otherwise a member like any
 /// other. A dot directory is passed over: a collection read out of a working
 /// tree carries `.git`.
-pub fn catalog(root: &Path, sources: &[Collection], fetch: bool) -> Result<Vec<Provider>, String> {
+pub fn catalog(
+    root: &Path,
+    sources: &[Collection],
+    fetch: bool,
+) -> Result<(Vec<Provider>, Vec<String>), String> {
     let mut listed: Vec<Provider> = Vec::new();
+    let mut hidden: Vec<String> = Vec::new();
     for collection in sources {
         let tree = match fetch {
             true => tree(root, collection)?,
@@ -196,14 +228,22 @@ pub fn catalog(root: &Path, sources: &[Collection], fetch: bool) -> Result<Vec<P
                 here: false,
             });
         }
+        for (holder, under) in nested(&tree) {
+            hidden.push(format!(
+                "`{owner}/{under}` is inside `{owner}/{holder}`, so nothing can list it: the walk \
+                 stops at the first module.kdl and everything below one is that module's own \
+                 content. Move it beside `{holder}` for it to be a module",
+                owner = collection.name
+            ));
+        }
     }
     listed.sort_by(|a, b| (&a.name, &a.owner).cmp(&(&b.name, &b.owner)));
-    Ok(listed)
+    Ok((listed, hidden))
 }
 
 /// The catalog as a question, with what it holds and how it is named.
 fn offered(root: &Path, sources: &[Collection]) -> Result<(Vec<Provider>, Vec<Choice>), String> {
-    let listed = catalog(root, sources, true)?;
+    let listed = catalog(root, sources, true)?.0;
     if listed.is_empty() {
         return Err(format!("no module in {}", names(sources)));
     }

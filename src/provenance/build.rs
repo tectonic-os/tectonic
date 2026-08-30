@@ -97,13 +97,18 @@ pub fn build() -> Json {
     record(&env)
 }
 
+/// The shape of the build record. A host binary reads it back, and is pinned
+/// independently of the one that wrote it, so the number is the whole of what
+/// says the two agree.
+pub const SCHEMA_VERSION: u32 = 1;
+
 /// The record from any reading of the arguments, so what it says can be
 /// checked without a container and without touching this process's environment.
 fn record(env: &dyn Fn(&str) -> Option<String>) -> Json {
     let declared = env("BASE_DECLARED");
     let resolved = env("BASE");
     Json::object([
-        ("schema_version", Json::Number(1)),
+        ("schema_version", Json::Number(SCHEMA_VERSION)),
         ("target", Json::optional(env("TARGET"))),
         ("image", Json::optional(env("IMAGE_ID"))),
         ("version", Json::optional(env("IMAGE_VERSION"))),

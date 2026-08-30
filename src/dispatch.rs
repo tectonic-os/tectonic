@@ -205,12 +205,7 @@ fn on_host(
     }
 
     let (manifest, record) = crate::emit::why::baked(Path::new(MANIFEST), Path::new(RECORD))
-        .map_err(|err| {
-            Error::Invocation(format!(
-                "{err}\n\nno repo.kdl here and no baked manifest either, so there is nothing to \
-                 answer from"
-            ))
-        })?;
+        .map_err(Error::Invocation)?;
     let (targets, scope) = built_as(&manifest, record.as_ref());
 
     if spec.verb == Verb::Why {
@@ -759,6 +754,20 @@ fn reading(
         Command::Why | Command::WhyJson | Command::Coverage | Command::CoverageJson
     ) && arg.is_none()
         && prompt.draws();
+    // What `generate` writes is read off the fetched trees, so it fetches them
+    // first. A `.remote` older than the collection bakes a deleted file into
+    // `plan.json`, and CI — which fetches into an empty tree — disagrees and is
+    // right. The issues are left for `run` to report; a repository that does
+    // not read has nothing to fetch for.
+    if command == Command::Generate {
+        let (list, issues, _) = crate::declarations(&root);
+        if issues.is_empty() {
+            for line in crate::fetch::modules(&root, &list)? {
+                eprintln!("tect: {line}");
+            }
+        }
+    }
+
     let mut chosen = None;
     let mut run = if picks {
         let loaded = crate::load(&root);
@@ -825,6 +834,9 @@ fn reading(
         }
         for name in &run.modified {
             eprintln!("tect: `{name}` has been edited since it was imported");
+        }
+        for line in run.index.hidden() {
+            eprintln!("tect: {line}");
         }
         for line in crate::scap::conformance(&run.list, &run.index, datastream.as_deref())? {
             eprintln!("tect: {line}");

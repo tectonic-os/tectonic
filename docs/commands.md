@@ -409,8 +409,13 @@ modules the base already provides.
 
 #### Notes:
 - Above the counts it names every base a collection describes differently from
-  the tool's own entry, every collection declared `unpinned`, and every image
-  declaring a `conforms` nothing it lists claims a rule of.
+  the tool's own entry, every collection declared `unpinned`, every image
+  declaring a `conforms` nothing it lists claims a rule of, and every
+  `module.kdl` sitting below another member's directory in a collection.
+- A member inside a member is invisible everywhere else: the walk stops at the
+  first `module.kdl`, and everything below one is that module's own content. It
+  is left that way — descending would make a member's own subdirectory
+  ambiguous — so what `check` fixes is the silence, not the walk.
 - None of those is an error, and none changes the exit code. An image is
   allowed to declare a target it has not reached; that is what declaring one
   first is for.
@@ -432,6 +437,10 @@ Writes the build files and lists what it wrote:
 - Every workflow the `workflows` block names, under `.github/workflows/`
 
 #### Notes:
+- Referenced modules are fetched first, as `build` does. What is written is read
+  off `modules/.remote/`, so a tree older than the collection would bake a
+  deleted file into `plan.json` and CI — which fetches into an empty tree —
+  would disagree and be right.
 - `generated/` is cleared first, so an image or module that is gone leaves with
   its files. A workflow is removed by name instead: one the tool does not ship
   is the repository's own and is left where it is.
@@ -650,6 +659,12 @@ whether it enables a third-party package repository.
 - It answers two ways from one renderer. In a repository it reads the resolved
   plan; on a booted image it reads the two baked documents, scoped to the
   target the record names.
+- On a host, a baked document written against a schema version this binary does
+  not read is refused rather than answered off. The binary in an image is pinned
+  independently of the one that built it, so the two can be a schema apart, and
+  a host is the one place with no repository to check an answer against. The
+  refusal names both numbers and the tool version; `tect plan --json` prints the
+  manifest as it stands and is unaffected, since it reads no field out of it.
 - On a booted image it also prints the repository the image was built from and
   the commit it was at, with the `git clone` that reaches them. The module tree
   is deliberately not in the finished image, so comparing this machine against

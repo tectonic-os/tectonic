@@ -874,18 +874,52 @@ pub fn known_on_host(manifest: &Json, record: Option<&Json>) -> Vec<String> {
     out
 }
 
-/// The two documents an image carries, read from where the build put them.
+/// Whether this binary knows the shape of a baked document. The binary in an
+/// image is pinned independently of the one that built it, so the two can be a
+/// schema apart, and a host is the one place with no repository to check an
+/// answer against: a read-out off fields that moved looks exactly like a right
+/// one. So it refuses, and names both numbers.
+fn readable(document: &Json, at: &std::path::Path, reads: u32) -> Result<(), String> {
+    let tool = env!("CARGO_PKG_VERSION");
+    match crate::emit::json::field(document, "schema_version") {
+        Some(Json::Number(found)) if *found == reads => Ok(()),
+        Some(Json::Number(found)) => Err(format!(
+            "{}: this image was built against schema version {found}, and Tectonic v{tool} reads \
+             {reads}\n\nrun the release that built the image, which `tect summary` names as the \
+             tool version in the build record",
+            at.display()
+        )),
+        _ => Err(format!(
+            "{}: this image names no schema version, so it was built before the field existed and \
+             Tectonic v{tool}, which reads {reads}, cannot tell what shape it is\n\nrebuild the \
+             image with this release, or read it with the one that built it",
+            at.display()
+        )),
+    }
+}
+
+/// The two documents an image carries, read from where the build put them, and
+/// refused unless this binary knows the schema each is written against.
 pub fn baked(
     manifest: &std::path::Path,
     record: &std::path::Path,
 ) -> Result<(Json, Option<Json>), String> {
-    let raw = std::fs::read_to_string(manifest)
-        .map_err(|err| format!("{}: {err}", manifest.display()))?;
+    let raw = std::fs::read_to_string(manifest).map_err(|err| {
+        format!(
+            "{}: {err}\n\nno repo.kdl here and no baked manifest either, so there is nothing to \
+             answer from",
+            manifest.display()
+        )
+    })?;
     let declared = Json::parse(&raw).map_err(|err| format!("{}: {err}", manifest.display()))?;
+    readable(&declared, manifest, crate::model::image::SCHEMA_VERSION)?;
     let resolved = match std::fs::read_to_string(record) {
         Ok(raw) => Some(Json::parse(&raw).map_err(|err| format!("{}: {err}", record.display()))?),
         Err(_) => None,
     };
+    if let Some(resolved) = &resolved {
+        readable(resolved, record, crate::provenance::build::SCHEMA_VERSION)?;
+    }
     Ok((declared, resolved))
 }
 
@@ -1037,5 +1071,51 @@ mod tests {
 
         assert_eq!(table.header, ["Field", "Value"]);
         assert_eq!(table.rows.len(), 4);
+    }
+    /// The binary in an image is pinned apart from the one that built it, so a
+    /// host can be a schema away from the documents it is reading. Both numbers
+    /// and the tool version are named, because on a host there is nothing else
+    /// to check the answer against.
+    #[test]
+    fn a_baked_document_this_binary_does_not_know_is_refused() {
+        let dir = std::env::temp_dir().join(format!("tect-baked.{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let manifest = dir.join("plan.json");
+        let record = dir.join("build.json");
+        let write = |at: &std::path::Path, body: &str| crate::init::put(at, body).unwrap();
+        let tool = env!("CARGO_PKG_VERSION");
+
+        // The pair this binary was built to read.
+        write(&manifest, r#"{"schema_version": 1, "images": []}"#);
+        write(&record, r#"{"schema_version": 1, "target": "desktop"}"#);
+        assert!(super::baked(&manifest, &record).is_ok());
+
+        // A manifest a schema ahead: refused, both numbers named.
+        write(&manifest, r#"{"schema_version": 2, "images": []}"#);
+        let refused = super::baked(&manifest, &record).err().expect("refused");
+        assert!(refused.contains("schema version 2"), "{refused}");
+        assert!(refused.contains("reads 1"), "{refused}");
+        assert!(refused.contains(tool), "{refused}");
+
+        // A manifest from before the field existed: the same refusal, said
+        // differently, because there is no number to name.
+        write(&manifest, r#"{"images": []}"#);
+        let refused = super::baked(&manifest, &record).err().expect("refused");
+        assert!(refused.contains("names no schema version"), "{refused}");
+        assert!(refused.contains("reads 1"), "{refused}");
+        assert!(refused.contains(tool), "{refused}");
+
+        // The record is read back too, and refused on its own terms.
+        write(&manifest, r#"{"schema_version": 1, "images": []}"#);
+        write(&record, r#"{"schema_version": 7, "target": "desktop"}"#);
+        let refused = super::baked(&manifest, &record).err().expect("refused");
+        assert!(refused.contains("build.json"), "{refused}");
+        assert!(refused.contains("schema version 7"), "{refused}");
+
+        // A record that is not there at all is not a refusal: an unscoped
+        // read-out is the honest answer and already says so.
+        std::fs::remove_file(&record).unwrap();
+        assert!(super::baked(&manifest, &record).is_ok());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -67,6 +67,9 @@ pub struct Index {
     unread: Vec<String>,
     /// Whether the repository declares any collections at all.
     sourced: bool,
+    /// A member nested inside another member, which the walk stops short of and
+    /// nothing else would ever mention.
+    hidden: Vec<String>,
 }
 
 impl Index {
@@ -83,13 +86,15 @@ impl Index {
                 declares: parse::module::summary(&layout::manifest(root, dir)),
             });
         }
-        for module in crate::import::catalog(root, sources, fetch).unwrap_or_default() {
+        let (found, hidden) = crate::import::catalog(root, sources, fetch).unwrap_or_default();
+        for module in found {
             if !out.iter().any(|held| held.dir() == module.dir()) {
                 out.push(module);
             }
         }
         Self {
             held: out,
+            hidden,
             // The collections `catalog` just skipped: `cached` is the same
             // question it asked, and on `fetch` there is nothing to skip.
             unread: match fetch {
@@ -115,6 +120,13 @@ impl Index {
     /// empty `unread` is told from having nowhere else to look.
     pub fn sourced(&self) -> bool {
         self.sourced
+    }
+
+    /// The members no walk of a declared collection can reach. Nothing else
+    /// names them: they are absent from the catalog, from `find` and from the
+    /// picker alike, and absence is exactly what a silent one looks like.
+    pub fn hidden(&self) -> &[String] {
+        &self.hidden
     }
 
     /// The same thing as a sentence, so every diagnostic concluding from
