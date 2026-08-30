@@ -332,6 +332,18 @@ jobs:
           echo "PUBLISH=${publish}" >> "${GITHUB_ENV}"
           echo "publish=${publish}" >> "${GITHUB_OUTPUT}"
 
+      # The runner hands root podman a fuse-overlayfs mount program, which
+      # turns off the native overlay diff, so every layer commit walks the
+      # whole rootfs: two minutes a layer on the build and twice the time on
+      # the rechunk and the SBOM. Written before anything pulls, so the store
+      # is created under the driver it keeps and nothing has to be reset.
+      - name: Settle the container storage driver
+        run: |
+          sudo mkdir -p /etc/containers
+          printf '[storage]\ndriver = "overlay"\n' \
+            | sudo tee /etc/containers/storage.conf > /dev/null
+          sudo podman info --format 'storage: {{.Store.GraphDriverName}} {{.Store.GraphOptions}}'
+
       - name: Select a working container runtime
         id: runtime
         run: |
@@ -436,9 +448,6 @@ jobs:
             echo "wrote build secret ${id} from ${name}"
           done < <(jq -r '.secrets[]' "$TARGET_PLAN")
 
-      - name: Setup Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
-
       - name: Login to GitHub Container Registry
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
@@ -452,13 +461,13 @@ jobs:
           # The digest the label was stamped with, so the build record and the
           # label are one resolution of a moving tag rather than two.
           BASE: ${{ steps.base.outputs.name }}@${{ steps.base.outputs.digest }}
-          EVENT: ${{ github.event_name }}
-          ON_DEFAULT_BRANCH: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
           IMAGE_VERSION: ${{ steps.date.outputs.version }}
-          TAGS: ${{ steps.metadata.outputs.tags }}
           LABELS: ${{ steps.metadata.outputs.labels }}
         run: |
-          args=(--backend buildx --target "$TARGET")
+          # The one staging tag every step below reads. The published tags are
+          # the push's, so the raw image carries one name and `podman rmi`
+          # after the rechunk frees it rather than untagging it.
+          args=(--target "$TARGET" --tag "localhost/${IMAGE_NAME}:raw")
           for secret in "${RUNNER_TEMP}"/build-secrets/*; do
             [ -f "$secret" ] || continue
             args+=(--secret "$(basename "$secret")=${secret}")
@@ -466,18 +475,16 @@ jobs:
           if [ -n "$KERNEL" ]; then
             args+=(--kernel "$KERNEL")
           fi
-          if [ "$EVENT" = "schedule" ]; then
-            args+=(--no-cache-from)
-          fi
-          if [ "$KERNEL" != "stock" ] \
-             && { [ "$EVENT" = "schedule" ] \
-                  || { [ "$EVENT" != "pull_request" ] && [ "$ON_DEFAULT_BRANCH" = "true" ]; }; }; then
-            args+=(--cache-to)
-          fi
-          if [ "$PUBLISH" = "true" ]; then
-            args+=(--oci-output "${RUNNER_TEMP}/raw-oci.tar")
-          fi
-          ./scripts/tect.sh build "${args[@]}"
+          # Root, because every step after this is `sudo podman` against the
+          # root store: a rootless build would need an export to reach it.
+          sudo git config --system --add safe.directory "$PWD"
+          sudo env \
+            BASE="$BASE" \
+            IMAGE_REGISTRY="$IMAGE_REGISTRY" \
+            IMAGE_VERSION="$IMAGE_VERSION" \
+            LABELS="$LABELS" \
+            KERNEL="$KERNEL" \
+            "${PWD}/$(./scripts/tect.sh --path)" build "${args[@]}"
 
       - name: Summarize the resolved build
         env:
@@ -500,13 +507,6 @@ jobs:
         id: setup-syft
         if: env.PUBLISH == 'true'
         uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
-
-      - name: Import image into containers-storage
-        if: env.PUBLISH == 'true'
-        run: |
-          sudo skopeo copy "oci-archive:${RUNNER_TEMP}/raw-oci.tar:latest" \
-            "containers-storage:localhost/${IMAGE_NAME}:raw"
-          rm -f "${RUNNER_TEMP}/raw-oci.tar"
 
       - name: Generate SBOM
         if: env.PUBLISH == 'true'
@@ -581,11 +581,11 @@ jobs:
           path: ${{ runner.temp }}/sbom.spdx.json
           retention-days: 30
 
-      # The image is in containers-storage from here, and the rechunk holds
-      # three copies of it beside whatever the builder is still caching.
+      # The rechunk holds two copies of the image beside the intermediate
+      # layers the build cached, and nothing here uses docker's store at all.
       - name: Reclaim the build cache
         run: |
-          docker buildx prune --all --force > /dev/null
+          sudo podman image prune --force > /dev/null
           docker image prune --all --force > /dev/null
           df -h /
 
