@@ -889,10 +889,19 @@ fn readable(document: &Json, at: &std::path::Path, reads: u32) -> Result<(), Str
              tool version in the build record",
             at.display()
         )),
-        _ => Err(format!(
+        None => Err(format!(
             "{}: this image names no schema version, so it was built before the field existed and \
              Tectonic v{tool}, which reads {reads}, cannot tell what shape it is\n\nrebuild the \
              image with this release, or read it with the one that built it",
+            at.display()
+        )),
+        // Present and not a number is neither of the two above: saying it was
+        // built before the field existed would send the reader to rebuild an
+        // image whose document is simply malformed.
+        Some(_) => Err(format!(
+            "{}: this image names a schema version that is not a number, so nothing can be \
+             compared against the {reads} Tectonic v{tool} reads\n\nthe document is malformed; \
+             rebuild the image",
             at.display()
         )),
     }
@@ -912,7 +921,7 @@ pub fn baked(
         )
     })?;
     let declared = Json::parse(&raw).map_err(|err| format!("{}: {err}", manifest.display()))?;
-    readable(&declared, manifest, crate::model::image::SCHEMA_VERSION)?;
+    readable(&declared, manifest, crate::emit::plan::SCHEMA_VERSION)?;
     let resolved = match std::fs::read_to_string(record) {
         Ok(raw) => Some(Json::parse(&raw).map_err(|err| format!("{}: {err}", record.display()))?),
         Err(_) => None,

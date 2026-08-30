@@ -2,6 +2,7 @@ Tectonic v{version}
 
 tect: `tectonic-os` is unpinned, so a fetch from it takes whatever its ref holds then, unverified
 tect: `tect-version` names {version} with no sha256, so the binary it fetches is whatever the release holds, unverified
+tect: The `tectonic-os` collection is declared but not on this machine, so nothing read it: `tect fetch modules` downloads it
 tect: `example` conforms to `standard` and no module it lists declares `satisfies`, so nothing here claims a rule of it. Nothing read a datastream, so that counts declarations rather than rules: `tect check --datastream <file>` says which of the profile's rules are unclaimed
 tect: 1 images, 0 modules, 0 flavours
 ==== exit 0

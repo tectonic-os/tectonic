@@ -838,6 +838,14 @@ fn reading(
         for line in run.index.hidden() {
             eprintln!("tect: {line}");
         }
+        // `hidden` concludes from silence the same way `coverage` does: a
+        // collection that is declared and not on this machine is not walked,
+        // and a clean `check` on a fresh clone would otherwise read as one
+        // that looked.
+        match run.index.unsearched() {
+            clause if clause.is_empty() => {}
+            clause => eprintln!("tect: {clause}"),
+        }
         for line in crate::scap::conformance(&run.list, &run.index, datastream.as_deref())? {
             eprintln!("tect: {line}");
         }
