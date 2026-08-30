@@ -371,8 +371,8 @@ jobs:
 
       - name: Maximize build space
         run: |
-          # a desktop-sized image holds the build cache, the raw copy and the
-          # chunked one on this disk at once
+          # a desktop-sized image holds the raw copy and the chunked one on
+          # this disk at once
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
             /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/share/swift \
             /usr/local/share/powershell /usr/local/share/chromium
@@ -483,8 +483,7 @@ jobs:
             IMAGE_REGISTRY="$IMAGE_REGISTRY" \
             IMAGE_VERSION="$IMAGE_VERSION" \
             LABELS="$LABELS" \
-            KERNEL="$KERNEL" \
-            "${PWD}/$(./scripts/tect.sh --path)" build "${args[@]}"
+            "$(realpath "$(./scripts/tect.sh --path)")" build "${args[@]}"
 
       - name: Summarize the resolved build
         env:
@@ -581,11 +580,12 @@ jobs:
           path: ${{ runner.temp }}/sbom.spdx.json
           retention-days: 30
 
-      # The rechunk holds two copies of the image beside the intermediate
-      # layers the build cached, and nothing here uses docker's store at all.
-      - name: Reclaim the build cache
+      # Nothing here builds with docker, so its preinstalled images are pure
+      # headroom for the rechunk. The build's own intermediate layers are not
+      # reclaimable: they are the raw image's layers, and podman calls an image
+      # dangling only when it is untagged and childless.
+      - name: Reclaim the runner's docker images
         run: |
-          sudo podman image prune --force > /dev/null
           docker image prune --all --force > /dev/null
           df -h /
 

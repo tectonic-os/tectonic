@@ -81,17 +81,3 @@ jobs:
               delete_version "${pkg}" "${id}" "${kind}${tags:+, tags: ${tags}}"
             done <<<"${deletions}"
           done
-
-          pkg="$(jq -r '.cache_image' plan.json)"
-          live="$(jq -c '[.images[].targets[].published]' plan.json)"
-          echo "== ${pkg}"
-          if versions="$(list_versions "${pkg}")"; then
-            deletions="$(printf '%s' "${versions}" | jq -s 'add' | jq -r --argjson live "${live}" '
-              map(select((.metadata.container.tags | map(select(. as $t | $live | index($t))) | length) == 0))
-              | .[] | [.id, (.metadata.container.tags | join(","))] | @tsv')"
-            [ -n "${deletions}" ] || echo "nothing to delete"
-            while IFS=$'\t' read -r id tags; do
-              [ -n "${id}" ] || continue
-              delete_version "${pkg}" "${id}" "stale cache${tags:+, tags: ${tags}}"
-            done <<<"${deletions}"
-          fi
