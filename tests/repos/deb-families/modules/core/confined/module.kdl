@@ -1,0 +1,5 @@
+description "Ships one AppArmor profile, which the parser has to accept"
+
+supports "debian"
+
+requires "apparmor-policy"

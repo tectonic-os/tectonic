@@ -1286,6 +1286,7 @@ fn image_kdl(
         for (node, names) in [
             ("provides", &known.provides),
             ("provides-file", &known.provides_files),
+            ("requires", &known.requires),
         ] {
             if !names.is_empty() {
                 let listed: Vec<String> = names.iter().map(|name| format!("\"{name}\"")).collect();
@@ -1477,6 +1478,7 @@ mod tests {
             family: "fedora".to_string(),
             provides: Vec::new(),
             provides_files: Vec::new(),
+            requires: Vec::new(),
             about: "what a collection describes".to_string(),
             signed: true,
             span: crate::diag::Span::default(),

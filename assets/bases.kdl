@@ -1,7 +1,7 @@
 base "quay.io/fedora/fedora-bootc:44" {
     about "Fedora 44, nothing above the base system"
     family "fedora"
-    provides "rechunking" "initramfs-generation" "mac-policy"
+    provides "rechunking" "initramfs-generation" "selinux-policy"
 }
 
 // Universal Blue Images
@@ -42,7 +42,7 @@ base "ghcr.io/ublue-os/kinoite-main:44" {
 base "ghcr.io/bootcrew/debian-bootc:latest" {
     about "Experimental Debian bootc base from Bootcrew"
     family "debian"
-    provides "initramfs-generation"
+    provides "initramfs-generation" "apparmor-policy"
     signed #true
 }
 
@@ -57,5 +57,15 @@ base "ghcr.io/jmarrero/ubuntu-bootc:latest" {
     about "Experimental Ubuntu 26.04 bootc base with cloud-init"
     family "ubuntu"
     provides "initramfs-generation"
+    signed #false
+}
+
+// A container base, not a bootc image: it carries no kernel, no dracut, no
+// bootc and no AppArmor userspace, so a module set has to make it bootable
+// before anything else in an image on it means anything.
+base "docker.io/library/debian:trixie" {
+    about "Debian 13, which a module set has to turn into a bootc image"
+    family "debian"
+    requires "bootc-base"
     signed #false
 }

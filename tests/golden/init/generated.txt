@@ -1,3 +1,4 @@
+==== generated/lib/apparmor-helpers.sh
 ==== generated/lib/dkms-helpers.sh
 ==== generated/lib/fetch-helpers.sh
 ==== generated/lib/kernel-helpers.sh
@@ -224,8 +225,8 @@ graph LR
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
 | `initramfs-generation` | capability | `base` |  |  |
-| `mac-policy` | capability | `base` |  |  |
 | `rechunking` | capability | `base` |  |  |
+| `selinux-policy` | capability | `base` |  |  |
 ==== generated/example.graph.json
 {
   "image": "example",
@@ -239,7 +240,7 @@ graph LR
       "after": []
     },
     {
-      "name": "mac-policy",
+      "name": "rechunking",
       "kind": "capability",
       "build_only": false,
       "provider": "base",
@@ -247,7 +248,7 @@ graph LR
       "after": []
     },
     {
-      "name": "rechunking",
+      "name": "selinux-policy",
       "kind": "capability",
       "build_only": false,
       "provider": "base",

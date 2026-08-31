@@ -93,6 +93,10 @@ pub struct Base {
     pub provides: Vec<Decl>,
     /// Binaries the base guarantees.
     pub provides_files: Vec<Decl>,
+    /// Capabilities the base is unusable without: a container base a module
+    /// set turns into a bootc image declares what that module set has to
+    /// provide, and `check` refuses the image until something does.
+    pub requires: Vec<Decl>,
     /// Whether the base image publishes a cosign signature.
     pub signed: bool,
     pub span: Span,

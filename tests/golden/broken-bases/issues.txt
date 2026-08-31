@@ -17,9 +17,9 @@
     :        `-- not part of the schema
  14 | }
     `----
-  help: a base entry holds `about`, `family`, `provides`, `provides-file` and
-        `signed`: what an image built on it may assume, and what a person
-        picks it by
+  help: a base entry holds `about`, `family`, `provides`, `provides-file`,
+        `requires` and `signed`: what an image built on it may assume, what it
+        still needs, and what a person picks it by
 
   x `base` declares no `about`
     ,-[./collections/two/bases.kdl:11:1]

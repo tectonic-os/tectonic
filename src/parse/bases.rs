@@ -39,14 +39,18 @@ const BASE: Node = Node::new("base",
         Node::new("provides-file",
             "Absolute paths this base guarantees, written into every image scaffolded on it.")
             .arg(Arg::Strs, Say::NONE),
+        Node::new("requires",
+            "Capabilities this base is unusable without, which an enabled module must provide.")
+            .arg(Arg::Strs, Say::NONE),
         Node::new("signed",
             "Whether this base publishes a cosign signature, which a scaffolded image records.")
             .arg(Arg::Bool, Say::new("`signed` needs #true or #false", "not a boolean",
                 "`signed #true` records that this base publishes a cosign signature"))
             .once(""),
     ], Say::new("unknown node `{}` in a base", "not part of the schema",
-        "a base entry holds `about`, `family`, `provides`, `provides-file` and `signed`: what an \
-         image built on it may assume, and what a person picks it by"));
+        "a base entry holds `about`, `family`, `provides`, `provides-file`, `requires` and \
+         `signed`: what an image built on it may assume, what it still needs, and what a person \
+         picks it by"));
 
 /// bases.kdl's grammar, and the whole of it.
 #[rustfmt::skip]
@@ -104,7 +108,7 @@ fn entry(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Base> {
         let span: Span = kid.name().span().into();
         for value in string_args(kid) {
             match kid.name().value() {
-                "provides" => check_capability(value, span, src, issues),
+                "provides" | "requires" => check_capability(value, span, src, issues),
                 "provides-file" => check_path(value, span, src, issues),
                 _ => {}
             }
@@ -115,6 +119,7 @@ fn entry(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Base> {
         family: text(node, "family"),
         provides: strings(node, "provides"),
         provides_files: strings(node, "provides-file"),
+        requires: strings(node, "requires"),
         about: text(node, "about"),
         signed: child(node, "signed").and_then(bool_arg).unwrap_or(false),
         span: node.name().span().into(),

@@ -1,0 +1,3 @@
+profile one /usr/bin/one {
+  /usr/bin/one mr,
+}

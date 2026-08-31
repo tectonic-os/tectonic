@@ -145,6 +145,10 @@ fn image(list: &List, image: &Image, resolved: &Resolved) -> Json {
                         "provides_files",
                         Json::strings(base.provides_files.iter().map(|d| d.name.clone())),
                     ),
+                    (
+                        "requires",
+                        Json::strings(base.requires.iter().map(|d| d.name.clone())),
+                    ),
                 ]),
             },
         ),

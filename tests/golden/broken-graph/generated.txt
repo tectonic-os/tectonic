@@ -1,3 +1,4 @@
+==== generated/lib/apparmor-helpers.sh
 ==== generated/lib/dkms-helpers.sh
 ==== generated/lib/fetch-helpers.sh
 ==== generated/lib/kernel-helpers.sh
@@ -20,6 +21,9 @@ export MODDIR
 source /ctx/lib/family.sh
 
 install_packages 'fastfetch'
+
+source /ctx/lib/apparmor-helpers.sh
+install_apparmor_profile /ctx/modules/core/one/apparmor/usr.bin.one
 ==== generated/broken-graph.d/core/two.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
@@ -27,6 +31,10 @@ set -euxo pipefail
 
 MODDIR=/ctx/modules/core/two
 export MODDIR
+
+source /ctx/lib/selinux-helpers.sh
+cp /ctx/modules/core/two/selinux/two.te /tmp/two.te
+install_selinux_module /tmp/two.te
 ==== generated/broken-graph.d/core/three.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.

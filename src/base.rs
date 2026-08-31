@@ -24,6 +24,10 @@ pub struct Base {
     /// providing only these.
     pub provides: Vec<String>,
     pub provides_files: Vec<String>,
+    /// Capabilities the base is not usable without, which a module in the
+    /// image has to provide. A base that is already a bootc image requires
+    /// nothing; one that a module set makes into one says so here.
+    pub requires: Vec<String>,
     /// What a person needs to see to pick between this and the rest.
     pub about: String,
     pub signed: bool,
@@ -38,6 +42,7 @@ impl Base {
         self.family != other.family
             || self.provides != other.provides
             || self.provides_files != other.provides_files
+            || self.requires != other.requires
             || self.about != other.about
             || self.signed != other.signed
     }

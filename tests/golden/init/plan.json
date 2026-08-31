@@ -56,9 +56,10 @@
         "provides": [
           "rechunking",
           "initramfs-generation",
-          "mac-policy"
+          "selinux-policy"
         ],
-        "provides_files": []
+        "provides_files": [],
+        "requires": []
       },
       "flavours": [],
       "default_flavour": null,

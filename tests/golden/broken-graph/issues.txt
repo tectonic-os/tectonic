@@ -4,7 +4,7 @@
  6 |         provides "rechunking" "boot policy"
    :         ^^^^|^^^
    :             `-- lowercase, digits and dashes, starting with a letter
- 7 |     }
+ 7 |         requires "bootc-base"
    `----
   help: the name is written into the generated graph as a mermaid label and a
         markdown table cell, neither of which quotes anything
@@ -63,6 +63,28 @@
    `----
   help: provided by: core/two, core/three. Enable one provider, so that what
         satisfies a requirement is never ambiguous
+
+  x `core/one` ships an AppArmor profile without requiring `apparmor-policy`
+  help: add `requires "apparmor-policy"`; the generated build script validates
+        apparmor/* with `apparmor_parser -Q` and places each one in /etc/
+        apparmor.d under its own filename
+
+  x `core/two` ships SELinux policy without requiring `selinux-policy`
+  help: add `requires "selinux-policy"`; the generated build script compiles
+        selinux/*.te against the base image's policy store
+
+  x `quay.io/fedora/fedora-bootc:44` requires `bootc-base`, which nothing
+  | enabled provides
+   ,-[./image.kdl:7:9]
+ 6 |         provides "rechunking" "boot policy"
+ 7 |         requires "bootc-base"
+   :         ^^^^|^^^
+   :             `-- the base is not usable without it
+ 8 |     }
+   `----
+  help: no module in the repository declares `provides "bootc-base"`, and
+        neither does the `base` node in ./image.kdl. repo.kdl declares no
+        `sources`, so there is no collection to import one from
 
   x `core/one` requires `package-manager`, which nothing enabled provides
     ,-[./modules/core/one/module.kdl:10:1]

@@ -1,0 +1,3 @@
+profile confined /usr/bin/confined {
+  /usr/bin/confined mr,
+}

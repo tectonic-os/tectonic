@@ -38,7 +38,8 @@
         ],
         "provides_files": [
           "/usr/bin/flatpak"
-        ]
+        ],
+        "requires": []
       },
       "flavours": [],
       "default_flavour": null,

@@ -19,6 +19,64 @@ const PRIVATE_KEYS: &str = "private";
 /// A module's overlay tree, staged into the image by the collector.
 pub const OVERLAY: &str = "files";
 
+/// Mandatory access control policy a module ships: which directory holds it,
+/// what marks a file in there as policy, and the capability a base has to
+/// provide before the build can take it. Both kinds are discovered the same
+/// way; what the layer then does with them is not symmetric.
+pub struct Policy {
+    pub dir: &'static str,
+    /// The suffix a policy source carries, or nothing where the filename is
+    /// itself the identifier.
+    pub ext: Option<&'static str>,
+    pub capability: &'static str,
+    /// What a diagnostic calls the thing shipped, and what it says to do.
+    pub about: &'static str,
+    pub help: &'static str,
+}
+
+pub const SELINUX: Policy = Policy {
+    dir: "selinux",
+    ext: Some("te"),
+    capability: "selinux-policy",
+    about: "SELinux policy",
+    help: "the generated build script compiles selinux/*.te against the base image's policy store",
+};
+
+/// AppArmor names a profile by its filename, so nothing is stripped and no
+/// suffix is expected: `apparmor/usr.bin.foo` is placed as that name.
+pub const APPARMOR: Policy = Policy {
+    dir: "apparmor",
+    ext: None,
+    capability: "apparmor-policy",
+    about: "an AppArmor profile",
+    help: "the generated build script validates apparmor/* with `apparmor_parser -Q` and places \
+           each one in /etc/apparmor.d under its own filename",
+};
+
+pub const POLICIES: &[Policy] = &[SELINUX, APPARMOR];
+
+impl Policy {
+    /// The policy sources one module ships, sorted so two runs emit the same
+    /// script. A subdirectory is not a profile: AppArmor abstractions and
+    /// tunables are includes, and a module placing one uses `files/`.
+    pub fn files(&self, module_dir: &Path) -> Vec<String> {
+        let Ok(entries) = std::fs::read_dir(module_dir.join(self.dir)) else {
+            return Vec::new();
+        };
+        let mut out: Vec<String> = entries
+            .flatten()
+            .filter(|e| e.file_type().is_ok_and(|ty| ty.is_file()))
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|name| match self.ext {
+                Some(ext) => name.ends_with(&format!(".{ext}")),
+                None => true,
+            })
+            .collect();
+        out.sort();
+        out
+    }
+}
+
 /// GitHub's path, not this repository's choice, which is why it is written
 /// here rather than declared anywhere.
 pub const WORKFLOW_DIR: &str = ".github/workflows";

@@ -88,13 +88,16 @@ pub const IMAGE: Node = Node::new("image",
                 Node::new("provides-file",
                     "Absolute paths the base guarantees, which a module may require.")
                     .arg(Arg::Strs, Say::NONE),
+                Node::new("requires",
+                    "Capabilities the base is unusable without, which an enabled module must provide.")
+                    .arg(Arg::Strs, Say::NONE),
                 Node::new("signed", "Whether the base publishes a cosign signature.")
                     .arg(Arg::Bool, Say::new("`signed` needs #true or #false", "not a boolean",
                         "`signed #false` records that this base publishes no cosign signature; \
                          base-sig-probe.yml keeps it current"))
                     .once(""),
             ], Say::new("unknown base property `{}`", "not part of the schema",
-                "a base accepts `family`, `provides`, `provides-file` and `signed`")),
+                "a base accepts `family`, `provides`, `provides-file`, `requires` and `signed`")),
 
         Node::new("flavours", "The flavours this image publishes beside its ungated build.")
             .once("a second block would split one set of flavours in two")
@@ -261,11 +264,12 @@ impl Image {
             family: text(node, "family"),
             provides: decls(node, "provides"),
             provides_files: decls(node, "provides-file"),
+            requires: decls(node, "requires"),
             signed: child(node, "signed").and_then(bool_arg).unwrap_or(false),
             span: node.name().span().into(),
         };
 
-        for decl in &base.provides {
+        for decl in base.provides.iter().chain(&base.requires) {
             check_capability(&decl.name, decl.span, src, issues);
         }
         for decl in &base.provides_files {

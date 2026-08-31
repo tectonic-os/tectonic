@@ -162,7 +162,7 @@ fn script(
         let _ = write!(out, "\nsource {dir}/module.sh\n");
     }
 
-    let policy = te_files(&on_disk.join("selinux"));
+    let policy = layout::SELINUX.files(&on_disk);
     if !policy.is_empty() {
         let _ = write!(out, "\nsource /ctx/lib/selinux-helpers.sh\n");
         for file in policy {
@@ -173,6 +173,16 @@ fn script(
                 "cp {dir}/selinux/{file} /tmp/{file}\n\
                  install_selinux_module /tmp/{file}\n"
             );
+        }
+    }
+
+    // AppArmor validates and places: the parser only reads, so nothing is
+    // copied out of the read-only mount first.
+    let profiles = layout::APPARMOR.files(&on_disk);
+    if !profiles.is_empty() {
+        let _ = write!(out, "\nsource /ctx/lib/apparmor-helpers.sh\n");
+        for file in profiles {
+            let _ = write!(out, "install_apparmor_profile {dir}/apparmor/{file}\n");
         }
     }
 
@@ -222,20 +232,6 @@ fn repo_id(file: &Path) -> Option<String> {
         .find_map(|line| line.trim().strip_prefix("REPO_ID=").map(str::trim))
         .map(|value| value.trim_matches('"').to_string())
         .filter(|value| !value.is_empty())
-}
-
-/// The policy sources a module ships, sorted so two runs emit the same script.
-fn te_files(dir: &Path) -> Vec<String> {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return Vec::new();
-    };
-    let mut out: Vec<String> = entries
-        .flatten()
-        .map(|e| e.file_name().to_string_lossy().into_owned())
-        .filter(|name| name.ends_with(".te"))
-        .collect();
-    out.sort();
-    out
 }
 
 #[cfg(test)]

@@ -36,7 +36,10 @@
           "rechunking",
           "boot policy"
         ],
-        "provides_files": []
+        "provides_files": [],
+        "requires": [
+          "bootc-base"
+        ]
       },
       "flavours": [],
       "default_flavour": null,
@@ -75,7 +78,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "b20dd7feb60952319947739a49a2dc482d0996c0755d31dd7278abd3b13f082c",
+                "content": "b74a53d7f87a96dc66a6efd90e446778ae1042ea15a41fc9b33c409e717f8268",
                 "repo": false,
                 "pin": null,
                 "imported": null
@@ -99,7 +102,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "8be1a54ebdf5472ed5728519b398d412875d6d634edf7a562f3f5f9059d3e091",
+                "content": "a3db3f58a5275b4cf2aeb04540a205c1a1348e8273faa8f98b80ee49db5f89c8",
                 "repo": false,
                 "pin": null,
                 "imported": null

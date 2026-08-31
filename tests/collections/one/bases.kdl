@@ -1,7 +1,7 @@
 base "quay.io/fedora/fedora-bootc:44" {
     about "Fedora 44, as this collection describes it"
     family "fedora"
-    provides "rechunking" "initramfs-generation" "mac-policy"
+    provides "rechunking" "initramfs-generation" "selinux-policy"
     signed #true
 }
 

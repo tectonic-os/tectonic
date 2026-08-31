@@ -1,3 +1,4 @@
+==== generated/lib/apparmor-helpers.sh
 ==== generated/lib/dkms-helpers.sh
 ==== generated/lib/fetch-helpers.sh
 ==== generated/lib/kernel-helpers.sh
@@ -182,6 +183,217 @@ graph LR
       "kind": "capability",
       "build_only": false,
       "provider": "base",
+      "required_by": [],
+      "after": []
+    }
+  ],
+  "overrides": [],
+  "suppressed": []
+}
+==== generated/trixie.d/debian-family.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/debian-family
+export MODDIR
+==== generated/trixie.d/core/bootc-base.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/bootc-base
+export MODDIR
+==== generated/trixie.d/core/confined.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/confined
+export MODDIR
+
+source /ctx/lib/apparmor-helpers.sh
+install_apparmor_profile /ctx/modules/core/confined/apparmor/usr.bin.confined
+==== generated/trixie.d/core/shared.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/shared
+export MODDIR
+
+source /ctx/lib/family.sh
+
+install_packages 'curl' 'git'
+==== generated/trixie.d/finalize.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+# ---- /opt relocation ----
+mkdir -p /usr/lib/opt
+tmpfiles=/usr/lib/tmpfiles.d/zz-opt-symlinks.conf
+printf 'd /var/opt 0755 root root -\n' > "$tmpfiles"
+for d in /opt/*/; do
+    [ -d "$d" ] || continue
+    name="$(basename "$d")"
+    cp -a "$d" "/usr/lib/opt/${name}"
+    esc="${name// /\\x20}"
+    printf 'L+ /var/opt/%s - - - - /usr/lib/opt/%s\n' "$esc" "$esc" >> "$tmpfiles"
+done
+rm -rf /opt
+mv /opt.bak /opt
+
+# ---- module presets ----
+apply_module_presets() {
+    local scope="$1" dir="$2" flag=() f verb unit
+    [ "$scope" = user ] && flag=(--global)
+    for f in "$dir"/45-module-*.preset; do
+        [ -f "$f" ] || continue
+        while read -r verb unit; do
+            case "$verb" in
+                enable) systemctl "${flag[@]}" enable "$unit" ;;
+                disable) systemctl "${flag[@]}" disable "$unit" ;;
+                *) ;;
+            esac
+        done < "$f"
+    done
+}
+apply_module_presets system /usr/lib/systemd/system-preset
+apply_module_presets user /usr/lib/systemd/user-preset
+
+# ---- /var to tmpfiles ----
+# `rpm-ostree` walks /var at base compose time and writes these rules; nothing
+# regenerates them for a derived layer, on any distro. So a directory this build
+# leaves in /var is applied once at provisioning and never updated again by
+# `bootc upgrade`. Runs last, after every hook: a directory a later step made
+# would not be recorded.
+var_conf=/usr/lib/tmpfiles.d/zz-var-autogen.conf
+
+# /var/cache and /var/log are cache mounts on this layer — busy, and not ours.
+# /var/run is the symlink out to /run and stock systemd already declares it.
+# ponytail: /var/lib/dpkg is skipped because on the deb bases it *is* the
+# package database; drop it once the admindir moves to /usr/lib/sysimage/dpkg.
+var_keep=(/var/cache /var/log /var/run /var/lib/dpkg)
+
+# systemd splits a line on whitespace and unquotes it, then expands `%`
+# specifiers in what is left, so both have to be written escaped.
+var_escape() {
+    local s=$1
+    s=${s//\\/\\x5c}
+    s=${s//%/%%}
+    s=${s//$'\t'/\\x09}
+    s=${s//$'\n'/\\x0a}
+    s=${s//$'\r'/\\x0d}
+    s=${s//$'\v'/\\x0b}
+    s=${s//$'\f'/\\x0c}
+    s=${s//\'/\\x27}
+    s=${s//\"/\\x22}
+    s=${s// /\\x20}
+    printf '%s' "$s"
+}
+
+# Every path some tmpfiles.d file already declares, this run's own file
+# included: systemd warns about a duplicate and drops one of the two, and
+# reading our own back is what makes a second finalize over this image keep
+# the entries whose directories the first one emptied.
+declare -A var_declared=()
+touch "$var_conf"
+while read -r verb path _; do
+    case "$verb" in '' | \#*) continue ;; esac
+    [ -n "$path" ] && var_declared[$path]=1
+done < <(cat /usr/lib/tmpfiles.d/*.conf /etc/tmpfiles.d/*.conf 2> /dev/null)
+
+var_prune=()
+for keep in "${var_keep[@]}"; do
+    var_prune+=(-path "$keep" -o)
+done
+unset 'var_prune[-1]'
+
+# Pre-order, so a directory's own line lands above the lines below it.
+var_remove=()
+while IFS=$'\t' read -r -d '' type mode owner group path; do
+    esc="$(var_escape "$path")"
+    # Already declared by another tmpfiles file: that is the base's own /var,
+    # the lint does not flag it, and something later in the build may still
+    # need it on disk — the rechunk runs `rpm-ostree`, which writes to
+    # /var/tmp, and tmpfiles has never run inside a container build.
+    [ -n "${var_declared[$esc]:-}" ] && continue
+    var_declared[$esc]=1
+    var_remove+=("$path")
+    case "$type" in
+        d) printf 'd %s %s %s %s -\n' "$esc" "$mode" "$owner" "$group" >> "$var_conf" ;;
+        l) printf 'L+ %s - - - - %s\n' "$esc" "$(var_escape "$(readlink "$path")")" >> "$var_conf" ;;
+        # A regular file: a tmpfiles rule reconstructs a directory, not a
+        # file's content. Dropped, which is what bootc's own converter does.
+        *) ;;
+    esac
+done < <(find /var -mindepth 1 -xdev \( "${var_prune[@]}" \) -prune -o -printf '%y\t%m\t%u\t%g\t%p\0')
+
+# Only what was recorded above, deepest first since find listed parents before
+# children. `rmdir` rather than `rm -rf`, so a directory still holding
+# something that was skipped survives instead of taking it down too.
+for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
+    path="${var_remove[i]}"
+    if [ -d "$path" ] && [ ! -L "$path" ]; then
+        rmdir --ignore-fail-on-non-empty "$path"
+    else
+        rm -f "$path"
+    fi
+done
+==== generated/trixie.graph.md
+# Trixie capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["docker.io/library/debian:trixie"]
+    m0["debian-family"]
+    m1["core/bootc-base"]
+    m2["core/confined"]
+    m3["core/shared"]
+    m1 -->|"apparmor-policy"| m2
+```
+
+## Capabilities
+
+| Name | Kind | Provided by | Required by | After |
+|---|---|---|---|---|
+| `apparmor-policy` | capability | `core/bootc-base` | `core/confined` |  |
+| `bootc-base` | capability | `core/bootc-base` |  |  |
+| `build-environment` | capability | `debian-family` |  |  |
+==== generated/trixie.graph.json
+{
+  "image": "trixie",
+  "capabilities": [
+    {
+      "name": "apparmor-policy",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "core/bootc-base",
+      "required_by": [
+        "core/confined"
+      ],
+      "after": []
+    },
+    {
+      "name": "bootc-base",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "core/bootc-base",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "build-environment",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "debian-family",
       "required_by": [],
       "after": []
     }

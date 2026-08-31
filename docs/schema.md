@@ -332,6 +332,7 @@ The image every layer builds on, and what building on it may assume.
 | `family` | a string, exactly one | The base's family, matched against every module's `supports`. |
 | `provides` | one or more strings | Capabilities the upstream image already ships; a module providing only these is suppressed. |
 | `provides-file` | one or more strings | Absolute paths the base guarantees, which a module may require. |
+| `requires` | one or more strings | Capabilities the base is unusable without, which an enabled module must provide. |
 | `signed` | `#true` or `#false`, at most one | Whether the base publishes a cosign signature. |
 
 #### `flavours`
@@ -457,6 +458,7 @@ One base a collection describes, named by the reference an image builds on.
 | `family` | a string, exactly one | The family an image built on this base declares, matched against every module's `supports`. |
 | `provides` | one or more strings | Capabilities this base already ships, written into every image scaffolded on it. |
 | `provides-file` | one or more strings | Absolute paths this base guarantees, written into every image scaffolded on it. |
+| `requires` | one or more strings | Capabilities this base is unusable without, which an enabled module must provide. |
 | `signed` | `#true` or `#false`, at most one | Whether this base publishes a cosign signature, which a scaffolded image records. |
 
 <!-- /schema: bases -->
@@ -471,7 +473,8 @@ in the directory is convention.
 | --- | --- |
 | `repo` | sourced first, unless its `REPO_ID` is already configured |
 | `module.sh` | sourced as the install logic |
-| `selinux/*.te` | compiled and installed, which needs `requires "mac-policy"` |
+| `selinux/*.te` | compiled and installed, which needs `requires "selinux-policy"` |
+| `apparmor/*` | validated and placed in `/etc/apparmor.d`, which needs `requires "apparmor-policy"` |
 | `files/` | copied over `/` |
 | `finalize.sh` | sourced by the finalize phase, in resolved order |
 | `Containerfile.inc` | placed verbatim by `fragment` |

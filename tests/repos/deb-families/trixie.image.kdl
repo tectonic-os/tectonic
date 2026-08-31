@@ -1,0 +1,15 @@
+image {
+    name "Trixie"
+
+    base "docker.io/library/debian:trixie" {
+        family "debian"
+        requires "bootc-base"
+    }
+
+    modules {
+        module "debian-family"
+        module "core/bootc-base"
+        module "core/confined"
+        module "core/shared"
+    }
+}
