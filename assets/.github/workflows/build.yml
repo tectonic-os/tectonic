@@ -340,7 +340,9 @@ jobs:
       - name: Settle the container storage driver
         run: |
           sudo mkdir -p /etc/containers
-          printf '[storage]\ndriver = "overlay"\n' \
+          # skopeo reads this file too and, unlike podman, defaults neither
+          # path: `containers-storage:` refuses with `runroot must be set`.
+          printf '[storage]\ndriver = "overlay"\nrunroot = "/run/containers/storage"\ngraphroot = "/var/lib/containers/storage"\n' \
             | sudo tee /etc/containers/storage.conf > /dev/null
           sudo podman info --format 'storage: {{.Store.GraphDriverName}} {{.Store.GraphOptions}}'
 
