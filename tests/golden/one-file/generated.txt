@@ -113,10 +113,16 @@ done
 unset 'var_prune[-1]'
 
 # Pre-order, so a directory's own line lands above the lines below it.
+var_remove=()
 while IFS=$'\t' read -r -d '' type mode owner group path; do
     esc="$(var_escape "$path")"
+    # Already declared by another tmpfiles file: that is the base's own /var,
+    # the lint does not flag it, and something later in the build may still
+    # need it on disk — the rechunk runs `rpm-ostree`, which writes to
+    # /var/tmp, and tmpfiles has never run inside a container build.
     [ -n "${var_declared[$esc]:-}" ] && continue
     var_declared[$esc]=1
+    var_remove+=("$path")
     case "$type" in
         d) printf 'd %s %s %s %s -\n' "$esc" "$mode" "$owner" "$group" >> "$var_conf" ;;
         l) printf 'L+ %s - - - - %s\n' "$esc" "$(var_escape "$(readlink "$path")")" >> "$var_conf" ;;
@@ -126,12 +132,17 @@ while IFS=$'\t' read -r -d '' type mode owner group path; do
     esac
 done < <(find /var -mindepth 1 -xdev \( "${var_prune[@]}" \) -prune -o -printf '%y\t%m\t%u\t%g\t%p\0')
 
-# Files first, then directories bottom-up. A directory holding something the
-# keep list named stays, which is what --ignore-fail-on-non-empty is for.
-find /var -mindepth 1 -xdev \( "${var_prune[@]}" \) -prune -o ! -type d -print0 \
-    | xargs -0 -r rm -f
-find /var -mindepth 1 -xdev -depth \( "${var_prune[@]}" \) -prune -o -type d -print0 \
-    | xargs -0 -r rmdir --ignore-fail-on-non-empty
+# Only what was recorded above, deepest first since find listed parents before
+# children. `rmdir` rather than `rm -rf`, so a directory still holding
+# something that was skipped survives instead of taking it down too.
+for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
+    path="${var_remove[i]}"
+    if [ -d "$path" ] && [ ! -L "$path" ]; then
+        rmdir --ignore-fail-on-non-empty "$path"
+    else
+        rm -f "$path"
+    fi
+done
 ==== generated/alpha.graph.md
 # Alpha capability graph
 
@@ -282,10 +293,16 @@ done
 unset 'var_prune[-1]'
 
 # Pre-order, so a directory's own line lands above the lines below it.
+var_remove=()
 while IFS=$'\t' read -r -d '' type mode owner group path; do
     esc="$(var_escape "$path")"
+    # Already declared by another tmpfiles file: that is the base's own /var,
+    # the lint does not flag it, and something later in the build may still
+    # need it on disk — the rechunk runs `rpm-ostree`, which writes to
+    # /var/tmp, and tmpfiles has never run inside a container build.
     [ -n "${var_declared[$esc]:-}" ] && continue
     var_declared[$esc]=1
+    var_remove+=("$path")
     case "$type" in
         d) printf 'd %s %s %s %s -\n' "$esc" "$mode" "$owner" "$group" >> "$var_conf" ;;
         l) printf 'L+ %s - - - - %s\n' "$esc" "$(var_escape "$(readlink "$path")")" >> "$var_conf" ;;
@@ -295,12 +312,17 @@ while IFS=$'\t' read -r -d '' type mode owner group path; do
     esac
 done < <(find /var -mindepth 1 -xdev \( "${var_prune[@]}" \) -prune -o -printf '%y\t%m\t%u\t%g\t%p\0')
 
-# Files first, then directories bottom-up. A directory holding something the
-# keep list named stays, which is what --ignore-fail-on-non-empty is for.
-find /var -mindepth 1 -xdev \( "${var_prune[@]}" \) -prune -o ! -type d -print0 \
-    | xargs -0 -r rm -f
-find /var -mindepth 1 -xdev -depth \( "${var_prune[@]}" \) -prune -o -type d -print0 \
-    | xargs -0 -r rmdir --ignore-fail-on-non-empty
+# Only what was recorded above, deepest first since find listed parents before
+# children. `rmdir` rather than `rm -rf`, so a directory still holding
+# something that was skipped survives instead of taking it down too.
+for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
+    path="${var_remove[i]}"
+    if [ -d "$path" ] && [ ! -L "$path" ]; then
+        rmdir --ignore-fail-on-non-empty "$path"
+    else
+        rm -f "$path"
+    fi
+done
 ==== generated/beta.graph.md
 # Beta capability graph
 
