@@ -263,7 +263,7 @@ image {
 
     base "quay.io/fedora/fedora-bootc:44" {
         family "fedora"
-        provides "rechunking" "initramfs-generation" "mac-policy"
+        provides "rechunking" "initramfs-generation" "selinux-policy"
         provides-file "/usr/bin/bootc" "/usr/bin/systemctl"
     }
 
