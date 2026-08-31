@@ -95,8 +95,8 @@ image_file="out/${type}/disk.${type}"
 sudoif() {
     if [ "${UID}" -eq 0 ]; then
         "$@"
-    elif [ -n "${SSH_ASKPASS:-}" ] && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
-        sudo --askpass "$@"
+    elif [ -n "${SUDO_ASKPASS:-}${SSH_ASKPASS:-}" ] && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
+        SUDO_ASKPASS="${SUDO_ASKPASS:-${SSH_ASKPASS}}" sudo --askpass "$@"
     else
         sudo "$@"
     fi
