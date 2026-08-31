@@ -344,6 +344,10 @@ jobs:
           # path: `containers-storage:` refuses with `runroot must be set`.
           printf '[storage]\ndriver = "overlay"\nrunroot = "/run/containers/storage"\ngraphroot = "/var/lib/containers/storage"\n' \
             | sudo tee /etc/containers/storage.conf > /dev/null
+          # The config alone changes nothing: the store the runner ships was
+          # created with the mount program and keeps the naive diff until it is
+          # thrown away. Nothing has pulled yet, so this costs nothing.
+          sudo podman system reset --force > /dev/null 2>&1 || true
           sudo podman info --format 'storage: {{.Store.GraphDriverName}} {{.Store.GraphOptions}}'
 
       - name: Select a working container runtime
