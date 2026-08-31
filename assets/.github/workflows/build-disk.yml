@@ -46,7 +46,10 @@ jobs:
             '.images[] | select([.targets[].name] | index($t)) | .base.family' \
             <<< "$plan")"
           echo "family=${family}" >> "$GITHUB_OUTPUT"
-          [ "$family" = fedora ] || echo "::warning::the builder relabels its buildroot with SELinux and installs with Anaconda, so it builds no disk for the ${family} family"
+          # Measured 2026-08-31 against both bootcrew bases: the iso wants
+          # Anaconda, and the qcow2 does not get that far, dying in `setfiles`
+          # against an SELinux policy a deb image does not carry.
+          [ "$family" = fedora ] || echo "::warning::the builder installs with Anaconda and relabels its buildroot with SELinux, and the ${family} family carries neither, so it builds no disk here"
 
   build:
     name: Build disk images

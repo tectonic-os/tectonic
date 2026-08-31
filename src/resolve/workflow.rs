@@ -12,8 +12,12 @@ use std::path::{Path, PathBuf};
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Needs {
     Nothing,
-    /// The disk builder deploys the image as its own buildroot and relabels it
-    /// with SELinux, so it builds nothing at all for a deb image.
+    /// Both halves of the disk workflow, measured 2026-08-31 and failing for
+    /// two different reasons. The iso is **Anaconda's**, which is Fedora's
+    /// installer with no deb equivalent to point the builder at — say Anaconda
+    /// and not *installer iso*, because an Anaconda-free one is a different
+    /// question and `BACKLOG.md` holds it. The qcow2 dies in the **SELinux
+    /// relabel**, `setfiles` against a policy a deb image does not carry.
     Fedora,
     /// A module taking a `KERNEL` build arg, which is what it tracks.
     Kernel,
@@ -106,7 +110,11 @@ pub const SHIPPED: &[Shipped] = &[
     shipped!(
         "smoke-test",
         "installs the image to a disk and boots it under qemu",
-        Needs::Fedora,
+        // Nothing in its body is a family: it installs out of the published
+        // image with `bootc install to-disk` and boots that, with no builder,
+        // no Anaconda and no relabel. Whether a base can install itself is the
+        // base's fact and the run is what measures it.
+        Needs::Nothing,
         Some((-9, "1"))
     ),
 ];
@@ -280,6 +288,21 @@ mod tests {
                 shipped.stem
             );
         }
+    }
+
+    #[test]
+    fn a_deb_repository_may_smoke_test_and_may_not_build_a_disk() {
+        let deb = Basis {
+            fedora: false,
+            kernel: false,
+        };
+        let met = |stem: &str| find(stem).expect(stem).met(&deb);
+        assert!(met("build"));
+        assert!(
+            met("smoke-test"),
+            "it installs out of the image, not a family"
+        );
+        assert!(!met("build-disk"), "the installer iso is Anaconda's");
     }
 
     #[test]
