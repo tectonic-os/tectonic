@@ -194,6 +194,25 @@ mod tests {
         }
     }
 
+    /// A denial is not a failed unit, so a smoke test that only reads
+    /// `systemctl --failed` reports `running` while the policy refuses work.
+    #[test]
+    fn the_smoke_test_fails_on_an_selinux_denial_and_not_on_a_quiet_journal() {
+        const MATCHER: &str = "grep -Ei 'avc:[[:space:]]+denied'";
+        let body = include_str!("../../assets/.github/workflows/smoke-test.yml");
+        assert!(body.contains(MATCHER));
+        let denials = |journal: &str| {
+            let out = std::process::Command::new("bash")
+                .args(["-c", &format!("printf %s \"$1\" | {MATCHER}"), "_", journal])
+                .output()
+                .unwrap();
+            String::from_utf8_lossy(&out.stdout).trim().to_string()
+        };
+        assert!(!denials("audit: avc:  denied  { execute }").is_empty());
+        assert!(denials("").is_empty());
+        assert!(denials("nothing to see").is_empty());
+    }
+
     /// Every shipped body, not just the one with regions in it: a marker left
     /// behind anywhere is a comment a repository commits and nobody wrote.
     #[test]

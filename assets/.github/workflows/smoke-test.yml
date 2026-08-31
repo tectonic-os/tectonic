@@ -155,6 +155,14 @@ jobs:
             echo "No failed units"
           fi
 
+          echo "==> selinux denials"
+          denials="$(s journalctl -b --no-pager | grep -Ei 'avc:[[:space:]]+denied')" || true
+          if [ -n "$denials" ]; then
+            printf '%s\n' "$denials"
+          else
+            echo "No SELinux denials"
+          fi
+
           echo "system state: ${state:-unreachable}"
           if [ "$state" != running ]; then
             echo "FAIL: system state is '${state}', expected running" >&2
@@ -162,6 +170,13 @@ jobs:
           fi
           if [ -n "$failed" ]; then
             echo "FAIL: the units above are failed" >&2
+            exit 1
+          fi
+          # A denial is not a failed unit: the smoke test reports `running`
+          # while the policy is refusing work, which is a pass that means
+          # nothing. Judged last so the readings above are all printed first.
+          if [ -n "$denials" ]; then
+            echo "FAIL: the denials above were logged" >&2
             exit 1
           fi
 
