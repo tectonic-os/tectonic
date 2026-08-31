@@ -37,12 +37,24 @@ jobs:
           changed=""
           while IFS='|' read -r image base recorded file; do
             [ -n "${image}" ] || continue
+            # `signed` records that a signature is published, which is not the
+            # same as one a consumer can attribute. A keyless signature carries
+            # a Fulcio certificate naming the signer and its issuer; a key-based
+            # one carries none, and verifying it needs a public key obtained
+            # some other way. Both are `#true`, so the run log says which.
             if cosign download signature "${base}" > /dev/null 2>&1; then
               actual="true"
+              if cosign verify --certificate-identity-regexp='.*' \
+                --certificate-oidc-issuer-regexp='.*' "${base}" > /dev/null 2>&1; then
+                kind="signed, and the signature names its signer"
+              else
+                kind="signed, but the signature names no signer, so it can be verified only with a key obtained elsewhere"
+              fi
             else
               actual="false"
+              kind="unsigned"
             fi
-            echo "${image}: ${base} is $([ "${actual}" = true ] && echo signed || echo unsigned), recorded as ${recorded}"
+            echo "${image}: ${base} is ${kind}, recorded as ${recorded}"
             [ "${actual}" != "${recorded}" ] || continue
 
             sed -i "s/signed #${recorded}/signed #${actual}/" "${file}"
