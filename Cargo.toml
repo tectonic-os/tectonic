@@ -1,6 +1,6 @@
 [package]
 name = "tect"
-version = "0.6.17"
+version = "0.6.18"
 edition = "2021"
 publish = false
 description = "Reads the image files and the per-module module.kdl manifests"
