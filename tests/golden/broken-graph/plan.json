@@ -34,7 +34,8 @@
         "signed": false,
         "provides": [
           "rechunking",
-          "boot policy"
+          "boot policy",
+          "selinux-policy"
         ],
         "provides_files": [],
         "requires": [
@@ -64,7 +65,8 @@
               "options": {},
               "provides": [],
               "requires": [
-                "package-manager"
+                "package-manager",
+                "apparmor-policy"
               ],
               "packages": [
                 {
@@ -78,7 +80,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "b74a53d7f87a96dc66a6efd90e446778ae1042ea15a41fc9b33c409e717f8268",
+                "content": "cd0e63ddee4093b5e600f136ebe87bce7666c1c51b1d74051c4dce969090c16a",
                 "repo": false,
                 "pin": null,
                 "imported": null
@@ -102,7 +104,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "a3db3f58a5275b4cf2aeb04540a205c1a1348e8273faa8f98b80ee49db5f89c8",
+                "content": "4e919cf274a5c012aeb2be57885676f92b8849876220e0138a432d9132db7d91",
                 "repo": false,
                 "pin": null,
                 "imported": null

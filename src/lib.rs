@@ -154,7 +154,7 @@ pub(crate) fn load(root: &Path) -> Loaded {
         resolve::graph::suppress(image);
         let order = resolve::order::sort(image, &mut issues);
         resolve::order::apply(image, &order);
-        resolve::graph::check_graph(image, root, &index, &mut issues);
+        resolve::graph::check_graph(image, &index, &mut issues);
         resolve::graph::check_fragments(image, &mut issues);
         let shipped = resolve::overlay::index(image, &disk);
         resolve::overlay::check(image, &shipped, &mut issues);

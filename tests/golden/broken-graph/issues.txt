@@ -1,7 +1,7 @@
   x invalid capability name `boot policy`
    ,-[./image.kdl:6:9]
  5 |         family "fedora"
- 6 |         provides "rechunking" "boot policy"
+ 6 |         provides "rechunking" "boot policy" "selinux-policy"
    :         ^^^^|^^^
    :             `-- lowercase, digits and dashes, starting with a letter
  7 |         requires "bootc-base"
@@ -64,19 +64,10 @@
   help: provided by: core/two, core/three. Enable one provider, so that what
         satisfies a requirement is never ambiguous
 
-  x `core/one` ships an AppArmor profile without requiring `apparmor-policy`
-  help: add `requires "apparmor-policy"`; the generated build script validates
-        apparmor/* with `apparmor_parser -Q` and places each one in /etc/
-        apparmor.d under its own filename
-
-  x `core/two` ships SELinux policy without requiring `selinux-policy`
-  help: add `requires "selinux-policy"`; the generated build script compiles
-        selinux/*.te against the base image's policy store
-
   x `quay.io/fedora/fedora-bootc:44` requires `bootc-base`, which nothing
   | enabled provides
    ,-[./image.kdl:7:9]
- 6 |         provides "rechunking" "boot policy"
+ 6 |         provides "rechunking" "boot policy" "selinux-policy"
  7 |         requires "bootc-base"
    :         ^^^^|^^^
    :             `-- the base is not usable without it
@@ -92,29 +83,41 @@
  10 | requires "package-manager"
     : ^^^^|^^^
     :     `-- unsatisfied
- 11 | requires-file "/usr/bin/nothing"
+ 11 | requires "apparmor-policy"
     `----
   help: no module in the repository declares `provides "package-manager"`, and
         neither does the `base` node in ./image.kdl. repo.kdl declares no
         `sources`, so there is no collection to import one from
 
-  x `core/one` requires-file `/usr/bin/nothing`, which nothing enabled
-  | provides
+  x `core/one` requires `apparmor-policy`, which nothing enabled provides
     ,-[./modules/core/one/module.kdl:11:1]
  10 | requires "package-manager"
- 11 | requires-file "/usr/bin/nothing"
+ 11 | requires "apparmor-policy"
+    : ^^^^|^^^
+    :     `-- unsatisfied
+ 12 | requires-file "/usr/bin/nothing"
+    `----
+  help: no module in the repository declares `provides "apparmor-policy"`, and
+        neither does the `base` node in ./image.kdl. repo.kdl declares no
+        `sources`, so there is no collection to import one from
+
+  x `core/one` requires-file `/usr/bin/nothing`, which nothing enabled
+  | provides
+    ,-[./modules/core/one/module.kdl:12:1]
+ 11 | requires "apparmor-policy"
+ 12 | requires-file "/usr/bin/nothing"
     : ^^^^^^|^^^^^^
     :       `-- unsatisfied
- 12 | after "logging"
+ 13 | after "logging"
     `----
   help: no module in the repository declares `provides "/usr/bin/nothing"`,
         and neither does the `base` node in ./image.kdl. repo.kdl declares no
         `sources`, so there is no collection to import one from
 
   x `core/one` builds after `logging`, which nothing enabled provides
-    ,-[./modules/core/one/module.kdl:12:1]
- 11 | requires-file "/usr/bin/nothing"
- 12 | after "logging"
+    ,-[./modules/core/one/module.kdl:13:1]
+ 12 | requires-file "/usr/bin/nothing"
+ 13 | after "logging"
     : ^^|^^
     :   `-- nothing to order after
     `----

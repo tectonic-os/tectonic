@@ -357,14 +357,13 @@ graph LR
     m1["core/bootc-base"]
     m2["core/confined"]
     m3["core/shared"]
-    m1 -->|"apparmor-policy"| m2
 ```
 
 ## Capabilities
 
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
-| `apparmor-policy` | capability | `core/bootc-base` | `core/confined` |  |
+| `apparmor-policy` | capability | `core/bootc-base` |  |  |
 | `bootc-base` | capability | `core/bootc-base` |  |  |
 | `build-environment` | capability | `debian-family` |  |  |
 ==== generated/trixie.graph.json
@@ -376,9 +375,7 @@ graph LR
       "kind": "capability",
       "build_only": false,
       "provider": "core/bootc-base",
-      "required_by": [
-        "core/confined"
-      ],
+      "required_by": [],
       "after": []
     },
     {

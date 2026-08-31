@@ -21,9 +21,6 @@ export MODDIR
 source /ctx/lib/family.sh
 
 install_packages 'fastfetch'
-
-source /ctx/lib/apparmor-helpers.sh
-install_apparmor_profile /ctx/modules/core/one/apparmor/usr.bin.one
 ==== generated/broken-graph.d/core/two.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
@@ -180,10 +177,12 @@ graph LR
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
 | `/usr/bin/nothing` | file |  | `core/one` |  |
+| `apparmor-policy` | capability |  | `core/one` |  |
 | `boot policy` | capability | `base` |  |  |
 | `logging` | capability |  |  | `core/one` |
 | `package-manager` | capability |  | `core/one` |  |
 | `rechunking` | capability | `base` |  |  |
+| `selinux-policy` | capability | `base` |  |  |
 | `shell-tools` | capability | `core/two` |  |  |
 ==== generated/broken-graph.graph.json
 {
@@ -192,6 +191,16 @@ graph LR
     {
       "name": "/usr/bin/nothing",
       "kind": "file",
+      "build_only": false,
+      "provider": null,
+      "required_by": [
+        "core/one"
+      ],
+      "after": []
+    },
+    {
+      "name": "apparmor-policy",
+      "kind": "capability",
       "build_only": false,
       "provider": null,
       "required_by": [
@@ -229,6 +238,14 @@ graph LR
     },
     {
       "name": "rechunking",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "selinux-policy",
       "kind": "capability",
       "build_only": false,
       "provider": "base",

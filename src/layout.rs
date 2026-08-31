@@ -20,26 +20,22 @@ const PRIVATE_KEYS: &str = "private";
 pub const OVERLAY: &str = "files";
 
 /// Mandatory access control policy a module ships: which directory holds it,
-/// what marks a file in there as policy, and the capability a base has to
-/// provide before the build can take it. Both kinds are discovered the same
-/// way; what the layer then does with them is not symmetric.
+/// what marks a file in there as policy, and the capability that says the
+/// image has that MAC. A module may ship for more than one and is built for
+/// whichever the image has, the way a `packages` batch is taken for the base's
+/// family. Discovery is shared; what the layer then does is not symmetric.
 pub struct Policy {
     pub dir: &'static str,
     /// The suffix a policy source carries, or nothing where the filename is
     /// itself the identifier.
     pub ext: Option<&'static str>,
     pub capability: &'static str,
-    /// What a diagnostic calls the thing shipped, and what it says to do.
-    pub about: &'static str,
-    pub help: &'static str,
 }
 
 pub const SELINUX: Policy = Policy {
     dir: "selinux",
     ext: Some("te"),
     capability: "selinux-policy",
-    about: "SELinux policy",
-    help: "the generated build script compiles selinux/*.te against the base image's policy store",
 };
 
 /// AppArmor names a profile by its filename, so nothing is stripped and no
@@ -48,12 +44,7 @@ pub const APPARMOR: Policy = Policy {
     dir: "apparmor",
     ext: None,
     capability: "apparmor-policy",
-    about: "an AppArmor profile",
-    help: "the generated build script validates apparmor/* with `apparmor_parser -Q` and places \
-           each one in /etc/apparmor.d under its own filename",
 };
-
-pub const POLICIES: &[Policy] = &[SELINUX, APPARMOR];
 
 impl Policy {
     /// The policy sources one module ships, sorted so two runs emit the same

@@ -6,6 +6,7 @@ use crate::model::image::{Entry, Image};
 use crate::model::module::{Copr, Module};
 use crate::model::options::{env_name, OptType};
 use crate::resolve::collect::Collection;
+use std::collections::BTreeSet;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
@@ -30,9 +31,28 @@ pub fn path(image: &Image, entry: &Entry) -> PathBuf {
     dir(image).join(name)
 }
 
+/// Every capability the image has, whoever offers it: what a family-shaped
+/// piece of a module is selected against, the way `base_family` selects a
+/// `packages` batch.
+fn provided(image: &Image) -> BTreeSet<&str> {
+    image
+        .base
+        .iter()
+        .flat_map(|base| base.provides.iter().chain(base.provides_files.iter()))
+        .map(|decl| decl.name.as_str())
+        .chain(
+            image
+                .modules()
+                .flat_map(|m| m.provides.iter().chain(m.provides_files.iter()))
+                .map(|decl| decl.name.as_str()),
+        )
+        .collect()
+}
+
 /// One script per module layer the Containerfile emits.
 pub fn scripts(image: &Image, collection: &Collection, root: &Path) -> Vec<(PathBuf, String)> {
     let base_family = image.base.as_ref().map_or("", |b| b.family.as_str());
+    let has = provided(image);
     let mut out = Vec::new();
     for entry in &image.entries {
         let Some(module) = entry.module.as_ref().filter(|m| m.standard_layer) else {
@@ -40,7 +60,7 @@ pub fn scripts(image: &Image, collection: &Collection, root: &Path) -> Vec<(Path
         };
         out.push((
             path(image, entry),
-            script(entry, module, collection, base_family, root),
+            script(entry, module, collection, base_family, &has, root),
         ));
     }
     out
@@ -51,6 +71,7 @@ fn script(
     module: &Module,
     collection: &Collection,
     base_family: &str,
+    has: &BTreeSet<&str>,
     root: &Path,
 ) -> String {
     let dir = format!("/ctx/modules/{}", entry.dir());
@@ -162,7 +183,13 @@ fn script(
         let _ = write!(out, "\nsource {dir}/module.sh\n");
     }
 
-    let policy = layout::SELINUX.files(&on_disk);
+    // Both directories are taken the way a `packages` batch is: only the kind
+    // this image has a MAC for. A module shipping for both is built for
+    // whichever the base turned out to carry.
+    let policy = match has.contains(layout::SELINUX.capability) {
+        true => layout::SELINUX.files(&on_disk),
+        false => Vec::new(),
+    };
     if !policy.is_empty() {
         let _ = write!(out, "\nsource /ctx/lib/selinux-helpers.sh\n");
         for file in policy {
@@ -178,7 +205,10 @@ fn script(
 
     // AppArmor validates and places: the parser only reads, so nothing is
     // copied out of the read-only mount first.
-    let profiles = layout::APPARMOR.files(&on_disk);
+    let profiles = match has.contains(layout::APPARMOR.capability) {
+        true => layout::APPARMOR.files(&on_disk),
+        false => Vec::new(),
+    };
     if !profiles.is_empty() {
         let _ = write!(out, "\nsource /ctx/lib/apparmor-helpers.sh\n");
         for file in profiles {

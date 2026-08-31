@@ -208,14 +208,12 @@
               "description": "Ships one AppArmor profile, which the parser has to accept",
               "options": {},
               "provides": [],
-              "requires": [
-                "apparmor-policy"
-              ],
+              "requires": [],
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "86a583e975e61fb36cf2316cd523acb0dad1939bbba40612bb3f0ed62f9cfd61",
+                "content": "93d2a8f73f72f9bf9ded25fc442e70a9495c4b507531a15d76b06b5a55b77169",
                 "repo": false,
                 "pin": null,
                 "imported": null

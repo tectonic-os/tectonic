@@ -473,8 +473,8 @@ in the directory is convention.
 | --- | --- |
 | `repo` | sourced first, unless its `REPO_ID` is already configured |
 | `module.sh` | sourced as the install logic |
-| `selinux/*.te` | compiled and installed, which needs `requires "selinux-policy"` |
-| `apparmor/*` | validated and placed in `/etc/apparmor.d`, which needs `requires "apparmor-policy"` |
+| `selinux/*.te` | compiled and installed, where the image provides `selinux-policy` |
+| `apparmor/*` | validated and placed in `/etc/apparmor.d`, where the image provides `apparmor-policy` |
 | `files/` | copied over `/` |
 | `finalize.sh` | sourced by the finalize phase, in resolved order |
 | `Containerfile.inc` | placed verbatim by `fragment` |
@@ -491,6 +491,12 @@ after "vfio"
 secret "mok_privkey"
 arg "KERNEL"
 ```
+
+A module may ship both, and each is taken only where the image has that MAC,
+the way a `packages` batch is taken for the base's family. Neither directory
+declares anything on its own: a module that cannot work without a given MAC
+says so with `requires "selinux-policy"` or `requires "apparmor-policy"`, and
+is refused on an image that has not got it like any other requirement.
 
 Build order is resolved from `requires` and `after`, never from the order of
 the list, which is only a tie-break. A `requires` nothing provides fails the
