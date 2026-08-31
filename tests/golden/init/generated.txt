@@ -125,6 +125,75 @@ apply_module_presets() {
 }
 apply_module_presets system /usr/lib/systemd/system-preset
 apply_module_presets user /usr/lib/systemd/user-preset
+
+# ---- /var to tmpfiles ----
+# `rpm-ostree` walks /var at base compose time and writes these rules; nothing
+# regenerates them for a derived layer, on any distro. So a directory this build
+# leaves in /var is applied once at provisioning and never updated again by
+# `bootc upgrade`. Runs last, after every hook: a directory a later step made
+# would not be recorded.
+var_conf=/usr/lib/tmpfiles.d/zz-var-autogen.conf
+
+# /var/cache and /var/log are cache mounts on this layer — busy, and not ours.
+# /var/run is the symlink out to /run and stock systemd already declares it.
+# ponytail: /var/lib/dpkg is skipped because on the deb bases it *is* the
+# package database; drop it once the admindir moves to /usr/lib/sysimage/dpkg.
+var_keep=(/var/cache /var/log /var/run /var/lib/dpkg)
+
+# systemd splits a line on whitespace and unquotes it, then expands `%`
+# specifiers in what is left, so both have to be written escaped.
+var_escape() {
+    local s=$1
+    s=${s//\\/\\x5c}
+    s=${s//%/%%}
+    s=${s//$'\t'/\\x09}
+    s=${s//$'\n'/\\x0a}
+    s=${s//$'\r'/\\x0d}
+    s=${s//$'\v'/\\x0b}
+    s=${s//$'\f'/\\x0c}
+    s=${s//\'/\\x27}
+    s=${s//\"/\\x22}
+    s=${s// /\\x20}
+    printf '%s' "$s"
+}
+
+# Every path some tmpfiles.d file already declares, this run's own file
+# included: systemd warns about a duplicate and drops one of the two, and
+# reading our own back is what makes a second finalize over this image keep
+# the entries whose directories the first one emptied.
+declare -A var_declared=()
+touch "$var_conf"
+while read -r verb path _; do
+    case "$verb" in '' | \#*) continue ;; esac
+    [ -n "$path" ] && var_declared[$path]=1
+done < <(cat /usr/lib/tmpfiles.d/*.conf /etc/tmpfiles.d/*.conf 2> /dev/null)
+
+var_prune=()
+for keep in "${var_keep[@]}"; do
+    var_prune+=(-path "$keep" -o)
+done
+unset 'var_prune[-1]'
+
+# Pre-order, so a directory's own line lands above the lines below it.
+while IFS=$'\t' read -r -d '' type mode owner group path; do
+    esc="$(var_escape "$path")"
+    [ -n "${var_declared[$esc]:-}" ] && continue
+    var_declared[$esc]=1
+    case "$type" in
+        d) printf 'd %s %s %s %s -\n' "$esc" "$mode" "$owner" "$group" >> "$var_conf" ;;
+        l) printf 'L+ %s - - - - %s\n' "$esc" "$(var_escape "$(readlink "$path")")" >> "$var_conf" ;;
+        # A regular file: a tmpfiles rule reconstructs a directory, not a
+        # file's content. Dropped, which is what bootc's own converter does.
+        *) ;;
+    esac
+done < <(find /var -mindepth 1 -xdev \( "${var_prune[@]}" \) -prune -o -printf '%y\t%m\t%u\t%g\t%p\0')
+
+# Files first, then directories bottom-up. A directory holding something the
+# keep list named stays, which is what --ignore-fail-on-non-empty is for.
+find /var -mindepth 1 -xdev \( "${var_prune[@]}" \) -prune -o ! -type d -print0 \
+    | xargs -0 -r rm -f
+find /var -mindepth 1 -xdev -depth \( "${var_prune[@]}" \) -prune -o -type d -print0 \
+    | xargs -0 -r rmdir --ignore-fail-on-non-empty
 ==== generated/example.graph.md
 # Example capability graph
 
