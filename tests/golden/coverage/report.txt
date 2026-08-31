@@ -1,14 +1,15 @@
 ==== the read-out, with no scan behind it
 # Enforced coverage of `standard`
 
-`standard` (Standard System Security Profile for Fedora) selects 3 rules, and what `enforced` lists claims 2 of them.
+`standard` (Standard System Security Profile for Fedora) selects 4 rules, and what `enforced` lists claims 2 of them. One of them carries no number, so no `satisfies` can name it.
 
 | Number | Rule | Claimed by | Would claim |
 |---|---|---|---|
 | `1.1.1.1` | Install AIDE | `one/hello` |  |
 | `4.1.3.1` | Record Attempts to Alter Logon and Logout Events |  |  |
 | `5.2.20`, `RHEL-09-232010` | Disable SSH Root Login | `one/hello` |  |
-tect: 1 of 3 rules are unclaimed
+|  | Ensure gpgcheck Enabled In Main dnf Configuration |  |  |
+tect: 2 of 4 rules are unclaimed
 ==== exit 0
 ==== and as json
 {
@@ -47,10 +48,17 @@ tect: 1 of 3 rules are unclaimed
         "one/hello"
       ],
       "would_claim": []
+    },
+    {
+      "rule": "xccdf_org.ssgproject.content_rule_gpgcheck_enabled",
+      "numbers": [],
+      "title": "Ensure gpgcheck Enabled In Main dnf Configuration",
+      "claimed_by": [],
+      "would_claim": []
     }
   ]
 }
-tect: 1 of 3 rules are unclaimed
+tect: 2 of 4 rules are unclaimed
 ==== exit 0
 ==== conforming to a profile the content does not carry
   × `enforced` conforms to `nosuch`, which is none of the profiles this

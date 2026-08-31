@@ -116,6 +116,7 @@ impl Coverage<'_> {
             .count()
         {
             0 => String::new(),
+            1 => " One of them carries no number, so no `satisfies` can name it.".into(),
             n => format!(" {n} of them carry no number, so no `satisfies` can name them."),
         };
         let mut out = format!(

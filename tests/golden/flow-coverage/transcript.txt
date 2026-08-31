@@ -1,12 +1,13 @@
 # Example coverage of `standard`
 
-`standard` (Standard System Security Profile for Fedora) selects 3 rules, and what `example` lists claims 0 of them.
+`standard` (Standard System Security Profile for Fedora) selects 4 rules, and what `example` lists claims 0 of them. One of them carries no number, so no `satisfies` can name it.
 
 | Number | Rule | Claimed by | Would claim |
 |---|---|---|---|
 | `1.1.1.1` | Install AIDE |  |  |
 | `4.1.3.1` | Record Attempts to Alter Logon and Logout Events |  |  |
 | `5.2.20`, `RHEL-09-232010` | Disable SSH Root Login |  | `hardening` |
-tect: 3 of 3 rules are unclaimed
+|  | Ensure gpgcheck Enabled In Main dnf Configuration |  |  |
+tect: 4 of 4 rules are unclaimed
 tect: The `tectonic-os` collection is declared but not on this machine, so nothing read it: `tect fetch modules` downloads it
 ==== exit 0

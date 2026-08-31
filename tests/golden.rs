@@ -890,6 +890,29 @@ fn flow_repo_claiming(name: &str) -> PathBuf {
     flow_repo_with(name, "three")
 }
 
+/// The same, enforcing, which is the other half of what a `conforms` costs: in
+/// an enforcing repository a rule the image fails fails the build, and both
+/// places that say so read the same declaration.
+fn flow_repo_enforcing(name: &str) -> PathBuf {
+    let root = flow_repo_claiming(name);
+    let file = root.join("repo.kdl");
+    let mut repo = std::fs::read_to_string(&file).unwrap();
+    repo.push_str("\naudit {\n    enforce #true\n}\n");
+    std::fs::write(&file, repo).unwrap();
+    root
+}
+
+/// The same, with a second image, since an import lists a module in as many
+/// images as the answer names and writes a `conforms` into every one of them.
+fn flow_repo_claiming_two(name: &str) -> PathBuf {
+    let root = flow_repo_claiming(name);
+    tect(
+        &root,
+        &["--no-tui", "--root", ".", "create", "image", "Server"],
+    );
+    root
+}
+
 /// The image lists the module a claim is written into, so `check` holds the
 /// manifest the picker wrote to the schema.
 fn lists_sshd(root: &Path) {
@@ -1018,6 +1041,23 @@ fn flows() {
         &conforms,
         None,
         &["--root", ".", "coverage", "--datastream", &stream],
+    );
+
+    // Tier 2 over a `conforms` naming a profile the datastream does not carry.
+    // A typo reaches this, and the notice has to say what the content does
+    // hold rather than report nothing found.
+    let stranger = flow_repo("flow-conforms-stranger");
+    let image = stranger.join("example.image.kdl");
+    let declared = std::fs::read_to_string(&image).unwrap().replace(
+        "    modules {",
+        "    conforms \"cusp_fedora\"\n\n    modules {",
+    );
+    std::fs::write(&image, declared).unwrap();
+    flow(
+        "flow-check-conforms-stranger",
+        &stranger,
+        None,
+        &["--root", ".", "check", "--datastream", &stream],
     );
 
     let root = flow_repo("flow-module");
@@ -1149,6 +1189,61 @@ fn flows() {
         "{left}"
     );
 
+    // What the same two say in an enforcing repository, which is the arm of
+    // the cost line neither caller reached: there the scan does not only
+    // publish a score, it fails the build.
+    let enforcing = flow_repo_enforcing("flow-set-conforms-enforced-in");
+    flow(
+        "flow-set-conforms-enforced",
+        &enforcing,
+        None,
+        &["--root", ".", "set", "conforms", "--datastream", &stream],
+    );
+    let importing = flow_repo_enforcing("flow-import-conforms-enforced-in");
+    flow(
+        "flow-import-conforms-enforced",
+        &importing,
+        None,
+        &import_sshd,
+    );
+
+    // Two images in one listing, each getting the `conforms` written: the
+    // sentence is plural and both files are edited, where every golden above
+    // has one image and reads the same either way.
+    let both = flow_repo_claiming_two("flow-import-conforms-two-in");
+    flow("flow-import-conforms-two", &both, None, &import_sshd);
+    for named in ["example", "server"] {
+        let written = std::fs::read_to_string(both.join(format!("{named}.image.kdl"))).unwrap();
+        assert!(
+            written.contains("    conforms \"standard\"\n") && written.contains("module \"sshd\""),
+            "{named}: {written}"
+        );
+    }
+
+    // A named datastream that does not read is a typo, and refuses rather than
+    // importing in silence. One this machine merely happens to lack is the
+    // other arm, and it is the one every flow above takes.
+    let typo = flow_repo_claiming("flow-import-datastream-in");
+    flow(
+        "flow-import-datastream",
+        &typo,
+        None,
+        &[
+            "--root",
+            ".",
+            "import",
+            "module",
+            "three/sshd",
+            "--datastream",
+            "no-such-datastream.xml",
+        ],
+    );
+    let untouched = std::fs::read_to_string(typo.join("example.image.kdl")).unwrap();
+    assert!(
+        !untouched.contains("sshd") && !typo.join("modules/sshd").exists(),
+        "the refusal leaves the repository as it was: {untouched}"
+    );
+
     let vendored = flow_repo_claiming("flow-copy-conforms-in");
     flow(
         "flow-copy-conforms",
@@ -1182,6 +1277,42 @@ fn flows() {
     for name in ["flow-set-claims", "flow-set-claims-again"] {
         flow(name, &claimed, None, &claims);
     }
+
+    // A module already declaring two benchmarks, which the writer collapses to
+    // one node under the name the chosen profile derives. Every claim above
+    // opened on a single node, so the merge across two was never written.
+    let two = flow_repo("flow-set-claims-two-in");
+    lists_sshd(&two);
+    std::fs::create_dir_all(two.join("modules/sshd")).unwrap();
+    std::fs::write(
+        two.join("modules/sshd/module.kdl"),
+        format!(
+            "{CLAIMANT}\nsatisfies {{\n    cis-fedora \"5.5.2\"\n    \
+             stig-fedora \"RHEL-09-232010\"\n}}\n"
+        ),
+    )
+    .unwrap();
+    flow(
+        "flow-set-claims-two",
+        &two,
+        None,
+        &[
+            "--root",
+            ".",
+            "set",
+            "claims",
+            "sshd",
+            "--datastream",
+            stream.as_str(),
+        ],
+    );
+    let merged = std::fs::read_to_string(two.join("modules/sshd/module.kdl")).unwrap();
+    assert_eq!(merged.matches("satisfies ").count(), 1, "{merged}");
+    assert!(
+        !merged.contains("cis-fedora") && !merged.contains("stig-fedora"),
+        "both benchmark names collapse into the derived one: {merged}"
+    );
+    tect(&two, &["--no-tui", "--root", ".", "check"]);
 
     std::fs::create_dir_all(claimed.join("modules/.remote/one/sshd")).unwrap();
     std::fs::write(

@@ -1,0 +1,18 @@
+Tectonic v{version}
+
+  1) example  Example
+  2) server  Server
+Which images list it? [1-2, several, 0 for none]: 1 2
+
+`sshd` claims rules `standard` and `ospp` select, and `example` and `server` declare no `conforms`.
+A `conforms` turns the scan on: every build measures `example` and `server` against the profile and publishes the score.
+
+  1) standard  Standard System Security Profile for Fedora
+  2) ospp  Protection Profile for General Purpose Operating Systems
+Which profile? [1-2, 0 for none]: 1
+
+
+example/
+├── ~ example.image.kdl  measured against `standard`, and sshd added to modules
+└── ~ server.image.kdl  measured against `standard`, and sshd added to modules
+==== exit 0

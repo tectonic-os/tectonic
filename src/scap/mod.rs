@@ -1077,7 +1077,7 @@ mod tests {
         assert_eq!(
             said,
             [
-                "`enforced` conforms to `standard`, and nothing it lists claims 1 of the 3 rules it \
+                "`enforced` conforms to `standard`, and nothing it lists claims 2 of the 4 rules it \
               selects; nothing in the repository claims them"
             ]
         );

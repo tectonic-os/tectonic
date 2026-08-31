@@ -585,6 +585,11 @@ impl Claims {
         }
         match selected.len() - rules.len() {
             0 => {}
+            1 => println!(
+                "One of the rules `{}` selects is reached by no number of its own, so no \
+                 `satisfies` can name it.\n",
+                profile.name()
+            ),
             missed => println!(
                 "{missed} of the rules `{}` selects are reached by no number of their own, so no \
                  `satisfies` can name them.\n",
