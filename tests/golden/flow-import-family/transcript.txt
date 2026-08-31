@@ -1,0 +1,12 @@
+Tectonic v{version}
+
+List it in example? (Yes/No)
+Yes
+
+Import what these modules require? (Yes/No)
+Yes
+
+
+example/
+└── ~ example.image.kdl  fedora-family and needs-family added to modules
+==== exit 0

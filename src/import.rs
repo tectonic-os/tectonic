@@ -743,21 +743,32 @@ fn short(
         if unmet.contains(&want) {
             continue;
         }
-        let any = targets
-            .iter()
-            .any(|(image, flavour)| !image_has(image, *flavour, want, &index));
-        // A provider the repository owns needs a line rather than an import,
-        // which is what the unsatisfied-`requires` help already says.
-        let Some(provider) = (match any {
-            false => None,
-            true => index.of(want).into_iter().find(|held| held.owner.is_some()),
-        }) else {
-            continue;
-        };
-        unmet.push(want);
-        let qualified = provider.qualified();
-        if !bring.contains(&qualified) {
-            bring.push(qualified);
+        // Per target, because the adapter filling a role is a different module
+        // on every family: two images on two families owe two providers, and
+        // one image owes the one that supports it rather than the one that
+        // sorts first.
+        for (image, flavour) in &targets {
+            if image_has(image, *flavour, want, &index) {
+                continue;
+            }
+            let family = image.base.as_ref().map_or("", |base| base.family.as_str());
+            // A provider the repository owns needs a line rather than an
+            // import, which is what the unsatisfied-`requires` help already
+            // says.
+            let Some(provider) = index
+                .fitting(want, family)
+                .into_iter()
+                .find(|held| held.owner.is_some())
+            else {
+                continue;
+            };
+            if !unmet.contains(&want) {
+                unmet.push(want);
+            }
+            let qualified = provider.qualified();
+            if !bring.contains(&qualified) {
+                bring.push(qualified);
+            }
         }
     }
     if bring.is_empty() {

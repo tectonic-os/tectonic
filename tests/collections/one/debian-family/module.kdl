@@ -1,0 +1,7 @@
+description "apt and its state directories, which every deb build layer reaches for"
+
+supports "debian" "ubuntu"
+
+provides "build-environment"
+
+helpers "lib/family.sh"

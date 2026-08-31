@@ -154,13 +154,23 @@ impl Index {
             .collect()
     }
 
+    /// Every module declaring `capability` that supports `family`, the
+    /// repository's own first. An adapter role is filled per family, so a
+    /// provider for another family is not a candidate for this image at all —
+    /// `of` alone would hand a fedora image the deb adapter whenever the deb
+    /// one sorts first.
+    pub fn fitting(&self, capability: &str, family: &str) -> Vec<&Provider> {
+        self.of(capability)
+            .into_iter()
+            .filter(|held| held.declares.supports.iter().any(|has| has == family))
+            .collect()
+    }
+
     /// The module filling a role on one family: it provides the capability the
     /// role is named by, and it supports the family. Every family needs the
     /// same role filled by a different module.
     pub fn adapter(&self, capability: &str, family: &str) -> Option<&Provider> {
-        self.of(capability)
-            .into_iter()
-            .find(|held| held.declares.supports.iter().any(|has| has == family))
+        self.fitting(capability, family).into_iter().next()
     }
 
     /// Every module declaring a key of this kind.

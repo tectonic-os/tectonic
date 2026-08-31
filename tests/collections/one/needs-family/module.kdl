@@ -1,0 +1,9 @@
+description "A module that needs the family adapter under it"
+
+supports "fedora"
+
+requires "build-environment"
+
+packages {
+    fedora "htop"
+}

@@ -1244,6 +1244,23 @@ fn flows() {
         "the refusal leaves the repository as it was: {untouched}"
     );
 
+    // A `requires` filled from a collection holding an adapter for more than
+    // one family. The image's base is fedora, so the fedora adapter is the one
+    // to bring; picking the first provider of the capability brings the deb
+    // one, which supports a family this image is not.
+    let family = flow_repo_with("flow-import-family-in", "one");
+    flow(
+        "flow-import-family",
+        &family,
+        None,
+        &["--root", ".", "import", "module", "one/needs-family"],
+    );
+    let listed = std::fs::read_to_string(family.join("example.image.kdl")).unwrap();
+    assert!(
+        listed.contains("module \"fedora-family\"") && !listed.contains("debian-family"),
+        "the adapter brought has to support the base's family: {listed}"
+    );
+
     let vendored = flow_repo_claiming("flow-copy-conforms-in");
     flow(
         "flow-copy-conforms",
