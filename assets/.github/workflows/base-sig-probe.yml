@@ -83,7 +83,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -B "${branch}"
-          git add ./*.kdl
+          # `signed` reaches `generated/plan.json`, so a PR carrying only the
+          # manifest edit lands a tree whose lint fails on a stale generated
+          # file. This is the help that failure prints.
+          ./scripts/tect.sh generate
+          git add ./*.kdl generated
           git commit -m "Record the base image signature status" \
             -m "${SUMMARY}"
           # A fresh checkout has no remote-tracking ref to lease against, and
@@ -103,9 +107,10 @@ jobs:
           [this workflow](.github/workflows/base-sig-probe.yml) rather than by
           hand, so this PR only makes the declaration match the registry.
 
-          **Nothing about the build changes.** `signed` reaches no generated
-          file, no build arg and no layer, and the images this repository
-          publishes are cosign signed either way.
+          **Nothing about the build changes.** `signed` reaches no build arg and
+          no layer, and the images this repository publishes are cosign signed
+          either way. It does reach `generated/plan.json`, which is why this PR
+          carries the regenerated file beside the manifest.
 
           ## If a base turned `#true`
 
