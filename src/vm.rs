@@ -25,14 +25,6 @@ const TYPES: [(&str, &str); 3] = [
     ("iso", copy::DISK_ISO),
 ];
 
-/// `disk_config/disk.toml` declares a 20 GiB root in a block the image builder
-/// never applies, so the disk is whatever size the builder defaults to. Said
-/// here because putting the disk in the menu puts that in front of everyone
-/// who finds it.
-const DEFAULT_SIZE: &str = "tect: the disk is the image builder's default size; the \
-                            root `disk_config/disk.toml` declares is in a block it \
-                            does not apply";
-
 /// What the flags gave, in the script's own spelling.
 pub struct Options {
     pub target: Option<String>,
@@ -60,9 +52,6 @@ pub fn run(
             "{} is not there; `tect generate` writes it",
             script.display()
         ));
-    }
-    if kind != "iso" {
-        eprintln!("{DEFAULT_SIZE}");
     }
     Err(format!(
         "{}: {}",

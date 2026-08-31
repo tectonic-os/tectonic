@@ -499,9 +499,9 @@ or `iso`, asked for where there is a terminal to ask on. `build` converts,
   is the script's: it asks for sudo and boots a machine onto it, and nothing
   here captures or reimplements any of that. Every default is the script's too,
   so a flag not passed is not restated in Rust.
-- The disk is the image builder's default size, and the command says so on
-  every run that is not an iso. The root filesystem `disk_config/disk.toml`
-  declares sits in a block the builder does not apply.
+- The disk is the size `disk_config/disk.toml` declares. Its
+  `[[customizations.filesystem]]` root is applied by the image builder, and the
+  disk comes out that size plus about 1.5 GiB of ESP and `/boot`.
 - It reads the image out of rootful podman, so it asks for sudo and copies the
   image into root's store with `podman image scp` where it is not there.
 - Building a disk is fedora-only: the image builder cannot build one from an
