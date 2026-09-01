@@ -139,6 +139,24 @@ pub fn generated(root: &Path) -> PathBuf {
     root.join(GENERATED)
 }
 
+/// Everything `generate` writes for one image, under a directory of its own.
+/// The per-image files used to sit flat beside `plan.json` and `lib/`, four
+/// apiece, so what belonged to the repository and what belonged to one image
+/// were the same pile.
+pub fn generated_image(id: &str) -> PathBuf {
+    PathBuf::from(GENERATED).join(id)
+}
+
+/// What the generated Containerfile is called. It was named for its image and
+/// nothing else, so the one file a person goes looking for was the one with no
+/// extension to find it by.
+pub const CONTAINERFILE: &str = "Containerfile";
+
+/// The one directory under `generated/` that belongs to no image: the helper
+/// library every module build mounts at `/ctx/lib`. It is a sibling of
+/// `generated_image`, so no image may be called this.
+pub const LIB: &str = "lib";
+
 pub fn out(root: &Path) -> PathBuf {
     root.join(OUT)
 }

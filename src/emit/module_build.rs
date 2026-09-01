@@ -16,9 +16,11 @@ const HEADER: &str = "\
 set -euxo pipefail
 ";
 
-/// Where the scripts for one image live, beside the Containerfile named for it.
+/// Where the scripts for one image live, under that image's own directory.
+/// Below `modules/` there, so a module called `finalize` cannot land on the
+/// image's own `finalize.sh` beside it.
 pub fn dir(image: &Image) -> PathBuf {
-    PathBuf::from(layout::GENERATED).join(format!("{}.d", image.id))
+    layout::generated_image(&image.id).join(layout::MODULES)
 }
 
 /// The script for one entry, as the path it is written at. A module listed

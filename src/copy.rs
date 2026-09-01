@@ -52,12 +52,14 @@ pub fn list_in(target: &str) -> String {
     format!("List it in {target}?")
 }
 
-// What an import offers to bring with it. The clauses these questions used to
-// carry are still reachable: the modules a `requires` offer named are the rows
-// of the import that follows it, and the rules a claims offer counted are what
-// `tect coverage` prints.
+// What an import or a copy offers to bring with it. The clauses these
+// questions used to carry are still reachable: the modules a `requires` offer
+// named are the rows of the import that follows it, and the rules a claims
+// offer counted are what `tect coverage` prints.
 
-pub const IMPORT_REQUIRED: &str = "Import what these modules require?";
+/// Asked by both commands, and answered by whichever one asked: an import
+/// references what it brings, a copy vendors it.
+pub const BRING_REQUIRED: &str = "Bring what these modules require?";
 pub const IMPORT_CLAIMING: &str = "Import the modules claiming these rules?";
 
 /// What a list says above itself about an answer it cleared. `unmet` is the

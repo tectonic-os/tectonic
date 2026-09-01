@@ -2,7 +2,6 @@
 //! every module's finalize hook, both named here in the order the resolved
 //! plan put them in.
 
-use crate::emit::module_build;
 use crate::layout;
 use crate::model::image::{Entry, Image};
 use crate::resolve::collect::Collection;
@@ -17,7 +16,7 @@ set -euxo pipefail
 
 /// Where the script for one image is written.
 pub fn path(image: &Image) -> PathBuf {
-    module_build::dir(image).join("finalize.sh")
+    layout::generated_image(&image.id).join("finalize.sh")
 }
 
 /// Every module directory whose finalize hook this image runs, in build order

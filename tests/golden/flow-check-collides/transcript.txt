@@ -7,7 +7,7 @@ Tectonic v{version}
         `overrides "/usr/share/example/remotes.list"` here if replacing it is
         the point
 
-tect: 1 problem in ./example.image.kdl, ./repo.kdl
+tect: 1 problem in ./modules/.remote/one/flatpak/module.kdl; none in ./example.image.kdl, ./repo.kdl
 tect: one/bases.kdl replaces the tool's own entry for quay.io/fedora/fedora-bootc:44
 tect: `tect-version` names {version} with no sha256, so the binary it fetches is whatever the release holds, unverified
 ==== exit 2

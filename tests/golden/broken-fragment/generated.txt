@@ -10,14 +10,14 @@
 ==== scripts/render-iso-config.sh
 ==== scripts/tect.sh
 ==== scripts/vm.sh
-==== generated/broken-fragment.d/core/early.sh
+==== generated/broken-fragment/modules/core/early.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/core/early
 export MODDIR
-==== generated/broken-fragment.d/core/silent@dev.sh
+==== generated/broken-fragment/modules/core/silent@dev.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -29,7 +29,7 @@ if [ "${FLAVOUR:-}" != "dev" ]; then
     echo "skipping core/silent: not built for '${FLAVOUR:-the ungated build}'"
     exit 0
 fi
-==== generated/broken-fragment.d/core/mismatched@dev.sh
+==== generated/broken-fragment/modules/core/mismatched@dev.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -41,7 +41,7 @@ if [ "${FLAVOUR:-}" != "dev" ]; then
     echo "skipping core/mismatched: not built for '${FLAVOUR:-the ungated build}'"
     exit 0
 fi
-==== generated/broken-fragment.d/finalize.sh
+==== generated/broken-fragment/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -157,7 +157,7 @@ for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
         rm -f "$path"
     fi
 done
-==== generated/broken-fragment.graph.md
+==== generated/broken-fragment/graph.md
 # Broken Fragment capability graph
 
 GENERATED FILE, do not edit.
@@ -179,7 +179,7 @@ graph LR
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
 | `rechunking` | capability | `base` |  |  |
-==== generated/broken-fragment.graph.json
+==== generated/broken-fragment/graph.json
 {
   "image": "broken-fragment",
   "capabilities": [

@@ -200,10 +200,11 @@ fn create(name: &str, root: &Path) {
         false,
         vec!["example".into(), "server".into()],
         None,
+        tect::import::Place::Reference,
         &silent,
     )
     .unwrap_or_else(|err| panic!("{}", err.message()))
-    .apply(here)
+    .apply(here, &list.sources)
     .unwrap();
 
     let mut out = String::new();
@@ -1261,15 +1262,29 @@ fn flows() {
         "the adapter brought has to support the base's family: {listed}"
     );
 
+    // The same offer down the copy path, which is the same path: a vendored
+    // module claiming rules a profile selects is exactly as worth measuring as
+    // a referenced one, and the offer used to reach only the reference.
     let vendored = flow_repo_claiming("flow-copy-conforms-in");
     flow(
         "flow-copy-conforms",
         &vendored,
         None,
-        &["--root", ".", "copy", "module", "three/sshd"],
+        &[
+            "--root",
+            ".",
+            "copy",
+            "module",
+            "three/sshd",
+            "--datastream",
+            stream.as_str(),
+        ],
     );
     let copied = std::fs::read_to_string(vendored.join("example.image.kdl")).unwrap();
-    assert!(!copied.contains("conforms"), "{copied}");
+    assert!(
+        copied.contains("conforms \"standard\"") && copied.contains("module \"sshd\""),
+        "{copied}"
+    );
 
     // The claim the module author makes, chosen out of the rules a profile
     // selects rather than typed. The second run opens on what the first wrote
@@ -1689,10 +1704,11 @@ fn flows() {
         false,
         Vec::new(),
         None,
+        tect::import::Place::Reference,
         &tect::prompt::Prompt::silent(),
     )
     .unwrap_or_else(|err| panic!("{}", err.message()))
-    .apply(&root)
+    .apply(&root, &list.sources)
     .unwrap_err();
     assert!(declined.contains("--image"), "{declined}");
 
@@ -1703,10 +1719,11 @@ fn flows() {
         false,
         vec!["example".into()],
         None,
+        tect::import::Place::Reference,
         &tect::prompt::Prompt::silent(),
     )
     .unwrap_or_else(|err| panic!("{}", err.message()))
-    .apply(&root)
+    .apply(&root, &list.sources)
     .unwrap();
     let image = std::fs::read_to_string(root.join("example.image.kdl")).unwrap();
     assert_eq!(image.matches("source \"one\"").count(), 1);
@@ -1722,6 +1739,7 @@ fn flows() {
         false,
         vec!["example".into()],
         None,
+        tect::import::Place::Reference,
         &tect::prompt::Prompt::silent(),
     )
     .err()
@@ -1781,7 +1799,7 @@ fn flows() {
     tect(&nested, &["--no-tui", "--root", ".", "check"]);
     tect(&nested, &["--no-tui", "--root", ".", "generate"]);
     assert!(nested
-        .join("generated/example.d/four/hardening/coredumps.sh")
+        .join("generated/example/modules/four/hardening/coredumps.sh")
         .is_file());
 
     // A typed name is a suffix of a member path at a `/` boundary, as `why`
@@ -1812,7 +1830,7 @@ fn flows() {
     tect(&suffix, &["--no-tui", "--root", ".", "check"]);
     tect(&suffix, &["--no-tui", "--root", ".", "generate"]);
     assert!(suffix
-        .join("generated/example.d/four/hardening/coredumps.sh")
+        .join("generated/example/modules/four/hardening/coredumps.sh")
         .is_file());
 
     // Two collections hold a member ending in the typed name: the ask lists
@@ -1943,7 +1961,7 @@ fn flows() {
     tect(&copied_nested, &["--no-tui", "--root", ".", "check"]);
     tect(&copied_nested, &["--no-tui", "--root", ".", "generate"]);
     assert!(copied_nested
-        .join("generated/example.d/hardening/coredumps.sh")
+        .join("generated/example/modules/hardening/coredumps.sh")
         .is_file());
 
     // The vendoring verb says the same collision: the copy is the repository's

@@ -69,7 +69,8 @@ This is the whole surface today. The rest of it is not built yet.
                           declares, with both halves under keys/
     tect check            validate every manifest, and say where and why
     tect generate         write the Containerfile per image, the per-module
-                          build scripts and the graph, under generated/
+                          build scripts and the graph, under
+                          generated/<image>/
     tect build [target]   verify the build files, then build the image
     tect section [image]  the generated Containerfile module section
     tect graph [--format md|json]

@@ -10,7 +10,7 @@
 ==== scripts/render-iso-config.sh
 ==== scripts/tect.sh
 ==== scripts/vm.sh
-==== generated/broken-options.d/core/configurable.sh
+==== generated/broken-options/modules/core/configurable.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -20,7 +20,7 @@ export MODDIR
 
 OPT_FONTS=(JetBrainsMono)
 export OPT_STARSHIP="1"
-==== generated/broken-options.d/finalize.sh
+==== generated/broken-options/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -136,7 +136,7 @@ for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
         rm -f "$path"
     fi
 done
-==== generated/broken-options.graph.md
+==== generated/broken-options/graph.md
 # Broken Options capability graph
 
 GENERATED FILE, do not edit.
@@ -156,7 +156,7 @@ graph LR
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
 | `rechunking` | capability | `base` |  |  |
-==== generated/broken-options.graph.json
+==== generated/broken-options/graph.json
 {
   "image": "broken-options",
   "capabilities": [

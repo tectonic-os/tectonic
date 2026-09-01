@@ -10,14 +10,14 @@
 ==== scripts/render-iso-config.sh
 ==== scripts/tect.sh
 ==== scripts/vm.sh
-==== generated/same.d/fedora-family.sh
+==== generated/same/modules/fedora-family.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/fedora-family
 export MODDIR
-==== generated/same.d/core/hello.sh
+==== generated/same/modules/core/hello.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -28,7 +28,7 @@ export MODDIR
 source /ctx/lib/family.sh
 
 install_packages 'fastfetch'
-==== generated/same.d/finalize.sh
+==== generated/same/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -144,7 +144,7 @@ for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
         rm -f "$path"
     fi
 done
-==== generated/same.graph.md
+==== generated/same/graph.md
 # Same capability graph
 
 GENERATED FILE, do not edit.
@@ -166,7 +166,7 @@ graph LR
 |---|---|---|---|---|
 | `build-environment` | capability | `fedora-family` |  |  |
 | `rechunking` | capability | `base` |  |  |
-==== generated/same.graph.json
+==== generated/same/graph.json
 {
   "image": "same",
   "capabilities": [
@@ -190,14 +190,14 @@ graph LR
   "overrides": [],
   "suppressed": []
 }
-==== generated/same.d/fedora-family.sh
+==== generated/same/modules/fedora-family.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/fedora-family
 export MODDIR
-==== generated/same.d/core/hello.sh
+==== generated/same/modules/core/hello.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -208,7 +208,7 @@ export MODDIR
 source /ctx/lib/family.sh
 
 install_packages 'fastfetch'
-==== generated/same.d/finalize.sh
+==== generated/same/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -324,7 +324,7 @@ for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
         rm -f "$path"
     fi
 done
-==== generated/same.graph.md
+==== generated/same/graph.md
 # Same capability graph
 
 GENERATED FILE, do not edit.
@@ -346,7 +346,7 @@ graph LR
 |---|---|---|---|---|
 | `build-environment` | capability | `fedora-family` |  |  |
 | `rechunking` | capability | `base` |  |  |
-==== generated/same.graph.json
+==== generated/same/graph.json
 {
   "image": "same",
   "capabilities": [

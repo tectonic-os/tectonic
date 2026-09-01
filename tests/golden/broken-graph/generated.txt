@@ -10,7 +10,7 @@
 ==== scripts/render-iso-config.sh
 ==== scripts/tect.sh
 ==== scripts/vm.sh
-==== generated/broken-graph.d/core/one.sh
+==== generated/broken-graph/modules/core/one.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -21,7 +21,7 @@ export MODDIR
 source /ctx/lib/family.sh
 
 install_packages 'fastfetch'
-==== generated/broken-graph.d/core/two.sh
+==== generated/broken-graph/modules/core/two.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -32,14 +32,14 @@ export MODDIR
 source /ctx/lib/selinux-helpers.sh
 cp /ctx/modules/core/two/selinux/two.te /tmp/two.te
 install_selinux_module /tmp/two.te
-==== generated/broken-graph.d/core/three.sh
+==== generated/broken-graph/modules/core/three.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/core/three
 export MODDIR
-==== generated/broken-graph.d/finalize.sh
+==== generated/broken-graph/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -155,7 +155,7 @@ for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
         rm -f "$path"
     fi
 done
-==== generated/broken-graph.graph.md
+==== generated/broken-graph/graph.md
 # Broken Graph capability graph
 
 GENERATED FILE, do not edit.
@@ -184,7 +184,7 @@ graph LR
 | `rechunking` | capability | `base` |  |  |
 | `selinux-policy` | capability | `base` |  |  |
 | `shell-tools` | capability | `core/two` |  |  |
-==== generated/broken-graph.graph.json
+==== generated/broken-graph/graph.json
 {
   "image": "broken-graph",
   "capabilities": [

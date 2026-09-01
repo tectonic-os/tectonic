@@ -57,8 +57,8 @@ fails stops the command: what earlier steps wrote stays, and each of those
 steps is a command of its own to finish the run with.
 
 `create repo`, `create image`, `create flavour`, `create module`, `import
-module` and `copy module` end with a tree of the files they wrote, rooted at the repository, each leaf
-carrying a phrase saying what it is for. `create key` names its two halves
+module`, `copy module` and `generate` end with a tree of the files they wrote,
+rooted at the repository, each leaf carrying a phrase saying what it is for. `create key` names its two halves
 instead: one of them is private and ignored, so a tracked-file tree omits it.
 
 `--root <dir>` is accepted by every command below. A flag a command does not
@@ -234,7 +234,7 @@ Asks you for:
   the one listing answer and one of each offer below
 - Which images or flavours the modules are listed in; an import with none has no
   repository representation and is refused
-- Whether to import what they require and nothing in those images provides
+- Whether to bring what they require and nothing in those images provides
 - Whether to generate the CI they make runnable
 - Which profile to be measured against, where they claim benchmark rules a
   profile selects and an image listing them declares no `conforms`
@@ -264,13 +264,20 @@ Asks you for:
 
 ### `copy module [name]`
 
-Copies one module out of a source collection into `modules/<name>` and records
-its source in `provenance.kdl`.
+Copies modules out of a source collection into `modules/<name>` and records
+each one's source in `provenance.kdl`. The repository owns them from then on:
+nothing fetches over them and no pin moves them.
 
-It asks the same questions and takes the same repeatable `--image` flag as
-`import module`. A bare name searches every collection; `<owner>/<name>` picks
-one. If another collection's namesake was already copied, the command refuses
-and names both collections.
+It is `import module` with a different ending — the same picker, the same
+questions, the same offers, the same flags and the same refusals — and differs
+only in these three ways:
+- The modules land under `modules/` and are listed by their own names, with no
+  `source` block, so what the requires offer brings is vendored too
+- No image is not a refusal. A copied module is in the repository whether one
+  lists it or not, and the listing offer is the second half of the job rather
+  than the whole of it
+- Something already at `modules/<name>` is refused, and the refusal names the
+  collection the thing there came from
 
 ### `create key <kind>`
 
@@ -428,15 +435,22 @@ modules the base already provides.
 
 ### `generate`
 
-Writes the build files and lists what it wrote:
-- The Containerfile for each image
-- The per-module build scripts
-- Both renderings of the capability graph
-- `plan.json`
-- `seed.kdl`, where `repo.kdl` nominates a seedable image
+Writes the build files and draws the tree of what it wrote:
+- `generated/<image>/Containerfile`, one per image
+- `generated/<image>/modules/<module>.sh`, the per-module build scripts
+- `generated/<image>/finalize.sh`
+- `generated/<image>/graph.md` and `graph.json`, both renderings of the
+  capability graph
+- `generated/plan.json`
+- `generated/seed.kdl`, where `repo.kdl` nominates a seedable image
 - Every workflow the `workflows` block names, under `.github/workflows/`
 
 #### Notes:
+- Everything one image generates lives under a directory named for it, so what
+  belongs to the repository and what belongs to one image are not the same
+  pile. The Containerfile is called `Containerfile` rather than the image's
+  name, which left the one file a person goes looking for with no extension to
+  find it by.
 - Referenced modules are fetched first, as `build` does. What is written is read
   off `modules/.remote/`, so a tree older than the collection would bake a
   deleted file into `plan.json` and CI — which fetches into an empty tree —
@@ -444,6 +458,7 @@ Writes the build files and lists what it wrote:
 - `generated/` is cleared first, so an image or module that is gone leaves with
   its files. A workflow is removed by name instead: one the tool does not ship
   is the repository's own and is left where it is.
+- A terminal gets the tree; a pipe or a redirect gets the flat list of paths.
 - The workflow bodies are shipped verbatim, with the declared schedules
   substituted and the kernel build input kept only where a listed module takes
   one. A tool upgrade re-syncs them by regeneration, so nothing is ever copied

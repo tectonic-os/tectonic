@@ -10,7 +10,7 @@
 ==== scripts/render-iso-config.sh
 ==== scripts/tect.sh
 ==== scripts/vm.sh
-==== generated/signing.d/kernel/signed-kernel.sh
+==== generated/signing/modules/kernel/signed-kernel.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -19,14 +19,14 @@ MODDIR=/ctx/modules/kernel/signed-kernel
 export MODDIR
 
 install -D -m 0644 -- '/ctx/keys/usr/share/secureboot/sb_cert.der' '/usr/share/secureboot/sb_cert.der'
-==== generated/signing.d/drivers/kvmfr.sh
+==== generated/signing/modules/drivers/kvmfr.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/drivers/kvmfr
 export MODDIR
-==== generated/signing.d/finalize.sh
+==== generated/signing/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -142,7 +142,7 @@ for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
         rm -f "$path"
     fi
 done
-==== generated/signing.graph.md
+==== generated/signing/graph.md
 # Signing capability graph
 
 GENERATED FILE, do not edit.
@@ -169,7 +169,7 @@ graph LR
 | `initramfs-generation` | capability | `base` | `kernel/signed-kernel` |  |
 | `kernel-devel` | capability | `kernel/signed-kernel` | `drivers/kvmfr` |  |
 | `rechunking` | capability | `base` |  |  |
-==== generated/signing.graph.json
+==== generated/signing/graph.json
 {
   "image": "signing",
   "capabilities": [

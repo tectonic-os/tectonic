@@ -1,6 +1,6 @@
 Tectonic v{version}
 
-Import what these modules require? (Yes/No)
+Bring what these modules require? (Yes/No)
 Yes
 
 

@@ -10,7 +10,7 @@
 ==== scripts/render-iso-config.sh
 ==== scripts/tect.sh
 ==== scripts/vm.sh
-==== generated/enforced.d/one/hello.sh
+==== generated/enforced/modules/one/hello.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -29,14 +29,14 @@ else
 fi
 
 source /ctx/modules/one/hello/module.sh
-==== generated/enforced.d/core/consumer.sh
+==== generated/enforced/modules/core/consumer.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/core/consumer
 export MODDIR
-==== generated/enforced.d/finalize.sh
+==== generated/enforced/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -152,7 +152,7 @@ for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
         rm -f "$path"
     fi
 done
-==== generated/enforced.graph.md
+==== generated/enforced/graph.md
 # Enforced capability graph
 
 GENERATED FILE, do not edit.
@@ -175,7 +175,7 @@ graph LR
 |---|---|---|---|---|
 | `hello` | capability | `one/hello` | `core/consumer` |  |
 | `rechunking` | capability | `base` |  |  |
-==== generated/enforced.graph.json
+==== generated/enforced/graph.json
 {
   "image": "enforced",
   "capabilities": [

@@ -3,7 +3,7 @@ Tectonic v{version}
 List it in example? (Yes/No)
 Yes
 
-Import what these modules require? (Yes/No)
+Bring what these modules require? (Yes/No)
 Yes
 
 

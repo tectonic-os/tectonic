@@ -10,7 +10,7 @@
 ==== scripts/render-iso-config.sh
 ==== scripts/tect.sh
 ==== scripts/vm.sh
-==== generated/Not An Id.d/finalize.sh
+==== generated/Not An Id/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -126,7 +126,7 @@ for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
         rm -f "$path"
     fi
 done
-==== generated/Not An Id.graph.md
+==== generated/Not An Id/graph.md
 #  capability graph
 
 GENERATED FILE, do not edit.
@@ -138,7 +138,7 @@ right.
 ```mermaid
 graph LR
 ```
-==== generated/Not An Id.graph.json
+==== generated/Not An Id/graph.json
 {
   "image": "Not An Id",
   "capabilities": [],

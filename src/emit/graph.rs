@@ -117,7 +117,7 @@ pub fn files(image: &Image) -> Vec<(PathBuf, String)> {
 }
 
 pub fn path(image: &Image, format: &str) -> PathBuf {
-    PathBuf::from(layout::GENERATED).join(format!("{}.graph.{format}", image.id))
+    layout::generated_image(&image.id).join(format!("graph.{format}"))
 }
 
 impl<'a> Graph<'a> {

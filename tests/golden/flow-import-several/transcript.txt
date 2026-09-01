@@ -13,7 +13,7 @@ Which modules? [1-8, several, 0 for none]: 2 3
 List it in example? (Yes/No)
 Yes
 
-Import what these modules require? (Yes/No)
+Bring what these modules require? (Yes/No)
 Yes
 
 `kernel-freshness` tracks the kernel a module pins, and proposes a bump

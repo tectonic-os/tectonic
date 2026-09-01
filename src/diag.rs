@@ -137,16 +137,45 @@ impl Issues {
     }
 
     /// Prints every issue and returns whether any were found.
+    ///
+    /// `context` is every file that was read, in read order. The closing line
+    /// splits it: the ones a problem was found in, then the ones none was, so
+    /// two images in one repository do not read as two broken images.
     pub fn report(self, context: &str) -> bool {
         let found = !self.0.is_empty();
         let count = self.0.len();
+        let mut bad: Vec<&str> = Vec::new();
+        for issue in &self.0 {
+            if !bad.contains(&issue.src.name()) {
+                bad.push(issue.src.name());
+            }
+        }
+        // A source a problem was found in is not always one of the files read:
+        // a module manifest is reached through an image, and a generated file
+        // nothing emits is reached through neither.
+        //
+        // One entry is never split. It is either the file the problem is in,
+        // which leaves nothing to say, or the root directory `context` falls
+        // back to when nothing parsed, which is not a file that came out clean.
+        let clean: Vec<&str> = match context.contains(", ") {
+            false => Vec::new(),
+            true => context
+                .split(", ")
+                .filter(|file| !bad.contains(file))
+                .collect(),
+        };
+        let (bad, clean) = (bad.join(", "), clean.join(", "));
         for issue in self.0 {
             eprintln!("{:?}", miette::Report::new(issue));
         }
         if found {
             eprintln!(
-                "tect: {count} problem{} in {context}",
-                if count == 1 { "" } else { "s" }
+                "tect: {count} problem{} in {bad}{}",
+                if count == 1 { "" } else { "s" },
+                match clean.is_empty() {
+                    true => String::new(),
+                    false => format!("; none in {clean}"),
+                }
             );
         }
         found

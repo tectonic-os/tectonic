@@ -309,7 +309,7 @@ jobs:
           {
             echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}"
             echo "IMAGE_NAME=$(jq -r '.published' "$TARGET_PLAN")"
-            echo "CONTAINERFILE=generated/$(jq -r '.image' "$TARGET_PLAN")"
+            echo "CONTAINERFILE=generated/$(jq -r '.image' "$TARGET_PLAN")/Containerfile"
             echo "RECHUNK=$(jq -r '.base.provides | index("rechunking") != null' "$IMAGE_PLAN")"
             echo "IMAGE_DESC=$(jq -r --arg t "$TARGET" \
               '.description | if . == "" then $t else "\(.) (\($t))" end' "$IMAGE_PLAN")"

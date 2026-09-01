@@ -10,28 +10,28 @@
 ==== scripts/render-iso-config.sh
 ==== scripts/tect.sh
 ==== scripts/vm.sh
-==== generated/broken-collect.d/core/menu.sh
+==== generated/broken-collect/modules/core/menu.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/core/menu
 export MODDIR
-==== generated/broken-collect.d/core/absent.sh
+==== generated/broken-collect/modules/core/absent.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/core/absent
 export MODDIR
-==== generated/broken-collect.d/core/unclaimed.sh
+==== generated/broken-collect/modules/core/unclaimed.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/core/unclaimed
 export MODDIR
-==== generated/broken-collect.d/finalize.sh
+==== generated/broken-collect/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -147,7 +147,7 @@ for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
         rm -f "$path"
     fi
 done
-==== generated/broken-collect.graph.md
+==== generated/broken-collect/graph.md
 # Broken Collect capability graph
 
 GENERATED FILE, do not edit.
@@ -169,7 +169,7 @@ graph LR
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
 | `rechunking` | capability | `base` |  |  |
-==== generated/broken-collect.graph.json
+==== generated/broken-collect/graph.json
 {
   "image": "broken-collect",
   "capabilities": [

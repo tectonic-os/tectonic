@@ -15,7 +15,7 @@ pub const END: &str = "# ---- END GENERATED ----";
 
 /// Where the assembled Containerfile for one image is written.
 pub fn path(image: &Image) -> PathBuf {
-    PathBuf::from(layout::GENERATED).join(&image.id)
+    layout::generated_image(&image.id).join(layout::CONTAINERFILE)
 }
 
 /// The skeleton with `section` between its markers, the syntax directive kept

@@ -29,11 +29,11 @@
     },
   ],
 
-  // A generated Containerfile is named for its image, which the dockerfile
-  // manager does not recognise, and its FROM has to bump with the declaration
-  // below.
+  // A generated Containerfile sits under its image's own directory, which the
+  // dockerfile manager does not recognise, and its FROM has to bump with the
+  // declaration below.
   "dockerfile": {
-    "managerFilePatterns": ["/^generated/[^/.]+$/"],
+    "managerFilePatterns": ["/^generated/[^/]+/Containerfile$/"],
   },
 
   // Each of these matches a `renovate` node and the tracked line directly

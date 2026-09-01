@@ -10,21 +10,21 @@
 ==== scripts/render-iso-config.sh
 ==== scripts/tect.sh
 ==== scripts/vm.sh
-==== generated/broken-cycle.d/core/a.sh
+==== generated/broken-cycle/modules/core/a.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/core/a
 export MODDIR
-==== generated/broken-cycle.d/core/b.sh
+==== generated/broken-cycle/modules/core/b.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/core/b
 export MODDIR
-==== generated/broken-cycle.d/finalize.sh
+==== generated/broken-cycle/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -140,7 +140,7 @@ for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
         rm -f "$path"
     fi
 done
-==== generated/broken-cycle.graph.md
+==== generated/broken-cycle/graph.md
 # Broken Cycle capability graph
 
 GENERATED FILE, do not edit.
@@ -165,7 +165,7 @@ graph LR
 | `a` | capability | `core/a` | `core/b` |  |
 | `b` | capability | `core/b` | `core/a` |  |
 | `rechunking` | capability | `base` |  |  |
-==== generated/broken-cycle.graph.json
+==== generated/broken-cycle/graph.json
 {
   "image": "broken-cycle",
   "capabilities": [

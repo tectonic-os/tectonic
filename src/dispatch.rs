@@ -309,6 +309,31 @@ fn open(here: &Context) -> Result<Option<PathBuf>, Error> {
     Ok((!refused).then_some(root))
 }
 
+/// `import module` and `copy module`: the same collection, the same questions
+/// and the same offers, differing only in where the members land.
+fn module_from_collection(
+    name: Option<String>,
+    root: &std::path::Path,
+    list: &crate::model::image::List,
+    images: Vec<String>,
+    datastream: Option<&std::path::Path>,
+    place: crate::import::Place,
+    prompt: &Prompt,
+) -> Result<(), Error> {
+    crate::import::Module::collect(
+        name,
+        root,
+        &list.sources,
+        list.audit_enforce,
+        images,
+        datastream,
+        place,
+        prompt,
+    )?
+    .apply(root, &list.sources)?;
+    Ok(())
+}
+
 fn collection_repo(here: &Context) -> Result<Option<(PathBuf, crate::model::image::List)>, Error> {
     let root = repo_root(here)?;
     let (list, issues, context) = crate::declarations(&root);
@@ -439,16 +464,15 @@ pub fn dispatch(
             let Some((root, list)) = collection_repo(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
-            crate::import::Module::collect(
+            module_from_collection(
                 name,
                 &root,
-                &list.sources,
-                list.audit_enforce,
+                &list,
                 images,
                 datastream.as_deref(),
+                crate::import::Place::Reference,
                 prompt,
-            )?
-            .apply(&root)?;
+            )?;
             Ok(ExitCode::SUCCESS)
         }
         Verb::CopyModule => {
@@ -456,15 +480,15 @@ pub fn dispatch(
             let Some((root, list)) = collection_repo(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
-            crate::import::Copy::collect(
+            module_from_collection(
                 name,
                 &root,
-                &list.sources,
-                list.audit_enforce,
+                &list,
                 images,
+                datastream.as_deref(),
+                crate::import::Place::Vendored,
                 prompt,
-            )?
-            .apply(&root, &list.sources)?;
+            )?;
             Ok(ExitCode::SUCCESS)
         }
         Verb::SetWorkflows => {
@@ -854,7 +878,27 @@ fn reading(
         return Ok(ExitCode::from(REPO_ERROR));
     }
     if command == Command::Generate {
+        // Read before the write, which is what makes every one of them exist:
+        // a file already there is one this run took further, not a new one.
+        let wrote: Vec<(PathBuf, crate::create::Change)> = run
+            .files
+            .iter()
+            .map(|(path, _)| {
+                let change = match root.join(path).exists() {
+                    true => crate::create::Change::Updated(String::new()),
+                    false => crate::create::Change::Created,
+                };
+                (path.clone(), change)
+            })
+            .collect();
         crate::write_generated(&root, &run.files)?;
+        if prompt.draws() {
+            // The same tree every writing command draws. The flat list of
+            // paths stays on stdout for a pipe, which is the only reader a
+            // tree would be worse for.
+            crate::create::report(&root, &wrote);
+            run.stdout.clear();
+        }
     }
     // A terminal gets the read-out and nothing else, and only while it is wide
     // enough that no table folds a word mid-way; a pipe, a redirect, `--no-tui`

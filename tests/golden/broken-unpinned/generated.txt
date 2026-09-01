@@ -10,7 +10,7 @@
 ==== scripts/render-iso-config.sh
 ==== scripts/tect.sh
 ==== scripts/vm.sh
-==== generated/broken-unpinned.d/finalize.sh
+==== generated/broken-unpinned/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -126,7 +126,7 @@ for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
         rm -f "$path"
     fi
 done
-==== generated/broken-unpinned.graph.md
+==== generated/broken-unpinned/graph.md
 # Broken Unpinned capability graph
 
 GENERATED FILE, do not edit.
@@ -145,7 +145,7 @@ graph LR
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
 | `rechunking` | capability | `base` |  |  |
-==== generated/broken-unpinned.graph.json
+==== generated/broken-unpinned/graph.json
 {
   "image": "broken-unpinned",
   "capabilities": [

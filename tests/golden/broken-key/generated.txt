@@ -10,7 +10,7 @@
 ==== scripts/render-iso-config.sh
 ==== scripts/tect.sh
 ==== scripts/vm.sh
-==== generated/broken-key.d/core/keys.sh
+==== generated/broken-key/modules/core/keys.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -19,7 +19,7 @@ MODDIR=/ctx/modules/core/keys
 export MODDIR
 
 install -D -m 0644 -- '/ctx/keys/usr/share/secureboot/sb_cert.der' '/usr/share/secureboot/sb_cert.der'
-==== generated/broken-key.d/finalize.sh
+==== generated/broken-key/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -135,7 +135,7 @@ for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
         rm -f "$path"
     fi
 done
-==== generated/broken-key.graph.md
+==== generated/broken-key/graph.md
 # Broken Key capability graph
 
 GENERATED FILE, do not edit.
@@ -156,7 +156,7 @@ graph LR
 |---|---|---|---|---|
 | `/usr/share/secureboot/sb_cert.der` | file | `core/keys` |  |  |
 | `rechunking` | capability | `base` |  |  |
-==== generated/broken-key.graph.json
+==== generated/broken-key/graph.json
 {
   "image": "broken-key",
   "capabilities": [

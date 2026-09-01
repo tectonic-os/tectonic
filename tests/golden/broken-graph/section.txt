@@ -11,7 +11,7 @@ RUN --mount=type=bind,from=ctx,source=/modules/core/one,target=/ctx/modules/core
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib,rw \
     --mount=type=bind,from=ctx,source=/modules/core/one/lib/one/shared.sh,target=/ctx/lib/shared.sh \
     --mount=type=bind,from=ctx,source=/modules/core/two/lib/two/shared.sh,target=/ctx/lib/shared.sh \
-    --mount=type=bind,from=ctx,source=/generated/broken-graph.d/core/one.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-graph/modules/core/one.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
@@ -23,7 +23,7 @@ RUN --mount=type=bind,from=ctx,source=/modules/core/two,target=/ctx/modules/core
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib,rw \
     --mount=type=bind,from=ctx,source=/modules/core/one/lib/one/shared.sh,target=/ctx/lib/shared.sh \
     --mount=type=bind,from=ctx,source=/modules/core/two/lib/two/shared.sh,target=/ctx/lib/shared.sh \
-    --mount=type=bind,from=ctx,source=/generated/broken-graph.d/core/two.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-graph/modules/core/two.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
@@ -35,7 +35,7 @@ RUN --mount=type=bind,from=ctx,source=/modules/core/three,target=/ctx/modules/co
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib,rw \
     --mount=type=bind,from=ctx,source=/modules/core/one/lib/one/shared.sh,target=/ctx/lib/shared.sh \
     --mount=type=bind,from=ctx,source=/modules/core/two/lib/two/shared.sh,target=/ctx/lib/shared.sh \
-    --mount=type=bind,from=ctx,source=/generated/broken-graph.d/core/three.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-graph/modules/core/three.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
@@ -61,7 +61,7 @@ RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     IMAGE_VERSION="${IMAGE_VERSION}" IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" /ctx/tect os-release
 
 # ---- finalize ----
-RUN --mount=type=bind,from=ctx,source=/generated/broken-graph.d/finalize.sh,target=/ctx/finalize.sh \
+RUN --mount=type=bind,from=ctx,source=/generated/broken-graph/finalize.sh,target=/ctx/finalize.sh \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \

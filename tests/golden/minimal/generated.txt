@@ -10,14 +10,14 @@
 ==== scripts/render-iso-config.sh
 ==== scripts/tect.sh
 ==== scripts/vm.sh
-==== generated/minimal.d/fedora-family.sh
+==== generated/minimal/modules/fedora-family.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/fedora-family
 export MODDIR
-==== generated/minimal.d/core/hello.sh
+==== generated/minimal/modules/core/hello.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -41,7 +41,7 @@ TECT_ENABLE_REPO='updates-testing' install_packages 'fastfetch'
 TECT_ENABLE_REPO='copr:copr.fedorainfracloud.org:example:tools' install_packages 'example-tool'
 
 install_groups 'core'
-==== generated/minimal.d/finalize.sh
+==== generated/minimal/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -157,7 +157,7 @@ for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
         rm -f "$path"
     fi
 done
-==== generated/minimal.graph.md
+==== generated/minimal/graph.md
 # Minimal capability graph
 
 GENERATED FILE, do not edit.
@@ -179,7 +179,7 @@ graph LR
 |---|---|---|---|---|
 | `build-environment` | capability | `fedora-family` |  |  |
 | `rechunking` | capability | `base` |  |  |
-==== generated/minimal.graph.json
+==== generated/minimal/graph.json
 {
   "image": "minimal",
   "capabilities": [

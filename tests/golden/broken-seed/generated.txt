@@ -10,21 +10,21 @@
 ==== scripts/render-iso-config.sh
 ==== scripts/tect.sh
 ==== scripts/vm.sh
-==== generated/example.d/core/hello.sh
+==== generated/example/modules/core/hello.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/core/hello
 export MODDIR
-==== generated/example.d/steam-tweaks.sh
+==== generated/example/modules/steam-tweaks.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/.remote/steam-tweaks
 export MODDIR
-==== generated/example.d/finalize.sh
+==== generated/example/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -140,7 +140,7 @@ for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
         rm -f "$path"
     fi
 done
-==== generated/example.graph.md
+==== generated/example/graph.md
 # Example capability graph
 
 GENERATED FILE, do not edit.
@@ -155,7 +155,7 @@ graph LR
     m0["core/hello"]
     m1["steam-tweaks"]
 ```
-==== generated/example.graph.json
+==== generated/example/graph.json
 {
   "image": "example",
   "capabilities": [],

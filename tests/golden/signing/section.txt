@@ -13,7 +13,7 @@ RUN mv /opt /opt.bak && mkdir /opt
 # ---- kernel/signed-kernel ----
 RUN --mount=type=bind,from=ctx,source=/modules/kernel/signed-kernel,target=/ctx/modules/kernel/signed-kernel \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
-    --mount=type=bind,from=ctx,source=/generated/signing.d/kernel/signed-kernel.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/generated/signing/modules/kernel/signed-kernel.sh,target=/ctx/module.sh \
     --mount=type=bind,from=public-keys,source=/public,target=/ctx/keys \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
@@ -25,7 +25,7 @@ RUN --mount=type=bind,from=ctx,source=/modules/kernel/signed-kernel,target=/ctx/
 # ---- drivers/kvmfr ----
 RUN --mount=type=bind,from=ctx,source=/modules/drivers/kvmfr,target=/ctx/modules/drivers/kvmfr \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
-    --mount=type=bind,from=ctx,source=/generated/signing.d/drivers/kvmfr.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/generated/signing/modules/drivers/kvmfr.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
@@ -52,7 +52,7 @@ RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     IMAGE_VERSION="${IMAGE_VERSION}" IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" /ctx/tect os-release
 
 # ---- finalize ----
-RUN --mount=type=bind,from=ctx,source=/generated/signing.d/finalize.sh,target=/ctx/finalize.sh \
+RUN --mount=type=bind,from=ctx,source=/generated/signing/finalize.sh,target=/ctx/finalize.sh \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \

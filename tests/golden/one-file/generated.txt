@@ -10,14 +10,14 @@
 ==== scripts/render-iso-config.sh
 ==== scripts/tect.sh
 ==== scripts/vm.sh
-==== generated/alpha.d/fedora-family.sh
+==== generated/alpha/modules/fedora-family.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/fedora-family
 export MODDIR
-==== generated/alpha.d/core/hello.sh
+==== generated/alpha/modules/core/hello.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -28,7 +28,7 @@ export MODDIR
 source /ctx/lib/family.sh
 
 install_packages 'fastfetch'
-==== generated/alpha.d/finalize.sh
+==== generated/alpha/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -144,7 +144,7 @@ for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
         rm -f "$path"
     fi
 done
-==== generated/alpha.graph.md
+==== generated/alpha/graph.md
 # Alpha capability graph
 
 GENERATED FILE, do not edit.
@@ -166,7 +166,7 @@ graph LR
 |---|---|---|---|---|
 | `build-environment` | capability | `fedora-family` |  |  |
 | `rechunking` | capability | `base` |  |  |
-==== generated/alpha.graph.json
+==== generated/alpha/graph.json
 {
   "image": "alpha",
   "capabilities": [
@@ -190,14 +190,14 @@ graph LR
   "overrides": [],
   "suppressed": []
 }
-==== generated/beta.d/fedora-family.sh
+==== generated/beta/modules/fedora-family.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/fedora-family
 export MODDIR
-==== generated/beta.d/core/hello.sh
+==== generated/beta/modules/core/hello.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -208,7 +208,7 @@ export MODDIR
 source /ctx/lib/family.sh
 
 install_packages 'fastfetch'
-==== generated/beta.d/finalize.sh
+==== generated/beta/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -324,7 +324,7 @@ for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
         rm -f "$path"
     fi
 done
-==== generated/beta.graph.md
+==== generated/beta/graph.md
 # Beta capability graph
 
 GENERATED FILE, do not edit.
@@ -346,7 +346,7 @@ graph LR
 |---|---|---|---|---|
 | `build-environment` | capability | `fedora-family` |  |  |
 | `rechunking` | capability | `base` |  |  |
-==== generated/beta.graph.json
+==== generated/beta/graph.json
 {
   "image": "beta",
   "capabilities": [

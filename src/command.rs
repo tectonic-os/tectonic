@@ -233,7 +233,7 @@ pub const COMMANDS: &[Spec] = &[
         about: "copy a collection module into this repository",
         family: Family::Repo,
         host: false,
-        takes: &["root", "image"],
+        takes: &["root", "image", "datastream"],
     },
     Spec {
         verb: Verb::CreateKey,

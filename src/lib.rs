@@ -278,7 +278,9 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
     if matches!(command, Command::Generate | Command::Verify) {
         files.extend(emit::LIBRARIES.iter().map(|(name, body)| {
             (
-                PathBuf::from(layout::GENERATED).join("lib").join(name),
+                PathBuf::from(layout::GENERATED)
+                    .join(layout::LIB)
+                    .join(name),
                 (*body).to_string(),
             )
         }));

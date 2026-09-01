@@ -10,14 +10,14 @@
 ==== scripts/render-iso-config.sh
 ==== scripts/tect.sh
 ==== scripts/vm.sh
-==== generated/debian.d/debian-family.sh
+==== generated/debian/modules/debian-family.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/debian-family
 export MODDIR
-==== generated/debian.d/core/shared.sh
+==== generated/debian/modules/core/shared.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -28,7 +28,7 @@ export MODDIR
 source /ctx/lib/family.sh
 
 install_packages 'curl' 'git'
-==== generated/debian.d/finalize.sh
+==== generated/debian/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -144,7 +144,7 @@ for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
         rm -f "$path"
     fi
 done
-==== generated/debian.graph.md
+==== generated/debian/graph.md
 # Debian capability graph
 
 GENERATED FILE, do not edit.
@@ -165,7 +165,7 @@ graph LR
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
 | `build-environment` | capability | `debian-family` |  |  |
-==== generated/debian.graph.json
+==== generated/debian/graph.json
 {
   "image": "debian",
   "capabilities": [
@@ -181,21 +181,21 @@ graph LR
   "overrides": [],
   "suppressed": []
 }
-==== generated/forky.d/debian-family.sh
+==== generated/forky/modules/debian-family.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/debian-family
 export MODDIR
-==== generated/forky.d/core/bootc-base.sh
+==== generated/forky/modules/core/bootc-base.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/core/bootc-base
 export MODDIR
-==== generated/forky.d/core/confined.sh
+==== generated/forky/modules/core/confined.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -205,7 +205,7 @@ export MODDIR
 
 source /ctx/lib/apparmor-helpers.sh
 install_apparmor_profile /ctx/modules/core/confined/apparmor/usr.bin.confined
-==== generated/forky.d/core/shared.sh
+==== generated/forky/modules/core/shared.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -216,7 +216,7 @@ export MODDIR
 source /ctx/lib/family.sh
 
 install_packages 'curl' 'git'
-==== generated/forky.d/finalize.sh
+==== generated/forky/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -332,7 +332,7 @@ for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
         rm -f "$path"
     fi
 done
-==== generated/forky.graph.md
+==== generated/forky/graph.md
 # Forky capability graph
 
 GENERATED FILE, do not edit.
@@ -357,7 +357,7 @@ graph LR
 | `apparmor-policy` | capability | `core/bootc-base` |  |  |
 | `bootc-base` | capability | `core/bootc-base` |  |  |
 | `build-environment` | capability | `debian-family` |  |  |
-==== generated/forky.graph.json
+==== generated/forky/graph.json
 {
   "image": "forky",
   "capabilities": [
@@ -389,14 +389,14 @@ graph LR
   "overrides": [],
   "suppressed": []
 }
-==== generated/ubuntu.d/debian-family.sh
+==== generated/ubuntu/modules/debian-family.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/debian-family
 export MODDIR
-==== generated/ubuntu.d/core/shared.sh
+==== generated/ubuntu/modules/core/shared.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -407,7 +407,7 @@ export MODDIR
 source /ctx/lib/family.sh
 
 install_packages 'curl' 'vim'
-==== generated/ubuntu.d/finalize.sh
+==== generated/ubuntu/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -523,7 +523,7 @@ for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
         rm -f "$path"
     fi
 done
-==== generated/ubuntu.graph.md
+==== generated/ubuntu/graph.md
 # Ubuntu capability graph
 
 GENERATED FILE, do not edit.
@@ -544,7 +544,7 @@ graph LR
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
 | `build-environment` | capability | `debian-family` |  |  |
-==== generated/ubuntu.graph.json
+==== generated/ubuntu/graph.json
 {
   "image": "ubuntu",
   "capabilities": [

@@ -303,6 +303,19 @@ impl Image {
                     .help("it becomes an image tag, a cache tag and the default hostname, all of which restrict it"),
             );
         }
+        // `generated/<id>/` is a sibling of the one directory the repository
+        // shares between images, so an image called `lib` writes its
+        // Containerfile and its scripts into the helper library every module
+        // build mounts at `/ctx/lib`. Nothing overwrites anything today, which
+        // is why this has to be said rather than discovered.
+        if self.id == crate::layout::LIB {
+            issues.push(
+                Issue::new(format!("`{}` is not available as an image name", self.id), src)
+                    .at(self.span, "generated/lib/ is the shared helper library")
+                    .help("declare `id \"something\"`: everything else this image generates lands in generated/<id>/, which would be that directory"),
+            );
+            self.id = String::new();
+        }
     }
 
     fn parse_flavours(&mut self, block: &KdlNode, issues: &mut Issues) {
