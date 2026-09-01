@@ -34,11 +34,8 @@ Desktop
   3) ghcr.io/ublue-os/aurora:stable  KDE developer workstation over kinoite-main
   4) ghcr.io/ublue-os/bluefin:stable  GNOME developer workstation over silverblue-main
   5) ghcr.io/ublue-os/kinoite-main:44  Fedora Kinoite with the ublue additions, what bazzite builds on
-  6) ghcr.io/bootcrew/debian-bootc:latest  Experimental Debian bootc base from Bootcrew
-  7) ghcr.io/bootcrew/ubuntu-bootc:latest  Experimental Ubuntu bootc base from Bootcrew
-  8) ghcr.io/jmarrero/ubuntu-bootc:latest  Experimental Ubuntu 26.04 bootc base with cloud-init
-  9) docker.io/library/debian:trixie  Debian 13, which a module set has to turn into a bootc image
-What is the base image for this image? [1-9, 0 for none]: 1
+  6) docker.io/library/debian:forky  Debian 14, which a module set has to turn into a bootc image
+What is the base image for this image? [1-6, 0 for none]: 1
 
   1) [x] build  builds, scans, signs and publishes every image
   2) [x] build-disk  builds a disk image and an installer iso

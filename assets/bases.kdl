@@ -37,34 +37,17 @@ base "ghcr.io/ublue-os/kinoite-main:44" {
     signed #true
 }
 
-// Bootcrew images - bootc implemented for non-RHEL based images. Neither ships
-// rpm-ostree, and there are no rpm packages to chunk by, so neither rechunks.
-base "ghcr.io/bootcrew/debian-bootc:latest" {
-    about "Experimental Debian bootc base from Bootcrew"
-    family "debian"
-    provides "initramfs-generation" "apparmor-policy"
-    signed #true
-}
-
-base "ghcr.io/bootcrew/ubuntu-bootc:latest" {
-    about "Experimental Ubuntu bootc base from Bootcrew"
-    family "ubuntu"
-    provides "initramfs-generation"
-    signed #true
-}
-
-base "ghcr.io/jmarrero/ubuntu-bootc:latest" {
-    about "Experimental Ubuntu 26.04 bootc base with cloud-init"
-    family "ubuntu"
-    provides "initramfs-generation"
-    signed #false
-}
-
-// A container base, not a bootc image: it carries no kernel, no dracut, no
+// Debian, which is not a bootc image: it carries no kernel, no dracut, no
 // bootc and no AppArmor userspace, so a module set has to make it bootable
 // before anything else in an image on it means anything.
-base "docker.io/library/debian:trixie" {
-    about "Debian 13, which a module set has to turn into a bootc image"
+//
+// forky and not trixie, measured 2026-09-01. `--composefs-backend` is what
+// reaches a bootloader on a base with no `bootupd`, Debian packages no
+// `bootupd`, and every bootc carrying that flag needs libostree >= 2025.3.
+// trixie ships 2025.2, with nothing newer in backports or proposed-updates.
+// forky carries 2026.4 and becomes Debian 14.
+base "docker.io/library/debian:forky" {
+    about "Debian 14, which a module set has to turn into a bootc image"
     family "debian"
     requires "bootc-base"
     signed #false

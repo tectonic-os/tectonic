@@ -90,10 +90,7 @@ fn public_catalog_lists_every_shipped_base_in_order() {
             "ghcr.io/ublue-os/aurora:stable",
             "ghcr.io/ublue-os/bluefin:stable",
             "ghcr.io/ublue-os/kinoite-main:44",
-            "ghcr.io/bootcrew/debian-bootc:latest",
-            "ghcr.io/bootcrew/ubuntu-bootc:latest",
-            "ghcr.io/jmarrero/ubuntu-bootc:latest",
-            "docker.io/library/debian:trixie",
+            "docker.io/library/debian:forky",
         ]
     );
 }
@@ -130,31 +127,19 @@ fn missing_runtime_file_falls_back_to_embedded_catalog() {
     let mut issues = Issues::default();
     let (bases, shadows) = tect::base::catalog(Path::new("."), &[], &mut issues);
 
-    // Then: the embedded nine rows are selected.
+    // Then: the embedded six rows are selected.
     assert!(issues.is_empty(), "{}", issues.plain());
     assert!(shadows.is_empty());
-    assert_eq!(bases.len(), 9);
-    assert_eq!(bases[5].image, "ghcr.io/bootcrew/debian-bootc:latest");
+    assert_eq!(bases.len(), 6);
+    // The one row nothing can be built on until a module set says otherwise,
+    // and the only one outside the Fedora family: every published deb bootc
+    // base carries an empty package database, so an image on one reports its
+    // whole base as clean rather than refusing.
+    assert_eq!(bases[5].image, "docker.io/library/debian:forky");
     assert_eq!(bases[5].family, "debian");
-    assert_eq!(
-        bases[5].provides,
-        ["initramfs-generation", "apparmor-policy"]
-    );
-    assert!(bases[5].requires.is_empty());
-    assert!(bases[5].signed);
-    assert_eq!(bases[6].image, "ghcr.io/bootcrew/ubuntu-bootc:latest");
-    assert_eq!(bases[6].family, "ubuntu");
-    assert!(bases[6].signed);
-    assert_eq!(bases[7].image, "ghcr.io/jmarrero/ubuntu-bootc:latest");
-    assert_eq!(bases[7].family, "ubuntu");
-    assert_eq!(bases[7].provides, ["initramfs-generation"]);
-    assert!(!bases[7].signed);
-    // The one row nothing can be built on until a module set says otherwise.
-    assert_eq!(bases[8].image, "docker.io/library/debian:trixie");
-    assert_eq!(bases[8].family, "debian");
-    assert!(bases[8].provides.is_empty());
-    assert_eq!(bases[8].requires, ["bootc-base"]);
-    assert!(!bases[8].signed);
+    assert!(bases[5].provides.is_empty());
+    assert_eq!(bases[5].requires, ["bootc-base"]);
+    assert!(!bases[5].signed);
 }
 
 #[test]
@@ -255,7 +240,7 @@ fn collection_still_overrides_and_shadows_selected_catalog() {
 
     // Then: order is retained, the row is replaced, and the shadow is reported.
     assert!(issues.is_empty(), "{}", issues.plain());
-    assert_eq!(bases.len(), 9);
+    assert_eq!(bases.len(), 6);
     assert_eq!(bases[0].about, "collection replacement");
     assert!(bases[0].signed);
     assert_eq!(shadows.len(), 1);

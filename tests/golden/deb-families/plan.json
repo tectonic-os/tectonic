@@ -29,12 +29,10 @@
       "logo_url": "",
       "conforms": "",
       "base": {
-        "image": "ghcr.io/bootcrew/debian-bootc:latest",
+        "image": "docker.io/library/debian:forky",
         "family": "debian",
-        "signed": true,
-        "provides": [
-          "initramfs-generation"
-        ],
+        "signed": false,
+        "provides": [],
         "provides_files": [],
         "requires": []
       },
@@ -119,10 +117,10 @@
       ]
     },
     {
-      "id": "trixie",
-      "name": "Trixie",
+      "id": "forky",
+      "name": "Forky",
       "pretty_name": "",
-      "file": "./trixie.image.kdl",
+      "file": "./forky.image.kdl",
       "url": "",
       "issues_url": "",
       "description": "",
@@ -130,7 +128,7 @@
       "logo_url": "",
       "conforms": "",
       "base": {
-        "image": "docker.io/library/debian:trixie",
+        "image": "docker.io/library/debian:forky",
         "family": "debian",
         "signed": false,
         "provides": [],
@@ -143,10 +141,10 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "trixie",
-          "image": "trixie",
+          "name": "forky",
+          "image": "forky",
           "flavour": null,
-          "published": "trixie",
+          "published": "forky",
           "conforms": "",
           "default": false,
           "pr": false,
@@ -276,12 +274,10 @@
       "logo_url": "",
       "conforms": "",
       "base": {
-        "image": "ghcr.io/bootcrew/ubuntu-bootc:latest",
+        "image": "docker.io/library/ubuntu:26.04",
         "family": "ubuntu",
-        "signed": true,
-        "provides": [
-          "initramfs-generation"
-        ],
+        "signed": false,
+        "provides": [],
         "provides_files": [],
         "requires": []
       },

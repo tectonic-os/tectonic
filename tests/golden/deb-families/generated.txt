@@ -155,7 +155,7 @@ right.
 
 ```mermaid
 graph LR
-    base["ghcr.io/bootcrew/debian-bootc:latest"]
+    base["docker.io/library/debian:forky"]
     m0["debian-family"]
     m1["core/shared"]
 ```
@@ -165,7 +165,6 @@ graph LR
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
 | `build-environment` | capability | `debian-family` |  |  |
-| `initramfs-generation` | capability | `base` |  |  |
 ==== generated/debian.graph.json
 {
   "image": "debian",
@@ -177,34 +176,26 @@ graph LR
       "provider": "debian-family",
       "required_by": [],
       "after": []
-    },
-    {
-      "name": "initramfs-generation",
-      "kind": "capability",
-      "build_only": false,
-      "provider": "base",
-      "required_by": [],
-      "after": []
     }
   ],
   "overrides": [],
   "suppressed": []
 }
-==== generated/trixie.d/debian-family.sh
+==== generated/forky.d/debian-family.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/debian-family
 export MODDIR
-==== generated/trixie.d/core/bootc-base.sh
+==== generated/forky.d/core/bootc-base.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
 MODDIR=/ctx/modules/core/bootc-base
 export MODDIR
-==== generated/trixie.d/core/confined.sh
+==== generated/forky.d/core/confined.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -214,7 +205,7 @@ export MODDIR
 
 source /ctx/lib/apparmor-helpers.sh
 install_apparmor_profile /ctx/modules/core/confined/apparmor/usr.bin.confined
-==== generated/trixie.d/core/shared.sh
+==== generated/forky.d/core/shared.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -225,7 +216,7 @@ export MODDIR
 source /ctx/lib/family.sh
 
 install_packages 'curl' 'git'
-==== generated/trixie.d/finalize.sh
+==== generated/forky.d/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
@@ -341,8 +332,8 @@ for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
         rm -f "$path"
     fi
 done
-==== generated/trixie.graph.md
-# Trixie capability graph
+==== generated/forky.graph.md
+# Forky capability graph
 
 GENERATED FILE, do not edit.
 
@@ -352,7 +343,7 @@ right.
 
 ```mermaid
 graph LR
-    base["docker.io/library/debian:trixie"]
+    base["docker.io/library/debian:forky"]
     m0["debian-family"]
     m1["core/bootc-base"]
     m2["core/confined"]
@@ -366,9 +357,9 @@ graph LR
 | `apparmor-policy` | capability | `core/bootc-base` |  |  |
 | `bootc-base` | capability | `core/bootc-base` |  |  |
 | `build-environment` | capability | `debian-family` |  |  |
-==== generated/trixie.graph.json
+==== generated/forky.graph.json
 {
-  "image": "trixie",
+  "image": "forky",
   "capabilities": [
     {
       "name": "apparmor-policy",
@@ -543,7 +534,7 @@ right.
 
 ```mermaid
 graph LR
-    base["ghcr.io/bootcrew/ubuntu-bootc:latest"]
+    base["docker.io/library/ubuntu:26.04"]
     m0["debian-family"]
     m1["core/shared"]
 ```
@@ -553,7 +544,6 @@ graph LR
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
 | `build-environment` | capability | `debian-family` |  |  |
-| `initramfs-generation` | capability | `base` |  |  |
 ==== generated/ubuntu.graph.json
 {
   "image": "ubuntu",
@@ -563,14 +553,6 @@ graph LR
       "kind": "capability",
       "build_only": false,
       "provider": "debian-family",
-      "required_by": [],
-      "after": []
-    },
-    {
-      "name": "initramfs-generation",
-      "kind": "capability",
-      "build_only": false,
-      "provider": "base",
       "required_by": [],
       "after": []
     }

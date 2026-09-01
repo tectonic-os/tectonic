@@ -1,7 +1,7 @@
 image {
-    name "Trixie"
+    name "Forky"
 
-    base "docker.io/library/debian:trixie" {
+    base "docker.io/library/debian:forky" {
         family "debian"
         requires "bootc-base"
     }

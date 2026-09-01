@@ -1,10 +1,8 @@
 image {
     name "Ubuntu"
 
-    base "ghcr.io/bootcrew/ubuntu-bootc:latest" {
+    base "docker.io/library/ubuntu:26.04" {
         family "ubuntu"
-        provides "initramfs-generation"
-        signed #true
     }
 
     modules {
