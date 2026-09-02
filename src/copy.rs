@@ -94,6 +94,7 @@ pub fn claimed_rules(named: &str) -> String {
 
 pub const WHICH_KEY: &str = "Which key?";
 pub const KEY_CN: &str = "common name, which is what the enrolment prompt shows";
+pub const KEY_FROM: &str = "path to the public half you already hold";
 
 /// Which module's, where more than one declares the kind. The modules are the
 /// rows below, so the question does not list them.

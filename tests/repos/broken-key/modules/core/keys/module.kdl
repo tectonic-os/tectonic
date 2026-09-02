@@ -3,7 +3,7 @@ description "Every way a key declaration can be wrong"
 supports "fedora"
 
 key "cosign" when="published" {
-    generator "ssh-keygen"
+    generator "gpg"
     public "etc/pki/containers/cosign.pub" format="jwk"
     private "keys/cosign.key"
 }

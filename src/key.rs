@@ -1,6 +1,10 @@
-//! `create key <kind>`. Which key exists, where each half of it goes and what
-//! generates it come out of the module declaring it; the generators, and the
-//! text that follows one, are the tool's.
+//! `create key <kind>` and `set key <kind>`. Which key exists, where each half
+//! of it goes and what generates it come out of the module declaring it; the
+//! generators, and the text that follows one, are the tool's.
+//!
+//! The two verbs differ in one thing and share everything else. `create`
+//! invents a key and writes both halves; `set` records a public half the
+//! person already holds, which is the only half a repository ever commits.
 
 use crate::copy;
 use crate::layout;
@@ -23,6 +27,29 @@ pub struct Key {
     cn: Option<String>,
 }
 
+/// The declaration both verbs work off: which kind, and which module's, asked
+/// where the command named neither.
+fn declared(
+    command: &str,
+    root: &Path,
+    kind: Option<String>,
+    module: Option<String>,
+    prompt: &Prompt,
+) -> Result<Declared, String> {
+    let mut disk = Disk::scan(root);
+    let kind = match kind {
+        Some(kind) => kind,
+        None => which(command, &disk, prompt)?,
+    };
+
+    let mut declaring = disk.keys.remove(&kind).unwrap_or_default();
+    if declaring.is_empty() {
+        return Err(absent(root, &kind, &disk));
+    }
+    let at = provider(&declaring, &kind, module, prompt)?;
+    Ok(declaring.swap_remove(at).1)
+}
+
 impl Key {
     pub fn collect(
         root: &Path,
@@ -31,18 +58,8 @@ impl Key {
         cn: Option<String>,
         prompt: &Prompt,
     ) -> Result<Self, String> {
-        let mut disk = Disk::scan(root);
-        let kind = match kind {
-            Some(kind) => kind,
-            None => which(&disk, prompt)?,
-        };
-
-        let mut declaring = disk.keys.remove(&kind).unwrap_or_default();
-        if declaring.is_empty() {
-            return Err(absent(root, &kind, &disk));
-        }
-        let at = provider(&declaring, &kind, module, prompt)?;
-        let (_, declared) = declaring.swap_remove(at);
+        let declared = declared("create key", root, kind, module, prompt)?;
+        let kind = declared.kind.clone();
 
         let public = layout::public_key(root, &declared.public);
         let private = layout::private_key(root, &declared.private);
@@ -51,13 +68,12 @@ impl Key {
 
         // The openssl generator is set up by its profile, and there is one.
         let cn = match (declared.generator.as_str(), declared.profile.as_deref()) {
-            ("cosign", _) if cn.is_some() => {
-                return Err(
-                    "`--cn` is a certificate's common name, and `cosign` writes no certificate"
-                        .into(),
-                )
+            (generator @ ("cosign" | "ssh-keygen"), _) if cn.is_some() => {
+                return Err(format!(
+                    "`--cn` is a certificate's common name, and `{generator}` writes no certificate"
+                ))
             }
-            ("cosign", _) => None,
+            ("cosign" | "ssh-keygen", _) => None,
             ("openssl", Some("module-signing")) => Some(common_name(root, cn, prompt)?),
             (generator, _) => {
                 return Err(format!(
@@ -79,6 +95,7 @@ impl Key {
         let work = workspace(&self.declared.kind)?;
         let (public, private) = match self.declared.generator.as_str() {
             "cosign" => cosign(&work),
+            "ssh-keygen" => ssh(&work, &self.declared.kind),
             _ => openssl(
                 &work,
                 &self.declared,
@@ -103,6 +120,13 @@ impl Key {
         let public = shown(root, &self.public);
         let private = shown(root, &self.private);
         match self.declared.generator.as_str() {
+            "ssh-keygen" => format!(
+                "\nthe private half is yours and is not the repository's: nothing in a build \
+                 reads it,\nand the public half is what the image ships.\n\n\
+                 next:\n\
+                 \x20 commit {public}\n\
+                 \x20 ssh -i {private} into a machine built from this image\n"
+            ),
             "cosign" => format!(
                 "\nthe key carries no password, which is what the build workflow decrypts it with.\n\n\
                  next:\n\
@@ -125,8 +149,89 @@ impl Key {
     }
 }
 
+/// A public half the person already holds, recorded where the module says it
+/// goes. Only that half: a cosign key signs in CI, a MOK signs a kernel module
+/// and an authorized key logs a person in, and none of the three wants its
+/// private half copied into a repository.
+pub struct Recorded {
+    from: PathBuf,
+    public: PathBuf,
+}
+
+impl Recorded {
+    pub fn collect(
+        root: &Path,
+        kind: Option<String>,
+        module: Option<String>,
+        from: Option<String>,
+        prompt: &Prompt,
+    ) -> Result<Self, String> {
+        let declared = declared("set key", root, kind, module, prompt)?;
+        // Before the path is asked for, so a key that is already there is said
+        // so rather than after a person has typed one out.
+        let public = layout::public_key(root, &declared.public);
+        unwritten(&public)?;
+        let from = PathBuf::from(prompt.text(from, copy::KEY_FROM, "`--from`", None)?);
+        let bytes = std::fs::read(&from).map_err(|err| format!("{}: {err}", from.display()))?;
+        holds(&declared, &bytes)?;
+        Ok(Self { from, public })
+    }
+
+    pub fn apply(&self, root: &Path) -> Result<(), String> {
+        install(&self.from, &self.public, 0o644)?;
+        let public = shown(root, &self.public);
+        println!("wrote {public}");
+        println!(
+            "\nthe private half stays where it is; nothing here reads it.\n\n\
+             next:\n\
+             \x20 commit {public}\n"
+        );
+        Ok(())
+    }
+}
+
+/// Whether a file is the public half the declaration describes. A key recorded
+/// in the wrong form is a build that fails a long way from here, so the shape
+/// is read now rather than trusted.
+fn holds(declared: &Declared, bytes: &[u8]) -> Result<(), String> {
+    let text = String::from_utf8_lossy(bytes);
+    let (ok, wanted) = match declared.generator.as_str() {
+        "cosign" => (
+            text.starts_with("-----BEGIN PUBLIC KEY-----"),
+            "a PEM public key".to_string(),
+        ),
+        "ssh-keygen" => (
+            text.split_whitespace().next().is_some_and(|kind| {
+                ["ssh-", "ecdsa-", "sk-"]
+                    .iter()
+                    .any(|p| kind.starts_with(p))
+            }),
+            "an OpenSSH public key line".to_string(),
+        ),
+        _ => match declared.format.as_str() {
+            // A DER certificate is an ASN.1 SEQUENCE, so it opens 0x30.
+            "der" => (
+                bytes.first() == Some(&0x30),
+                "a DER certificate".to_string(),
+            ),
+            format => (
+                text.starts_with("-----BEGIN CERTIFICATE-----"),
+                format!("a {} certificate", format.to_uppercase()),
+            ),
+        },
+    };
+    match ok {
+        true => Ok(()),
+        false => Err(format!(
+            "`key \"{}\"` is written by `{}`, so the public half it records is {wanted}, and this \
+             file is not one",
+            declared.kind, declared.generator
+        )),
+    }
+}
+
 /// Which key, where the command named none.
-fn which(disk: &Disk, prompt: &Prompt) -> Result<String, String> {
+fn which(command: &str, disk: &Disk, prompt: &Prompt) -> Result<String, String> {
     let kinds: Vec<&String> = disk.keys.keys().collect();
     if kinds.is_empty() {
         return Err(undeclared("", disk));
@@ -137,7 +242,7 @@ fn which(disk: &Disk, prompt: &Prompt) -> Result<String, String> {
         .map(|at| kinds[at].clone())
         .ok_or_else(|| {
             format!(
-                "`tect create key <kind>` names which key; this repository declares {}",
+                "`tect {command} <kind>` names which key; this repository declares {}",
                 listed(disk)
             )
         })
@@ -190,7 +295,10 @@ fn absent(root: &Path, kind: &str, disk: &Disk) -> String {
              You can add it with `tect import module {first}`",
             found.join(" or ")
         ),
-        None => undeclared(kind, disk),
+        None => match index.unsearched() {
+            said if said.is_empty() => undeclared(kind, disk),
+            said => format!("{}\n\n{said}", undeclared(kind, disk)),
+        },
     }
 }
 
@@ -250,6 +358,23 @@ fn cosign(work: &Path) -> Result<(PathBuf, PathBuf), String> {
         "get it from https://github.com/sigstore/cosign/releases",
     )?;
     Ok((work.join("cosign.pub"), work.join("cosign.key")))
+}
+
+/// The keypair a person logs in with. ed25519 rather than the declared `bits`,
+/// which is an RSA size and means nothing here: the curve is the only choice
+/// there is, and it is the one every current OpenSSH has.
+fn ssh(work: &Path, kind: &str) -> Result<(PathBuf, PathBuf), String> {
+    let private = work.join(kind);
+    let mut generate = Command::new("ssh-keygen");
+    generate
+        .args(["-t", "ed25519", "-N", "", "-C", kind, "-f"])
+        .arg(&private);
+    finish(
+        generate,
+        "ssh-keygen",
+        "install it from your platform's openssh package",
+    )?;
+    Ok((work.join(format!("{kind}.pub")), private))
 }
 
 /// A self-signed certificate and its key, at the declared size and in the
@@ -405,17 +530,31 @@ key "secureboot" {
 }
 "#;
 
+    const SSH: &str = r#"description "x"
+
+supports "debian"
+
+key "ssh" {
+    generator "ssh-keygen"
+    public "/usr/lib/tectonic/authorized_keys"
+    private "id_ed25519"
+}
+"#;
+
+    /// Whether the tool is installed, which is whether it starts at all.
+    /// `ssh-keygen` has no `version` subcommand — it prints usage and exits 1 —
+    /// so asking for a successful exit skipped the test on every machine.
     fn have(tool: &str) -> bool {
         Command::new(tool)
             .arg("version")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status()
-            .is_ok_and(|status| status.success())
+            .is_ok()
     }
 
     fn repo(name: &str, manifest: &str) -> PathBuf {
-        let root = std::env::temp_dir().join(name);
+        let root = std::env::temp_dir().join(format!("{name}.{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         crate::init::put(&root.join("modules/keyholder/module.kdl"), manifest).unwrap();
         root
@@ -502,6 +641,133 @@ key "secureboot" {
             root.join("keys/public/usr/share/secureboot/sb_cert.der")
         );
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// The third generator, and the half of item 6 `create` covers: a key the
+    /// tool makes for a person who has none.
+    #[test]
+    fn an_ssh_key_is_a_pair_openssh_reads() {
+        if !have("ssh-keygen") {
+            return;
+        }
+        let root = repo("tect-ssh-key-test", SSH);
+        // Before anything is written: `unwritten` is checked ahead of the
+        // generator's own questions, so this refusal is unreachable once the
+        // key exists.
+        let err = Key::collect(
+            &root,
+            Some("ssh".into()),
+            None,
+            Some("Nobody".into()),
+            &Prompt::silent(),
+        )
+        .map(|_| ())
+        .unwrap_err();
+        assert!(err.contains("`ssh-keygen` writes no certificate"), "{err}");
+
+        Key::collect(&root, Some("ssh".into()), None, None, &Prompt::silent())
+            .unwrap()
+            .apply(&root)
+            .unwrap();
+        let public = layout::public_key(&root, "/usr/lib/tectonic/authorized_keys");
+        let line = std::fs::read_to_string(&public).unwrap();
+        assert!(line.starts_with("ssh-ed25519 "), "{line}");
+        // The pair is a pair: the private half prints the public one back.
+        let out = Command::new("ssh-keygen")
+            .args(["-y", "-P", "", "-f"])
+            .arg(layout::private_key(&root, "id_ed25519"))
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        let derived = String::from_utf8_lossy(&out.stdout);
+        assert_eq!(
+            derived.split_whitespace().nth(1),
+            line.split_whitespace().nth(1)
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// `set key`: the destination comes out of the module's `public`
+    /// declaration, and a file in the wrong form is refused rather than
+    /// committed and discovered by a build.
+    #[test]
+    fn a_recorded_key_lands_where_the_module_says_and_is_read_before_it_does() {
+        let root = repo("tect-set-key-test", SSH);
+        let held = root.join("held.pub");
+        let record = |from: &Path| {
+            Recorded::collect(
+                &root,
+                Some("ssh".into()),
+                None,
+                Some(from.display().to_string()),
+                &Prompt::silent(),
+            )
+            .map(|_| ())
+        };
+
+        std::fs::write(&held, "-----BEGIN CERTIFICATE-----\n").unwrap();
+        let err = record(&held).unwrap_err();
+        assert!(err.contains("an OpenSSH public key line"), "{err}");
+
+        std::fs::write(&held, "ssh-ed25519 AAAAC3Nz nobody@example\n").unwrap();
+        Recorded::collect(
+            &root,
+            Some("ssh".into()),
+            None,
+            Some(held.display().to_string()),
+            &Prompt::silent(),
+        )
+        .unwrap()
+        .apply(&root)
+        .unwrap();
+        let public = layout::public_key(&root, "/usr/lib/tectonic/authorized_keys");
+        assert_eq!(
+            std::fs::read_to_string(&public).unwrap(),
+            "ssh-ed25519 AAAAC3Nz nobody@example\n"
+        );
+        // The one already there is never written over, either way in — and it
+        // is said before `--from` is asked for, so a person is not made to
+        // type a path first. Nothing passing `--from` can observe that order.
+        assert!(record(&held)
+            .unwrap_err()
+            .contains("a key is never overwritten"));
+        let unasked = Recorded::collect(&root, Some("ssh".into()), None, None, &Prompt::silent())
+            .map(|_| ())
+            .unwrap_err();
+        assert!(unasked.contains("a key is never overwritten"), "{unasked}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Every kind is covered, since the point of `set key` is that a person may
+    /// already hold any of them.
+    #[test]
+    fn what_a_recorded_public_half_has_to_look_like_is_per_generator() {
+        let declared = |generator: &str, format: &str| Declared {
+            kind: "k".into(),
+            generator: generator.into(),
+            profile: None,
+            bits: 4096,
+            public: "/k".into(),
+            format: format.into(),
+            private: "k".into(),
+            span: Default::default(),
+        };
+        let cosign = declared("cosign", "pem");
+        assert!(holds(&cosign, b"-----BEGIN PUBLIC KEY-----\n").is_ok());
+        assert!(holds(&cosign, b"-----BEGIN CERTIFICATE-----\n").is_err());
+
+        let pem = declared("openssl", "pem");
+        assert!(holds(&pem, b"-----BEGIN CERTIFICATE-----\n").is_ok());
+        assert!(holds(&pem, b"\x30\x82").is_err());
+
+        let der = declared("openssl", "der");
+        assert!(holds(&der, b"\x30\x82\x03\x01").is_ok());
+        assert!(holds(&der, b"-----BEGIN CERTIFICATE-----\n").is_err());
+
+        let ssh = declared("ssh-keygen", "pem");
+        assert!(holds(&ssh, b"ssh-ed25519 AAAA c\n").is_ok());
+        assert!(holds(&ssh, b"sk-ssh-ed25519@openssh.com AAAA c\n").is_ok());
+        assert!(holds(&ssh, b"not a key\n").is_err());
     }
 
     #[test]

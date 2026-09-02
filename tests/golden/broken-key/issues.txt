@@ -4,24 +4,24 @@
  5 | key "cosign" when="published" {
    :              ^^^^^^^^|^^^^^^^
    :                      `-- not part of the schema
- 6 |     generator "ssh-keygen"
+ 6 |     generator "gpg"
    `----
   help: a key carries its kind, and everything else as child nodes
 
-  x `ssh-keygen` is not a generator the tool has
+  x `gpg` is not a generator the tool has
    ,-[./modules/core/keys/module.kdl:6:5]
  5 | key "cosign" when="published" {
- 6 |     generator "ssh-keygen"
+ 6 |     generator "gpg"
    :     ^^^^|^^^^
    :         `-- not a generator
  7 |     public "etc/pki/containers/cosign.pub" format="jwk"
    `----
-  help: the generators are `cosign` and `openssl`; a manifest picks one of
-        them rather than naming a command of its own
+  help: the generators are `cosign`, `openssl` and `ssh-keygen`; a manifest
+        picks one of them rather than naming a command of its own
 
   x `format` must be "pem" or "der"
    ,-[./modules/core/keys/module.kdl:7:44]
- 6 |     generator "ssh-keygen"
+ 6 |     generator "gpg"
  7 |     public "etc/pki/containers/cosign.pub" format="jwk"
    :                                            ^^^^^^|^^^^^
    :                                                  `-- not a format
@@ -110,7 +110,7 @@
 
   x `etc/pki/containers/cosign.pub` is not an absolute path in the image
    ,-[./modules/core/keys/module.kdl:7:5]
- 6 |     generator "ssh-keygen"
+ 6 |     generator "gpg"
  7 |     public "etc/pki/containers/cosign.pub" format="jwk"
    :     ^^^|^^
    :        `-- the public half goes here

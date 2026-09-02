@@ -43,7 +43,7 @@ fn bad_token(value: &str) -> Option<&'static str> {
 
 /// The generators the tool implements. A manifest picks one; it never names a
 /// command of its own.
-const GENERATORS: [&str; 2] = ["cosign", "openssl"];
+const GENERATORS: [&str; 3] = ["cosign", "openssl", "ssh-keygen"];
 
 /// The RSA size an `openssl` key is generated at when the declaration names
 /// none.
@@ -69,8 +69,8 @@ const KEY: Node = Node::new("key",
         Node::new("generator", "Which of the generators the tool implements writes this key.")
             .arg(Arg::One(&GENERATORS), Say::new("`{}` is not a generator the tool has",
                 "not a generator",
-                "the generators are `cosign` and `openssl`; a manifest picks one of them rather \
-                 than naming a command of its own"))
+                "the generators are `cosign`, `openssl` and `ssh-keygen`; a manifest picks one \
+                 of them rather than naming a command of its own"))
             .once("")
             .missing(NEEDED)
             .props(&[

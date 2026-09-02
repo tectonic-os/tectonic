@@ -311,6 +311,37 @@ The generators are closed, and each is one of:
   the `MOK_PRIVKEY` repository secret; `$MOK_KEY_PATH` points a local build at
   it. Every machine enrols the certificate once with `mokutil --import`, and
   until it does the modules signed with it will not load.
+- `ssh-keygen` writes the keypair a person logs in with, ed25519 and with no
+  passphrase. `bits` is an RSA size and means nothing here. Nothing in a build
+  reads the private half: it is yours, and the public half is what the image
+  ships.
+
+### `set key <kind>`
+
+Records a public half you already hold, in place of generating one. Where
+`create key` invents a key, this writes down one that exists: a cosign public
+key, a MOK certificate and an authorized key are all things a person may
+already have, and every kind a module declares can be recorded this way.
+
+Asks you for:
+- Which kind, listing the kinds the modules declare, when no argument is given
+- The file to read it from, where `--from` did not name one
+
+#### Flags:
+    --module <name>   which module, where two of them declare the same kind
+    --from <path>     the public half to record
+
+#### Notes:
+- The destination is the module's own `public` declaration, so nothing here
+  takes a path to write to.
+- Only the public half. A private half is not the repository's: a cosign key
+  signs in CI, a MOK signs a kernel module and an authorized key logs a person
+  in, and none of the three wants its private half copied here.
+- The file is read before it is written: a key in the wrong form for the
+  generator that would have made it — a PEM public key for `cosign`, a PEM or
+  DER certificate for `openssl`, an OpenSSH key line for `ssh-keygen` — is
+  refused here rather than by a build a long way from here.
+- An existing key is never replaced, exactly as with `create key`.
 
 ### `set workflows`
 
