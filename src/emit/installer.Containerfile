@@ -1,21 +1,41 @@
-# The installer live environment, and it is a layer on the image being
-# installed rather than a distribution of its own. Tacklebox rebuilds the
-# initramfs with this image's own dracut and boots the media from that kernel,
-# so what it needs is the whole boot chain a bootc image has, and a plain
-# `debian:forky` has none of it. Every payload has it by construction, which is
-# why deriving is the cheap answer.
+# The installer live environment. It is a fixed Fedora base rather than a layer
+# on the image being installed, and that is a decision about Secure Boot.
+#
+# The media's boot chain decides whether a stranger's machine will boot the
+# stick at all, and it is independent of what gets installed: fisherman runs
+# the target image through podman, so the family installing is not the family
+# installed. Fedora ships a shim signed by the Microsoft UEFI CA that firmware
+# already trusts; Debian ships an unsigned systemd-boot and no shim, which
+# firmware with Secure Boot on — the factory default — refuses with `Access
+# Denied` before the installer draws anything. Deriving from the payload made
+# that refusal a property of which target was being installed, which is the
+# wrong thing for it to depend on. Fedora/RHEL-derived images are also most of
+# the bootc ecosystem, so this is the best-travelled live environment rather
+# than merely the one that boots signed.
+#
+# Measured 2026-09-03: media built this way boots from a USB block device under
+# Secure Boot firmware with the default keys enrolled, and the kernel reports
+# `Kernel is locked down from EFI Secure Boot mode` — the whole chain verified,
+# with no key for anyone to enrol.
+#
+# Two costs, both real and neither hidden. The media no longer carries the
+# payload's own kernel, so a media that boots no longer proves the installed
+# system will. And a stick for a non-Fedora target grows — measured 996 MB to
+# 1.88 GB for the Debian one — because the live rootfs and the offline store
+# are then different images with nothing to share.
+#
+# What this does NOT fix: a Debian target still installs an unsigned
+# systemd-boot onto the disk, so the installed machine still needs Secure Boot
+# off. That is the family table's to answer, not this file's.
 #
 # Staged into out/bootiso/ by `tect vm build iso` and never committed: it
 # varies with nothing but the recipe beside it, and eighty lines of installer
 # plumbing in every repository buys nothing.
-#
-# Its cost is that the media carries the content roughly twice — this rootfs
-# and the offline store are near-identical squashfs images and squashfs does
-# not dedupe between them. 518 MB of ISO on an 800 MB payload, measured.
 
 # renovate: datasource=docker depName=docker.io/library/golang
 ARG GO_IMAGE=docker.io/library/golang:1.26
-ARG PAYLOAD
+# renovate: datasource=docker depName=quay.io/fedora/fedora-bootc
+ARG LIVE_BASE=quay.io/fedora/fedora-bootc:44
 
 # Neither project publishes a binary worth pinning — fisherman's one release
 # asset is 174 commits behind its own tip, and tacklebox has no releases at all
@@ -39,14 +59,17 @@ ARG FISHERMAN_COMMIT=027fa25c1d8bc01e2ac97d119cda9e8bb9c99ac7
 ARG FISHERMAN_SHA256=ffab2a2c1094fa02a9b4862958c280045c9390425c93195855a9f0f93956c72e
 # Tacklebox is this project's own fork, and unlike the fisherman pin above that
 # is not a preference about where the code lives — the media needs two changes
-# upstream has not got. It stages the payload's signed shim so the stick boots a
+# upstream has not got. The pin is the fork's `tectonic` branch, which is those
+# two and nothing else: each is also a branch of its own — `secure-boot-media`
+# and `esp-partition` — scoped for submission upstream separately, because they
+# are independent and only one of them is about Secure Boot. It stages the payload's signed shim so the stick boots a
 # machine with Secure Boot on, which is the factory default and refused the
 # unsigned systemd-boot with `Access Denied`; and it appends the ESP as a
 # partition so firmware finds it on a USB block device rather than only through
 # an El Torito scan. Report both upstream rather than keep them.
 ARG TACKLEBOX_ORG=tectonic-os
-ARG TACKLEBOX_COMMIT=734e14de7d0170febd791286196e4235d45226c6
-ARG TACKLEBOX_SHA256=926c000f84a06b240d07455a4649151480c921f0448ee9ec0f02064d7af866b2
+ARG TACKLEBOX_COMMIT=06d62ed0452958cec17a5f95184a7a3ce5f34032
+ARG TACKLEBOX_SHA256=09edec7c20c9900871c4243247852656afcb20e3ab42cbe9bd9f6374aa78f07b
 # `ExtractEFIBinary` takes an image argument, never reads it, and looks only at
 # two host paths — so a host with no systemd-boot-unsigned is a hard stop, and
 # on a cross-distro builder the host is the wrong source anyway: the media
@@ -69,7 +92,7 @@ RUN set -eux; \
     cd /src/fisherman/fisherman && CGO_ENABLED=0 go build -trimpath -o /out/fisherman ./cmd/fisherman/; \
     cd /src/tacklebox && CGO_ENABLED=0 go build -trimpath -o /out/tacklebox ./cmd/tacklebox
 
-FROM ${PAYLOAD}
+FROM ${LIVE_BASE}
 
 # podman runs the install container, so the family installing is irrelevant to
 # the family installed and there is one live environment rather than one per
@@ -85,9 +108,12 @@ FROM ${PAYLOAD}
 # the disk. `openssl passwd -6 -stdin` is what produces it, and crypt(3) is not
 # an option here — glibc keeps it in libcrypt rather than libc.
 #
-# The fedora arm is not measured: no tect fedora image has assembled an ISO
-# through this yet. The assertion below is what makes a wrong package name a
-# failed ISO build rather than a wiped disk.
+# The dnf arm is the one that runs, since the base above is Fedora. The apt arm
+# is kept because `LIVE_BASE` is overridable and a Debian live environment is
+# the fallback for anyone who cannot use this one — it produces unsigned media.
+# Measured 2026-09-03: the dnf arm assembles an ISO that boots. The assertion
+# below is what makes a wrong package name a failed ISO build rather than a
+# wiped disk.
 RUN set -eux; \
     if command -v apt-get > /dev/null 2>&1; then \
         apt-get update -y; \

@@ -147,6 +147,12 @@ pub fn media(list: &List, name: &str, image: &str, imgref: &str) -> Option<Json>
     Some(Json::object([
         ("media_name", Json::string(format!("{published}-install"))),
         ("size", Json::string(SIZE)),
+        // Opt in to the ESP being appended as a partition of type 0xEF.
+        // Tacklebox defaults it off, because it changes the partition table of
+        // every ISO it writes; this media is written to a USB stick, and
+        // firmware booting a block device looks for that partition rather than
+        // reading El Torito.
+        ("esp_partition", Json::Bool(true)),
         (
             "bootable_environments",
             Json::array([Json::object([
@@ -268,6 +274,7 @@ mod tests {
         assert_eq!(
             assembled.render(),
             "{\n  \"media_name\": \"forky-install\",\n  \"size\": \"20G\",\n  \
+             \"esp_partition\": true,\n  \
              \"bootable_environments\": [\n    {\n      \"id\": \"installer\",\n      \
              \"image\": \"localhost/forky-installer:latest\",\n      \"title\": \
              \"Forky installer\",\n      \"modes\": [\n        \"live\"\n      ]\n    }\n  ],\n  \"offline_payloads\": [\n    {\n      \"source\": \

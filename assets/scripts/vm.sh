@@ -270,14 +270,13 @@ build_iso() {
 
     # fisherman ships inside the live environment; tacklebox assembles the
     # media around it and runs here, so it is copied out of the same stage.
-    sudoif podman build --target tools -t "$tools" \
-        --build-arg "PAYLOAD=${ref}" "$staged"
+    sudoif podman build --target tools -t "$tools" "$staged"
     cid="$(sudoif podman create "$tools")"
     sudoif podman cp "${cid}:/out/tacklebox" "$tbx"
     sudoif podman rm "$cid" > /dev/null
     sudoif chown "$(id -u):$(id -g)" "$tbx"
 
-    sudoif podman build --build-arg "PAYLOAD=${ref}" -t "$live_image" "$staged"
+    sudoif podman build -t "$live_image" "$staged"
 
     # tacklebox leaves its offline-store overlay mounted and then trips over it
     # on the next run.
