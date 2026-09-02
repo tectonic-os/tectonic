@@ -559,12 +559,20 @@ or `iso`, asked for where there is a terminal to ask on. `build` converts,
   disk comes out that size plus about 1.5 GiB of ESP and `/boot`.
 - It reads the image out of rootful podman, so it asks for sudo and copies the
   image into root's store with `podman image scp` where it is not there.
-- Building a disk is fedora-only, and this refuses before it takes sudo or
-  pulls anything: the builder installs with Anaconda and relabels its buildroot
-  with SELinux, and no deb image carries either. The family is read off the
-  target's base, so an `--image` naming a ref this repository does not describe
-  is not guessed at. Install a deb image with `bootc install to-disk
-  --composefs-backend --filesystem ext4` from a pushed ref instead.
+- Fedora disks use bootc-image-builder. Other families use `bootc install
+  to-disk --composefs-backend --filesystem ext4` for `qcow2` and `raw`; an
+  installer `iso` remains Fedora-only. The family is read off the target's base,
+  so an `--image` naming a ref this repository does not describe is not guessed.
+- A target carrying a module that imports `passwd.hashed-password.*` gets a
+  console login: `run` and `spawn` pass a `tect` account through systemd
+  credentials, asking for its password without storing it in the image. Set
+  `VM_USER` to change the account or `VM_PASSWORD_HASH` to supply a stable
+  crypt(5) hash on a run without a terminal. Credentials provision an account
+  only on its first boot, so later boots use the password chosen then.
+- Where the target also declares an SSH key and its public half has been
+  recorded, the bootc installer passes it through
+  `--root-ssh-authorized-keys`. This provisions root SSH access at install time
+  and works independently of the hypervisor credential path.
 
 ### `section [image]`
 
