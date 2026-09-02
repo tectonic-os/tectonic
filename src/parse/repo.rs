@@ -259,6 +259,24 @@ pub fn pinned_unverified(root: &Path) -> Option<String> {
         .map(|(version, _)| version)
 }
 
+/// The collections a `sources` block declares, read out of text rather than
+/// out of a repository: what a repository that is not written yet will have,
+/// which is the only thing `create repo` can offer modules against. Anything
+/// wrong with the block is the scaffold's own and is reported where the
+/// repository is read.
+pub fn sources_in(text: &str) -> Vec<crate::model::remote::Collection> {
+    let src = Source::new(layout::REPO_FILE, text);
+    let Ok(doc) = text.parse::<KdlDocument>() else {
+        return Vec::new();
+    };
+    let mut list = List::empty(Path::new(""));
+    let mut issues = Issues::default();
+    for node in doc.nodes().iter().filter(|n| n.name().value() == "sources") {
+        list.parse_sources(node, &src, &mut issues);
+    }
+    list.sources
+}
+
 impl List {
     /// The versions first: a repository this release cannot work in is refused
     /// before anything in it is read.

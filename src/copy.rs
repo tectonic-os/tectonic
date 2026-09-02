@@ -60,6 +60,10 @@ pub fn list_in(target: &str) -> String {
 /// Asked by both commands, and answered by whichever one asked: an import
 /// references what it brings, a copy vendors it.
 pub const BRING_REQUIRED: &str = "Bring what these modules require?";
+/// The same question against the base row, asked one step earlier: a base that
+/// is not a bootc image says what makes it one, and a fresh repository has
+/// neither that nor the family adapter.
+pub const BRING_FOR_BASE: &str = "Do you want to add them now?";
 pub const IMPORT_CLAIMING: &str = "Import the modules claiming these rules?";
 
 /// What a list says above itself about an answer it cleared. `unmet` is the

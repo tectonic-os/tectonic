@@ -487,6 +487,9 @@ pub struct Image {
     pub base: String,
     /// What the chosen base belongs to, which decides what CI can run here.
     pub family: String,
+    /// Whether the offer of what the base cannot build without was taken, so
+    /// that asking again opens on the answer rather than back on yes.
+    took: bool,
     /// The image a second one takes the fallback away from, named in repo.kdl
     /// so that a bare build still builds what it built before.
     names_default: Option<String>,
@@ -518,6 +521,7 @@ impl Image {
                     .or_else(|| crate::init::id(repo).is_ok().then_some(repo)),
             )?,
         };
+        let took = prev.map_or(true, |prev| prev.took);
         let id = crate::init::id(&name)?;
         let file = root.join(format!("{id}{}", layout::IMAGE_SUFFIX));
         if file.exists() {
@@ -550,24 +554,61 @@ impl Image {
                 bases.first().map(|base| base.family.as_str()),
             )?,
         };
-        // Costs no network, the way the base catalog beside it does: a
-        // collection this machine has not fetched seeds nothing.
+        // A repository that is not written yet declares what the scaffold is
+        // about to give it, which is the only thing `create repo` has to offer
+        // modules against.
+        let scaffolded;
+        let sources = match list.sources.is_empty() && !root.join(layout::REPO_FILE).is_file() {
+            true => {
+                scaffolded =
+                    crate::parse::repo::sources_in(&crate::init::sources(&crate::init::assets()?));
+                scaffolded.as_slice()
+            }
+            false => list.sources.as_slice(),
+        };
         let disk = crate::parse::disk::Disk::scan(root);
-        let index = crate::provider::Index::scan(root, &list.sources, &disk, false);
-        let text = image_kdl(
-            &name,
-            url.as_deref(),
-            &base,
-            &family,
-            crate::base::find(&bases, &base),
-            &seeded(index.adapter(BUILD_ENVIRONMENT, &family)),
-        );
+        let known = crate::base::find(&bases, &base);
+        let roles = roles(known);
+        let index = crate::provider::Index::scan(root, sources, &disk, false);
+        let mut wanted = wanted(&index, &family, &roles);
+        // The one moment this costs network: only where the question it is for
+        // can be asked, and only where the collections already here did not
+        // answer it. A fresh repository has fetched nothing, so what the base
+        // says it needs is in a collection nothing has read, and an offer that
+        // named none of it would be no offer at all.
+        let fetched;
+        if wanted.len() < roles.len() && prompt.asks() && !index.unread().is_empty() {
+            // Nothing is written yet, and this run may end at the review screen
+            // without anything ever being: the fetch goes to scratch rather
+            // than laying a cache into a directory nobody asked for. The
+            // repository's own fetch is `tect fetch modules`, later.
+            let scratch = std::env::temp_dir().join(format!("tect-bases.{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&scratch);
+            let _ = std::fs::create_dir_all(&scratch);
+            let _ = std::fs::set_permissions(
+                &scratch,
+                std::os::unix::fs::PermissionsExt::from_mode(0o700),
+            );
+            let cache = match root.join(layout::REPO_FILE).is_file() {
+                true => root,
+                false => scratch.as_path(),
+            };
+            fetched = crate::provider::Index::scan(cache, sources, &disk, true);
+            wanted = self::wanted(&fetched, &family, &roles);
+            let _ = std::fs::remove_dir_all(&scratch);
+        }
+        let seed = match wanted.is_empty() || offer(&base, &wanted, prompt, took)? {
+            true => seeded(&wanted),
+            false => String::new(),
+        };
+        let text = image_kdl(&name, url.as_deref(), &base, &family, known, &seed);
         Ok(Self {
             text,
             file,
             name,
             base,
             family,
+            took: wanted.is_empty() || !seed.is_empty(),
             names_default,
         })
     }
@@ -1258,20 +1299,88 @@ fn append(
     std::fs::write(file, text).map_err(|err| format!("{}: {err}", file.display()))
 }
 
-/// The one module a fresh image opens with: whatever fills the family-adapter
-/// role, wrapped in its source block where it is a collection's. An image with
-/// nothing to fill it opens with an empty block, which is what it always did.
-fn seeded(adapter: Option<&crate::provider::Provider>) -> String {
-    let Some(adapter) = adapter else {
-        return String::new();
-    };
-    let chain: Vec<(&str, Option<&str>)> = adapter
-        .owner
-        .iter()
-        .map(|owner| ("source", Some(owner.as_str())))
-        .collect();
-    wrap(&chain, &format!("module \"{}\"", adapter.name))
-        .lines()
+/// The modules a fresh image cannot build without: whatever fills the
+/// family-adapter role, and whatever satisfies what the base row says it
+/// requires. Two kinds of missing module, and they fail together on a fresh
+/// repository — a base that is not a bootc image needs both, and neither is
+/// there — so they are gathered as one list and asked as one question.
+fn wanted<'a>(
+    index: &'a crate::provider::Index,
+    family: &str,
+    roles: &[&str],
+) -> Vec<&'a crate::provider::Provider> {
+    let mut out: Vec<&crate::provider::Provider> = Vec::new();
+    for capability in roles {
+        // The role is filled per family, so the provider that fits this image
+        // is the one wanted rather than the one that sorts first.
+        let Some(provider) = index.adapter(capability, family) else {
+            continue;
+        };
+        if !out.iter().any(|held| held.dir() == provider.dir()) {
+            out.push(provider);
+        }
+    }
+    out
+}
+
+/// The capabilities those modules are looked up by, which is also how many
+/// answers a complete offer has: one short of that is a collection nothing has
+/// read yet.
+fn roles(base: Option<&crate::base::Base>) -> Vec<&str> {
+    std::iter::once(BUILD_ENVIRONMENT)
+        .chain(
+            base.into_iter()
+                .flat_map(|base| base.requires.iter().map(String::as_str)),
+        )
+        .collect()
+}
+
+/// The question, which names them: a person meeting a base for the first time
+/// is told what it cannot build without. *Needs* rather than *requires*, since
+/// only one of the two kinds is a `requires` on the base row and the other is
+/// the family adapter, which no row declares. Nobody to ask takes them, which
+/// is what the seed always did.
+fn offer(
+    base: &str,
+    wanted: &[&crate::provider::Provider],
+    prompt: &Prompt,
+    current: bool,
+) -> Result<bool, String> {
+    if prompt.asks() {
+        println!("{base} needs the following modules:");
+        for provider in wanted {
+            println!("\x20   {}", provider.qualified());
+        }
+        println!();
+    }
+    prompt.confirm_current(copy::BRING_FOR_BASE, copy::YES, copy::NO, current)
+}
+
+/// Those modules as an image's `modules` block, each collection's grouped under
+/// one `source`. An image with nothing to seed opens with an empty block, which
+/// is what it always did.
+fn seeded(wanted: &[&crate::provider::Provider]) -> String {
+    let mut owners: Vec<Option<&str>> = Vec::new();
+    for provider in wanted {
+        let owner = provider.owner.as_deref();
+        if !owners.contains(&owner) {
+            owners.push(owner);
+        }
+    }
+    let mut out = String::new();
+    for owner in owners {
+        let leaf: String = wanted
+            .iter()
+            .filter(|provider| provider.owner.as_deref() == owner)
+            .map(|provider| format!("module \"{}\"", provider.name))
+            .collect::<Vec<String>>()
+            .join("\n");
+        let chain: Vec<(&str, Option<&str>)> =
+            owner.iter().map(|owner| ("source", Some(*owner))).collect();
+        out.push_str(&wrap(&chain, &leaf));
+        out.push('\n');
+    }
+    out.lines()
         .map(|line| format!("\x20       {line}\n"))
         .collect()
 }
@@ -1395,6 +1504,37 @@ fn create_remote(owner: &str, id: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Two collections' worth and two of one collection's, so the block a
+    /// fresh image opens with is one `source` per collection rather than one
+    /// per module.
+    #[test]
+    fn the_seeded_block_groups_each_collections_modules_under_one_source() {
+        let provider = |owner: Option<&str>, name: &str| crate::provider::Provider {
+            owner: owner.map(str::to_string),
+            name: name.to_string(),
+            here: false,
+            declares: crate::parse::module::Summary::default(),
+        };
+        // The second `tectonic-os` is not beside the first: grouping is by
+        // owner, not by run, so a base whose `requires` interleaves two
+        // collections still writes one block apiece.
+        let held = [
+            provider(Some("tectonic-os"), "debian-family"),
+            provider(None, "mine"),
+            provider(Some("tectonic-os"), "debian-bootc-base/bootc"),
+        ];
+        let wanted: Vec<&crate::provider::Provider> = held.iter().collect();
+        assert_eq!(
+            seeded(&wanted),
+            "        source \"tectonic-os\" {\n\
+             \x20           module \"debian-family\"\n\
+             \x20           module \"debian-bootc-base/bootc\"\n\
+             \x20       }\n\
+             \x20       module \"mine\"\n"
+        );
+        assert_eq!(seeded(&[]), "");
+    }
 
     #[test]
     fn repeated_targets_write_once_and_one_file_names_every_addition() {

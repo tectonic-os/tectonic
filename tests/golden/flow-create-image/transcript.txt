@@ -12,6 +12,12 @@ Beta
   7) example.invalid/collected:1  A base only the collection knows about
 What is the base image for this image? [1-7, 0 for none]: 7
 
+example.invalid/collected:1 needs the following modules:
+    one/fedora-family
+
+Do you want to add them now? (Yes/No)
+Yes
+
 
 example/
 ├── + beta.image.kdl

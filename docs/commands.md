@@ -156,12 +156,21 @@ Asks you for:
 - Writing a second image into a repository that declares no `default-image`
   appends one naming the image already there, so a bare build builds what it
   built before. Nothing else in `repo.kdl` moves.
-- The `modules` block opens with whatever fills the family-adapter role for the
-  base's family: the module that `supports` it and `provides
-  "build-environment"`, taken from the collections `sources` declares. It is an
-  ordinary line, so deleting it is how you decline it. A collection this
-  machine has not fetched seeds nothing, and the reference the seed writes
-  resolves on the next `tect fetch modules`.
+- The `modules` block opens with what the base cannot build without, offered as
+  one question naming the modules: whatever fills the family-adapter role for
+  the base's family — the module that `supports` it and `provides
+  "build-environment"` — and whatever satisfies each capability the base row
+  `requires`. Both come out of the collections `sources` declares, both are
+  missing on a fresh repository, and both read as one question. Declining
+  writes an empty block, and every line it writes is an ordinary one, so
+  deleting one afterwards is the same decision.
+- Answering that question needs the collections read, so where one is declared
+  and not on this machine it is fetched here. Nothing is fetched when the
+  collections already on disk answer the question, and nothing is fetched with
+  nobody to ask: a `--no-tui` run offers only what is already there. A
+  repository that does not exist yet caches that fetch outside itself and
+  throws it away, so a run left at the review screen leaves nothing behind —
+  which does mean re-editing the base re-fetches.
 
 ### `create flavour [name]`
 

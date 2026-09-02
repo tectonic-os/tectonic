@@ -86,7 +86,16 @@ impl Index {
                 declares: parse::module::summary(&layout::manifest(root, dir)),
             });
         }
-        let (found, hidden) = crate::import::catalog(root, sources, fetch).unwrap_or_default();
+        // One collection that cannot be reached takes the whole catalog with
+        // it, so a scan that meant to fetch falls back to what is already
+        // here: a reader asking what provides something is answered worse by
+        // nothing at all than by what one unreachable collection is missing
+        // from. `unread` is what still says the search was incomplete.
+        let fetched = crate::import::catalog(root, sources, fetch);
+        let reached = fetched.is_ok();
+        let (found, hidden) = fetched
+            .or_else(|_| crate::import::catalog(root, sources, false))
+            .unwrap_or_default();
         for module in found {
             if !out.iter().any(|held| held.dir() == module.dir()) {
                 out.push(module);
@@ -97,7 +106,7 @@ impl Index {
             hidden,
             // The collections `catalog` just skipped: `cached` is the same
             // question it asked, and on `fetch` there is nothing to skip.
-            unread: match fetch {
+            unread: match fetch && reached {
                 true => Vec::new(),
                 false => sources
                     .iter()
