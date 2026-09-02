@@ -35,6 +35,7 @@ Environment:
                       The file is sparse, so this is a ceiling rather than a cost.
   VM_USER             console account passed as a systemd credential (default: tect)
   VM_PASSWORD_HASH    its crypt(5) hash; when unset, run and spawn ask for a password
+  GPU                 Y for hardware rendering in the qemu viewer (default: N)
 EOF
 }
 
@@ -267,6 +268,12 @@ login_credentials() {
     echo "vm: login as ${vm_user}; credentials provision the account on its first boot"
 }
 
+# Measured 2026-09-02 on qemux `Podman v7.49`, QEMU 11.1.0, an amdgpu host with
+# Vulkan: `GPU=Y` makes qemux build a `virtio-vga-gl` line carrying
+# `host3d_blob_limit`, its own QEMU refuses the property, and the machine never
+# boots. So this passes qemux's own variable through at qemux's own default
+# rather than forcing hardware rendering on: `GPU=Y ./scripts/vm.sh run qcow2`
+# asks for it on a host where it works, and nothing else has to.
 run_qemu() {
     local port=8006 arguments sysusers_base64 credential_args=()
     while ss -tunal | grep -q ":${port} "; do
@@ -287,7 +294,7 @@ run_qemu() {
         --env "RAM_SIZE=${ram}" \
         --env DISK_SIZE=64G \
         --env TPM=Y \
-        --env GPU=Y \
+        --env "GPU=${GPU:-N}" \
         "${credential_args[@]}" \
         --device=/dev/kvm \
         --volume "${PWD}/${image_file}":"/boot.${type}" \
