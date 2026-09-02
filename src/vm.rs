@@ -150,7 +150,23 @@ fn stage(root: &Path, opts: &Options) -> Result<String, String> {
     for (name, body) in documents(&list, &target.to_string(), &image, &imgref)? {
         crate::init::put(&root.join(BOOTISO).join(name), &body)?;
     }
+    frontend(&root.join(BOOTISO).join("tect"))?;
     Ok(crate::emit::recipe::live(&published))
+}
+
+/// The frontend the media autostarts is *this* binary, copied into the build
+/// context beside the recipes. Not the published release: media assembled from
+/// a tree exists to prove that tree, and fetching a different `tect` would
+/// install with an installer nobody here is looking at.
+///
+/// A binary that cannot run in the live environment — a glibc build carried
+/// onto another distribution's libc — is caught by the `--version` the
+/// Containerfile runs, so the failure is an ISO build and not a boot.
+fn frontend(to: &Path) -> Result<(), String> {
+    let from = std::env::current_exe().map_err(|err| format!("this binary: {err}"))?;
+    std::fs::copy(&from, to)
+        .map(|_| ())
+        .map_err(|err| format!("{} -> {}: {err}", from.display(), to.display()))
 }
 
 /// Whether this run would convert the container image into a disk, which is

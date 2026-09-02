@@ -249,9 +249,10 @@ install_disk() {
 # why one live environment installs every family and there is no branch here.
 #
 # `tect vm build iso` stages the whole build context — both recipes, the
-# Containerfile and the one patch tacklebox needs — under out/bootiso/ before
-# it execs this script, because every one of them depends on --target, --tag
-# and $IMAGE_REGISTRY, which are build-time and not commit-time.
+# Containerfile, the one patch tacklebox needs and the tect binary the live
+# console autostarts — under out/bootiso/ before it execs this script, because
+# every one of them depends on --target, --tag and $IMAGE_REGISTRY, which are
+# build-time and not commit-time, or on the tree being built from.
 build_iso() {
     local tools=localhost/tect-installer-tools:latest tbx="${staged}/tacklebox" cid
     # Absolute, because tacklebox splices the build directory into a

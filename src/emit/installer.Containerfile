@@ -146,7 +146,7 @@ CONF
 # partitions disks and calls `bootc install`, so a console that cannot become
 # root cannot install anything — and this image is not the target: it is built
 # per target as `<published>-installer`, boots only from the media, and is
-# never what lands on the disk. When `tect install` autostarts here it will run
+# never what lands on the disk. The `tect install` that autostarts below runs
 # as root for the same reason.
 COPY <<'AUTOLOGIN' /usr/lib/systemd/system/serial-getty@.service.d/autologin.conf
 [Service]
@@ -161,3 +161,23 @@ ExecStart=-/sbin/agetty -o '-p -f -- \\u' --autologin root --noclear %I $TERM
 AUTOLOGIN
 
 RUN systemctl enable var-lib-tectonic-store.mount
+
+# The frontend, staged into this build context from the running binary by
+# `tect vm build iso`. `--version` runs it here rather than on the console, so
+# a binary that cannot execute in this environment fails the ISO build instead
+# of the boot it was assembled for.
+COPY tect /usr/bin/tect
+RUN /usr/bin/tect --version
+
+# Autostart is a login shell's profile and not a unit, and that is the whole
+# reason it is one line: root already autologins on both consoles above, an
+# installer that leaves — esc on the first screen — falls back to the shell it
+# was started from rather than to a dead service, and there is no tty to hand
+# between a unit and a getty. `/etc/profile.d` is read by bash and sh alike on
+# both families. `ui::inline` sets the window size itself, so a serial console
+# reporting none needs nothing here.
+COPY <<'START' /etc/profile.d/tect-install.sh
+if [ "$(id -u)" = 0 ] && [ -t 0 ]; then
+    tect install
+fi
+START
