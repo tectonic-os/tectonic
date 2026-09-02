@@ -35,21 +35,32 @@ pub fn reference(
     target: Option<&str>,
     tag: Option<&String>,
 ) -> Result<String, String> {
-    let tag = match tag {
-        Some(tag) => tag.clone(),
-        None => std::env::var("DEFAULT_TAG")
-            .ok()
-            .filter(|t| !t.is_empty())
-            .unwrap_or_else(|| "latest".to_string()),
-    };
     let target = match target {
         Some(name) => list.find_target(name)?,
         None => list
             .ungated_target()
             .ok_or("no default image to take a target from")?,
     };
-    let published = target.published();
-    Ok(format!("{}/{published}:{tag}", namespace(root)?))
+    Ok(at(&namespace(root)?, &target.published(), &self::tag(tag)))
+}
+
+/// The tag `--tag` gave, else `$DEFAULT_TAG`, else latest. Lifted out so the
+/// local build and the published reference cannot resolve it differently.
+pub fn tag(given: Option<&String>) -> String {
+    match given {
+        Some(tag) => tag.clone(),
+        None => std::env::var("DEFAULT_TAG")
+            .ok()
+            .filter(|t| !t.is_empty())
+            .unwrap_or_else(|| "latest".to_string()),
+    }
+}
+
+/// A namespace, a target's published name and a tag, joined. `localhost` is a
+/// namespace like any other, and is what names a build that has not been
+/// pushed anywhere.
+pub fn at(namespace: &str, published: &str, tag: &str) -> String {
+    format!("{namespace}/{published}:{tag}")
 }
 
 fn origin(root: &Path) -> Option<String> {

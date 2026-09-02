@@ -100,6 +100,67 @@ pub fn build(
     Some(Json::object(fields))
 }
 
+/// Where the media carries the selected image, and where the live environment
+/// registers it as an additional image store. `bootc install` is handed this
+/// path, and so is the live environment's own `storage.conf`: fisherman pulls
+/// before it starts the install container, and that pull knows nothing about
+/// the recipe.
+pub const STORE: &str = "/var/lib/tectonic/store";
+
+/// The staging ceiling the media is assembled in, not a cost: the ISO stage 1
+/// measured off a 20G recipe was 518 MB.
+const SIZE: &str = "20G";
+
+/// What the live environment is built and tagged as. Per target rather than
+/// one name for every repository, because the media's recipe is baked into it
+/// and root's image store is shared: a stale tag there ships silently.
+pub fn live(published: &str) -> String {
+    format!("localhost/{published}-installer:latest")
+}
+
+/// The media the installer is assembled into, as the recipe tacklebox takes.
+///
+/// `image` is the local build embedded in the media and `imgref` the name it
+/// is embedded *under*, so the installed machine's update origin is the
+/// published one while no byte of the install came from a registry. That pair
+/// is the whole of the split, and it is one recipe field rather than a design.
+///
+/// `None` on the same three refusals `build` makes, so the two documents on
+/// one medium cannot disagree about whether the target is installable.
+pub fn media(list: &List, name: &str, image: &str, imgref: &str) -> Option<Json> {
+    let target = list.targets().into_iter().find(|t| t.to_string() == name)?;
+    let declared = list.images.iter().find(|i| i.id == target.image)?;
+    self::family(&declared.base.as_ref()?.family)?;
+    let published = target.published();
+
+    Some(Json::object([
+        ("media_name", Json::string(format!("{published}-install"))),
+        ("size", Json::string(SIZE)),
+        (
+            "bootable_environments",
+            Json::array([Json::object([
+                ("id", Json::string("installer")),
+                ("image", Json::string(live(&published))),
+                // The image's name and not its `pretty-name`, which is
+                // optional and empty in most repositories: this is a boot menu
+                // entry, and there is no such thing as a blank one.
+                (
+                    "title",
+                    Json::string(format!("{} installer", declared.name)),
+                ),
+                ("modes", Json::strings(["live"])),
+            ])]),
+        ),
+        (
+            "offline_payloads",
+            Json::array([Json::object([
+                ("source", Json::string(image)),
+                ("ref", Json::string(imgref)),
+            ])]),
+        ),
+    ]))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -124,17 +185,19 @@ mod tests {
             "forky",
             "localhost/forky:latest",
             "ghcr.io/someone/forky:latest",
-            &["/var/lib/tectstore".to_string()],
+            &[STORE.to_string()],
         )
         .expect("a debian target has an answer");
         assert_eq!(
             recipe.render(),
-            "{\n  \"image\": \"localhost/forky:latest\",\n  \"targetImgref\": \
-             \"ghcr.io/someone/forky:latest\",\n  \"composeFsBackend\": true,\n  \
-             \"genericImage\": true,\n  \"bootloader\": \"systemd\",\n  \"filesystem\": \
-             \"ext4\",\n  \"hostname\": \"forky\",\n  \"user\": {\n    \"groups\": [\n      \
-             \"sudo\"\n    ]\n  },\n  \"additionalImageStores\": [\n    \
-             \"/var/lib/tectstore\"\n  ]\n}\n"
+            format!(
+                "{{\n  \"image\": \"localhost/forky:latest\",\n  \"targetImgref\": \
+                 \"ghcr.io/someone/forky:latest\",\n  \"composeFsBackend\": true,\n  \
+                 \"genericImage\": true,\n  \"bootloader\": \"systemd\",\n  \
+                 \"filesystem\": \"ext4\",\n  \"hostname\": \"forky\",\n  \"user\": \
+                 {{\n    \"groups\": [\n      \"sudo\"\n    ]\n  }},\n  \
+                 \"additionalImageStores\": [\n    \"{STORE}\"\n  ]\n}}\n"
+            )
         );
 
         // An ubuntu image is the same family answer, and a fedora one is the
@@ -177,6 +240,33 @@ mod tests {
         // A store nothing carries is an absent key rather than an empty list,
         // because fisherman bind-mounts every path it is given.
         assert!(field(&deb, "forky", "additionalImageStores").is_none());
+    }
+
+    /// The media carries the local bytes under the published name, which is
+    /// what makes the install offline and the update origin right at once.
+    #[test]
+    fn the_media_embeds_the_local_build_under_the_published_name() {
+        let deb = fixture("deb-families");
+        let assembled = media(
+            &deb,
+            "forky",
+            "localhost/forky:latest",
+            "ghcr.io/someone/forky:latest",
+        )
+        .expect("a debian target has an answer");
+        assert_eq!(
+            assembled.render(),
+            "{\n  \"media_name\": \"forky-install\",\n  \"size\": \"20G\",\n  \
+             \"bootable_environments\": [\n    {\n      \"id\": \"installer\",\n      \
+             \"image\": \"localhost/forky-installer:latest\",\n      \"title\": \
+             \"Forky installer\",\n      \"modes\": [\n        \"live\"\n      ]\n    }\n  ],\n  \"offline_payloads\": [\n    {\n      \"source\": \
+             \"localhost/forky:latest\",\n      \"ref\": \
+             \"ghcr.io/someone/forky:latest\"\n    }\n  ]\n}\n"
+        );
+
+        // Both documents on one medium refuse together, or the media would be
+        // assembled around a target no installer on it can install.
+        assert!(media(&deb, "not-a-target", "image", "imgref").is_none());
     }
 
     /// No family, no recipe. The refusal is the point: `bootc install` reaches
