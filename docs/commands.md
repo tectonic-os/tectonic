@@ -570,6 +570,10 @@ or `iso`, asked for where there is a terminal to ask on. `build` converts,
   to-disk --composefs-backend --filesystem ext4` for `qcow2` and `raw`; an
   installer `iso` remains Fedora-only. The family is read off the target's base,
   so an `--image` naming a ref this repository does not describe is not guessed.
+- The composefs backend will not read the image out of containers-storage, so
+  `skopeo copy` writes it to an OCI layout under `out/oci-cache` and
+  `--source-imgref oci:` points the install at that. It needs `skopeo`. This
+  used to be a transient local registry the script stood up and tore down.
 - A target carrying a module that imports `passwd.hashed-password.*` gets a
   console login: `run` and `spawn` pass a `tect` account through systemd
   credentials, asking for its password without storing it in the image. Set

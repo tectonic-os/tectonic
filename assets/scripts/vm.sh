@@ -167,47 +167,6 @@ build_disk() {
     sudoif chown -R "$(id -u):$(id -g)" out/
 }
 
-# A registry `bootc install --composefs-backend` can pull from, stood up for
-# this install and torn down after it. Measured 2026-09-02: the composefs pull
-# refuses any locally built image — `Invalid splitstream content type` — and
-# `--source-imgref containers-storage:` refuses identically, so it is about how
-# the image is stored rather than how it is named. A registry is the only way
-# in, and the objective is that nobody types a `podman run`, so this owns one.
-registry_up() {
-    local port=5000
-    while ss -tunal | grep -q ":${port} "; do
-        port=$((port + 1))
-    done
-    registry_port="$port"
-    registry_id="$(podman run --rm --detach --publish "127.0.0.1:${port}:5000" \
-        docker.io/library/registry:2)"
-    # The push below fails on a registry that is not listening yet.
-    local waited=0
-    until curl -sf -m 2 "http://localhost:${port}/v2/" > /dev/null; do
-        waited=$((waited + 1))
-        [ "$waited" -lt 60 ] || die "the registry did not come up on :${port}"
-        sleep 0.5
-    done
-}
-
-registry_down() {
-    [ -z "${registry_id:-}" ] || podman rm -f "$registry_id" > /dev/null 2>&1 || true
-    registry_id=""
-}
-
-# HUP as well as INT and TERM: bash runs no EXIT trap for an untrapped fatal
-# signal, so closing the terminal mid-install would leave the container holding
-# its port for good. The signal handlers exit rather than returning, since a
-# `registry_down` that fell through would carry on with no registry.
-arm_registry_trap() {
-    trap registry_down EXIT
-    trap 'registry_down; exit 130' INT TERM HUP
-}
-
-disarm_registry_trap() {
-    trap - EXIT INT TERM HUP
-}
-
 # `bootc install to-disk`, for a family bootc-image-builder cannot convert. It
 # writes a raw disk to a file with no loop device of its own: `--via-loopback`
 # is what removes the `losetup -P` the recipe used to need.
@@ -215,7 +174,8 @@ install_disk() {
     if [ "$type" = iso ]; then
         die "an installer iso is Anaconda's, and no deb family carries it"
     fi
-    command -v curl > /dev/null 2>&1 || die "curl is not installed, and this needs it"
+    command -v skopeo > /dev/null 2>&1 \
+        || die "skopeo is not installed, and it writes the layout bootc installs from"
     if [ "$type" = qcow2 ]; then
         command -v qemu-img > /dev/null 2>&1 \
             || die "qemu-img is not installed, and a qcow2 is converted from the raw disk"
@@ -225,15 +185,20 @@ install_disk() {
     # run that fails or is interrupted leaves the disk that was already there.
     # Truncating in place would replace a bootable disk with a sparse hole that
     # both this script and `tect vm` then read as finished.
-    local raw="out/${type}/disk.raw.part" pushed key_args=() key_mount=()
+    local raw="out/${type}/disk.raw.part" layout="out/oci-cache" key_args=() key_mount=()
     mkdir -p "out/${type}"
     rm -f "$raw"
     truncate -s "${DISK_SIZE:-20G}" "$raw"
 
-    arm_registry_trap
-    registry_up
-    pushed="localhost:${registry_port}/$(basename "${ref%:*}"):${ref##*:}"
-    podman push --tls-verify=false "$ref" "$pushed"
+    # `--composefs-backend` refuses a containers-storage image with `Invalid
+    # splitstream content type`, which is about how the image is stored rather
+    # than how it is named: measured 2026-09-02, `--source-imgref
+    # containers-storage:` refuses identically. An OCI layout is a different
+    # transport and it is accepted, so the bytes are copied out to one and
+    # bootc is pointed at that. This used to stand up a transient `registry:2`
+    # for the same job, with a port scan and signal traps to match.
+    rm -rf "$layout"
+    skopeo copy "containers-storage:${ref}" "oci:${layout}"
 
     if [ -n "$ssh_key" ]; then
         [ -s "$ssh_key" ] || die "$ssh_key does not hold an SSH public key"
@@ -241,27 +206,30 @@ install_disk() {
         key_args=(--root-ssh-authorized-keys /root-ssh-authorized-keys)
     fi
 
-    # --pull=always because root's store keeps the ref from a previous install,
-    # which is what silently ran a ten-minute-old image three times running.
+    # `load_rootful` is what keeps root's store from holding a ten-minute-old
+    # image of the same name — it compares the two stores by image id and
+    # copies across when they differ — so nothing here has to pull to be sure
+    # it is running what was just built.
+    #
     # --pid=host and --net=host are carried from the recipe this was measured
-    # with and are not individually justified here: the push is reachable
-    # without --net=host, since a rootless --publish binds in the host netns,
-    # but whether bootc's own fetch needs it was never separated out. Do not
-    # drop them as tidying without re-running an install.
+    # with and are not individually justified here. Nothing reaches the network
+    # any more, but whether bootc's own machinery wants either was never
+    # separated out. Do not drop them as tidying without re-running an install.
+    load_rootful
     sudoif podman run \
-        --rm --privileged --pull=always --tls-verify=false \
+        --rm --privileged --pull=never \
         --pid=host --net=host \
         -v /var/lib/containers:/var/lib/containers \
         -v /dev:/dev \
         -v "${PWD}/out/${type}":/out \
+        -v "${PWD}/${layout}":/oci:ro \
         "${key_mount[@]}" \
         --security-opt label=type:unconfined_t \
-        "$pushed" \
+        "$ref" \
         bootc install to-disk --via-loopback --composefs-backend \
+        --source-imgref oci:/oci \
         --filesystem ext4 --wipe --generic-image \
         "${key_args[@]}" /out/disk.raw.part
-    registry_down
-    disarm_registry_trap
 
     sudoif chown -R "$(id -u):$(id -g)" out/
     # bootc writes raw; a qcow2 is a conversion on top of it. Either way the
