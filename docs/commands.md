@@ -550,8 +550,12 @@ or `iso`, asked for where there is a terminal to ask on. `build` converts,
   disk comes out that size plus about 1.5 GiB of ESP and `/boot`.
 - It reads the image out of rootful podman, so it asks for sudo and copies the
   image into root's store with `podman image scp` where it is not there.
-- Building a disk is fedora-only: the image builder cannot build one from an
-  image carrying no SELinux policy.
+- Building a disk is fedora-only, and this refuses before it takes sudo or
+  pulls anything: the builder installs with Anaconda and relabels its buildroot
+  with SELinux, and no deb image carries either. The family is read off the
+  target's base, so an `--image` naming a ref this repository does not describe
+  is not guessed at. Install a deb image with `bootc install to-disk
+  --composefs-backend --filesystem ext4` from a pushed ref instead.
 
 ### `section [image]`
 

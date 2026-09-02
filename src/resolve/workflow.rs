@@ -161,7 +161,10 @@ impl Basis {
     }
 }
 
-const FEDORA: &str = "fedora";
+/// The one family a disk is built from: `bootc-image-builder` installs with
+/// Anaconda and relabels its buildroot with SELinux, and no deb image carries
+/// either. `build-disk.yml` gates on it, and so does `tect vm`.
+pub(crate) const FEDORA: &str = "fedora";
 const KERNEL_ARG: &str = "KERNEL";
 
 /// The workflows a module declaring `args` would make runnable that the
