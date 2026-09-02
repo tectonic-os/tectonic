@@ -441,12 +441,14 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
 fn verify(root: &Path, files: &[(PathBuf, String)], issues: &mut Issues) {
     const HELP: &str = "run `tect generate` and commit what it writes";
 
+    // A repository that has never generated is missing every one of them, and
+    // twenty-one copies of one sentence is not twenty-one findings. One says
+    // it, and `tect generate` is the answer to all of them.
+    let mut absent: Vec<String> = Vec::new();
     for (path, generated) in files {
         let name = path.display().to_string();
         let Ok(found) = std::fs::read_to_string(root.join(path)) else {
-            issues.push(
-                Issue::new(format!("`{name}` is not there"), &Source::new(&name, "")).help(HELP),
-            );
+            absent.push(name);
             continue;
         };
         if found == *generated {
@@ -461,6 +463,22 @@ fn verify(root: &Path, files: &[(PathBuf, String)], issues: &mut Issues) {
             .at(span, line)
             .help(HELP),
         );
+    }
+
+    match absent.as_slice() {
+        [] => {}
+        [name] => issues
+            .push(Issue::new(format!("`{name}` is not there"), &Source::new(name, "")).help(HELP)),
+        // Named for the tree rather than for whichever of them sorted first:
+        // the finding is about all of them, and pointing the summary line at
+        // one arbitrary file reads as that file being the problem.
+        many => issues.push(
+            Issue::new(
+                format!("{} generated files are not there", many.len()),
+                &Source::new(layout::GENERATED, ""),
+            )
+            .help(format!("{HELP}; it writes all {} of them", many.len())),
+        ),
     }
 
     let stale = tracked(&layout::generated(root))

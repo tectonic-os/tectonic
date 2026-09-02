@@ -29,3 +29,8 @@
 
 ==== and generated again
 smoke-test.yml is gone
+==== never generated
+  x 13 generated files are not there
+  help: run `tect generate` and commit what it writes; it writes all 13 of
+        them
+
