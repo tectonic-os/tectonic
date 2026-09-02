@@ -7,6 +7,7 @@ pub mod graph;
 pub mod json;
 pub mod module_build;
 pub mod plan;
+pub mod recipe;
 pub mod sbom;
 pub mod schema_md;
 pub mod seed;

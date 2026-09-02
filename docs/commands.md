@@ -722,6 +722,31 @@ the target's name and tag. The ungated target when none is named.
     --target <t>          the target, else the ungated one
     --tag <x>             the tag, else $DEFAULT_TAG, else latest
 
+### `recipe`
+
+Prints the half of an installation recipe the declaration answers, as JSON for
+`fisherman`: the reference installed and the reference the installed machine
+updates from, and the four values that are properties of the image rather than
+questions — whether the deployment is sealed with composefs, whether the
+install skips the bootupd check, which bootloader it reaches, and the root
+filesystem sealing forces. The disk, the account and the encryption are the
+person's and are not in it.
+
+#### Flags:
+    --target <t>          the target, else the ungated one
+    --tag <x>             the tag, else $DEFAULT_TAG, else latest
+    --image <ref>         the bytes installed, else the published reference
+
+#### Notes:
+- The base family settles every derived value, and a family with no answer is
+  refused rather than defaulted: a wrong one here is a disk that is erased and
+  then does not boot, minutes after the person confirmed.
+- `--image` is what installs a local build without making `localhost/...` the
+  machine's update origin: the bytes come from it, `targetImgref` stays the
+  published reference.
+- `hostname` is the published name, and is the one derived value a person is
+  expected to replace.
+
 ### `why [module] [--format md|json]`
 
 One module's trust read-out: which targets build it, what it provides and who
