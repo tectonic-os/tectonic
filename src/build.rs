@@ -50,12 +50,12 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
     }
     let target = target(&list, opts.target.as_deref())?;
 
-    for line in crate::fetch::modules(root, &list)? {
-        eprintln!("tect: {line}");
-    }
-    // Never regenerated here: a build proves the committed files are current.
-    // What it read is what the rest of this builds from, so the build cannot
-    // act on a second reading of the same files.
+    // Nothing is fetched or regenerated here: a build proves the committed
+    // files are current, and proving that by first writing them is proving
+    // nothing. `tect fetch modules` and `tect generate` are what change the
+    // repository, and `vm.sh --rebuild` runs both before it gets here. What
+    // this read is what the rest of this builds from, so the build cannot act
+    // on a second reading of the same files.
     let gate = crate::run(crate::Command::Verify, None, root);
     if gate.issues.report(&gate.context) {
         return Ok(Stopped::Repository);

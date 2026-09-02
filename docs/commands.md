@@ -491,10 +491,10 @@ Writes the build files and draws the tree of what it wrote:
   pile. The Containerfile is called `Containerfile` rather than the image's
   name, which left the one file a person goes looking for with no extension to
   find it by.
-- Referenced modules are fetched first, as `build` does. What is written is read
-  off `modules/.remote/`, so a tree older than the collection would bake a
-  deleted file into `plan.json` and CI — which fetches into an empty tree —
-  would disagree and be right.
+- Referenced modules are fetched first. What is written is read off
+  `modules/.remote/`, so a tree older than the collection would bake a deleted
+  file into `plan.json` and CI — which fetches into an empty tree — would
+  disagree and be right. `build` does not fetch; this is where it happens.
 - `generated/` is cleared first, so an image or module that is gone leaves with
   its files. A workflow is removed by name instead: one the tool does not ship
   is the repository's own and is left where it is.
@@ -515,10 +515,9 @@ Writes the build files and draws the tree of what it wrote:
 
 ### `build [target]`
 
-Builds one target: fetches the pinned modules, runs `verify` as the drift gate,
-then execs the container backend. A target is `<image>/<flavour>`, and the
-ungated set is named by the bare image id. The default target when none is
-named.
+Builds one target: runs `verify` as the drift gate, then execs the container
+backend. A target is `<image>/<flavour>`, and the ungated set is named by the
+bare image id. The default target when none is named.
 
 #### Flags:
     --target <t>          the target, where the positional argument is not used
@@ -533,7 +532,11 @@ named.
 #### Notes:
 - `$LABELS` adds OCI labels the way `$TAGS` adds tags, and `$IMAGE_VERSION` is
   stamped into the image, defaulting to today in UTC.
-- Nothing is regenerated here. A build proves the committed files are current.
+- Nothing is fetched and nothing is regenerated here. A build proves the
+  committed files are current, and a build that first wrote them would be
+  proving nothing. `tect fetch modules` and `tect generate` are what change the
+  repository; run them first, or let `tect vm --rebuild` run all three in
+  order.
 
 ### `vm build|run|spawn <type>`
 
@@ -547,9 +550,13 @@ or `iso`, asked for where there is a terminal to ask on. `build` converts,
     --image <ref>         the container image to convert, without its tag
     --tag <tag>           its tag, else $DEFAULT_TAG, else latest
     --ram <size>          memory for the virtual machine
-    --rebuild             build the container image first
+    --rebuild             fetch, generate and build the container image first
 
 #### Notes:
+- `--rebuild` is the one form of this that changes the repository, and it runs
+  the whole chain in the only order it works in: `fetch modules`, then
+  `generate`, then `build`. Without it nothing is fetched, written or built —
+  the disk that is already there is booted.
 - This is `scripts/vm.sh`, which `generate` writes and this execs. The terminal
   is the script's: it asks for sudo and boots a machine onto it, and nothing
   here captures or reimplements any of that. Every default is the script's too,
