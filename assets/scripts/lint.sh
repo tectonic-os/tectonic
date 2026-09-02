@@ -35,4 +35,3 @@ echo "lint: ${#scripts[@]} scripts pass shellcheck and shfmt"
 ./scripts/tect.sh check
 
 ./scripts/tect.sh verify
-./scripts/render-iso-config.sh > /dev/null

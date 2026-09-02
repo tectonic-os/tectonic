@@ -1,5 +1,5 @@
   1) [x] build  builds, scans, signs and publishes every image
-  2) [x] build-disk  builds a disk image and an installer iso
+  2) [x] build-disk  builds a disk image with bootc-image-builder
   3) [x] base-sig-probe  checks each base for a signature and corrects it
   4) [x] cleanup-registry  prunes old versions of the images off the registry
   5) [ ] kernel-freshness  needs a module taking a KERNEL arg

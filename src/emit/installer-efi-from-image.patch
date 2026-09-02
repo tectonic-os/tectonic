@@ -1,0 +1,76 @@
+diff --git a/internal/install/live.go b/internal/install/live.go
+index fea5431..3645b00 100644
+--- a/internal/install/live.go
++++ b/internal/install/live.go
+@@ -502,7 +502,70 @@ func ExtractEFIBinary(image, destDir string) (string, error) {
+ 			return b.dst, nil
+ 		}
+ 	}
+-	return "", fmt.Errorf("no systemd-boot EFI binary on host (and image %s wasn't probed); install systemd-boot-efi or systemd-boot-unsigned", image)
++	// The host is not the only place a systemd-boot binary lives, and on a
++	// cross-distro builder it is the wrong place: the media should boot with
++	// the bootloader its own image ships. Probe the image, which is what the
++	// error below already claimed to do.
++	if name, err := efiBinaryFromImage(image, destDir); err == nil {
++		return name, nil
++	} else if runner.Verbose {
++		fmt.Printf(">>> image EFI probe failed for %s: %v\n", image, err)
++	}
++	return "", fmt.Errorf("no systemd-boot EFI binary on host or in image %s; install systemd-boot-efi or systemd-boot-unsigned, or add systemd-boot to the image", image)
++}
++
++// efiBinaryFromImage copies a systemd-boot EFI binary out of the image itself,
++// mirroring ExtractBootFiles: a shell in the image writes to a user-writable
++// temp dir, then sudo moves the result into the (root-owned) staging tree.
++func efiBinaryFromImage(image, destDir string) (string, error) {
++	tmpDir, err := os.MkdirTemp("", "tbox-efi-*")
++	if err != nil {
++		return "", fmt.Errorf("mktemp: %w", err)
++	}
++	defer os.RemoveAll(tmpDir)
++	if err := os.Chmod(tmpDir, 0777); err != nil {
++		return "", fmt.Errorf("chmod tmpdir: %w", err)
++	}
++
++	// Emit the basename the caller has to return, rather than deciding it here
++	// from an architecture the image is the authority on.
++	const script = `set -eu
++for pair in systemd-bootx64.efi:BOOTX64.EFI systemd-bootaa64.efi:BOOTAA64.EFI; do
++    src="/usr/lib/systemd/boot/efi/${pair%%:*}"
++    [ -f "$src" ] || continue
++    cp "$src" "/dest/${pair#*:}"
++    echo "EFIBIN=${pair#*:}"
++    exit 0
++done
++echo "no systemd-boot EFI binary under /usr/lib/systemd/boot/efi" >&2
++exit 1`
++
++	upodman := UserPodmanPrefix()
++	args := append(upodman[1:],
++		"run", "--rm",
++		"--security-opt", "label=disable",
++		"--log-driver", "k8s-file",
++		"-v", tmpDir+":/dest",
++		"--entrypoint", "/bin/sh",
++		image, "-c", script)
++	out, err := runner.Output(upodman[0], args...)
++	if err != nil {
++		return "", fmt.Errorf("probe %s: %w", image, err)
++	}
++	var name string
++	for _, line := range strings.Split(string(out), "\n") {
++		if strings.HasPrefix(line, "EFIBIN=") {
++			name = strings.TrimPrefix(line, "EFIBIN=")
++			break
++		}
++	}
++	if name == "" {
++		return "", fmt.Errorf("probe %s: no EFIBIN line in output: %s", image, string(out))
++	}
++	if err := runner.Run("sudo", "cp", filepath.Join(tmpDir, name), filepath.Join(destDir, name)); err != nil {
++		return "", fmt.Errorf("place EFI binary: %w", err)
++	}
++	return name, nil
+ }
+ 
+ // shellEsc single-quotes a string for safe interpolation into a shell script.

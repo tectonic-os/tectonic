@@ -60,8 +60,12 @@ pub fn run(
     let Some(kind) = kind(spec, given, prompt)? else {
         return Ok(());
     };
-    let installer = installer(root, spec, kind, opts)?;
-    let access = access(root, opts);
+    let installer = installer(root, spec, kind, opts);
+    let live = match kind == "iso" && converts(root, spec, kind, opts) {
+        true => Some(stage(root, opts)?),
+        false => None,
+    };
+    let access = access(root, kind, opts);
     let script = root.join(SCRIPT);
     if !script.is_file() {
         return Err(format!(
@@ -73,9 +77,80 @@ pub fn run(
         "{}: {}",
         script.display(),
         Command::new(&script)
-            .args(argv(spec, kind, opts, installer, &access))
+            .args(argv(spec, kind, opts, installer, live.as_deref(), &access))
             .exec()
     ))
+}
+
+/// Where the media is assembled, which is also where the disk it writes lands.
+const BOOTISO: &str = "out/bootiso";
+
+/// The build context `vm.sh` hands `podman build`, and the recipe tacklebox
+/// assembles the media from. Neither is a `generate` output: both depend on
+/// `--target`, `--tag` and `$IMAGE_REGISTRY`, which are build-time and not
+/// commit-time, so they are staged here the way the installer and the login
+/// access already are.
+fn documents(
+    list: &crate::model::image::List,
+    name: &str,
+    image: &str,
+    imgref: &str,
+) -> Result<Vec<(&'static str, String)>, String> {
+    use crate::emit::recipe;
+    // `targetImgref` is the installed machine's update origin, so a medium
+    // built against a local namespace would write `localhost/...` into a
+    // machine. A disk records nothing and gets away with it; an iso does not.
+    if imgref.starts_with("localhost/") {
+        return Err(format!(
+            "`{imgref}` is where the installed machine would look for its updates, \
+             and nothing serves it.\n\nhelp: set $IMAGE_REGISTRY to where `{name}` \
+             publishes"
+        ));
+    }
+    let refuse = || {
+        format!(
+            "there is no measured install recipe for `{name}`: its base family is \
+             none of `fedora`, `debian` or `ubuntu`, and guessing one erases a disk \
+             before it fails to boot"
+        )
+    };
+    // Both references fisherman is given are the published one, and that is
+    // not a lost split — it is where the split already happened. Tacklebox
+    // embeds the local bytes *under* the published name, so on this medium
+    // that name is what the bytes are called; asking fisherman for
+    // `localhost/...` would miss the store and reach for a registry. The local
+    // reference is the media recipe's `source` and appears nowhere else.
+    let build = recipe::build(list, name, imgref, imgref, &[recipe::STORE.to_string()])
+        .ok_or_else(refuse)?;
+    let media = recipe::media(list, name, image, imgref).ok_or_else(refuse)?;
+    Ok(vec![
+        ("recipe.json", build.render()),
+        ("media.json", media.render()),
+        ("Containerfile", recipe::LIVE_ENV.to_string()),
+        ("efi-from-image.patch", recipe::EFI_PATCH.to_string()),
+    ])
+}
+
+/// Writes them, and answers the live environment's own reference: the script
+/// builds and boots that image and has no JSON reader to find it with.
+fn stage(root: &Path, opts: &Options) -> Result<String, String> {
+    let list = crate::model::image::List::load(root).0;
+    let target = target(&list, opts)
+        .ok_or("no target to build an installer iso for; name one with `--target`")?;
+    let published = target.published();
+    let tag = crate::registry::tag(opts.tag.as_ref());
+    let imgref =
+        crate::registry::reference(&list, root, opts.target.as_deref(), opts.tag.as_ref())?;
+    // What the script computes for itself on every other path: an `--image`
+    // names the bytes, and the published reference above stays the origin.
+    let image = match &opts.image {
+        Some(named) => format!("{named}:{tag}"),
+        None => crate::registry::at("localhost", &published, &tag),
+    };
+    for (name, body) in documents(&list, &target.to_string(), &image, &imgref)? {
+        crate::init::put(&root.join(BOOTISO).join(name), &body)?;
+    }
+    Ok(crate::emit::recipe::live(&published))
 }
 
 /// Whether this run would convert the container image into a disk, which is
@@ -86,7 +161,7 @@ fn converts(root: &Path, spec: &Spec, kind: &str, opts: &Options) -> bool {
         return true;
     }
     let at = match kind {
-        "iso" => "out/bootiso/install.iso".to_string(),
+        "iso" => format!("{BOOTISO}/install.iso"),
         kind => format!("out/{kind}/disk.{kind}"),
     };
     !root.join(at).is_file()
@@ -120,8 +195,13 @@ fn target(list: &crate::model::image::List, opts: &Options) -> Option<crate::mod
 /// Whether the selected target imports non-root password credentials, and the
 /// SSH public key `bootc install` can provision. An arbitrary image ref is
 /// deliberately not assumed to match this source.
-fn access(root: &Path, opts: &Options) -> Access {
-    if opts.image.is_some() {
+///
+/// Neither half applies to an installer iso: it boots a live environment that
+/// autologins root and creates the installed machine's account itself, so
+/// asking for a VM password there would provision an unprivileged account
+/// nobody needs and block a run with no terminal to ask on.
+fn access(root: &Path, kind: &str, opts: &Options) -> Access {
+    if kind == "iso" || opts.image.is_some() {
         return Access::default();
     }
     let list = crate::model::image::List::load(root).0;
@@ -178,31 +258,19 @@ fn imports_passwords(root: &Path, module: &str) -> bool {
 
 /// Which installer converts this image, where one would be converted at all:
 /// the script boots what is already there, and cannot read the family for
-/// itself. `None` is the script's own default, `bib`. An `iso` is the one type
-/// no deb family reaches, because the installer inside it is Anaconda's.
+/// itself. `None` is the script's own default, `bib`. An `iso` reaches
+/// neither converter — fisherman installs the target through podman, so one
+/// live environment installs every family — and so names no installer.
 ///
 /// Lifted out of `run`, which `exec`s and so cannot be tested past this point:
 /// this is the whole of what the change decides, and it is worth asserting.
-fn installer(
-    root: &Path,
-    spec: &Spec,
-    kind: &str,
-    opts: &Options,
-) -> Result<Option<&'static str>, String> {
-    if !converts(root, spec, kind, opts) {
-        return Ok(None);
+fn installer(root: &Path, spec: &Spec, kind: &str, opts: &Options) -> Option<&'static str> {
+    if kind == "iso" || !converts(root, spec, kind, opts) {
+        return None;
     }
-    let Some(family) = family(root, opts).filter(|family| family != FEDORA) else {
-        return Ok(None);
-    };
-    if kind == "iso" {
-        return Err(format!(
-            "an installer iso is built with Anaconda, which no `{family}` image \
-             carries.\n\nhelp: `qcow2` and `raw` are installed with `bootc install to-disk` \
-             on this family, and both boot"
-        ));
-    }
-    Ok(Some(BOOTC))
+    family(root, opts)
+        .filter(|family| family != FEDORA)
+        .map(|_| BOOTC)
 }
 
 /// What `vm.sh` calls `bootc install to-disk`. The script cannot read the base
@@ -217,11 +285,15 @@ fn argv(
     kind: &str,
     opts: &Options,
     installer: Option<&str>,
+    live: Option<&str>,
     access: &Access,
 ) -> Vec<String> {
     let mut args = vec![spec.noun.to_string(), kind.to_string()];
     if let Some(installer) = installer {
         args.extend(["--installer".to_string(), installer.to_string()]);
+    }
+    if let Some(live) = live {
+        args.extend(["--live-image".to_string(), live.to_string()]);
     }
     for (flag, value) in [
         ("--target", &opts.target),
@@ -307,7 +379,14 @@ mod tests {
             rebuild: true,
         };
         assert_eq!(
-            argv(Verb::VmRun.spec(), "qcow2", &opts, None, &Access::default()),
+            argv(
+                Verb::VmRun.spec(),
+                "qcow2",
+                &opts,
+                None,
+                None,
+                &Access::default()
+            ),
             [
                 "run",
                 "qcow2",
@@ -326,6 +405,7 @@ mod tests {
                 "raw",
                 &opts,
                 Some(BOOTC),
+                None,
                 &Access::default()
             )[..4],
             ["build", "raw", "--installer", "bootc"]
@@ -339,12 +419,13 @@ mod tests {
         assert!(iso(Verb::VmRun.spec()).available);
     }
 
-    /// A `debian` image is said no to before anything is pulled and before
-    /// sudo is asked for, rather than ten minutes in, inside osbuild. The disk
-    /// type is settled first, since the guard is about converting one and a
-    /// type is free to resolve.
+    /// A `debian` image is converted by bootc rather than by the builder that
+    /// cannot convert it, decided before anything is pulled and before sudo is
+    /// asked for rather than ten minutes in, inside osbuild. The disk type is
+    /// settled first, since the choice is about converting one and a type is
+    /// free to resolve.
     #[test]
-    fn a_family_the_builder_cannot_convert_is_refused_before_anything_is_pulled() {
+    fn the_family_names_the_converter_before_anything_is_pulled() {
         let root = std::env::temp_dir().join(format!("tect-vm-family.{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         crate::init::put(&root.join("repo.kdl"), "schema-version 1\nname \"Deb\"\n").unwrap();
@@ -367,7 +448,7 @@ mod tests {
             rebuild: false,
         };
         assert_eq!(family(&root, &opts(None)).as_deref(), Some("debian"));
-        let declared = access(&root, &opts(None));
+        let declared = access(&root, "raw", &opts(None));
         assert!(!declared.login);
         assert!(declared.ssh_key.is_none());
         crate::init::put(
@@ -377,13 +458,13 @@ mod tests {
             "[Service]\nImportCredential=passwd.hashed-password.*\n",
         )
         .unwrap();
-        assert!(access(&root, &opts(None)).login);
+        assert!(access(&root, "raw", &opts(None)).login);
         crate::init::put(
             &crate::layout::public_key(&root, "/usr/lib/tectonic/authorized_keys"),
             "ssh-ed25519 AAAA test\n",
         )
         .unwrap();
-        let recorded = access(&root, &opts(None));
+        let recorded = access(&root, "raw", &opts(None));
         assert!(recorded.login);
         assert!(recorded.ssh_key.is_some());
         let args = argv(
@@ -391,11 +472,15 @@ mod tests {
             "raw",
             &opts(None),
             Some(BOOTC),
+            None,
             &recorded,
         );
         assert!(args.contains(&"--login".to_string()));
         assert!(args.contains(&"--ssh-key".to_string()));
-        assert!(!access(&root, &opts(Some("localhost/other"))).login);
+        assert!(!access(&root, "raw", &opts(Some("localhost/other"))).login);
+        // An iso asks for no password: it autologins root and the installer
+        // creates the account on the machine it installs.
+        assert!(!access(&root, "iso", &opts(None)).login);
         let refuse = |kind, opts: &Options| {
             run(
                 &root,
@@ -412,20 +497,14 @@ mod tests {
         // told so, because it cannot read the family for itself.
         let build = Verb::VmBuild.spec();
         for kind in ["qcow2", "raw"] {
-            assert_eq!(
-                installer(&root, build, kind, &opts(None)).unwrap(),
-                Some(BOOTC)
-            );
+            assert_eq!(installer(&root, build, kind, &opts(None)), Some(BOOTC));
         }
         // So what a deb target hits is the missing script rather than a wall.
         let installed = refuse("qcow2", &opts(None));
         assert!(installed.contains("vm.sh is not there"), "{installed}");
-        // An iso is the one type that stays refused: Anaconda is Fedora's.
-        let iso = installer(&root, build, "iso", &opts(None)).unwrap_err();
-        assert!(
-            iso.starts_with("an installer iso is built with Anaconda"),
-            "{iso}"
-        );
+        // An iso reaches neither converter: the media boots a live environment
+        // that installs the target through podman, whatever family it is.
+        assert_eq!(installer(&root, build, "iso", &opts(None)), None);
 
         // With no type named and nobody to ask, the type is what is missing,
         // and that is what it says rather than reaching for the family.
@@ -450,7 +529,7 @@ mod tests {
         assert!(!converts(&root, Verb::VmRun.spec(), "raw", &opts(None)));
         // And nothing is named for it, so the script boots what is there.
         assert_eq!(
-            installer(&root, Verb::VmRun.spec(), "raw", &opts(None)).unwrap(),
+            installer(&root, Verb::VmRun.spec(), "raw", &opts(None)),
             None
         );
         let booted = refuse("raw", &opts(None));
@@ -487,10 +566,76 @@ mod tests {
         assert!(fedora.contains("vm.sh is not there"), "{fedora}");
         // Fedora keeps the script's own default, and its iso is not refused.
         for kind in ["qcow2", "raw", "iso"] {
-            assert_eq!(installer(&root, build, kind, &opts(None)).unwrap(), None);
+            assert_eq!(installer(&root, build, kind, &opts(None)), None);
         }
 
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// What an iso stages, and the two refusals that are the whole point of
+    /// staging it in the tool rather than in the script. Off the real
+    /// `deb-families` fixture, so the recipe is a declaration's and not a
+    /// constructed one, and off `documents` rather than `stage` because the
+    /// references are the caller's — resolving them reads $IMAGE_REGISTRY and
+    /// a git remote, and neither belongs in a unit test.
+    #[test]
+    fn an_iso_stages_both_recipes_and_refuses_a_local_update_origin() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/repos/deb-families");
+        let list = crate::model::image::List::load(&root).0;
+        let staged = documents(
+            &list,
+            "forky",
+            "localhost/forky:latest",
+            "ghcr.io/someone/forky:latest",
+        )
+        .expect("a debian target has a measured recipe");
+        let named: Vec<_> = staged.iter().map(|(name, _)| *name).collect();
+        assert_eq!(
+            named,
+            [
+                "recipe.json",
+                "media.json",
+                "Containerfile",
+                "efi-from-image.patch"
+            ]
+        );
+        let at = |want| staged.iter().find(|(name, _)| *name == want).unwrap();
+        // The store is named in both halves it has to be named in, and they
+        // are the halves nothing upstream connects: the recipe reaches the
+        // install container, the storage.conf reaches the pull before it.
+        assert!(at("recipe.json").1.contains(crate::emit::recipe::STORE));
+        // What fisherman installs is the name the media holds the bytes under,
+        // which is the published one: the local build appears only as the
+        // media recipe's source, and naming it here reaches for a registry.
+        assert!(at("recipe.json")
+            .1
+            .contains("\"image\": \"ghcr.io/someone/forky:latest\""));
+        assert!(!at("recipe.json").1.contains("localhost/"));
+        assert!(at("Containerfile").1.contains(crate::emit::recipe::STORE));
+        // The media embeds the local bytes under the published name, which is
+        // what makes the install offline and the update origin right at once.
+        assert!(at("media.json")
+            .1
+            .contains("\"source\": \"localhost/forky:latest\""));
+        assert!(at("media.json")
+            .1
+            .contains("\"ref\": \"ghcr.io/someone/forky:latest\""));
+
+        // A local namespace is where a disk gets away with recording nothing
+        // and a machine does not: refuse it by name rather than install one.
+        let local = documents(
+            &list,
+            "forky",
+            "localhost/forky:latest",
+            "localhost/forky:latest",
+        )
+        .unwrap_err();
+        assert!(local.contains("IMAGE_REGISTRY"), "{local}");
+        // And a family with no measured answer is refused before a disk is
+        // erased, not after.
+        let unknown =
+            documents(&list, "not-a-target", "image", "ghcr.io/someone/x:latest").unwrap_err();
+        assert!(unknown.contains("no measured install recipe"), "{unknown}");
     }
 
     #[test]

@@ -111,6 +111,17 @@ pub const STORE: &str = "/var/lib/tectonic/store";
 /// measured off a 20G recipe was 518 MB.
 const SIZE: &str = "20G";
 
+/// The live environment the media boots, layered on the image being installed.
+/// A compile-time asset rather than a generated file: it varies with nothing
+/// but the recipe staged beside it, so committing it into every repository
+/// would buy nothing and every fixture would gain it.
+pub const LIVE_ENV: &str = include_str!("installer.Containerfile");
+
+/// The one patch this project carries upstream, applied to tacklebox in the
+/// live environment's builder stage. It belongs beside the Containerfile that
+/// applies it, and both are staged into the same build context.
+pub const EFI_PATCH: &str = include_str!("installer-efi-from-image.patch");
+
 /// What the live environment is built and tagged as. Per target rather than
 /// one name for every repository, because the media's recipe is baked into it
 /// and root's image store is shared: a stale tag there ships silently.

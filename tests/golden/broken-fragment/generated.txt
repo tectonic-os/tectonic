@@ -7,7 +7,6 @@
 ==== generated/lib/sign-helpers.sh
 ==== generated/lib/wrap-helpers.sh
 ==== scripts/lint.sh
-==== scripts/render-iso-config.sh
 ==== scripts/tect.sh
 ==== scripts/vm.sh
 ==== generated/broken-fragment/modules/core/early.sh

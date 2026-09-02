@@ -34,8 +34,7 @@ example/
 ├── .github/
 │   └── + renovate.json5
 ├── disk_config/
-│   ├── + disk.toml
-│   └── + iso.template.toml
+│   └── + disk.toml
 ├── modules/
 │   └── + .gitkeep
 ├── scripts/

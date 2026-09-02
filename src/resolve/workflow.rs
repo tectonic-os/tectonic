@@ -12,12 +12,11 @@ use std::path::{Path, PathBuf};
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Needs {
     Nothing,
-    /// Both halves of the disk workflow, measured 2026-08-31 and failing for
-    /// two different reasons. The iso is **Anaconda's**, which is Fedora's
-    /// installer with no deb equivalent to point the builder at — say Anaconda
-    /// and not *installer iso*, because an Anaconda-free one is a different
-    /// question and `BACKLOG.md` holds it. The qcow2 dies in the **SELinux
-    /// relabel**, `setfiles` against a policy a deb image does not carry.
+    /// The disk workflow, measured 2026-08-31: it dies in the **SELinux
+    /// relabel**, `setfiles` against a policy a deb image does not carry. It
+    /// built an installer iso too until the Anaconda path was deleted, and
+    /// that half is now `tect vm build iso`, which needs no builder and no
+    /// family.
     Fedora,
     /// A module taking a `KERNEL` build arg, which is what it tracks.
     Kernel,
@@ -85,7 +84,7 @@ pub const SHIPPED: &[Shipped] = &[
     ),
     shipped!(
         "build-disk",
-        "builds a disk image and an installer iso",
+        "builds a disk image with bootc-image-builder",
         Needs::Fedora,
         None
     ),
@@ -161,9 +160,10 @@ impl Basis {
     }
 }
 
-/// The one family a disk is built from: `bootc-image-builder` installs with
-/// Anaconda and relabels its buildroot with SELinux, and no deb image carries
-/// either. `build-disk.yml` gates on it, and so does `tect vm`.
+/// The one family `bootc-image-builder` converts: it relabels its buildroot
+/// with SELinux, and no deb image carries a policy to relabel against.
+/// `build-disk.yml` gates on it, and so does `tect vm` for a `qcow2` or a
+/// `raw`. An installer iso is not converted by it and is not gated on it.
 pub(crate) const FEDORA: &str = "fedora";
 const KERNEL_ARG: &str = "KERNEL";
 
@@ -305,7 +305,7 @@ mod tests {
             met("smoke-test"),
             "it installs out of the image, not a family"
         );
-        assert!(!met("build-disk"), "the installer iso is Anaconda's");
+        assert!(!met("build-disk"), "the builder relabels with SELinux");
     }
 
     #[test]

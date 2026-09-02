@@ -60,10 +60,6 @@ pub(crate) const SCRIPTS: &[(&str, &str)] = &[
         include_str!("../../assets/scripts/lint.sh"),
     ),
     (
-        "scripts/render-iso-config.sh",
-        include_str!("../../assets/scripts/render-iso-config.sh"),
-    ),
-    (
         "scripts/tect.sh",
         include_str!("../../assets/scripts/tect.sh"),
     ),

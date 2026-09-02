@@ -2221,7 +2221,7 @@ fn golden() {
         !init.join("lib").exists(),
         "lib is generated; it must not land in the editable scaffold"
     );
-    for script in ["tect.sh", "lint.sh", "render-iso-config.sh"] {
+    for script in ["tect.sh", "lint.sh", "vm.sh"] {
         assert!(
             !init.join("scripts").join(script).exists(),
             "{script} is generated; it must not land in the editable scaffold"

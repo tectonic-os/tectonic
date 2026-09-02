@@ -8,8 +8,6 @@ on:
       - main
     paths:
       - 'disk_config/disk.toml'
-      - 'disk_config/iso.template.toml'
-      - 'scripts/render-iso-config.sh'
       - '.github/workflows/build-disk.yml'
 
 permissions: {}
@@ -46,13 +44,15 @@ jobs:
             '.images[] | select([.targets[].name] | index($t)) | .base.family' \
             <<< "$plan")"
           echo "family=${family}" >> "$GITHUB_OUTPUT"
-          # Measured 2026-08-31 against two deb bootc bases: the iso wants
-          # Anaconda, and the qcow2 does not get that far, dying in `setfiles`
-          # against an SELinux policy a deb image does not carry. A base built
-          # from `debian:forky` adds a second, earlier refusal, measured
-          # 2026-09-01: Debian omits VERSION_ID from os-release until release,
-          # and the builder will not generate a manifest without it.
-          [ "$family" = fedora ] || echo "::warning::the builder installs with Anaconda and relabels its buildroot with SELinux, and the ${family} family carries neither, so it builds no disk here"
+          # Measured 2026-08-31 against two deb bootc bases: the qcow2 dies in
+          # `setfiles`, relabelling its buildroot against an SELinux policy a
+          # deb image does not carry. A base built from `debian:forky` adds a
+          # second, earlier refusal, measured 2026-09-01: Debian omits
+          # VERSION_ID from os-release until release, and the builder will not
+          # generate a manifest without it. The installer iso is not this
+          # workflow's any more — `tect vm build iso` builds one for every
+          # family and calls no builder at all.
+          [ "$family" = fedora ] || echo "::warning::the builder relabels its buildroot with SELinux, and the ${family} family carries no policy, so it builds no disk here"
 
   build:
     name: Build disk images
@@ -62,7 +62,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        disk-type: ["qcow2", "anaconda-iso"]
+        disk-type: ["qcow2"]
     permissions:
       contents: read
       packages: read
@@ -90,10 +90,6 @@ jobs:
         uses: ublue-os/remove-unwanted-software@cc0becac701cf642c8f0a6613bbdaf5dc36b259e # v9
         with:
           remove-codeql: true
-
-      - name: Render the installer config
-        if: matrix.disk-type == 'anaconda-iso'
-        run: echo "ISO_CONFIG=$(./scripts/render-iso-config.sh)" >> "${GITHUB_ENV}"
 
       - name: Select a working container runtime
         run: |
@@ -151,7 +147,7 @@ jobs:
         uses: osbuild/bootc-image-builder-action@30960621b85c9e76c653082f9ef4cab5a10210d5 # main
         with:
           builder-image: ${{ env.BIB_IMAGE }}
-          config-file: ${{ matrix.disk-type == 'anaconda-iso' && env.ISO_CONFIG || './disk_config/disk.toml' }}
+          config-file: './disk_config/disk.toml'
           image: ${{ env.IMAGE_REF }}
           chown: ${{ env.USER_UID }}:${{ env.USER_GID }}
           types: ${{ matrix.disk-type }}

@@ -567,9 +567,33 @@ or `iso`, asked for where there is a terminal to ask on. `build` converts,
 - It reads the image out of rootful podman, so it asks for sudo and copies the
   image into root's store with `podman image scp` where it is not there.
 - Fedora disks use bootc-image-builder. Other families use `bootc install
-  to-disk --composefs-backend --filesystem ext4` for `qcow2` and `raw`; an
-  installer `iso` remains Fedora-only. The family is read off the target's base,
-  so an `--image` naming a ref this repository does not describe is not guessed.
+  to-disk --composefs-backend --filesystem ext4` for `qcow2` and `raw`. The
+  family is read off the target's base, so an `--image` naming a ref this
+  repository does not describe is not guessed.
+- An `iso` is converted by neither, on any family. It is a live environment
+  layered on the target's own image, carrying fisherman and the target's bytes,
+  assembled into media by tacklebox — both built from source pins in the same
+  build. `tect vm build iso` stages the two recipes, the live environment's
+  Containerfile and one upstream patch under `out/bootiso/`; they are not
+  generated files, because each depends on `--target`, `--tag` and
+  `$IMAGE_REGISTRY`, which are build-time rather than commit-time.
+- The recipe derives `composeFsBackend`, `genericImage`, `bootloader`,
+  `filesystem` and the admin group from the base family, and refuses a family
+  it has no measured answer for rather than guessing: a wrong value there is a
+  disk that is erased and then does not boot. `tect recipe` prints the same
+  document.
+- Building an `iso` needs a published reference, and says so when there is
+  none. The media installs local bytes while recording `$IMAGE_REGISTRY`'s
+  reference as the installed machine's update origin, so a local namespace
+  would write `localhost/...` into a machine. A disk records nothing and is
+  not refused for this.
+- `run iso` keeps its target disk under `out/bootiso/storage/`, so completing
+  an install and rebooting tests what was installed.
+- The live environment autologins root on the console and asks for no VM
+  password, because the installer partitions disks and creates the installed
+  machine's account itself. That console is the installer media's, never the
+  target's: it is a separate image built per target, and no byte of it reaches
+  the disk.
 - The composefs backend will not read the image out of containers-storage, so
   `skopeo copy` writes it to an OCI layout under `out/oci-cache` and
   `--source-imgref oci:` points the install at that. It needs `skopeo`. This
