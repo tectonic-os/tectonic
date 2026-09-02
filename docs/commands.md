@@ -1,7 +1,7 @@
 # Commands
 
-`tect --help` lists the commands a person runs: `upgrade` and `create repo`,
-and the ones that need a repository. The two families at the end of this file — what a build
+`tect --help` lists the commands a person runs: `upgrade`, `create repo` and
+`install`, and the ones that need a repository. The two families at the end of this file — what a build
 runs against, and what runs inside a build layer — are the contract rather than
 the help, and are not in that list.
 
@@ -128,6 +128,49 @@ location is defined in the command:
   `sha256` checks what arrived. Delete the block or replace it with a tagged and
   hashed pin if that trade is not one you want.
 - A repository does not nest, and one inside another is refused.
+
+## Installing onto a machine
+
+### `install`
+
+Installs a built tectonic image onto this machine's disk, from a payload rather
+than from a registry. `fisherman` is the backend and does the partitioning, the
+LUKS work and the `bootc install`; this finds the payload, completes its recipe
+and hands it over.
+
+#### Flags:
+    --from <dir>          the payload root, else /usr/share/tectonic
+    --disk <dev>          the block device to erase and install onto
+    --user <name>         the account to create, in the target's admin group
+    --password <secret>   its password, hashed before it is written anywhere
+
+#### Notes:
+- **A payload root is a directory carrying `install-recipe.json`.** That is the
+  whole discovery rule. The document is what `tect recipe` emits and what
+  `tect vm build iso` bakes onto installer media, and it names the image and the
+  store beside it — so nothing here opens a container image or re-derives a boot
+  chain.
+- **A payload wins over a repository, which is the opposite of how a repository
+  wins over a booted image everywhere else.** For authoring, the repository is
+  the source and is the more specific answer. For installing, the payload is the
+  artifact: it is already built, and rebuilding it to reach the same bytes is the
+  slowest possible way to be less certain.
+- A root holding a `repo.kdl` and nothing built is refused naming `tect build`,
+  and a root holding neither is refused naming both files. Either refusal comes
+  before anything is asked, so nobody is asked for a disk to erase on a root that
+  cannot install.
+- The three flags are the person's half of the recipe and nothing derives them.
+  With nobody to ask, each missing one fails naming itself; there is no default
+  disk.
+- The password is hashed with `openssl passwd -6` before it reaches the recipe,
+  and the completed recipe is written `0600` under `$TMPDIR`. Fisherman hands the
+  field to `chpasswd`, and only a `$`-prefixed crypt string takes its `-e`
+  branch: a plaintext one goes through PAM and dies after the OS is already on
+  the disk.
+- `user.groups` is merged rather than replaced. The group in the emitted recipe
+  is the *target's* admin group — `sudo` on Debian, `wheel` on Fedora — and
+  `useradd` refuses the whole call when it is handed a group the target has not
+  got.
 
 ## Working in a repository
 

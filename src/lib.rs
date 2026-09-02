@@ -11,6 +11,7 @@ pub mod emit;
 pub mod fetch;
 pub mod import;
 pub mod init;
+pub mod install;
 pub mod key;
 pub mod layout;
 pub mod model;

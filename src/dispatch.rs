@@ -48,8 +48,14 @@ pub struct Flags {
     pub images: Vec<String>,
     pub module: Option<String>,
     pub cn: Option<String>,
-    /// Where `set key` reads the public half it records from.
+    /// Where `set key` reads the public half it records from, and the root
+    /// `install` reads a payload from.
     pub from: Option<String>,
+    /// `install`'s three: the person's half of a recipe, which nothing
+    /// derives and no flag defaults.
+    pub disk: Option<String>,
+    pub user: Option<String>,
+    pub password: Option<String>,
     pub base: Option<String>,
     pub format: Option<String>,
     pub target: Option<String>,
@@ -360,6 +366,9 @@ pub fn dispatch(
         module: module_arg,
         cn,
         from,
+        disk,
+        user,
+        password,
         base,
         format,
         target,
@@ -392,6 +401,31 @@ pub fn dispatch(
                 )));
             }
             crate::upgrade::run()?;
+            Ok(ExitCode::SUCCESS)
+        }
+        // The installer this project owns. Discovery says what a root holds;
+        // the three flags are the person's half of the recipe, and with
+        // nobody to ask each one fails naming itself rather than guessing a
+        // disk to erase.
+        Verb::Install => {
+            if let [word, ..] = rest {
+                return Err(Error::Invocation(format!(
+                    "`{}` does not take {word}",
+                    spec.name()
+                )));
+            }
+            let root = from
+                .map(PathBuf::from)
+                .unwrap_or_else(crate::install::media);
+            let found = crate::install::classify(&root)?;
+            let payload = found.payload()?;
+            let answers = crate::install::Answers {
+                disk: prompt.text(disk, "which disk to erase and install onto", "--disk", None)?,
+                user: prompt.text(user, "the account to create", "--user", None)?,
+                // Stage 3 reads this one masked; it is the same call site.
+                password: prompt.text(password, "its password", "--password", None)?,
+            };
+            crate::install::run(payload, &answers)?;
             Ok(ExitCode::SUCCESS)
         }
         Verb::CreateRepo => {

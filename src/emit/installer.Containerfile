@@ -71,6 +71,12 @@ FROM ${PAYLOAD}
 # error text says to install systemd. tunaOS lost an image, an ISO and a live
 # boot to that, so this asserts the binaries and never the packages.
 #
+# openssl is `tect install`'s password hash. Fisherman hands the recipe's
+# password to chpasswd, and only a `$`-prefixed crypt string takes the `-e`
+# branch: a plaintext one goes through PAM and dies after the OS is already on
+# the disk. `openssl passwd -6 -stdin` is what produces it, and crypt(3) is not
+# an option here — glibc keeps it in libcrypt rather than libc.
+#
 # The fedora arm is not measured: no tect fedora image has assembled an ISO
 # through this yet. The assertion below is what makes a wrong package name a
 # failed ISO build rather than a wiped disk.
@@ -78,18 +84,18 @@ RUN set -eux; \
     if command -v apt-get > /dev/null 2>&1; then \
         apt-get update -y; \
         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            podman fuse-overlayfs systemd-cryptsetup cryptsetup skopeo \
+            podman fuse-overlayfs systemd-cryptsetup cryptsetup skopeo openssl \
             fdisk dosfstools e2fsprogs xfsprogs; \
         apt-get clean -y; \
         rm -rf /var/lib/apt/lists/*; \
     else \
         dnf install -y --setopt=install_weak_deps=False \
-            podman fuse-overlayfs cryptsetup skopeo \
+            podman fuse-overlayfs cryptsetup skopeo openssl \
             util-linux dosfstools e2fsprogs xfsprogs; \
         dnf clean all; \
     fi; \
     for tool in podman fuse-overlayfs skopeo cryptsetup systemd-cryptenroll \
-        sfdisk mkfs.fat mkfs.ext4 mkfs.xfs; do \
+        openssl sfdisk mkfs.fat mkfs.ext4 mkfs.xfs; do \
         command -v "$tool" > /dev/null 2>&1 \
             || { echo "the live environment has no ${tool}" >&2; exit 1; }; \
     done
