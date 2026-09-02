@@ -126,7 +126,7 @@ impl Repo {
                 .iter()
                 .map(|(_, label, value)| (label.to_string(), value.clone()))
                 .collect();
-            match crate::ui::review(copy::REVIEW, &drawn)? {
+            match crate::ui::review(copy::REVIEW, &drawn, copy::CREATE, copy::REVIEW_KEYS)? {
                 // Nothing was written, so leaving is a leaving rather than a
                 // failure, the way every other widget's is.
                 None => return Ok(None),

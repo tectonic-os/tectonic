@@ -1,0 +1,26 @@
+Computer Name [deb2]: 
+
+Username: tect
+
+[6n
+
+[1;1H[1m[38;5;6;49mPassword:[3;1H[22m[2m[39;49mtyped and not shown, enter confirms[39m[49m[59m[0m[?25l[2;1H*[39m[49m[59m[0m[?25l[2;2H*[39m[49m[59m[0m[?25l[2;3H*[39m[49m[59m[0m[?25l[2;4H*[39m[49m[59m[0m[?25l[2;5H*[39m[49m[59m[0m[?25l[2;6H*[39m[49m[59m[0m[?25l[2;7H*[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25h[6n
+
+[1;1H[1m[38;5;6;49mRetype password:[3;1H[22m[2m[39;49mtyped and not shown, enter confirms[39m[49m[59m[0m[?25l[2;1H*[39m[49m[59m[0m[?25l[2;2H*[39m[49m[59m[0m[?25l[2;3H*[39m[49m[59m[0m[?25l[2;4H*[39m[49m[59m[0m[?25l[2;5H*[39m[49m[59m[0m[?25l[2;6H*[39m[49m[59m[0m[?25l[2;7H*[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hPassword: set
+
+[6n
+
+
+
+
+[1;1H[1m[38;5;6;49mEncryption type[2;1H[22m[39;49m>[2;3Hnone[2;9H[2mnot encrypted[3;3H[22mtpm2-luks[3;14H[2munlocked by TPM[4;3H[22mluks-passphrase[4;20H[2munlocked by passphrase[5;3H[22mtpm2-luks-passphrase[5;25H[2mTPM with passphrase fallback[6;1Hup and down to move, enter to choose, esc cancels[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hEncryption type: none
+
+[6n
+
+
+
+
+
+
+
+[1;1H[1m[38;5;6;49mEverything on /dev/null is erased. Nothing survives.[2;1H[22m[39;49m>[2;3Hdisk[2;17H[2m/dev/null[3;3H[22mmachine[3;11Hname[3;17H[2mdeb2[4;3H[22muser[4;8Hname[4;17H[2mtect[5;3H[22mpassword[5;17H[2mset[6;3H[22mencryption[6;17H[2mnone[8;3H[22mErase[8;9Hand[8;13Hinstall[9;1H[2menter to change a field, esc cancels[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25h==== exit 0

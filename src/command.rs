@@ -189,7 +189,15 @@ pub const COMMANDS: &[Spec] = &[
         about: "install a built tectonic image onto this machine",
         family: Family::Anywhere,
         host: false,
-        takes: &["from", "disk", "user", "password"],
+        takes: &[
+            "from",
+            "disk",
+            "hostname",
+            "user",
+            "password",
+            "encryption",
+            "passphrase",
+        ],
     },
     Spec {
         verb: Verb::CreateRepo,

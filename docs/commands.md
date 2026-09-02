@@ -139,10 +139,17 @@ LUKS work and the `bootc install`; this finds the payload, completes its recipe
 and hands it over.
 
 #### Flags:
-    --from <dir>          the payload root, else /usr/share/tectonic
+    --from <dir>          the payload root, else the one a TECT partition or
+                          this media carries
     --disk <dev>          the block device to erase and install onto
+    --hostname <name>     what the installed machine is called, else the
+                          published name the recipe carries
     --user <name>         the account to create, in the target's admin group
     --password <secret>   its password, hashed before it is written anywhere
+    --encryption <type>   none, tpm2-luks, luks-passphrase or
+                          tpm2-luks-passphrase; none by default
+    --passphrase <secret> what unlocks the disk, for the two forms that
+                          are named for it
 
 #### Notes:
 - **A payload root is a directory carrying `install-recipe.json`.** That is the
@@ -150,6 +157,30 @@ and hands it over.
   `tect vm build iso` bakes onto installer media, and it names the image and the
   store beside it — so nothing here opens a container image or re-derives a boot
   chain.
+- **Where the root comes from, when no `--from` names one, is the filesystem
+  label `TECT`.** One partition carrying it is mounted read-only at
+  `/run/tect-payload` and classified there; more than one is refused naming
+  every one of them, because picking wrong erases a disk from the wrong image.
+  With none, the root is `/usr/share/tectonic`, which is where installer media
+  carries its own recipe beside the manifest — so a labelled partition
+  overrides the media, and someone who attached one did that deliberately.
+- **On a terminal the flags are screens instead**: the disk offered as the whole
+  disks `/sys/block` holds with their size, model and whether they are
+  removable; the password and the passphrase typed masked and asked twice, since
+  neither is visible to correct and a mistyped one is a machine nobody can log
+  into; and the whole set reviewed on one screen, which says what is erased
+  before it offers to erase it and lets any row be answered again. Leaving that
+  screen exits 0 having touched nothing.
+- Encryption is fisherman's, and the two forms whose name ends in `passphrase`
+  are the two it refuses the recipe without one. The `tpm2-` forms are shown and
+  not pickable on a machine with no `/dev/tpmrm0`. For `tpm2-luks` fisherman
+  prints a recovery key once, and the install echoes it on a line of its own:
+  it is the only copy there will ever be.
+- Fisherman writes a JSON event per line, and each one is rendered as a line —
+  `[ 45%] 7/12 install OS` — over whatever else it prints. Nothing here draws a
+  full-screen progress view: an alternate screen takes the transcript with it
+  when it exits, and this is the one program whose failures happen on someone
+  else's machine.
 - **A payload wins over a repository, which is the opposite of how a repository
   wins over a booted image everywhere else.** For authoring, the repository is
   the source and is the more specific answer. For installing, the payload is the

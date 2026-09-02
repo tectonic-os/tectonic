@@ -383,6 +383,13 @@ pub fn text(value: &Json, key: &str) -> Option<String> {
     }
 }
 
+pub fn number(value: &Json, key: &str) -> Option<u32> {
+    match field(value, key) {
+        Some(Json::Number(found)) => Some(*found),
+        _ => None,
+    }
+}
+
 pub fn items<'a>(value: &'a Json, key: &str) -> &'a [Json] {
     match field(value, key) {
         Some(Json::Array(found)) => found,

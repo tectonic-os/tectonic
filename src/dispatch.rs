@@ -51,11 +51,13 @@ pub struct Flags {
     /// Where `set key` reads the public half it records from, and the root
     /// `install` reads a payload from.
     pub from: Option<String>,
-    /// `install`'s three: the person's half of a recipe, which nothing
-    /// derives and no flag defaults.
+    /// `install`'s half of a recipe, which the payload does not answer.
     pub disk: Option<String>,
+    pub hostname: Option<String>,
     pub user: Option<String>,
     pub password: Option<String>,
+    pub encryption: Option<String>,
+    pub passphrase: Option<String>,
     pub base: Option<String>,
     pub format: Option<String>,
     pub target: Option<String>,
@@ -367,8 +369,11 @@ pub fn dispatch(
         cn,
         from,
         disk,
+        hostname,
         user,
         password,
+        encryption,
+        passphrase,
         base,
         format,
         target,
@@ -414,16 +419,24 @@ pub fn dispatch(
                     spec.name()
                 )));
             }
-            let root = from
-                .map(PathBuf::from)
-                .unwrap_or_else(crate::install::media);
+            let root = match from {
+                Some(from) => PathBuf::from(from),
+                None => crate::install::root()?,
+            };
             let found = crate::install::classify(&root)?;
             let payload = found.payload()?;
-            let answers = crate::install::Answers {
-                disk: prompt.text(disk, "which disk to erase and install onto", "--disk", None)?,
-                user: prompt.text(user, "the account to create", "--user", None)?,
-                // Stage 3 reads this one masked; it is the same call site.
-                password: prompt.text(password, "its password", "--password", None)?,
+            eprintln!("tect: {}, from {}", payload.image, root.display());
+            let given = crate::install::Given {
+                disk,
+                hostname,
+                user,
+                password,
+                encryption,
+                passphrase,
+            };
+            // Leaving the review is a leaving: no disk has been touched.
+            let Some(answers) = crate::install::Answers::collect(payload, given, prompt)? else {
+                return Ok(ExitCode::SUCCESS);
             };
             crate::install::run(payload, &answers)?;
             Ok(ExitCode::SUCCESS)

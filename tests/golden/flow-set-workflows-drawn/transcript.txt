@@ -3,7 +3,7 @@ Which workflows?: build, build-disk, base-sig-probe, cleanup-registry, smoke-tes
 [6n
 
 
-[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hPublish images only on scheduled builds?: Yes
+[1;1H[1m[38;5;6;49mPublish images only on scheduled builds?[2;1H[22m[39;49m>[2;3HYes[3;3HNo[4;1H[2mup and down to move, enter to answer[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hPublish images only on scheduled builds?: Yes
 
 what time the daily build runs, UTC [12:30]: 
 

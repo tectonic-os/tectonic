@@ -6,6 +6,12 @@ use crate::ui::{Answer, Choice};
 use std::cell::Cell;
 use std::io::{IsTerminal, Write};
 
+/// A question drawn on its own may end in a colon; one with a default, a
+/// range or an answer written after it must not carry two.
+fn stem(question: &str) -> &str {
+    question.trim_end_matches(':')
+}
+
 /// A file of answers, one per line, which a run answers from instead of asking.
 /// What the transcript goldens drive the binary with.
 const SCRIPT: &str = "TECT_ANSWERS";
@@ -106,7 +112,8 @@ impl Prompt {
         let missing = || match default {
             Some(default) => Ok(default.to_string()),
             None => Err(format!(
-                "give {flag}, since nothing can be asked here: {question}"
+                "give {flag}, since nothing can be asked here: {}",
+                stem(question)
             )),
         };
         if !self.ask {
@@ -114,14 +121,46 @@ impl Prompt {
         }
         let answer = match default {
             Some(default) => {
-                let question = format!("{question} [{default}]");
+                let question = format!("{} [{default}]", stem(question));
                 self.read(&question, &format!("{question}: "))?
             }
-            None => self.read(question, &format!("{question}: "))?,
+            None => self.read(question, &format!("{}: ", stem(question)))?,
         };
         match answer.is_empty() {
             true => missing(),
             false => Ok(answer),
+        }
+    }
+
+    /// The same, not echoed, and asked twice: a mistyped passphrase is a disk
+    /// that does not unlock and a mistyped password an account nobody can log
+    /// into, and neither is visible to correct. A redirected or scripted run
+    /// has no screen to hide it from and reads it as a line.
+    pub fn secret(
+        &self,
+        given: Option<String>,
+        question: &str,
+        flag: &str,
+    ) -> Result<String, String> {
+        if let Some(value) = given.filter(|value| !value.is_empty()) {
+            return Ok(value);
+        }
+        if !self.draw {
+            return self.text(None, question, flag, None);
+        }
+        loop {
+            let typed = crate::ui::secret(question)?;
+            if typed.is_empty() {
+                return Err(format!(
+                    "give {flag}, since nothing was typed: {}",
+                    stem(question)
+                ));
+            }
+            if typed == crate::ui::secret(crate::copy::PASSWORD_AGAIN)? {
+                println!("{}: {}\n", stem(question), crate::copy::PASSWORD_SET);
+                return Ok(typed);
+            }
+            println!("{}", crate::copy::NO_MATCH);
         }
     }
 
@@ -141,14 +180,15 @@ impl Prompt {
         let missing = || match default {
             Some(default) => Ok(default.to_string()),
             None => Err(format!(
-                "give {flag}, since nothing can be asked here: {question}"
+                "give {flag}, since nothing can be asked here: {}",
+                stem(question)
             )),
         };
         if !self.ask {
             return missing();
         }
         let question = match default {
-            Some(default) => format!("{question} [{default}]"),
+            Some(default) => format!("{} [{default}]", stem(question)),
             None => question.to_string(),
         };
         match self.read(&question, &format!("{question}\n{prefix}"))? {
@@ -181,10 +221,10 @@ impl Prompt {
         }
         if self.draw {
             let chosen = crate::ui::confirm_current(question, yes, no, current)?;
-            println!("{question}: {}\n", if chosen { yes } else { no });
+            println!("{}: {}\n", stem(question), if chosen { yes } else { no });
             return Ok(chosen);
         }
-        let question = format!("{question} ({yes}/{no})");
+        let question = format!("{} ({yes}/{no})", stem(question));
         let answer = self.read(&question, &format!("{question}\n"))?;
         if answer.is_empty() {
             return Ok(current);
@@ -230,12 +270,12 @@ impl Prompt {
         if self.draw {
             let chosen = crate::ui::select_current(question, options, current.unwrap_or(0))?;
             if let Some(index) = chosen {
-                println!("{question}: {}\n", options[index].label);
+                println!("{}: {}\n", stem(question), options[index].label);
             }
             return Ok(chosen);
         }
         self.numbered(options, current.as_slice());
-        let question = format!("{question} [{}, 0 for none]", range(options));
+        let question = format!("{} [{}, 0 for none]", stem(question), range(options));
         let answer = self.read(&question, &format!("{question}: "))?;
         if let (true, Some(current)) = (answer.is_empty(), current) {
             return Ok(Some(current));
@@ -266,7 +306,7 @@ impl Prompt {
         }
         if self.draw {
             let answer = crate::ui::multi(question, options, on)?;
-            println!("{question}: {}\n", said(&answer, options));
+            println!("{}: {}\n", stem(question), said(&answer, options));
             return Ok(answer);
         }
         self.numbered(options, on);
@@ -274,7 +314,11 @@ impl Prompt {
             1 => "",
             _ => ", several",
         };
-        let question = format!("{question} [{}{several}, 0 for none]", range(options));
+        let question = format!(
+            "{} [{}{several}, 0 for none]",
+            stem(question),
+            range(options)
+        );
         let answer = self.read(&question, &format!("{question}: "))?;
         if answer.is_empty() {
             return Ok(Answer::Chosen(on.to_vec()));

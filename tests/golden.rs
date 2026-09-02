@@ -2184,6 +2184,50 @@ fn flows() {
 
 /// The reference in docs/schema.md, re-rendered from the tables. The renderer
 /// is what checks that every marker names a schema and every schema is marked.
+/// Every screen `tect install` draws, over a payload root and on a real
+/// terminal: the name and the account as lines, the password masked and asked
+/// twice, the encryption picked, and the review that says what is erased.
+/// `esc` on that review is a leaving — exit 0, and no disk was touched, which
+/// is the property that makes the screen safe to reach.
+#[test]
+fn install_screens() {
+    let dir = empty("flow-install-drawn");
+    std::fs::write(
+        dir.join(tect::install::RECIPE),
+        r#"{
+  "image": "ghcr.io/tectonic-os/deb2:latest",
+  "targetImgref": "ghcr.io/tectonic-os/deb2:latest",
+  "composeFsBackend": true,
+  "genericImage": true,
+  "bootloader": "systemd",
+  "filesystem": "ext4",
+  "hostname": "deb2",
+  "user": { "groups": ["sudo"] }
+}
+"#,
+    )
+    .unwrap();
+    // `--disk` is given so the picker does not read this machine's own
+    // `/sys/block`, which no two hosts agree on.
+    drawn_flow(
+        "flow-install-drawn",
+        &dir,
+        &format!(
+            "'{}' install --from . --disk /dev/null",
+            env!("CARGO_BIN_EXE_tect")
+        ),
+        "Computer Name [deb2]: ",
+        &[b"\r", b"tect\r", b"hunter2\r", b"hunter2\r", b"\r", b"\x1b"],
+    );
+    // The one thing this screen exists to guarantee: what was typed is not in
+    // the transcript, which is what a serial console keeps and what a failed
+    // install is read back from.
+    let transcript =
+        std::fs::read_to_string(crate_dir().join("tests/golden/flow-install-drawn/transcript.txt"))
+            .unwrap();
+    assert!(!transcript.contains("hunter2"), "{transcript}");
+}
+
 #[test]
 fn schema_doc() {
     let path = crate_dir().join("docs/schema.md");

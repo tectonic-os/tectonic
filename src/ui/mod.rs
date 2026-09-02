@@ -5,7 +5,7 @@
 pub mod table;
 pub mod tree;
 
-use crate::copy::{CREATE, EITHER, NEST, PICK, REVIEW_KEYS, TOGGLE};
+use crate::copy::{EITHER, NEST, PICK, SECRET_KEYS, TOGGLE};
 
 use ratatui::backend::Backend;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
@@ -184,13 +184,29 @@ pub fn multi(question: &str, options: &[Choice], on: &[usize]) -> Result<Answer,
 }
 
 /// The answers a command has collected, one row per piece of configuration,
-/// with `Create` under them. `Some(rows.len())` is `Create`, anything smaller
+/// with `action` under them. `Some(rows.len())` is `action`, anything smaller
 /// is the row to ask again, and `None` is a cancel.
 ///
 /// It sizes to its rows rather than to `VISIBLE`, which exists for lists
 /// nothing bounds. This one is bounded by the questions the command has, which
-/// is known and small, so `Create` cannot scroll off.
-pub fn review(question: &str, rows: &[(String, String)]) -> Result<Option<usize>, String> {
+/// is known and small, so the action cannot scroll off.
+pub fn review(
+    question: &str,
+    rows: &[(String, String)],
+    action: &str,
+    keys: &str,
+) -> Result<Option<usize>, String> {
+    let options = sheet(rows, action);
+    let chosen = inline((options.len() + 2) as u16, |terminal| {
+        pick(terminal, question, &options, keys, 0)
+    })?;
+    // The spacer is never landed on, so anything past the last row is the action.
+    Ok(chosen.map(|at| at.min(rows.len())))
+}
+
+/// The rows as they are drawn: labels padded to one column, a spacer, and the
+/// action last.
+fn sheet(rows: &[(String, String)], action: &str) -> Vec<Choice> {
     let width = rows
         .iter()
         .map(|(label, _)| label.chars().count())
@@ -201,12 +217,43 @@ pub fn review(question: &str, rows: &[(String, String)]) -> Result<Option<usize>
         .map(|(label, value)| Choice::new(format!("{label:<width$}"), value))
         .collect();
     options.push(Choice::new("", ""));
-    options.push(Choice::new(CREATE, ""));
-    let chosen = inline((options.len() + 2) as u16, |terminal| {
-        pick(terminal, question, &options, REVIEW_KEYS, 0)
-    })?;
-    // The spacer is never landed on, so anything past the last row is `Create`.
-    Ok(chosen.map(|at| at.min(rows.len())))
+    options.push(Choice::new(action, ""));
+    options
+}
+
+/// A line typed and not echoed. Empty is what esc answers, and the caller
+/// turns that into the refusal naming its flag.
+pub fn secret(question: &str) -> Result<String, String> {
+    inline(3, |terminal| {
+        let mut typed = String::new();
+        loop {
+            terminal
+                .draw(|frame| masked(frame, question, typed.chars().count()))
+                .map_err(|err| err.to_string())?;
+            let Some(key) = read()? else { continue };
+            match key {
+                KeyCode::Enter => return Ok(typed),
+                KeyCode::Esc => return Ok(String::new()),
+                KeyCode::Backspace => {
+                    typed.pop();
+                }
+                KeyCode::Char(letter) => typed.push(letter),
+                _ => {}
+            }
+        }
+    })
+}
+
+fn masked(frame: &mut Frame, question: &str, typed: usize) {
+    let [head, body, foot] = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Min(1),
+        Constraint::Length(1),
+    ])
+    .areas(frame.area());
+    frame.render_widget(Line::from(question.bold().cyan()), head);
+    frame.render_widget(Line::from("*".repeat(typed)), body);
+    frame.render_widget(Line::from(SECRET_KEYS.dim()), foot);
 }
 
 /// The lines a question takes: its rows, whatever they are, under the question
@@ -215,12 +262,34 @@ fn height(rows: usize) -> u16 {
     (rows.min(VISIBLE) + 2) as u16
 }
 
+/// A serial console comes up 0x0 and nothing on it ever sends `SIGWINCH`, so a
+/// viewport laid out for the size it is told draws nothing at all. Setting the
+/// size here fixes every way the tool is started, which is the point: an
+/// installer is reached from a unit, from a shell and by hand.
+fn give_size() {
+    if !unsized_tty(terminal::size().ok()) {
+        return;
+    }
+    let size = libc::winsize {
+        ws_row: 24,
+        ws_col: NARROWEST as u16,
+        ws_xpixel: 0,
+        ws_ypixel: 0,
+    };
+    unsafe { libc::ioctl(libc::STDOUT_FILENO, libc::TIOCSWINSZ, &size) };
+}
+
+fn unsized_tty(size: Option<(u16, u16)>) -> bool {
+    !matches!(size, Some((cols, rows)) if cols > 0 && rows > 0)
+}
+
 /// A bounded region of the normal scroll, cleared again before this returns, so
 /// what the caller prints afterwards lands where the region was.
 fn inline<T>(
     height: u16,
     body: impl FnOnce(&mut DefaultTerminal) -> Result<T, String>,
 ) -> Result<T, String> {
+    give_size();
     let mut terminal = ratatui::try_init_with_options(TerminalOptions {
         viewport: Viewport::Inline(height),
     })
@@ -654,8 +723,84 @@ fn nested(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::copy::CREATE;
     use ratatui::backend::TestBackend;
     use ratatui::Terminal;
+
+    /// The serial console case: it comes up 0x0 and stays there, and a
+    /// viewport laid out for that draws nothing at all.
+    #[test]
+    fn a_terminal_that_reports_no_size_is_given_one() {
+        assert!(unsized_tty(None));
+        assert!(unsized_tty(Some((0, 0))));
+        assert!(unsized_tty(Some((80, 0))));
+        assert!(!unsized_tty(Some((80, 24))));
+    }
+
+    /// The one screen that carries what installing costs. What it must show is
+    /// the disk, what happens to it, and every answer that is about to be
+    /// acted on — and never the password itself.
+    #[test]
+    fn the_install_review_says_what_is_erased_before_it_offers_to_erase_it() {
+        let rows = [
+            (crate::copy::ROW_DISK.to_string(), "/dev/vda".to_string()),
+            (crate::copy::ROW_HOSTNAME.to_string(), "deb2".to_string()),
+            (crate::copy::ROW_ACCOUNT.to_string(), "tect".to_string()),
+            (
+                crate::copy::ROW_PASSWORD.to_string(),
+                crate::copy::PASSWORD_SET.to_string(),
+            ),
+            (
+                crate::copy::ROW_ENCRYPTION.to_string(),
+                "tpm2-luks".to_string(),
+            ),
+        ];
+        let options = sheet(&rows, crate::copy::INSTALL);
+        let mut state = ListState::default().with_selected(Some(0));
+        let mut terminal = Terminal::new(TestBackend::new(60, 10)).unwrap();
+        let question = crate::copy::erasing("/dev/vda");
+        terminal
+            .draw(|frame| {
+                draw(
+                    frame,
+                    &question,
+                    &options,
+                    None,
+                    crate::copy::INSTALL_KEYS,
+                    &mut state,
+                )
+            })
+            .unwrap();
+        let drawn = terminal.backend().to_string();
+        assert!(
+            drawn.contains("Everything on /dev/vda is erased. Nothing survives."),
+            "{drawn}"
+        );
+        assert!(drawn.contains("> disk          /dev/vda"), "{drawn}");
+        assert!(drawn.contains("  machine name  deb2"), "{drawn}");
+        assert!(drawn.contains("  user name     tect"), "{drawn}");
+        assert!(drawn.contains("  password      set"), "{drawn}");
+        assert!(drawn.contains("  encryption    tpm2-luks"), "{drawn}");
+        // The action is a wipe and says so; `Create` belongs to the other
+        // screen this widget draws.
+        assert!(drawn.contains("Erase and install"), "{drawn}");
+        assert!(!drawn.contains(CREATE), "{drawn}");
+    }
+
+    /// Someone is standing in front of this screen, so the length is all it
+    /// shows.
+    #[test]
+    fn a_secret_is_drawn_as_its_length_and_never_as_itself() {
+        let mut terminal = Terminal::new(TestBackend::new(60, 3)).unwrap();
+        terminal
+            .draw(|frame| masked(frame, crate::copy::LUKS_PASSPHRASE, "hunter2".len()))
+            .unwrap();
+        let drawn = terminal.backend().to_string();
+        assert!(drawn.contains(crate::copy::LUKS_PASSPHRASE), "{drawn}");
+        assert!(drawn.contains("*******"), "{drawn}");
+        assert!(!drawn.contains("hunter2"), "{drawn}");
+        assert!(drawn.contains(SECRET_KEYS), "{drawn}");
+    }
 
     #[test]
     fn columns_width_must_be_nonzero_and_fit_the_renderer() {
