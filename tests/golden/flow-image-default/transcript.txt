@@ -22,6 +22,7 @@ What will the image be called? [Example]
   6) docker.io/library/debian:forky  Debian 14, which a module set has to turn into a bootc image
 What is the base image for this image? [1-6, 0 for none]: 1
 
+tect: `tectonic-os`: curl: No such file or directory (os error 2); what is offered below is only what is already on this machine
 initialised a git repository in example
 
 example/

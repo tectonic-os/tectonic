@@ -594,6 +594,15 @@ impl Image {
                 false => scratch.as_path(),
             };
             fetched = crate::provider::Index::scan(cache, sources, &disk, true);
+            // One line, in this tool's voice, before the offer it narrows.
+            // The fetcher itself says nothing: a bare `curl: (6) Could not
+            // resolve host` printed underneath the question it just made
+            // incomplete is not a report of anything.
+            if let Some(why) = fetched.unreached() {
+                eprintln!(
+                    "tect: {why}; what is offered below is only what is already on this machine"
+                );
+            }
             wanted = self::wanted(&fetched, &family, &roles);
             let _ = std::fs::remove_dir_all(&scratch);
         }

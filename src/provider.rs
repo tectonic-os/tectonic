@@ -70,6 +70,9 @@ pub struct Index {
     /// A member nested inside another member, which the walk stops short of and
     /// nothing else would ever mention.
     hidden: Vec<String>,
+    /// Why a fetching scan fell back to what was already here. `None` where it
+    /// did not fetch, or where the fetch worked.
+    unreached: Option<String>,
 }
 
 impl Index {
@@ -92,6 +95,7 @@ impl Index {
         // nothing at all than by what one unreachable collection is missing
         // from. `unread` is what still says the search was incomplete.
         let fetched = crate::import::catalog(root, sources, fetch);
+        let unreached = fetched.as_ref().err().cloned();
         let reached = fetched.is_ok();
         let (found, hidden) = fetched
             .or_else(|_| crate::import::catalog(root, sources, false))
@@ -104,6 +108,7 @@ impl Index {
         Self {
             held: out,
             hidden,
+            unreached,
             // The collections `catalog` just skipped: `cached` is the same
             // question it asked, and on `fetch` there is nothing to skip.
             unread: match fetch && reached {
@@ -125,6 +130,13 @@ impl Index {
         &self.unread
     }
 
+    /// Why a fetch this scan asked for did not happen, said once and in this
+    /// tool's voice: the fetcher itself prints nothing, so a flow that goes on
+    /// to ask a question off an incomplete index says this before it asks.
+    pub fn unreached(&self) -> Option<&str> {
+        self.unreached.as_deref()
+    }
+
     /// Whether the repository declares collections at all, which is how an
     /// empty `unread` is told from having nowhere else to look.
     pub fn sourced(&self) -> bool {
@@ -141,6 +153,14 @@ impl Index {
     /// The same thing as a sentence, so every diagnostic concluding from
     /// silence carries one voice. Empty where the scan was complete.
     pub fn unsearched(&self) -> String {
+        // A scan that tried and failed is not a scan that skipped: saying
+        // `tect fetch modules` downloads it, to someone whose fetch has just
+        // been refused, is the wrong sentence.
+        if let Some(why) = &self.unreached {
+            return format!(
+                "A declared collection could not be read, so nothing searched it: {why}"
+            );
+        }
         let named: Vec<String> = self.unread.iter().map(|name| format!("`{name}`")).collect();
         match named.len() {
             0 => String::new(),
