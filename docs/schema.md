@@ -480,6 +480,12 @@ in the directory is convention.
 | `Containerfile.inc` | placed verbatim by `fragment` |
 | a file another module collects | staged for it |
 
+Shipping either policy directory also orders the module: it builds after
+whoever provides that MAC, the way an `after` would, without declaring one. A
+module that ships for both is built for whichever the image carries, so it
+cannot name one — and an image with no MAC at all installs no policy and so
+owes no provider.
+
 ```kdl
 description "kvmfr DKMS module for GPU passthrough"
 

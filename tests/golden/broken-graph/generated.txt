@@ -170,6 +170,7 @@ graph LR
     m0["core/one"]
     m1["core/two"]
     m2["core/three"]
+    base -.->|"selinux-policy"| m1
 ```
 
 ## Capabilities
@@ -177,12 +178,12 @@ graph LR
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
 | `/usr/bin/nothing` | file |  | `core/one` |  |
-| `apparmor-policy` | capability |  | `core/one` |  |
+| `apparmor-policy` | capability |  | `core/one` | `core/one`, `core/two` |
 | `boot policy` | capability | `base` |  |  |
 | `logging` | capability |  |  | `core/one` |
 | `package-manager` | capability |  | `core/one` |  |
 | `rechunking` | capability | `base` |  |  |
-| `selinux-policy` | capability | `base` |  |  |
+| `selinux-policy` | capability | `base` |  | `core/two` |
 | `shell-tools` | capability | `core/two` |  |  |
 ==== generated/broken-graph/graph.json
 {
@@ -206,7 +207,10 @@ graph LR
       "required_by": [
         "core/one"
       ],
-      "after": []
+      "after": [
+        "core/one",
+        "core/two"
+      ]
     },
     {
       "name": "boot policy",
@@ -250,7 +254,9 @@ graph LR
       "build_only": false,
       "provider": "base",
       "required_by": [],
-      "after": []
+      "after": [
+        "core/two"
+      ]
     },
     {
       "name": "shell-tools",

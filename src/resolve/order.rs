@@ -31,8 +31,18 @@ pub fn sort(image: &Image, issues: &mut Issues) -> Vec<usize> {
                 }
             }
         }
-        for decl in &module.after {
-            let Some(&provider) = offered.get(decl.name.as_str()) else {
+        // A module shipping MAC policy is one too: the layer calls the helper
+        // the provider installed, so it builds after whoever provides the MAC
+        // even though it requires nothing of it. Measured 2026-09-02 — `yubikey`
+        // above `debian-bootc-base/apparmor` dies on a missing
+        // `apparmor_parser`, and the same build the other way round passes.
+        let soft = module
+            .after
+            .iter()
+            .map(|decl| decl.name.as_str())
+            .chain(module.policies.iter().copied());
+        for name in soft {
+            let Some(&provider) = offered.get(name) else {
                 continue;
             };
             let drags_below_gate =

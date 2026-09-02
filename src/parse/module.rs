@@ -485,6 +485,11 @@ impl Module {
             provides: Vec::new(),
             requires: Vec::new(),
             after: Vec::new(),
+            policies: [layout::SELINUX, layout::APPARMOR]
+                .iter()
+                .filter(|policy| !policy.files(&dir).is_empty())
+                .map(|policy| policy.capability)
+                .collect(),
             provides_files: Vec::new(),
             provides_files_build_only: Vec::new(),
             requires_files: Vec::new(),

@@ -133,6 +133,12 @@ pub struct Module {
     pub requires: Vec<Decl>,
     /// Soft: ordering and cache preference, never fails.
     pub after: Vec<Decl>,
+    /// The MAC capabilities this module ships policy for, read off its
+    /// directory rather than declared: a profile is emitted against whatever
+    /// the image turned out to carry, so the module never names one. It is an
+    /// ordering edge and nothing else — an image with no MAC ships no policy
+    /// and owes no provider.
+    pub policies: Vec<&'static str>,
     /// Exact paths one module writes and another reads.
     pub provides_files: Vec<Decl>,
     /// The subset of `provides_files` declared `build-only=#true`: a real

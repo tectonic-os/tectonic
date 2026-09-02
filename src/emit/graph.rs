@@ -84,8 +84,19 @@ pub fn of(image: &Image) -> Graph<'_> {
                 graph.cap(&decl.name, file).required_by.push(node);
             }
         }
-        for decl in &module.after {
-            graph.cap(&decl.name, false).after.push(node);
+        // The policy a module ships orders it the same way an `after` does,
+        // so the graph draws that edge too: an ordering the build enforces and
+        // the graph does not show is an ordering nothing can be read off.
+        let after = module
+            .after
+            .iter()
+            .map(|decl| decl.name.as_str())
+            .chain(module.policies.iter().copied());
+        for name in after {
+            let held = &mut graph.cap(name, false).after;
+            if !held.contains(&node) {
+                held.push(node);
+            }
         }
         for decl in &module.overrides {
             graph.overrides.push((&module.path, &decl.name));
