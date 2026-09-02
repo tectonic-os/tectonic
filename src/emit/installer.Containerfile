@@ -37,8 +37,16 @@ ARG PAYLOAD
 FROM ${GO_IMAGE} AS tools
 ARG FISHERMAN_COMMIT=027fa25c1d8bc01e2ac97d119cda9e8bb9c99ac7
 ARG FISHERMAN_SHA256=ffab2a2c1094fa02a9b4862958c280045c9390425c93195855a9f0f93956c72e
-ARG TACKLEBOX_COMMIT=b37b7a2fe9c47a551933e70d6ef023a00abda6ee
-ARG TACKLEBOX_SHA256=760ddffbe234159f039508664c0112c663e0a550f41a6e2ffa4f6548bbd0baef
+# Tacklebox is this project's own fork, and unlike the fisherman pin above that
+# is not a preference about where the code lives — the media needs two changes
+# upstream has not got. It stages the payload's signed shim so the stick boots a
+# machine with Secure Boot on, which is the factory default and refused the
+# unsigned systemd-boot with `Access Denied`; and it appends the ESP as a
+# partition so firmware finds it on a USB block device rather than only through
+# an El Torito scan. Report both upstream rather than keep them.
+ARG TACKLEBOX_ORG=tectonic-os
+ARG TACKLEBOX_COMMIT=734e14de7d0170febd791286196e4235d45226c6
+ARG TACKLEBOX_SHA256=926c000f84a06b240d07455a4649151480c921f0448ee9ec0f02064d7af866b2
 # `ExtractEFIBinary` takes an image argument, never reads it, and looks only at
 # two host paths — so a host with no systemd-boot-unsigned is a hard stop, and
 # on a cross-distro builder the host is the wrong source anyway: the media
@@ -48,14 +56,14 @@ ARG TACKLEBOX_SHA256=760ddffbe234159f039508664c0112c663e0a550f41a6e2ffa4f6548bbd
 COPY efi-from-image.patch /tmp/efi-from-image.patch
 RUN set -eux; \
     fetch() { \
-        curl --retry 3 -fsSLo "/tmp/$1.tar.gz" \
-            "https://github.com/tuna-os/$1/archive/$2.tar.gz"; \
-        echo "$3  /tmp/$1.tar.gz" | sha256sum -c -; \
-        mkdir -p "/src/$1"; \
-        tar -xf "/tmp/$1.tar.gz" -C "/src/$1" --strip-components=1; \
+        curl --retry 3 -fsSLo "/tmp/$2.tar.gz" \
+            "https://github.com/$1/$2/archive/$3.tar.gz"; \
+        echo "$4  /tmp/$2.tar.gz" | sha256sum -c -; \
+        mkdir -p "/src/$2"; \
+        tar -xf "/tmp/$2.tar.gz" -C "/src/$2" --strip-components=1; \
     }; \
-    fetch fisherman "${FISHERMAN_COMMIT}" "${FISHERMAN_SHA256}"; \
-    fetch tacklebox "${TACKLEBOX_COMMIT}" "${TACKLEBOX_SHA256}"; \
+    fetch tuna-os fisherman "${FISHERMAN_COMMIT}" "${FISHERMAN_SHA256}"; \
+    fetch "${TACKLEBOX_ORG}" tacklebox "${TACKLEBOX_COMMIT}" "${TACKLEBOX_SHA256}"; \
     git -C /src/tacklebox apply -p1 /tmp/efi-from-image.patch; \
     mkdir -p /out; \
     cd /src/fisherman/fisherman && CGO_ENABLED=0 go build -trimpath -o /out/fisherman ./cmd/fisherman/; \
