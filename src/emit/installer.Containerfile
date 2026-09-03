@@ -68,9 +68,14 @@ ARG FISHERMAN_SHA256=ffab2a2c1094fa02a9b4862958c280045c9390425c93195855a9f0f9395
 # unsigned systemd-boot with `Access Denied`; and it appends the ESP as a
 # partition so firmware finds it on a USB block device rather than only through
 # an El Torito scan. Report both upstream rather than keep them.
+#
+# The pin also carries a fourth layout for the signed pair: the deb families
+# keep theirs under `/usr/lib/shim` and `/usr/lib/grub/x86_64-efi-signed`, which
+# none of the three bootupd/ostree layouts upstream knows covers, so a deb
+# `LIVE_BASE` fell through to unsigned media without saying so.
 ARG TACKLEBOX_ORG=tectonic-os
-ARG TACKLEBOX_COMMIT=06d62ed0452958cec17a5f95184a7a3ce5f34032
-ARG TACKLEBOX_SHA256=09edec7c20c9900871c4243247852656afcb20e3ab42cbe9bd9f6374aa78f07b
+ARG TACKLEBOX_COMMIT=e5f34b19c76cc3d7bc575fe28beaeee003d756fb
+ARG TACKLEBOX_SHA256=a1c801b193b79755c6fc71faa398fe6c0932d63b064a668c9ac83905c7bea7d1
 # `ExtractEFIBinary` takes an image argument, never reads it, and looks only at
 # two host paths — so a host with no systemd-boot-unsigned is a hard stop, and
 # on a cross-distro builder the host is the wrong source anyway: the media
