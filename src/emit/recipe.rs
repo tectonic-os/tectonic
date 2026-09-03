@@ -43,14 +43,25 @@ fn family(name: &str) -> Option<Family> {
             admin: "wheel",
         },
         // Debian packages no bootupd at all, so the install aborts without
-        // `--generic-image` and reaches systemd-boot instead. This project's
-        // own base seals the deployment with composefs, and a sealed one needs
-        // fs-verity: xfs has none and drops into a dracut emergency shell,
-        // and a sealed btrfs deployment fails to mount. Measured `NEXT-40`.
+        // `--generic-image`. This project's own base seals the deployment with
+        // composefs, and a sealed one needs fs-verity: xfs has none and drops
+        // into a dracut emergency shell, and a sealed btrfs deployment fails
+        // to mount. Measured `NEXT-40`.
+        //
+        // `grub2` and not `systemd`, because the base builds bootupd from
+        // source and stages Debian's own signed shim and GRUB as its payload,
+        // so the installed disk boots with Secure Boot on — where the unsigned
+        // systemd-boot this row used to ask for needed it turned off. The
+        // signed GRUB reads no BLS entries, so the image also ships
+        // `/usr/libexec/grub-menu-from-bls`; the installer runs it against the
+        // target it still has mounted, since bootupd installs the bootloader
+        // before the entries exist. Flipping this row without an installer
+        // that renders the menu is a worse failure than the unsigned one it
+        // replaces: GRUB comes up to an empty menu rather than booting.
         "debian" | "ubuntu" => Family {
             composefs: true,
             generic: true,
-            bootloader: "systemd",
+            bootloader: "grub2",
             filesystem: "ext4",
             admin: "sudo",
         },
@@ -210,7 +221,7 @@ mod tests {
             format!(
                 "{{\n  \"image\": \"localhost/forky:latest\",\n  \"targetImgref\": \
                  \"ghcr.io/someone/forky:latest\",\n  \"composeFsBackend\": true,\n  \
-                 \"genericImage\": true,\n  \"bootloader\": \"systemd\",\n  \
+                 \"genericImage\": true,\n  \"bootloader\": \"grub2\",\n  \
                  \"filesystem\": \"ext4\",\n  \"hostname\": \"forky\",\n  \"user\": \
                  {{\n    \"groups\": [\n      \"sudo\"\n    ]\n  }},\n  \
                  \"additionalImageStores\": [\n    \"{STORE}\"\n  ]\n}}\n"
@@ -230,7 +241,7 @@ mod tests {
             };
         assert_eq!(
             field(&deb, "ubuntu", "bootloader").as_deref(),
-            Some("\"systemd\"")
+            Some("\"grub2\"")
         );
         assert_eq!(field(&deb, "ubuntu", "user"), field(&deb, "forky", "user"));
 
