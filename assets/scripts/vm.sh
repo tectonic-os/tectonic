@@ -305,8 +305,11 @@ build_iso() {
 
 login_credentials() {
     vm_user="${VM_USER:-tect}"
-    [[ "$vm_user" =~ ^[a-z_][a-z0-9_-]*$ ]] && [ "${#vm_user}" -le 31 ] \
-        || die "VM_USER must be a Linux user name of at most 31 characters"
+    # An `if`, not `A && B || C`: shellcheck reads that as a mistyped
+    # if-then-else, because C runs whenever B is false as well as when A is.
+    if ! [[ "$vm_user" =~ ^[a-z_][a-z0-9_-]*$ ]] || [ "${#vm_user}" -gt 31 ]; then
+        die "VM_USER must be a Linux user name of at most 31 characters"
+    fi
     vm_password_hash="${VM_PASSWORD_HASH:-}"
     if [ -z "$vm_password_hash" ]; then
         [ -t 0 ] || die "set VM_PASSWORD_HASH when no terminal can ask for a VM password"
