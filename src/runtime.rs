@@ -604,12 +604,32 @@ pub fn validate_image() -> Result<(), String> {
         report.fail(message);
     }
 
+    // `systemd-analyze verify` creates /run/systemd, and this runs in the last
+    // layer of the build, so the directory is committed into the image — where
+    // `bootc container lint` reports it as `nonempty-run-tmp`. The in-build
+    // lint only warns; a consumer running `--fatal-warnings` fails on it, which
+    // is how it was found. Removed here rather than in a later step, because
+    // this is what created it and there is no later step.
+    clear_run_systemd();
+
     println!();
     if report.failures == 0 {
         println!("All validation checks passed.");
         Ok(())
     } else {
         Err(format!("{} validation check(s) failed.", report.failures))
+    }
+}
+
+/// The one runtime directory this command leaves behind. Failure to remove it
+/// is not a validation failure: it is a build layer's tidiness, and reporting
+/// it as a broken image would be a lie.
+fn clear_run_systemd() {
+    let path = Path::new("/run/systemd");
+    if path.is_dir() {
+        if let Err(err) = fs::remove_dir_all(path) {
+            eprintln!("    could not remove {}: {err}", path.display());
+        }
     }
 }
 
