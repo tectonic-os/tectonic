@@ -444,6 +444,39 @@ describe is an error, the way a collection declared twice is. Nothing is
 fetched to read one: a collection that is not on this machine already extends
 nothing, and the selected catalog is what the picker offers.
 
+**No row carries a digest, and that is deliberate.** A base reference joins the
+locator and the selector, so a digest could be written here — but a digest in
+the catalog is a digest only a tool release can roll, and a row that goes stale
+between releases is one nobody can fix without waiting for the next one. Worse,
+a registry that retires the digest leaves a catalog pin that no longer resolves
+at all. So the catalog offers the tag, and the digest belongs in the image file
+built on it, where the repository taking the risk takes the decision:
+
+```kdl
+image {
+    name "Ubuntu"
+
+    base "docker.io/library/ubuntu:26.04@sha256:889d056d5c6c…" {
+        family "ubuntu"
+        requires "bootc-base"
+        signed #false
+    }
+}
+```
+
+The digest is matched off before a reference is looked up, so a pinned base is
+still the catalog's base: `tect create image --base` writes the same `family`,
+`provides` and `requires` for both spellings, and Renovate's image-file manager
+bumps whichever half is written. The three rows with no signature — Fedora's
+and both deb families' — are the ones this matters most for: with nothing to
+attribute a signature to, the digest is the strongest trust root on offer.
+
+`tect build` records the base either way, but it records two different things:
+a tag is resolved against the registry and the record says what answered, while
+a declared digest is already the answer and is recorded verbatim. Recording is
+not pinning — the record says what one build got, and only a digest in the
+image file says what the next one will.
+
 <!-- schema: bases -->
 
 ### `base`

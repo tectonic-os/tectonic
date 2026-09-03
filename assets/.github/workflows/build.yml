@@ -395,8 +395,16 @@ jobs:
         run: |
           set -euo pipefail
           base="$(jq -r '.base.image' "$IMAGE_PLAN")"
-          digest="$(skopeo inspect --format '{{.Digest}}' "docker://${base}")"
-          echo "name=${base}" >> "$GITHUB_OUTPUT"
+          # A declared digest is this repository's own pin. It is already the
+          # answer, so it is not asked again: `skopeo inspect` refuses a
+          # reference carrying both a tag and a digest, and appending a second
+          # one would make `FROM` unparseable.
+          name="${base%@*}"
+          case "$base" in
+              *@*) digest="${base#*@}" ;;
+              *) digest="$(skopeo inspect --format '{{.Digest}}' "docker://${base}")" ;;
+          esac
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Image Metadata

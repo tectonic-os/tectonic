@@ -119,6 +119,15 @@ pub fn catalog(
     (bases, shadows)
 }
 
+/// The reference with any `@sha256:…` taken off. A digest is a consumer's pin
+/// on a base the catalog already describes, not a second base: the family it
+/// belongs to and what it ships do not change with the digest, so both sides of
+/// a lookup are compared without one.
+fn undigested(image: &str) -> &str {
+    image.split_once('@').map_or(image, |(before, _)| before)
+}
+
 pub fn find<'a>(bases: &'a [Base], image: &str) -> Option<&'a Base> {
-    bases.iter().find(|base| base.image == image)
+    let image = undigested(image);
+    bases.iter().find(|base| undigested(&base.image) == image)
 }

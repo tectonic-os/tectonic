@@ -70,7 +70,7 @@ fn after_rejects_a_provider_on_another_target() {
 /// though it declares no `requires` for it: the profile is emitted against
 /// whatever the image carries, so the module supports families with a different
 /// MAC and cannot name one. Measured 2026-09-02 — `yubikey` listed above
-/// `debian-bootc-base/apparmor` dies on a missing `apparmor_parser`, and the
+/// `deb-bootc-base/apparmor` dies on a missing `apparmor_parser`, and the
 /// same build with the two the other way round passes.
 #[test]
 fn shipped_policy_orders_a_module_after_the_mac_that_installs_it() {

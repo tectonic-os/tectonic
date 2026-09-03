@@ -1,3 +1,12 @@
+// No row here carries a digest, which is a decision rather than an omission.
+// Pinning in this file would make every digest roll a tool release, and a row
+// that goes stale between releases is one nobody can fix without waiting for
+// the next one — worse on a base whose registry retires the old digest, where
+// a stale catalog pin stops resolving at all. So the catalog offers the tag,
+// and the digest belongs in the image file built on it: the repository that
+// takes the risk takes the decision, Renovate bumps it there like any other
+// pin, and `tect build` records the digest it actually resolved either way.
+
 base "quay.io/fedora/fedora-bootc:44" {
     about "Fedora 44, nothing above the base system"
     family "fedora"
@@ -49,6 +58,25 @@ base "ghcr.io/ublue-os/kinoite-main:44" {
 base "docker.io/library/debian:forky" {
     about "Debian 14, which a module set has to turn into a bootc image"
     family "debian"
+    requires "bootc-base"
+    signed #false
+}
+
+// Ubuntu, measured 2026-09-03 against the gates that chose forky over trixie.
+// It clears all of them and one forky cannot: `VERSION_ID` is present, which
+// `bootc-image-builder` refuses to write a manifest without. An LTS rather
+// than a rolling testing suite, and its package database is real, so the audit
+// argument that condemns every published deb bootc base does not condemn this.
+//
+// One thing it needs that Debian does not: `ubuntu:*` ships
+// `/etc/dpkg/dpkg.cfg.d/excludes`, which path-excludes man pages, most of
+// `/usr/share/doc` and the locale catalogues from every package any derived
+// image ever unpacks. `deb-bootc-base` removes it and reinstalls every
+// recorded package, because deleting the file restores nothing already
+// stripped. See §8 of cannot-claim.md: that is a repair, not an absence.
+base "docker.io/library/ubuntu:26.04" {
+    about "Ubuntu 26.04 LTS, which a module set has to turn into a bootc image"
+    family "ubuntu"
     requires "bootc-base"
     signed #false
 }

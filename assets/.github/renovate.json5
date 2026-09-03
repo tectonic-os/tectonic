@@ -53,11 +53,14 @@
       "customType": "regex",
       // Every root .kdl but repo.kdl is an image declaring its own base, so
       // the pattern is the layout rather than one file name.
+      // The digest is optional because the catalog offers a tag and pinning one
+      // is the repository's decision; with `currentDigest` matched, Renovate
+      // bumps whichever half is written.
       "description": "Base image reference in an image file",
       "managerFilePatterns": ["/^[^/]+\\.kdl$/"],
       "datasourceTemplate": "docker",
       "matchStrings": [
-        "base \"(?<depName>[^\":]+):(?<currentValue>[^\"]+)\"",
+        "base \"(?<depName>[^\":]+):(?<currentValue>[^\"@]+)(?:@(?<currentDigest>sha256:[0-9a-f]{64}))?\"",
       ],
     },
     {

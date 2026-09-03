@@ -91,6 +91,7 @@ fn public_catalog_lists_every_shipped_base_in_order() {
             "ghcr.io/ublue-os/bluefin:stable",
             "ghcr.io/ublue-os/kinoite-main:44",
             "docker.io/library/debian:forky",
+            "docker.io/library/ubuntu:26.04",
         ]
     );
 }
@@ -127,19 +128,59 @@ fn missing_runtime_file_falls_back_to_embedded_catalog() {
     let mut issues = Issues::default();
     let (bases, shadows) = tect::base::catalog(Path::new("."), &[], &mut issues);
 
-    // Then: the embedded six rows are selected.
+    // Then: the embedded seven rows are selected.
     assert!(issues.is_empty(), "{}", issues.plain());
     assert!(shadows.is_empty());
-    assert_eq!(bases.len(), 6);
-    // The one row nothing can be built on until a module set says otherwise,
-    // and the only one outside the Fedora family: every published deb bootc
+    assert_eq!(bases.len(), 7);
+    // The two rows nothing can be built on until a module set says otherwise,
+    // and the only ones outside the Fedora family: every published deb bootc
     // base carries an empty package database, so an image on one reports its
-    // whole base as clean rather than refusing.
-    assert_eq!(bases[5].image, "docker.io/library/debian:forky");
-    assert_eq!(bases[5].family, "debian");
-    assert!(bases[5].provides.is_empty());
-    assert_eq!(bases[5].requires, ["bootc-base"]);
-    assert!(!bases[5].signed);
+    // whole base as clean rather than refusing. One module set covers both,
+    // so both rows require the same capability and each names its own family.
+    for (at, image, family) in [
+        (5, "docker.io/library/debian:forky", "debian"),
+        (6, "docker.io/library/ubuntu:26.04", "ubuntu"),
+    ] {
+        assert_eq!(bases[at].image, image);
+        assert_eq!(bases[at].family, family);
+        assert!(bases[at].provides.is_empty(), "{image}");
+        assert_eq!(bases[at].requires, ["bootc-base"], "{image}");
+        // Docker Official Images publish no cosign signature, so the digest a
+        // consumer pins is the trust root and this field cannot pretend
+        // otherwise.
+        assert!(!bases[at].signed, "{image}");
+    }
+}
+
+/// A digest is a pin on a catalogued tag, not a second base. Without this the
+/// scaffolder falls through to the unknown-base branch and writes the first
+/// row's family — `fedora` for an Ubuntu image — and drops the `requires` that
+/// is the only thing saying the base is unusable bare.
+#[test]
+fn a_digest_pinned_reference_still_finds_its_catalog_row() {
+    // Given: the shipped catalog, which carries tags and no digests.
+    let _assets = Assets::new("task-2-digest-pinned");
+    let mut issues = Issues::default();
+    let (bases, _) = tect::base::catalog(Path::new("."), &[], &mut issues);
+    assert!(issues.is_empty(), "{}", issues.plain());
+
+    // When: a reference is looked up with a digest appended, as a repository
+    // pinning its own base writes it.
+    let tagged = "docker.io/library/ubuntu:26.04";
+    let pinned = format!("{tagged}@sha256:{}", "0".repeat(64));
+    let found = tect::base::find(&bases, &pinned).expect("the pinned base is the catalogued base");
+
+    // Then: it is the same row the bare tag finds.
+    assert_eq!(found.image, tagged);
+    assert_eq!(found.family, "ubuntu");
+    assert_eq!(found.requires, ["bootc-base"]);
+
+    // And: a digest does not make an uncatalogued base catalogued.
+    assert!(tect::base::find(
+        &bases,
+        &format!("example.invalid/nosuch:1@sha256:{}", "0".repeat(64))
+    )
+    .is_none());
 }
 
 #[test]
@@ -240,7 +281,7 @@ fn collection_still_overrides_and_shadows_selected_catalog() {
 
     // Then: order is retained, the row is replaced, and the shadow is reported.
     assert!(issues.is_empty(), "{}", issues.plain());
-    assert_eq!(bases.len(), 6);
+    assert_eq!(bases.len(), 7);
     assert_eq!(bases[0].about, "collection replacement");
     assert!(bases[0].signed);
     assert_eq!(shadows.len(), 1);

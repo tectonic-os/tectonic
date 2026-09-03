@@ -9,8 +9,9 @@ Beta
   4) ghcr.io/ublue-os/bluefin:stable  GNOME developer workstation over silverblue-main
   5) ghcr.io/ublue-os/kinoite-main:44  Fedora Kinoite with the ublue additions, what bazzite builds on
   6) docker.io/library/debian:forky  Debian 14, which a module set has to turn into a bootc image
-  7) example.invalid/collected:1  A base only the collection knows about
-What is the base image for this image? [1-7, 0 for none]: 7
+  7) docker.io/library/ubuntu:26.04  Ubuntu 26.04 LTS, which a module set has to turn into a bootc image
+  8) example.invalid/collected:1  A base only the collection knows about
+What is the base image for this image? [1-8, 0 for none]: 8
 
 example.invalid/collected:1 needs the following modules:
     one/fedora-family
