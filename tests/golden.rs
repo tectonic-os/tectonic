@@ -22,9 +22,39 @@ fn compare(name: &str, file: &str, actual: &str) {
         .unwrap_or_else(|err| panic!("{}: {err}\nrun UPDATE_GOLDEN=1 cargo test", path.display()));
     assert!(
         expected == actual,
-        "{} changed. Rerun with UPDATE_GOLDEN=1 and read the diff",
-        path.display()
+        "{} changed. Rerun with UPDATE_GOLDEN=1 and read the diff.\n{}",
+        path.display(),
+        first_difference(&expected, &actual)
     );
+}
+
+/// Where two goldens first part, as escaped bytes either side of the offset.
+///
+/// A transcript golden is mostly escape sequences, so a diff nobody can run —
+/// on CI, where there is no working tree to regenerate into — has to travel in
+/// the failure itself. Windowed rather than whole: the point is which byte
+/// moved, not the file.
+fn first_difference(expected: &str, actual: &str) -> String {
+    let at = expected
+        .bytes()
+        .zip(actual.bytes())
+        .position(|(a, b)| a != b)
+        .unwrap_or(expected.len().min(actual.len()));
+    let window = |s: &str| {
+        let from = at.saturating_sub(60);
+        let to = (at + 60).min(s.len());
+        s.get(from..to)
+            .unwrap_or("<not a char boundary>")
+            .escape_debug()
+            .to_string()
+    };
+    format!(
+        "first difference at byte {at} of {} expected, {} actual\n  expected: {}\n    actual: {}",
+        expected.len(),
+        actual.len(),
+        window(expected),
+        window(actual)
+    )
 }
 
 /// The plan, the generated section and every diagnostic, for one repository.
