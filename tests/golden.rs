@@ -817,6 +817,9 @@ fn drawn_flow(name: &str, dir: &Path, command: &str, after: &str, steps: &[&[u8]
         // A host exporting COLUMNS would leak into the pty and redraw at that
         // width, so the drawn width is pinned the way the golden captured it.
         .env("COLUMNS", "80")
+        // Whether this machine has a TPM decides what the encryption picker
+        // draws beside its two `tpm2-` rows, so it is pinned the same way.
+        .env("TECT_TPM", "/nonexistent")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

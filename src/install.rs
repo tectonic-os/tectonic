@@ -173,7 +173,17 @@ const KINDS: [(&str, &str); 4] = [
 const NONE: &str = "none";
 
 /// What a machine with a TPM has, and what the two `tpm2-` forms need.
+///
+/// `$TECT_TPM` names it instead where it is set, which is how the drawn golden
+/// stops depending on whether the machine running it has one — the same reason
+/// that flow is given a `--disk` rather than reading `/sys/block`.
 const TPM: &str = "/dev/tpmrm0";
+
+fn tpm() -> PathBuf {
+    std::env::var_os("TECT_TPM")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(TPM))
+}
 
 pub struct Encryption {
     pub kind: String,
@@ -410,7 +420,7 @@ fn ask_encryption(
         Some(kind) => kind,
         None if !prompt.asks() => current.kind.clone(),
         None => {
-            let options = kinds(Path::new(TPM).exists());
+            let options = kinds(tpm().exists());
             let at = KINDS
                 .iter()
                 .position(|(name, _)| *name == current.kind)

@@ -13,7 +13,7 @@ Username: tect
 
 
 
-[1;1H[1m[38;5;6;49mEncryption type[2;1H[22m[39;49m>[2;3Hnone[2;9H[2mnot encrypted[3;3H[22mtpm2-luks[3;14H[2munlocked by TPM[4;3H[22mluks-passphrase[4;20H[2munlocked by passphrase[5;3H[22mtpm2-luks-passphrase[5;25H[2mTPM with passphrase fallback[6;1Hup and down to move, enter to choose, esc cancels[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hEncryption type: none
+[1;1H[1m[38;5;6;49mEncryption type[2;1H[22m[39;49m>[2;3Hnone[2;9H[2mnot encrypted[3;3Htpm2-luks[3;14HNo TPM available[4;3H[22mluks-passphrase[4;20H[2munlocked by passphrase[5;3Htpm2-luks-passphrase[5;25HNo TPM available[6;1Hup and down to move, enter to choose, esc cancels[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hEncryption type: none
 
 [6n
 
