@@ -24,9 +24,10 @@
 # 1.88 GB for the Debian one — because the live rootfs and the offline store
 # are then different images with nothing to share.
 #
-# What this does NOT fix: a Debian target still installs an unsigned
-# systemd-boot onto the disk, so the installed machine still needs Secure Boot
-# off. That is the family table's to answer, not this file's.
+# The installed disk is a separate question from the media, and the family
+# table answers it: the deb row asks for grub2, and the deb base stages
+# Debian's own signed shim and GRUB as bootupd's payload, so the installed
+# machine boots with Secure Boot on as well.
 #
 # Staged into out/bootiso/ by `tect vm build iso` and never committed: it
 # varies with nothing but the recipe beside it, and eighty lines of installer
@@ -41,12 +42,23 @@ ARG LIVE_BASE=quay.io/fedora/fedora-bootc:44
 # asset is 174 commits behind its own tip, and tacklebox has no releases at all
 # — so both are source archives pinned by sha256 and built here.
 #
-# The fisherman pin is `tuna-os`, deliberately, and its own repository
+# The fisherman pin is this project's own fork, and it carries one commit on
+# top of `tuna-os/fisherman` at `027fa25c`: it runs the deployment's own
+# `/usr/libexec/grub-menu-from-bls` against the target it still has mounted,
+# just after the Plymouth and LUKS boot arguments are written and before the
+# target is remounted read-only. The deb families install GRUB through bootupd,
+# which runs before bootc writes the BLS entries, so nothing renders the menu
+# during the install itself and the first boot would reach an empty one. The
+# call is guarded on the file and never on the family, so a Fedora target skips
+# it. The branch is `render-bls-menu`, scoped for submission upstream, and
+# `tectonic` is the same commit and is what this pins.
+#
+# The base it forks from is `tuna-os` deliberately, and that repository's own
 # description says otherwise: it reads `MOVED -> github.com/projectbluefin/
 # fisherman`, and that destination is a fork whose tip is 123 commits and a
 # month behind this one. The `composefs-backend requires fs-verity, which XFS
 # does not support` guard — the one rule that catches a wrong `filesystem` in
-# the recipe emitted beside this file — landed here ten days after the fork
+# the recipe emitted beside this file — landed there ten days after the fork
 # stopped. A redirect a project asserts about itself is not evidence of where
 # its code is. Do not "correct" this pin.
 #
@@ -55,9 +67,9 @@ ARG LIVE_BASE=quay.io/fedora/fedora-bootc:44
 # Fisherman's Go module is at `fisherman/` inside its own repository and not at
 # the root, which is why the two build directories below are not symmetrical.
 FROM ${GO_IMAGE} AS tools
-ARG FISHERMAN_ORG=tuna-os
-ARG FISHERMAN_COMMIT=027fa25c1d8bc01e2ac97d119cda9e8bb9c99ac7
-ARG FISHERMAN_SHA256=ffab2a2c1094fa02a9b4862958c280045c9390425c93195855a9f0f93956c72e
+ARG FISHERMAN_ORG=tectonic-os
+ARG FISHERMAN_COMMIT=8c48ef50c4ab2922bd3a84139b6d23e67836e7de
+ARG FISHERMAN_SHA256=5e05d284ec83902c4800532c8a4902dc69adddac3a060f83bff03d69765bbdae
 # Tacklebox is this project's own fork, and unlike the fisherman pin above that
 # is not a preference about where the code lives — the media needs two changes
 # upstream has not got. The pin is the fork's `tectonic` branch, which is those
