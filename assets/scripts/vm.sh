@@ -331,10 +331,11 @@ build_iso() {
     sudoif podman build -t "$live_image" "$staged"
 
     # tacklebox leaves its offline-store overlay mounted and then trips over it
-    # on the next run.
-    if mountpoint -q "${build}/tbox-offline-store/overlay" 2> /dev/null; then
-        sudoif umount "${build}/tbox-offline-store/overlay"
-    fi
+    # on the next run. Cleared before *and* after: before, because a tree left
+    # by an older run is what the next one trips over, and after, because a
+    # mount nobody unmounts is one `rm -rf out` answers `Device or resource
+    # busy` on, with nothing to tell the person which path is held or why.
+    unmount_offline_store "$build"
 
     # Written beside the media and moved onto it last, so a failed build leaves
     # the iso that was already there. tacklebox shells out to bare `sudo`
@@ -348,11 +349,23 @@ build_iso() {
     rm -f "${image_file}.part"
     if ! sudoif env HOME=/root "$tbx" build "${PWD}/${staged}/media.json" \
         --iso "${PWD}/${image_file}.part" -b "$build"; then
+        unmount_offline_store "$build"
         sudoif chown -R "$(id -u):$(id -g)" "$staged"
         die "tacklebox could not assemble the media; it left its staging under ${build}"
     fi
+    unmount_offline_store "$build"
     sudoif chown -R "$(id -u):$(id -g)" "$staged"
     mv -f "${image_file}.part" "$image_file"
+}
+
+# The one mount tacklebox makes and does not remove. Quiet where there is none,
+# because this runs on the path where the build has already failed as well as
+# on the one where it worked.
+unmount_offline_store() {
+    local overlay="$1/tbox-offline-store/overlay"
+    if mountpoint -q "$overlay" 2> /dev/null; then
+        sudoif umount "$overlay"
+    fi
 }
 
 login_credentials() {
