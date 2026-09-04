@@ -627,12 +627,12 @@ fn render_menu(image: &str, disk: &str) -> Result<(), String> {
     let boot = at.join("boot");
     std::fs::create_dir_all(&boot).map_err(|err| format!("{TARGET}: {err}"))?;
 
-    let Some(device) = boot_partition(disk, &boot)? else {
+    let Some((device, root)) = boot_partition(disk, &boot)? else {
         return Err(format!(
             "no partition of {disk} carries `loader/entries`, so there is no menu to render"
         ));
     };
-    let rendered = run_renderer(image);
+    let rendered = run_renderer(image, root);
     let _ = Command::new("umount").arg(&boot).output();
     match rendered {
         Ok(true) => {
@@ -644,10 +644,17 @@ fn render_menu(image: &str, disk: &str) -> Result<(), String> {
     }
 }
 
-/// The first partition of `disk` whose filesystem holds `loader/entries`,
-/// left mounted at `boot`. Found by content and not by label, so nothing here
-/// depends on how the backend names its partitions.
-fn boot_partition(disk: &str, boot: &Path) -> Result<Option<String>, String> {
+/// The first partition of `disk` whose filesystem carries the boot entries,
+/// left mounted at `boot`, with the root the renderer wants for it.
+///
+/// Two layouts and one mount point: a target whose /boot is its own partition
+/// has the entries at the top of it, and one whose /boot is a directory on the
+/// root filesystem has them a level down. The mount is the same either way and
+/// only the root moves, so nothing has to know which the backend chose.
+///
+/// Found by content and not by label, so this depends on nothing about how the
+/// backend names its partitions.
+fn boot_partition(disk: &str, boot: &Path) -> Result<Option<(String, &'static str)>, String> {
     let listed = Command::new("lsblk")
         .args(["-nrpo", "NAME", disk])
         .output()
@@ -663,7 +670,10 @@ fn boot_partition(disk: &str, boot: &Path) -> Result<Option<String>, String> {
             continue;
         }
         if boot.join("loader/entries").is_dir() {
-            return Ok(Some(device));
+            return Ok(Some((device, "/target")));
+        }
+        if boot.join("boot/loader/entries").is_dir() {
+            return Ok(Some((device, "/target/boot")));
         }
         let _ = Command::new("umount").arg(boot).output();
     }
@@ -672,7 +682,7 @@ fn boot_partition(disk: &str, boot: &Path) -> Result<Option<String>, String> {
 
 /// `false` where the image ships no renderer, which is how a fedora target is
 /// skipped without this knowing which families have `blscfg`.
-fn run_renderer(image: &str) -> Result<bool, String> {
+fn run_renderer(image: &str, root: &str) -> Result<bool, String> {
     let out = Command::new("podman")
         .args([
             "run",
@@ -685,7 +695,7 @@ fn run_renderer(image: &str) -> Result<bool, String> {
             image,
             "/bin/sh",
             "-c",
-            &format!("test -x {RENDERER} || exit 3; exec {RENDERER} /target"),
+            &format!("test -x {RENDERER} || exit 3; exec {RENDERER} {root}"),
         ])
         .output()
         .map_err(|err| format!("podman: {err}, and it is what runs the image's renderer"))?;
