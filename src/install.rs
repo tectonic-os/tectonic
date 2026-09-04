@@ -602,6 +602,103 @@ fn say(line: &str) -> String {
     }
 }
 
+/// The renderer a deb image ships and a fedora one does not: their signed GRUB
+/// reads no BLS entries, so the menu is rendered from the entries `bootc` just
+/// wrote. Run *from the image* — a composefs deployment on the disk is sealed
+/// erofs with no walkable `/usr` to read it out of.
+const RENDERER: &str = "/usr/libexec/grub-menu-from-bls";
+
+/// Where the target's boot filesystem is mounted while the menu is written.
+/// The renderer takes a root and looks under `<root>/boot`, so the filesystem
+/// carrying the entries is mounted *at* `boot` beneath this, which is the same
+/// shape whether the target keeps /boot on its own partition or on the root.
+const TARGET: &str = "/run/tect-target";
+
+/// The menu the installed machine boots from, written after fisherman has
+/// finished and unmounted: `bootc` installs the bootloader before it writes
+/// the entries, so nothing during the install itself can render them.
+///
+/// Silence is the failure this exists to avoid. An image with no renderer is a
+/// family that needs none and is skipped; anything else is an error, because a
+/// disk that installs and then reaches an empty GRUB menu looks like a broken
+/// image rather than a missing file.
+fn render_menu(image: &str, disk: &str) -> Result<(), String> {
+    let at = PathBuf::from(TARGET);
+    let boot = at.join("boot");
+    std::fs::create_dir_all(&boot).map_err(|err| format!("{TARGET}: {err}"))?;
+
+    let Some(device) = boot_partition(disk, &boot)? else {
+        return Err(format!(
+            "no partition of {disk} carries `loader/entries`, so there is no menu to render"
+        ));
+    };
+    let rendered = run_renderer(image);
+    let _ = Command::new("umount").arg(&boot).output();
+    match rendered {
+        Ok(true) => {
+            eprintln!("tect: wrote the boot menu {device} needs, since its GRUB reads no BLS");
+            Ok(())
+        }
+        Ok(false) => Ok(()),
+        Err(err) => Err(err),
+    }
+}
+
+/// The first partition of `disk` whose filesystem holds `loader/entries`,
+/// left mounted at `boot`. Found by content and not by label, so nothing here
+/// depends on how the backend names its partitions.
+fn boot_partition(disk: &str, boot: &Path) -> Result<Option<String>, String> {
+    let listed = Command::new("lsblk")
+        .args(["-nrpo", "NAME", disk])
+        .output()
+        .map_err(|err| format!("lsblk: {err}, and it is what lists a disk's partitions"))?;
+    for device in labelled(&String::from_utf8_lossy(&listed.stdout)) {
+        if device == disk {
+            continue;
+        }
+        let mounted = Command::new("mount")
+            .args([&device, &boot.to_string_lossy().to_string()])
+            .output();
+        if !matches!(&mounted, Ok(out) if out.status.success()) {
+            continue;
+        }
+        if boot.join("loader/entries").is_dir() {
+            return Ok(Some(device));
+        }
+        let _ = Command::new("umount").arg(boot).output();
+    }
+    Ok(None)
+}
+
+/// `false` where the image ships no renderer, which is how a fedora target is
+/// skipped without this knowing which families have `blscfg`.
+fn run_renderer(image: &str) -> Result<bool, String> {
+    let out = Command::new("podman")
+        .args([
+            "run",
+            "--rm",
+            "--net=none",
+            "--security-opt",
+            "label=disable",
+            "-v",
+            &format!("{TARGET}:/target"),
+            image,
+            "/bin/sh",
+            "-c",
+            &format!("test -x {RENDERER} || exit 3; exec {RENDERER} /target"),
+        ])
+        .output()
+        .map_err(|err| format!("podman: {err}, and it is what runs the image's renderer"))?;
+    match out.status.code() {
+        Some(0) => Ok(true),
+        Some(3) => Ok(false),
+        _ => Err(format!(
+            "{RENDERER} in {image}: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        )),
+    }
+}
+
 /// Completes the recipe and runs fisherman over it, rendering its event stream
 /// as it goes. Not an `exec`: the events are only worth reading if something
 /// reads them, and the staged recipe is only removable if something outlives
@@ -628,10 +725,10 @@ pub fn run(payload: &Payload, answers: &Answers) -> Result<(), String> {
     let status = child.wait().map_err(|err| format!("{BACKEND}: {err}"))?;
     // It carries the password hash and the passphrase, and the install is over.
     let _ = std::fs::remove_file(&path);
-    match status.success() {
-        true => Ok(()),
-        false => Err(format!("{BACKEND} did not finish: {status}")),
+    if !status.success() {
+        return Err(format!("{BACKEND} did not finish: {status}"));
     }
+    render_menu(&payload.image, &answers.disk)
 }
 
 #[cfg(test)]
