@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
+# The renderer a deb image ships and a fedora one does not.
+RENDERER=/usr/libexec/grub-menu-from-bls
 cd "$(dirname "$0")/.."
 
 die() {
@@ -171,6 +174,54 @@ build_disk() {
     sudoif chown -R "$(id -u):$(id -g)" out/
 }
 
+# The boot menu a deb image needs and a fedora one does not: their signed GRUB
+# reads no BLS entries, so it is rendered from the entries `bootc` just wrote.
+# `tect install` does this after fisherman; this is the other path that writes a
+# disk, and it needs it for the same reason — no `--bootloader` is passed above,
+# so bootc picks one itself, and an image carrying `bootupd` now gets GRUB.
+#
+# The renderer is run *from the image*: a composefs deployment on the disk is
+# sealed erofs with no walkable /usr to read it out of. An image that ships none
+# is a family that needs none, which is exit 3 and not a failure. Two layouts
+# and one mount point: the entries sit at the top of a /boot partition and a
+# level down when /boot is a directory on the root filesystem.
+render_menu() {
+    local raw="$1" lo target device root=""
+    target="$(mktemp -d)"
+    mkdir -p "${target}/boot"
+    lo="$(sudoif losetup --show -fP "$raw")"
+    for device in "${lo}"p*; do
+        [ -b "$device" ] || continue
+        sudoif mount "$device" "${target}/boot" 2> /dev/null || continue
+        if [ -d "${target}/boot/loader/entries" ]; then
+            root=/target
+            break
+        fi
+        if [ -d "${target}/boot/boot/loader/entries" ]; then
+            root=/target/boot
+            break
+        fi
+        sudoif umount "${target}/boot"
+    done
+    if [ -z "$root" ]; then
+        sudoif losetup -d "$lo"
+        rmdir "${target}/boot" "$target" 2> /dev/null || true
+        die "no partition of the disk carries \`loader/entries\`, so there is no menu to render"
+    fi
+    local status=0
+    sudoif podman run --rm --net=none --security-opt label=disable \
+        -v "${target}:/target" --entrypoint "" "$ref" \
+        /bin/sh -c "test -x ${RENDERER} || exit 3; exec ${RENDERER} ${root}" || status=$?
+    sudoif umount "${target}/boot"
+    sudoif losetup -d "$lo"
+    rmdir "${target}/boot" "$target" 2> /dev/null || true
+    case "$status" in
+        0) echo "vm: wrote the boot menu, since this image's GRUB reads no BLS" ;;
+        3) ;;
+        *) die "${RENDERER} in ${ref} failed: exit ${status}" ;;
+    esac
+}
+
 # `bootc install to-disk`, for a family bootc-image-builder cannot convert. It
 # writes a raw disk to a file with no loop device of its own: `--via-loopback`
 # is what removes the `losetup -P` the recipe used to need.
@@ -233,6 +284,7 @@ install_disk() {
         "${key_args[@]}" /out/disk.raw.part
 
     sudoif chown -R "$(id -u):$(id -g)" out/
+    render_menu "$raw"
     # bootc writes raw; a qcow2 is a conversion on top of it. Either way the
     # finished article is moved into place as the last thing that happens.
     if [ "$type" = qcow2 ]; then
