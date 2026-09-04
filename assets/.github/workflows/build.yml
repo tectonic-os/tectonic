@@ -336,18 +336,24 @@ jobs:
       # turns off the native overlay diff, so every layer commit walks the
       # whole rootfs: two minutes a layer on the build and twice the time on
       # the rechunk and the SBOM. Written before anything pulls, so the store
-      # is created under the driver it keeps and nothing has to be reset.
+      # is created under the driver it keeps.
       - name: Settle the container storage driver
         run: |
+          # The reset goes first, and the order is the whole point: the runner
+          # ships a root store already created under its own config, and with
+          # the new file in place every podman call that opens it — `system
+          # reset` included — dies on `database graph driver "" does not match
+          # our graph driver "overlay"`. Reset under the config that made the
+          # store, then write ours and let the next call create a fresh one.
+          # Errors are shown rather than swallowed: `|| true` covers a runner
+          # with no store at all, and hiding stderr is what made this take a
+          # red run to find.
+          sudo podman system reset --force || true
           sudo mkdir -p /etc/containers
           # skopeo reads this file too and, unlike podman, defaults neither
           # path: `containers-storage:` refuses with `runroot must be set`.
           printf '[storage]\ndriver = "overlay"\nrunroot = "/run/containers/storage"\ngraphroot = "/var/lib/containers/storage"\n' \
             | sudo tee /etc/containers/storage.conf > /dev/null
-          # The config alone changes nothing: the store the runner ships was
-          # created with the mount program and keeps the naive diff until it is
-          # thrown away. Nothing has pulled yet, so this costs nothing.
-          sudo podman system reset --force > /dev/null 2>&1 || true
           sudo podman info --format 'storage: {{.Store.GraphDriverName}} {{.Store.GraphOptions}}'
 
       - name: Select a working container runtime
