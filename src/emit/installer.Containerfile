@@ -42,16 +42,16 @@ ARG LIVE_BASE=quay.io/fedora/fedora-bootc:44
 # asset is 174 commits behind its own tip, and tacklebox has no releases at all
 # — so both are source archives pinned by sha256 and built here.
 #
-# The fisherman pin is this project's own fork, and it carries one commit on
-# top of `tuna-os/fisherman` at `027fa25c`: it runs the deployment's own
-# `/usr/libexec/grub-menu-from-bls` against the target it still has mounted,
-# just after the Plymouth and LUKS boot arguments are written and before the
-# target is remounted read-only. The deb families install GRUB through bootupd,
-# which runs before bootc writes the BLS entries, so nothing renders the menu
-# during the install itself and the first boot would reach an empty one. The
-# call is guarded on the file and never on the family, so a Fedora target skips
-# it. The branch is `render-bls-menu`, scoped for submission upstream, and
-# `tectonic` is the same commit and is what this pins.
+# Fisherman is pinned to **upstream** and this project carries no fisherman fork
+# any more. It did carry one commit — running the deployment's own
+# `/usr/libexec/grub-menu-from-bls` against the target while it was still
+# mounted — and that became redundant on 2026-09-04 when `tect install` learned
+# to render after fisherman returns. Both ran for a while and wrote the same
+# file; measured in one install log as fisherman's `test -f
+# /mnt/fisherman-target/…/grub-menu-from-bls` followed by `tect: wrote the boot
+# menu`. Dropping the fork loses nothing here, and the render is still worth
+# submitting upstream for anyone else building on fisherman — the case is in
+# `FISHERMAN-FORK.md`, outside this repository.
 #
 # The base it forks from is `tuna-os` deliberately, and that repository's own
 # description says otherwise: it reads `MOVED -> github.com/projectbluefin/
@@ -67,27 +67,34 @@ ARG LIVE_BASE=quay.io/fedora/fedora-bootc:44
 # Fisherman's Go module is at `fisherman/` inside its own repository and not at
 # the root, which is why the two build directories below are not symmetrical.
 FROM ${GO_IMAGE} AS tools
-ARG FISHERMAN_ORG=tectonic-os
-ARG FISHERMAN_COMMIT=8c48ef50c4ab2922bd3a84139b6d23e67836e7de
-ARG FISHERMAN_SHA256=5e05d284ec83902c4800532c8a4902dc69adddac3a060f83bff03d69765bbdae
-# Tacklebox is this project's own fork, and unlike the fisherman pin above that
-# is not a preference about where the code lives — the media needs two changes
-# upstream has not got. The pin is the fork's `tectonic` branch, which is those
-# two and nothing else: each is also a branch of its own — `secure-boot-media`
-# and `esp-partition` — scoped for submission upstream separately, because they
-# are independent and only one of them is about Secure Boot. It stages the payload's signed shim so the stick boots a
-# machine with Secure Boot on, which is the factory default and refused the
-# unsigned systemd-boot with `Access Denied`; and it appends the ESP as a
-# partition so firmware finds it on a USB block device rather than only through
-# an El Torito scan. Report both upstream rather than keep them.
+ARG FISHERMAN_ORG=tuna-os
+ARG FISHERMAN_COMMIT=027fa25c1d8bc01e2ac97d119cda9e8bb9c99ac7
+ARG FISHERMAN_SHA256=ffab2a2c1094fa02a9b4862958c280045c9390425c93195855a9f0f93956c72e
+# Tacklebox is the one fork left, and unlike the fisherman pin above that is not
+# a preference about where the code lives — the media needs a change upstream
+# has not got. **The pin is `secure-boot-media`, not the wider `tectonic`
+# branch**: it stages the payload's signed shim so the stick boots a machine
+# with Secure Boot on, which is the factory default and refused the unsigned
+# systemd-boot with `Access Denied`. Upstream has most of this already in
+# `purefs.DetectBootChain`, wired only into `cmd/purebuild` and `cmd/tbwasm`;
+# the right upstream shape is `iso.go` calling it. Report it rather than keep it.
 #
-# The pin also carries a fourth layout for the signed pair: the deb families
+# **The `esp-partition` branch is deliberately not pinned any more.** It
+# appended the ESP as a `0xEF` partition so firmware would find it on a USB
+# block device, and it cost CD-ROM boot outright — see `emit::recipe::media`,
+# where `esp_partition` is no longer set. Measured both directions under OVMF:
+# a block device boots either way, a DVD-ROM only without it. So the fork now
+# carries Secure Boot work and nothing else, which is the shape it should have
+# been submitted in.
+#
+# The pin does still carry a fourth layout for the signed pair: the deb families
 # keep theirs under `/usr/lib/shim` and `/usr/lib/grub/x86_64-efi-signed`, which
 # none of the three bootupd/ostree layouts upstream knows covers, so a deb
-# `LIVE_BASE` fell through to unsigned media without saying so.
+# `LIVE_BASE` fell through to unsigned media without saying so. Inert while
+# `LIVE_BASE` is Fedora, which it is by default.
 ARG TACKLEBOX_ORG=tectonic-os
-ARG TACKLEBOX_COMMIT=e5f34b19c76cc3d7bc575fe28beaeee003d756fb
-ARG TACKLEBOX_SHA256=a1c801b193b79755c6fc71faa398fe6c0932d63b064a668c9ac83905c7bea7d1
+ARG TACKLEBOX_COMMIT=b3f3b9a744d65c93dc2536cc55e4bb3030e0535c
+ARG TACKLEBOX_SHA256=3c9d9904d6ae0ef9fbd949435c63d1c20ab0cab940543b17668fd94e0330e278
 # `ExtractEFIBinary` takes an image argument, never reads it, and looks only at
 # two host paths — so a host with no systemd-boot-unsigned is a hard stop, and
 # on a cross-distro builder the host is the wrong source anyway: the media
