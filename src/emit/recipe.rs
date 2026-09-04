@@ -158,12 +158,20 @@ pub fn media(list: &List, name: &str, image: &str, imgref: &str) -> Option<Json>
     Some(Json::object([
         ("media_name", Json::string(format!("{published}-install"))),
         ("size", Json::string(SIZE)),
-        // Opt in to the ESP being appended as a partition of type 0xEF.
-        // Tacklebox defaults it off, because it changes the partition table of
-        // every ISO it writes; this media is written to a USB stick, and
-        // firmware booting a block device looks for that partition rather than
-        // reading El Torito.
-        ("esp_partition", Json::Bool(true)),
+        // `esp_partition` is deliberately not set, so tacklebox keeps its own
+        // default of off. Appending the ESP as a 0xEF partition costs CD-ROM
+        // boot outright: xorriso then records the El Torito EFI image with a
+        // load size of 0, because the image *is* the appended partition and
+        // its length is not known when the catalog is written. Measured on
+        // this media — `El Torito boot img: 1 UEFI y none 0x0000 0x00 0
+        // 829579`, and firmware attached as a DVD-ROM answers `Not Found`.
+        // A block device boots either way — measured both directions on this
+        // media under OVMF, USB attach and DVD-ROM, Secure Boot on — because
+        // EDK2's El Torito driver runs on any block device. That is the whole
+        // of what was proved: no physical stick has been written, so firmware
+        // that looks for a 0xEF partition instead of scanning El Torito is a
+        // risk this turns back on, and it is the risk that predates the
+        // appended partition rather than a new one.
         (
             "bootable_environments",
             Json::array([Json::object([
@@ -285,7 +293,6 @@ mod tests {
         assert_eq!(
             assembled.render(),
             "{\n  \"media_name\": \"forky-install\",\n  \"size\": \"20G\",\n  \
-             \"esp_partition\": true,\n  \
              \"bootable_environments\": [\n    {\n      \"id\": \"installer\",\n      \
              \"image\": \"localhost/forky-installer:latest\",\n      \"title\": \
              \"Forky installer\",\n      \"modes\": [\n        \"live\"\n      ]\n    }\n  ],\n  \"offline_payloads\": [\n    {\n      \"source\": \
