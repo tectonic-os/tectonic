@@ -62,6 +62,11 @@ const FAMILY_ARG: &str = "\
 # ---- base family ----
 ARG FAMILY";
 
+/// What a fragment writes where a mount writes `source=/modules/<dir>`. It is
+/// inlined verbatim, so it cannot name its own directory, and `${...}` would be
+/// read as a build arg.
+const MODULE_DIR: &str = "@MODULE@";
+
 /// The binary, so anything running in the image can call the tool.
 const TECT_MOUNT: &str = "--mount=type=bind,from=tect,source=/tect,target=/ctx/tect \\\n    ";
 
@@ -278,12 +283,13 @@ fn standard(entry: &Entry, module: &Module, image: &Image, script: &Path) -> Str
 /// inlined verbatim above the standard block, or below it when the manifest
 /// says `position "after"`.
 fn fragment(entry: &Entry, body: &str) -> String {
+    let dir = entry.dir();
     let mut out = String::new();
     let _ = write!(
         out,
-        "# verbatim from modules/{}/Containerfile.inc:\n{}",
-        entry.dir(),
+        "# verbatim from modules/{dir}/Containerfile.inc:\n{}",
         body.trim_end_matches('\n')
+            .replace(MODULE_DIR, &format!("/modules/{dir}"))
     );
     out
 }

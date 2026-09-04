@@ -8,6 +8,7 @@ RUN mv /opt /opt.bak && mkdir /opt
 
 # ---- core/early ----
 # verbatim from modules/core/early/Containerfile.inc:
+COPY --from=ctx /modules/core/early/hostname /etc/hostname
 RUN echo "building ${FLAVOUR}" > /usr/share/early
 
 RUN --mount=type=bind,from=ctx,source=/modules/core/early,target=/ctx/modules/core/early \

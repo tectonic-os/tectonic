@@ -510,8 +510,14 @@ in the directory is convention.
 | `apparmor/*` | validated and placed in `/etc/apparmor.d`, where the image provides `apparmor-policy` |
 | `files/` | copied over `/` |
 | `finalize.sh` | sourced by the finalize phase, in resolved order |
-| `Containerfile.inc` | placed verbatim by `fragment` |
+| `Containerfile.inc` | placed verbatim by `fragment`, with `@MODULE@` replaced by the module's directory in the build context |
 | a file another module collects | staged for it |
+
+A fragment is inlined verbatim and so cannot name its own directory. `@MODULE@`
+expands to the path the module layer's mounts use, `/modules/<dir>`, which is
+what a `COPY --from=ctx` needs to reach a file the module ships — the way to
+write `/etc/hostname`, `/etc/hosts` or `/etc/resolv.conf`, which are bind-mounted
+over during every `RUN`.
 
 Shipping either policy directory also orders the module: it builds after
 whoever provides that MAC, the way an `after` would, without declaring one. A
