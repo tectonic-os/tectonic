@@ -50,8 +50,14 @@ impl Disk {
                     .unwrap_or(&path)
                     .display()
                     .to_string();
-                out.overlays
-                    .insert(name.clone(), overlay_paths(&path.join(layout::OVERLAY)));
+                // A family overlay puts paths in the image too, so an override
+                // one module gates and another does not is still two modules
+                // writing one path.
+                let mut paths = overlay_paths(&path.join(layout::OVERLAY));
+                for family in crate::parse::module::FAMILIES {
+                    paths.extend(overlay_paths(&path.join(family).join(layout::OVERLAY)));
+                }
+                out.overlays.insert(name.clone(), paths);
 
                 let Ok(text) = std::fs::read_to_string(&manifest) else {
                     continue;

@@ -20,17 +20,23 @@ pub fn path(image: &Image) -> PathBuf {
 }
 
 /// Every module directory whose finalize hook this image runs, in build order
-/// and without the repeat a module listed under two flavours would produce.
-pub fn hooks<'a>(image: &'a Image, root: &Path) -> Vec<&'a Entry> {
+/// and without the repeat a module listed under two flavours would produce,
+/// each with the hooks it ships: its own, then the one under the base family's
+/// directory. A module shipping only the gated one runs only on that family.
+pub fn hooks<'a>(image: &'a Image, root: &Path) -> Vec<(&'a Entry, Vec<String>)> {
+    let family = image.base.as_ref().map_or("", |base| base.family.as_str());
     image
         .entries
         .iter()
         .filter(|entry| entry.module.is_some())
-        .filter(|entry| {
-            layout::modules(root)
-                .join(entry.dir())
-                .join("finalize.sh")
-                .is_file()
+        .filter_map(|entry| {
+            let dir = layout::modules(root).join(entry.dir());
+            let found: Vec<String> = std::iter::once(String::new())
+                .chain(layout::family_dir(&dir, family).map(|_| format!("{family}/")))
+                .filter(|at| dir.join(at).join("finalize.sh").is_file())
+                .map(|at| format!("{at}finalize.sh"))
+                .collect();
+            (!found.is_empty()).then_some((entry, found))
         })
         .collect()
 }
@@ -60,9 +66,13 @@ rm -rf {dest}.d
         );
     }
 
-    for entry in hooks {
+    for (entry, scripts) in hooks {
         let dir = format!("/ctx/modules/{}", entry.dir());
-        let mut body = format!("MODDIR={dir}\nexport MODDIR\nsource {dir}/finalize.sh\n");
+        let sourced: String = scripts
+            .iter()
+            .map(|script| format!("source {dir}/{script}\n"))
+            .collect();
+        let mut body = format!("MODDIR={dir}\nexport MODDIR\n{sourced}");
         if let Some(flavour) = &entry.flavour {
             body = body
                 .lines()

@@ -33,7 +33,7 @@ modules/flatpak/module.kdl
 modules/flatpak/provenance.kdl
 ==== the record
 imported "one" {
-    content "b1d3c80ac19b0db6acf256c6e50b59e60aca7be95e6ada7a0d048ea2cb4385a7"
+    content "0d73958368889de63481af715cfed2349cc329c4b209f46d904533d5c29f4e61"
 }
 ==== check
 ==== modified

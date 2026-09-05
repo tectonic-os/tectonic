@@ -1,9 +1,9 @@
 Tectonic v{version}
 
   × `two/browser` requires `flatpak`, which nothing enabled provides
-   ╭─[./modules/.remote/two/browser/module.kdl:9:1]
- 8 │ 
- 9 │ requires "flatpak"
+   ╭─[./modules/.remote/two/browser/module.kdl:7:1]
+ 6 │ 
+ 7 │ requires "flatpak"
    · ────┬───
    ·     ╰── unsatisfied
    ╰────

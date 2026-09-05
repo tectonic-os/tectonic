@@ -112,7 +112,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "5e07652a052642f48a2ed4254583c3d2a255a61307560603b8da6bfbec66d840",
+                "content": "ff8e03106067dc485e959cd95c77f9dabccf23a0e65b91fdfd9f8afbec44cebf",
                 "repo": false,
                 "pin": {
                   "locator": "https://github.com/tectonic-os/modules/archive/refs/heads/{version}.tar.gz",

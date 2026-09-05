@@ -26,11 +26,22 @@ export MODDIR
 
 source /ctx/lib/family.sh
 
-install_packages 'curl' 'git'
+install_packages 'curl'
+
+install_packages 'git'
+
+source /ctx/modules/core/shared/debian/module.sh
+
+cp -rT /ctx/modules/core/shared/debian/files /
 ==== generated/debian/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
+
+# ---- core/shared ----
+MODDIR=/ctx/modules/core/shared
+export MODDIR
+source /ctx/modules/core/shared/debian/finalize.sh
 
 # ---- /opt relocation ----
 mkdir -p /usr/lib/opt
@@ -214,11 +225,22 @@ export MODDIR
 
 source /ctx/lib/family.sh
 
-install_packages 'curl' 'git'
+install_packages 'curl'
+
+install_packages 'git'
+
+source /ctx/modules/core/shared/debian/module.sh
+
+cp -rT /ctx/modules/core/shared/debian/files /
 ==== generated/forky/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
+
+# ---- core/shared ----
+MODDIR=/ctx/modules/core/shared
+export MODDIR
+source /ctx/modules/core/shared/debian/finalize.sh
 
 # ---- /opt relocation ----
 mkdir -p /usr/lib/opt
@@ -408,7 +430,9 @@ export MODDIR
 
 source /ctx/lib/family.sh
 
-install_packages 'curl' 'vim'
+install_packages 'curl'
+
+install_packages 'vim'
 ==== generated/ubuntu/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.

@@ -882,7 +882,9 @@ fn module_kdl(
         for pkg in pkgs {
             listed.push_str(&format!(" \"{}\"", quotable(pkg)?));
         }
-        text.push_str(&format!("\npackages {{\n    {family}{listed}\n}}\n"));
+        // A scaffolded module supports one family, so the list needs no gate:
+        // outside a gate is every family the module supports, which is this one.
+        text.push_str(&format!("\npackages{listed}\n"));
     }
     Ok(text)
 }

@@ -2,7 +2,7 @@ description "A module both the Debian and Ubuntu images enable"
 
 supports "debian" "ubuntu"
 
-packages {
-    debian "curl" "git"
-    ubuntu "curl" "vim"
-}
+packages "curl"
+
+family "debian" { packages "git" }
+family "ubuntu" { packages "vim" }

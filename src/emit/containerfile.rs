@@ -199,7 +199,7 @@ fn finalize_layer(image: &Image, identity_env: &str, root: &Path) -> String {
     );
 
     let mut mounted: Vec<String> = Vec::new();
-    for entry in hooks {
+    for (entry, _) in hooks {
         let dir = entry.dir();
         if mounted.contains(&dir) {
             continue;

@@ -162,8 +162,22 @@ const FETCHES: [&str; 8] = [
     "go install",
 ];
 
-/// The scripts a module runs, which are the two places it can fetch from.
+/// The scripts a module runs, which are the two places it can fetch from --
+/// each also under a family directory, where the same script runs on one family
+/// alone and can fetch just as undeclared.
 const SCRIPTS: [&str; 2] = ["module.sh", "finalize.sh"];
+
+fn scripts() -> Vec<String> {
+    SCRIPTS
+        .iter()
+        .map(|name| name.to_string())
+        .chain(
+            crate::parse::module::FAMILIES
+                .iter()
+                .flat_map(|family| SCRIPTS.iter().map(move |name| format!("{family}/{name}"))),
+        )
+        .collect()
+}
 
 /// A module that reaches the network with nothing declaring what it pulls.
 /// Always on, whatever the posture: an undeclared fetch is the one thing no
@@ -177,8 +191,8 @@ pub fn check_fetch(
     if !module.assets.is_empty() {
         return;
     }
-    for script in SCRIPTS {
-        let Ok(text) = std::fs::read_to_string(dir.join(script)) else {
+    for script in scripts() {
+        let Ok(text) = std::fs::read_to_string(dir.join(&script)) else {
             continue;
         };
         let Some(verb) = FETCHES.into_iter().find(|verb| {

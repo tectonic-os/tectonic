@@ -123,7 +123,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "987959e7e222f7d6449d7a973aebd8b0c409357e4d67f78ad0d6feb421053ad8",
+                "content": "1e3bca8b5bd1fac5812bbc04987737b5119fee8f22da0f011843d4f5c208daaa",
                 "repo": false,
                 "pin": null,
                 "imported": null
@@ -157,7 +157,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "669ec9f26e62b112f7d7c790552d0ef16ceb1f04b9d3547cc263c175015182f4",
+                "content": "0179980f392ae7c6c8b7bb593c99c97d140a879abf2620a2a4ff21f49fb092fa",
                 "repo": false,
                 "pin": {
                   "locator": "https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz",
@@ -249,7 +249,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "987959e7e222f7d6449d7a973aebd8b0c409357e4d67f78ad0d6feb421053ad8",
+                "content": "1e3bca8b5bd1fac5812bbc04987737b5119fee8f22da0f011843d4f5c208daaa",
                 "repo": false,
                 "pin": null,
                 "imported": null
@@ -283,7 +283,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "669ec9f26e62b112f7d7c790552d0ef16ceb1f04b9d3547cc263c175015182f4",
+                "content": "0179980f392ae7c6c8b7bb593c99c97d140a879abf2620a2a4ff21f49fb092fa",
                 "repo": false,
                 "pin": {
                   "locator": "https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz",
@@ -321,7 +321,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "678c23e20ae43a4a23e082356550942d582907b1d22514cfed2276972158408c",
+                "content": "ee0f1fd3170c1a308f38630297cce8898bd1d81ab4de46e0bbc46bfdcd9194fc",
                 "repo": false,
                 "pin": null,
                 "imported": null

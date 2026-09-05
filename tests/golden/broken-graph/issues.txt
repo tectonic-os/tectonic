@@ -78,24 +78,24 @@
         `sources`, so there is no collection to import one from
 
   x `core/one` requires `package-manager`, which nothing enabled provides
-    ,-[./modules/core/one/module.kdl:10:1]
-  9 | helpers "lib/one/shared.sh"
- 10 | requires "package-manager"
-    : ^^^^|^^^
-    :     `-- unsatisfied
- 11 | requires "apparmor-policy"
-    `----
+   ,-[./modules/core/one/module.kdl:8:1]
+ 7 | helpers "lib/one/shared.sh"
+ 8 | requires "package-manager"
+   : ^^^^|^^^
+   :     `-- unsatisfied
+ 9 | requires "apparmor-policy"
+   `----
   help: no module in the repository declares `provides "package-manager"`, and
         neither does the `base` node in ./image.kdl. repo.kdl declares no
         `sources`, so there is no collection to import one from
 
   x `core/one` requires `apparmor-policy`, which nothing enabled provides
-    ,-[./modules/core/one/module.kdl:11:1]
- 10 | requires "package-manager"
- 11 | requires "apparmor-policy"
+    ,-[./modules/core/one/module.kdl:9:1]
+  8 | requires "package-manager"
+  9 | requires "apparmor-policy"
     : ^^^^|^^^
     :     `-- unsatisfied
- 12 | requires-file "/usr/bin/nothing"
+ 10 | requires-file "/usr/bin/nothing"
     `----
   help: no module in the repository declares `provides "apparmor-policy"`, and
         neither does the `base` node in ./image.kdl. repo.kdl declares no
@@ -103,21 +103,21 @@
 
   x `core/one` requires-file `/usr/bin/nothing`, which nothing enabled
   | provides
-    ,-[./modules/core/one/module.kdl:12:1]
- 11 | requires "apparmor-policy"
- 12 | requires-file "/usr/bin/nothing"
+    ,-[./modules/core/one/module.kdl:10:1]
+  9 | requires "apparmor-policy"
+ 10 | requires-file "/usr/bin/nothing"
     : ^^^^^^|^^^^^^
     :       `-- unsatisfied
- 13 | after "logging"
+ 11 | after "logging"
     `----
   help: no module in the repository declares `provides "/usr/bin/nothing"`,
         and neither does the `base` node in ./image.kdl. repo.kdl declares no
         `sources`, so there is no collection to import one from
 
   x `core/one` builds after `logging`, which nothing enabled provides
-    ,-[./modules/core/one/module.kdl:13:1]
- 12 | requires-file "/usr/bin/nothing"
- 13 | after "logging"
+    ,-[./modules/core/one/module.kdl:11:1]
+ 10 | requires-file "/usr/bin/nothing"
+ 11 | after "logging"
     : ^^|^^
     :   `-- nothing to order after
     `----

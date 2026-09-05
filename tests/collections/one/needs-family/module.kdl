@@ -4,6 +4,4 @@ supports "fedora"
 
 requires "build-environment"
 
-packages {
-    fedora "htop"
-}
+packages "htop"

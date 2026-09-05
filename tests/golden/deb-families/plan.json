@@ -86,7 +86,13 @@
                 {
                   "family": "debian",
                   "names": [
-                    "curl",
+                    "curl"
+                  ],
+                  "enablerepo": null
+                },
+                {
+                  "family": "debian",
+                  "names": [
                     "git"
                   ],
                   "enablerepo": null
@@ -95,7 +101,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "bc71ee256b11752cba5dec1bd1034ccae9850624f24370f1ac8509b2aa3bbc1f",
+                "content": "52fe524b0a1d16042ce1695cbd648d1c40e5c5c90769e72965279df47eda8996",
                 "repo": false,
                 "pin": null,
                 "imported": null
@@ -109,7 +115,9 @@
           "verify_exceptions": [],
           "assets": [],
           "provides_files": {},
-          "overlay_files": {},
+          "overlay_files": {
+            "/etc/shared.conf": "core/shared"
+          },
           "overlay_overridden": [],
           "collected_files": {},
           "collect_destinations": []
@@ -232,7 +240,13 @@
                 {
                   "family": "debian",
                   "names": [
-                    "curl",
+                    "curl"
+                  ],
+                  "enablerepo": null
+                },
+                {
+                  "family": "debian",
+                  "names": [
                     "git"
                   ],
                   "enablerepo": null
@@ -241,7 +255,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "bc71ee256b11752cba5dec1bd1034ccae9850624f24370f1ac8509b2aa3bbc1f",
+                "content": "52fe524b0a1d16042ce1695cbd648d1c40e5c5c90769e72965279df47eda8996",
                 "repo": false,
                 "pin": null,
                 "imported": null
@@ -255,7 +269,9 @@
           "verify_exceptions": [],
           "assets": [],
           "provides_files": {},
-          "overlay_files": {},
+          "overlay_files": {
+            "/etc/shared.conf": "core/shared"
+          },
           "overlay_overridden": [],
           "collected_files": {},
           "collect_destinations": []
@@ -331,7 +347,13 @@
                 {
                   "family": "ubuntu",
                   "names": [
-                    "curl",
+                    "curl"
+                  ],
+                  "enablerepo": null
+                },
+                {
+                  "family": "ubuntu",
+                  "names": [
                     "vim"
                   ],
                   "enablerepo": null
@@ -340,7 +362,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "bc71ee256b11752cba5dec1bd1034ccae9850624f24370f1ac8509b2aa3bbc1f",
+                "content": "52fe524b0a1d16042ce1695cbd648d1c40e5c5c90769e72965279df47eda8996",
                 "repo": false,
                 "pin": null,
                 "imported": null
@@ -354,7 +376,9 @@
           "verify_exceptions": [],
           "assets": [],
           "provides_files": {},
-          "overlay_files": {},
+          "overlay_files": {
+            "/etc/shared.conf": "core/shared"
+          },
           "overlay_overridden": [],
           "collected_files": {},
           "collect_destinations": []

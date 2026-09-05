@@ -4,9 +4,7 @@ description "My Editor"
 supports "fedora"
 provides "editor"
 
-packages {
-    fedora "nano"
-}
+packages "nano"
 ==== modules/plain/module.kdl
 description "plain"
 

@@ -511,6 +511,7 @@ in the directory is convention.
 | `files/` | copied over `/` |
 | `finalize.sh` | sourced by the finalize phase, in resolved order |
 | `Containerfile.inc` | placed verbatim by `fragment`, with `@MODULE@` replaced by the module's directory in the build context |
+| `<family>/` | `module.sh`, `files/` and `finalize.sh` under `fedora/`, `debian/` or `ubuntu/`, each taken on that family alone |
 | a file another module collects | staged for it |
 
 A fragment is inlined verbatim and so cannot name its own directory. `@MODULE@`
@@ -549,6 +550,84 @@ check and names every module that would satisfy it; an `after` nothing
 provides is ignored. A capability name is lowercase letters, digits and
 dashes, starting with a letter, since the generated graph writes it into a
 mermaid label and a markdown table cell without quoting it.
+
+### Gating by family
+
+A module that builds on more than one base family usually installs different
+package names on each, and sometimes does something different altogether. Two
+things gate on the family, one for what the manifest declares and one for what
+the directory ships. Both follow the same rule: **outside a gate is every
+family the module supports, inside a gate is the families it names.**
+
+`family` gates declarations. It takes one or more family names, so a list two
+families share is written once rather than twice:
+
+```kdl
+description "Traditional CLI utilities"
+
+supports "fedora" "debian" "ubuntu"
+
+packages "bash-completion" "htop" "rsync" "tmux"
+
+family "fedora" {
+    packages "7zip-standalone" "vim-enhanced"
+    copr "someone/tools"
+}
+
+family "debian" "ubuntu" {
+    packages "7zip" "vim"
+}
+```
+
+`packages`, `package-groups`, `copr`, `requires`, `after` and `satisfies` go
+inside one. The rest of the manifest does not: `description` and `supports` are
+what the module is and what it claims, `option`, `variant` and `asset` are the
+image author's interface and must not change shape underneath them, and `key`,
+`collects`, `contributes` and `helpers` are contracts with other modules.
+`provides` is left out too — a capability offered on one family and not another
+is a module that should have been two.
+
+A gate is read whether or not the image is built for it, so a manifest is held
+to the same checks on every family it claims rather than only on the one being
+built. What a gate the build does not want declared is then dropped: a
+Fedora-only `after` does not dangle on a Debian image, and a Fedora rule number
+in `satisfies` is not a claim a Debian scan can fail to map.
+
+`<family>/` gates files, because `module.sh`, `finalize.sh` and `files/` are
+files and no node names them. A `debian/` directory holding any of the three is
+taken on Debian alone, the way `selinux/` is taken only where the image has
+that MAC:
+
+```
+modules/login-access/
+├── module.kdl
+├── files/            # every family
+├── module.sh         # every family
+└── debian/
+    ├── files/        # Debian alone, copied after files/
+    └── module.sh     # Debian alone, sourced after module.sh
+```
+
+**The convention is additive and nothing has to be renamed to use it.** An
+ungated `module.sh` and `files/` at the module root mean exactly what they
+always meant: run everywhere. A module with no `<family>/` directory has
+nothing gated, which is the overwhelmingly common case, and a module written
+for one base family writes no gate at all — `packages "htop"` under
+`supports "fedora"` installs on Fedora because that is the only family it
+supports. The convention earns its keep in a collection published for
+consumers whose base its author does not control, where the alternative is
+duplicating every module per family or refusing the family outright.
+
+The gated half runs after the ungated one rather than instead of it: the
+family `files/` is copied over the shared one, so it may replace a shared file,
+and the family `module.sh` is sourced below the shared one. A `<family>/`
+directory or a `family` gate naming a family the module does not `supports` is
+refused, since no image could reach it.
+
+A directory name is one family where a `family` gate takes several, so two
+families needing the same files are a symlink — `ubuntu -> debian` beside
+`debian/` — rather than a second copy. A fetch resolves it, so the consumer
+gets two real directories and the collection stores one.
 
 `collects` claims a filename across the whole image and `contributes` says
 this module ships one. Each contribution is staged as
@@ -688,25 +767,17 @@ Where the module's Containerfile.inc goes relative to the generated layer.
 
 ### `packages`
 
-The packages this module installs, listed per base family.
-
-#### `<name>`
-
-One base family, and the packages to install on it.
+The packages this module installs, on every family it supports or, inside a `family` block, on the families that names.
 
 *one or more strings*
 
 | Property | Value | Meaning |
 | --- | --- | --- |
-| `enablerepo=` | a string | A repository enabled for this install and disabled otherwise. Fedora only. |
+| `enablerepo=` | a string | A repository enabled for this install and disabled otherwise. Fedora only, so the batch has to resolve to Fedora alone. |
 
 ### `package-groups`
 
-The package groups this module installs, listed per base family. Fedora only.
-
-#### `<name>`
-
-One base family, and the groups to install on it.
+The package groups this module installs. Fedora only, so an ungated one is a module supporting Fedora alone.
 
 *one or more strings*
 
@@ -723,6 +794,20 @@ The benchmarks and rules this module claims to harden, as an audit declaration t
 | Node | Takes | Meaning |
 | --- | --- | --- |
 | `<name>` | one or more strings, one per name | One benchmark, and the rule IDs it covers. |
+
+### `family`
+
+The declarations inside taken only on the base families named, everything outside a gate being taken on every family the module supports.
+
+*one or more strings, never empty*
+
+Also holds `packages`, as above, `package-groups`, as above and `satisfies`, as above.
+
+| Node | Takes | Meaning |
+| --- | --- | --- |
+| `copr` | a string, one per name | A COPR repository this module enables for its own installs, as owner/project. Fedora only. |
+| `requires` | one or more strings | A capability another module has to provide, which also orders the build. |
+| `after` | one or more strings | A module this one builds after without requiring anything of it. |
 
 <!-- /schema: module -->
 

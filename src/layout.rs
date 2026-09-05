@@ -68,6 +68,22 @@ impl Policy {
     }
 }
 
+/// A module's family-gated subtree: `debian/module.sh`, `debian/files/` and
+/// `debian/finalize.sh` are taken on that family alone, the way `selinux/` is
+/// taken only where the image has that MAC. `Policy` names a capability where
+/// this names a family, and the emitter filters on it the same way.
+///
+/// The convention is additive and nothing is renamed to keep working. An
+/// ungated `module.sh` and `files/` at the module root still run everywhere, so
+/// a module with no such directory has nothing gated -- the overwhelmingly
+/// common case, and the one that has to stay cheapest to write. `None` where
+/// the image declares no family, so a repository that never names one is never
+/// asked to.
+pub fn family_dir(module_dir: &Path, family: &str) -> Option<PathBuf> {
+    let dir = module_dir.join(family);
+    (!family.is_empty() && dir.is_dir()).then_some(dir)
+}
+
 /// GitHub's path, not this repository's choice, which is why it is written
 /// here rather than declared anywhere.
 pub const WORKFLOW_DIR: &str = ".github/workflows";

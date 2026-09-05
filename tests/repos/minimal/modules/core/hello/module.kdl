@@ -4,11 +4,7 @@ supports "fedora"
 
 copr "example/tools"
 
-packages {
-    fedora "fastfetch" enablerepo="updates-testing"
-    fedora "example-tool" enablerepo="example/tools"
-}
+packages "fastfetch" enablerepo="updates-testing"
+packages "example-tool" enablerepo="example/tools"
 
-package-groups {
-    fedora "core"
-}
+package-groups "core"

@@ -20,9 +20,7 @@ variant "beta" {
     set "remotes" "flathub" "flathub-beta"
 }
 
-packages {
-    fedora "flatpak"
-}
+packages "flatpak"
 
 satisfies {
     cis-fedora "9.9.9.9"
