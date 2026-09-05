@@ -546,8 +546,10 @@ is refused on an image that has not got it like any other requirement.
 
 Build order is resolved from `requires` and `after`, never from the order of
 the list, which is only a tie-break. A `requires` nothing provides fails the
-check and names every module that would satisfy it; an `after` nothing
-provides is ignored. A capability name is lowercase letters, digits and
+check and names every module that would satisfy it, and so does an `after`
+nothing provides — both are edges, and an edge to nothing is a declaration
+about a module that is not there. A `family` gate is how an ordering true on
+one family alone is written without dangling on the others. A capability name is lowercase letters, digits and
 dashes, starting with a letter, since the generated graph writes it into a
 mermaid label and a markdown table cell without quoting it.
 
