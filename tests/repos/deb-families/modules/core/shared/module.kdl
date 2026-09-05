@@ -6,3 +6,5 @@ packages "curl"
 
 family "debian" { packages "git" }
 family "ubuntu" { packages "vim" }
+
+contributes "justfile.inc" priority=900

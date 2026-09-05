@@ -1216,7 +1216,15 @@ impl Module {
         let contributed = string_args(node).first().map(|s| s.to_string());
         match (contributed, priority(node)) {
             (Some(contributed), Some(priority)) => {
-                if !dir.join(&contributed).is_file() {
+                // Every family, since a manifest is read without one: a
+                // contribution gated to a family this build is not for is
+                // still a file the module ships.
+                let anywhere = layout::FAMILY_DIRS
+                    .iter()
+                    .map(|(gated, _)| dir.join(gated).join(&contributed))
+                    .chain(std::iter::once(dir.join(&contributed)))
+                    .any(|at| at.is_file());
+                if !anywhere {
                     issues.push(
                         Issue::new(
                             format!("`{}` orders a {contributed} it does not ship", self.path),

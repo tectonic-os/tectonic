@@ -16,6 +16,13 @@ set -euxo pipefail
 
 MODDIR=/ctx/modules/debian-family
 export MODDIR
+==== generated/debian/modules/core/menu.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/menu
+export MODDIR
 ==== generated/debian/modules/core/shared.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
@@ -37,10 +44,24 @@ source /ctx/modules/core/shared/debian/module.sh
 cp -rT /ctx/modules/core/shared/deb/files /
 
 cp -rT /ctx/modules/core/shared/debian/files /
+
+mkdir -p /usr/share/just/justfile.apps.d
+cat /ctx/modules/core/shared/deb/justfile.inc > /usr/share/just/justfile.apps.d/0900-core-shared.part
 ==== generated/debian/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
+
+# ---- /usr/share/just/justfile.apps ----
+parts=()
+for part in /usr/share/just/justfile.apps.d/0900-core-shared.part; do
+    [ -f "$part" ] || continue
+    parts+=("$part")
+done
+if [ ${#parts[@]} -gt 0 ]; then
+    cat "${parts[@]}" > /usr/share/just/justfile.apps
+fi
+rm -rf /usr/share/just/justfile.apps.d
 
 # ---- core/shared ----
 MODDIR=/ctx/modules/core/shared
@@ -171,7 +192,8 @@ right.
 graph LR
     base["docker.io/library/debian:forky"]
     m0["debian-family"]
-    m1["core/shared"]
+    m1["core/menu"]
+    m2["core/shared"]
 ```
 
 ## Capabilities
@@ -219,6 +241,13 @@ export MODDIR
 
 source /ctx/lib/apparmor-helpers.sh
 install_apparmor_profile /ctx/modules/core/confined/apparmor/usr.bin.confined
+==== generated/forky/modules/core/menu.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/menu
+export MODDIR
 ==== generated/forky/modules/core/shared.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
@@ -240,10 +269,24 @@ source /ctx/modules/core/shared/debian/module.sh
 cp -rT /ctx/modules/core/shared/deb/files /
 
 cp -rT /ctx/modules/core/shared/debian/files /
+
+mkdir -p /usr/share/just/justfile.apps.d
+cat /ctx/modules/core/shared/deb/justfile.inc > /usr/share/just/justfile.apps.d/0900-core-shared.part
 ==== generated/forky/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
+
+# ---- /usr/share/just/justfile.apps ----
+parts=()
+for part in /usr/share/just/justfile.apps.d/0900-core-shared.part; do
+    [ -f "$part" ] || continue
+    parts+=("$part")
+done
+if [ ${#parts[@]} -gt 0 ]; then
+    cat "${parts[@]}" > /usr/share/just/justfile.apps
+fi
+rm -rf /usr/share/just/justfile.apps.d
 
 # ---- core/shared ----
 MODDIR=/ctx/modules/core/shared
@@ -376,7 +419,8 @@ graph LR
     m0["debian-family"]
     m1["core/bootc-base"]
     m2["core/confined"]
-    m3["core/shared"]
+    m3["core/menu"]
+    m4["core/shared"]
     m1 -.->|"apparmor-policy"| m2
 ```
 
@@ -428,6 +472,13 @@ set -euxo pipefail
 
 MODDIR=/ctx/modules/debian-family
 export MODDIR
+==== generated/ubuntu/modules/core/menu.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/menu
+export MODDIR
 ==== generated/ubuntu/modules/core/shared.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
@@ -445,10 +496,24 @@ install_packages 'vim'
 source /ctx/modules/core/shared/deb/module.sh
 
 cp -rT /ctx/modules/core/shared/deb/files /
+
+mkdir -p /usr/share/just/justfile.apps.d
+cat /ctx/modules/core/shared/deb/justfile.inc > /usr/share/just/justfile.apps.d/0900-core-shared.part
 ==== generated/ubuntu/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
+
+# ---- /usr/share/just/justfile.apps ----
+parts=()
+for part in /usr/share/just/justfile.apps.d/0900-core-shared.part; do
+    [ -f "$part" ] || continue
+    parts+=("$part")
+done
+if [ ${#parts[@]} -gt 0 ]; then
+    cat "${parts[@]}" > /usr/share/just/justfile.apps
+fi
+rm -rf /usr/share/just/justfile.apps.d
 
 # ---- /opt relocation ----
 mkdir -p /usr/lib/opt
@@ -574,7 +639,8 @@ right.
 graph LR
     base["docker.io/library/ubuntu:26.04"]
     m0["debian-family"]
-    m1["core/shared"]
+    m1["core/menu"]
+    m2["core/shared"]
 ```
 
 ## Capabilities

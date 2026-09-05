@@ -1,0 +1,5 @@
+description "Collects the justfile fragments the rest of the image contributes"
+
+supports "debian" "ubuntu"
+
+collects "justfile.inc" into="/usr/share/just/justfile.apps" priority=500

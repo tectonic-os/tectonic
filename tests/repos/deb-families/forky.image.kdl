@@ -10,6 +10,7 @@ image {
         module "debian-family"
         module "core/bootc-base"
         module "core/confined"
+        module "core/menu"
         module "core/shared"
     }
 }

@@ -17,6 +17,17 @@ RUN --mount=type=bind,from=ctx,source=/modules/debian-family,target=/ctx/modules
     --mount=type=tmpfs,target=/tmp \
     bash /ctx/module.sh
 
+# ---- core/menu ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/menu,target=/ctx/modules/core/menu \
+    --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib,rw \
+    --mount=type=bind,from=ctx,source=/modules/debian-family/lib/family.sh,target=/ctx/lib/family.sh \
+    --mount=type=bind,from=ctx,source=/generated/debian/modules/core/menu.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/module.sh
+
 # ---- core/shared ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/shared,target=/ctx/modules/core/shared \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib,rw \

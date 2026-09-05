@@ -86,6 +86,28 @@ pub const FAMILY_DIRS: [(&str, &[&str]); 4] = [
     ("ubuntu", &["ubuntu"]),
 ];
 
+/// Where a file a module ships is read from, most specific first and the module
+/// root last: what a lookup that picks one copy rather than layering them walks.
+/// The reverse of `family_dirs`, whose order is what a layering emitter wants.
+pub fn family_first(module_dir: &Path, family: &str) -> Vec<String> {
+    family_dirs(module_dir, family)
+        .into_iter()
+        .rev()
+        .map(|gated| format!("{gated}/"))
+        .chain(std::iter::once(String::new()))
+        .collect()
+}
+
+/// A file one module ships, as the path inside its directory that a build
+/// reads it at: the family copy where there is one, and the ungated copy
+/// otherwise. `None` where the module ships it nowhere.
+pub fn shipped(module_dir: &Path, family: &str, file: &str) -> Option<String> {
+    family_first(module_dir, family)
+        .into_iter()
+        .map(|at| format!("{at}{file}"))
+        .find(|at| module_dir.join(at).is_file())
+}
+
 /// The ones this module ships for this family, in the order they are taken.
 ///
 /// The convention is additive and nothing is renamed to keep working. An

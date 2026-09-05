@@ -63,12 +63,16 @@ pub fn resolve_collects(
     out.destinations.sort();
     out.destinations.dedup();
 
+    // A contribution is a file the module ships, so it gates the way the rest
+    // of them do. One file lands per module and the collector claims one name,
+    // so this picks the most specific copy rather than layering them.
+    let family = image.base.as_ref().map_or("", |base| base.family.as_str());
     for module in image.modules() {
         let dir = layout::module(root, &module.dir);
         for (file, collector) in &disk.collectors {
-            if !dir.join(file).is_file() {
+            let Some(shipped) = layout::shipped(&dir, family, file) else {
                 continue;
-            }
+            };
             match by_file.get(file.as_str()) {
                 Some(enabled) => {
                     let declared = enabled.collects.iter().find(|c| &c.file == file);
@@ -99,7 +103,7 @@ pub fn resolve_collects(
                         .entry(module.path.clone())
                         .or_default()
                         .push(Collected {
-                            file: file.clone(),
+                            file: shipped,
                             staged: staged(&into, priority, &module.path),
                             into,
                         });

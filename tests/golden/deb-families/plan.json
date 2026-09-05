@@ -73,6 +73,27 @@
               "satisfies": []
             },
             {
+              "path": "core/menu",
+              "dir": "core/menu",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Collects the justfile fragments the rest of the image contributes",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "content": "2a6f8d22daf6f487613524677a42149601d6ea56b226ce27d0fa59e0bd99bbd7",
+                "repo": false,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": []
+            },
+            {
               "path": "core/shared",
               "dir": "core/shared",
               "flavour": null,
@@ -101,7 +122,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "f45998d24d14cc73c13bb1d23fcbbfa45af85039922a0dde5898c9376ec0319e",
+                "content": "41195cf91139d62b808eede7ec3e09fc9a533f5c86afe8303a3adfae61105841",
                 "repo": false,
                 "pin": null,
                 "imported": null
@@ -120,8 +141,17 @@
             "/etc/shared.conf": "core/shared"
           },
           "overlay_overridden": [],
-          "collected_files": {},
-          "collect_destinations": []
+          "collected_files": {
+            "core/shared": [
+              {
+                "file": "deb/justfile.inc",
+                "staged": "/usr/share/just/justfile.apps.d/0900-core-shared.part"
+              }
+            ]
+          },
+          "collect_destinations": [
+            "/usr/share/just/justfile.apps"
+          ]
         }
       ]
     },
@@ -228,6 +258,27 @@
               "satisfies": []
             },
             {
+              "path": "core/menu",
+              "dir": "core/menu",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Collects the justfile fragments the rest of the image contributes",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "content": "2a6f8d22daf6f487613524677a42149601d6ea56b226ce27d0fa59e0bd99bbd7",
+                "repo": false,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": []
+            },
+            {
               "path": "core/shared",
               "dir": "core/shared",
               "flavour": null,
@@ -256,7 +307,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "f45998d24d14cc73c13bb1d23fcbbfa45af85039922a0dde5898c9376ec0319e",
+                "content": "41195cf91139d62b808eede7ec3e09fc9a533f5c86afe8303a3adfae61105841",
                 "repo": false,
                 "pin": null,
                 "imported": null
@@ -275,8 +326,17 @@
             "/etc/shared.conf": "core/shared"
           },
           "overlay_overridden": [],
-          "collected_files": {},
-          "collect_destinations": []
+          "collected_files": {
+            "core/shared": [
+              {
+                "file": "deb/justfile.inc",
+                "staged": "/usr/share/just/justfile.apps.d/0900-core-shared.part"
+              }
+            ]
+          },
+          "collect_destinations": [
+            "/usr/share/just/justfile.apps"
+          ]
         }
       ]
     },
@@ -336,6 +396,27 @@
               "satisfies": []
             },
             {
+              "path": "core/menu",
+              "dir": "core/menu",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Collects the justfile fragments the rest of the image contributes",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "content": "2a6f8d22daf6f487613524677a42149601d6ea56b226ce27d0fa59e0bd99bbd7",
+                "repo": false,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": []
+            },
+            {
               "path": "core/shared",
               "dir": "core/shared",
               "flavour": null,
@@ -364,7 +445,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "f45998d24d14cc73c13bb1d23fcbbfa45af85039922a0dde5898c9376ec0319e",
+                "content": "41195cf91139d62b808eede7ec3e09fc9a533f5c86afe8303a3adfae61105841",
                 "repo": false,
                 "pin": null,
                 "imported": null
@@ -383,8 +464,17 @@
             "/etc/shared.conf": "core/shared"
           },
           "overlay_overridden": [],
-          "collected_files": {},
-          "collect_destinations": []
+          "collected_files": {
+            "core/shared": [
+              {
+                "file": "deb/justfile.inc",
+                "staged": "/usr/share/just/justfile.apps.d/0900-core-shared.part"
+              }
+            ]
+          },
+          "collect_destinations": [
+            "/usr/share/just/justfile.apps"
+          ]
         }
       ]
     }
