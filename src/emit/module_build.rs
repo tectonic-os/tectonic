@@ -185,8 +185,8 @@ fn script(
     // family subtree. Ungated first, so a family adds to what runs everywhere
     // rather than replacing it, and a file it ships lands over the shared one.
     let mut roots = vec![(on_disk.clone(), dir.clone())];
-    if let Some(gated) = layout::family_dir(&on_disk, base_family) {
-        roots.push((gated, format!("{dir}/{base_family}")));
+    for gated in layout::family_dirs(&on_disk, base_family) {
+        roots.push((on_disk.join(gated), format!("{dir}/{gated}")));
     }
 
     for (at, ctx) in &roots {

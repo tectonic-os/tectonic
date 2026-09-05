@@ -32,7 +32,11 @@ pub fn hooks<'a>(image: &'a Image, root: &Path) -> Vec<(&'a Entry, Vec<String>)>
         .filter_map(|entry| {
             let dir = layout::modules(root).join(entry.dir());
             let found: Vec<String> = std::iter::once(String::new())
-                .chain(layout::family_dir(&dir, family).map(|_| format!("{family}/")))
+                .chain(
+                    layout::family_dirs(&dir, family)
+                        .into_iter()
+                        .map(|gated| format!("{gated}/")),
+                )
                 .filter(|at| dir.join(at).join("finalize.sh").is_file())
                 .map(|at| format!("{at}finalize.sh"))
                 .collect();

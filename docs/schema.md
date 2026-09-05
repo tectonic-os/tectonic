@@ -511,7 +511,7 @@ in the directory is convention.
 | `files/` | copied over `/` |
 | `finalize.sh` | sourced by the finalize phase, in resolved order |
 | `Containerfile.inc` | placed verbatim by `fragment`, with `@MODULE@` replaced by the module's directory in the build context |
-| `<family>/` | `module.sh`, `files/` and `finalize.sh` under `fedora/`, `debian/` or `ubuntu/`, each taken on that family alone |
+| `<family>/` | `module.sh`, `files/` and `finalize.sh` under `fedora/`, `debian/`, `ubuntu/` or `deb/`, each taken on the families that name is for |
 | a file another module collects | staged for it |
 
 A fragment is inlined verbatim and so cannot name its own directory. `@MODULE@`
@@ -608,6 +608,9 @@ modules/login-access/
     └── module.sh     # Debian alone, sourced after module.sh
 ```
 
+`fedora/`, `debian/`, `ubuntu/` and `deb/` are the four names; anything else in
+a module directory is the author's own and is read by nothing.
+
 **The convention is additive and nothing has to be renamed to use it.** An
 ungated `module.sh` and `files/` at the module root mean exactly what they
 always meant: run everywhere. A module with no `<family>/` directory has
@@ -624,10 +627,18 @@ and the family `module.sh` is sourced below the shared one. A `<family>/`
 directory or a `family` gate naming a family the module does not `supports` is
 refused, since no image could reach it.
 
-A directory name is one family where a `family` gate takes several, so two
-families needing the same files are a symlink — `ubuntu -> debian` beside
-`debian/` — rather than a second copy. A fetch resolves it, so the consumer
-gets two real directories and the collection stores one.
+A directory name is one family where a `family` gate takes a list, so `deb/` is
+the name for the two families that share an installer and would otherwise hold
+two copies of one file set. It is taken on Debian and Ubuntu both, and a
+`debian/` beside it is Debian alone and is taken after it — widest first, the
+same order as the ungated half and a gate:
+
+```
+modules/login-access/
+├── files/            # every family
+├── deb/files/        # Debian and Ubuntu
+└── debian/files/     # Debian alone, copied after deb/files/
+```
 
 `collects` claims a filename across the whole image and `contributes` says
 this module ships one. Each contribution is staged as

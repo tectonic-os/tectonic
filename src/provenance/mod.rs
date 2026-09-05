@@ -172,9 +172,9 @@ fn scripts() -> Vec<String> {
         .iter()
         .map(|name| name.to_string())
         .chain(
-            crate::parse::module::FAMILIES
+            crate::layout::FAMILY_DIRS
                 .iter()
-                .flat_map(|family| SCRIPTS.iter().map(move |name| format!("{family}/{name}"))),
+                .flat_map(|(gated, _)| SCRIPTS.iter().map(move |name| format!("{gated}/{name}"))),
         )
         .collect()
 }

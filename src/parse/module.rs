@@ -925,22 +925,26 @@ impl Module {
             }
         }
 
-        for family in FAMILIES {
-            if layout::family_dir(dir, family).is_some()
-                && !module.supports.iter().any(|claimed| claimed == family)
+        for (gated, taken_on) in layout::FAMILY_DIRS {
+            if !dir.join(gated).is_dir()
+                || taken_on
+                    .iter()
+                    .any(|family| module.supports.iter().any(|claimed| claimed == family))
             {
-                issues.push(
-                    Issue::new(
-                        format!("`{path}` ships a `{family}/` directory and does not support `{family}`"),
-                        src,
-                    )
-                    .help(format!(
-                        "nothing would ever read it, since the directory is taken on `{family}` \
-                         and no image on it may enable this module: add `{family}` to `supports`, \
-                         or drop the directory"
-                    )),
-                );
+                continue;
             }
+            let named = taken_on.join("` or `");
+            issues.push(
+                Issue::new(
+                    format!("`{path}` ships a `{gated}/` directory and supports no family it is taken on"),
+                    src,
+                )
+                .help(format!(
+                    "nothing would ever read it, since the directory is taken on `{named}` and \
+                     no image on either may enable this module: widen `supports`, or drop the \
+                     directory"
+                )),
+            );
         }
         for (family, span) in gated {
             if module.supports.iter().any(|claimed| claimed == family) {

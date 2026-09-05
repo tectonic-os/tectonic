@@ -68,20 +68,39 @@ impl Policy {
     }
 }
 
-/// A module's family-gated subtree: `debian/module.sh`, `debian/files/` and
-/// `debian/finalize.sh` are taken on that family alone, the way `selinux/` is
-/// taken only where the image has that MAC. `Policy` names a capability where
-/// this names a family, and the emitter filters on it the same way.
+/// Every directory name a module may gate files behind, and the families each
+/// is taken on. `debian/module.sh`, `debian/files/` and `debian/finalize.sh`
+/// are taken on Debian alone, the way `selinux/` is taken only where the image
+/// has that MAC: `Policy` names a capability where this names a family, and the
+/// emitter filters on it the same way.
+///
+/// A directory name is one family where a `family` gate takes a list, so `deb`
+/// names the two families that share an installer and would otherwise hold two
+/// copies of one file set. Ordered widest first: a `debian/` beside a `deb/` is
+/// Debian alone and is taken after it, the way a gate is taken after what sits
+/// outside one.
+pub const FAMILY_DIRS: [(&str, &[&str]); 4] = [
+    ("deb", &["debian", "ubuntu"]),
+    ("fedora", &["fedora"]),
+    ("debian", &["debian"]),
+    ("ubuntu", &["ubuntu"]),
+];
+
+/// The ones this module ships for this family, in the order they are taken.
 ///
 /// The convention is additive and nothing is renamed to keep working. An
 /// ungated `module.sh` and `files/` at the module root still run everywhere, so
 /// a module with no such directory has nothing gated -- the overwhelmingly
-/// common case, and the one that has to stay cheapest to write. `None` where
-/// the image declares no family, so a repository that never names one is never
+/// common case, and the one that has to stay cheapest to write. Empty where the
+/// image declares no family, so a repository that never names one is never
 /// asked to.
-pub fn family_dir(module_dir: &Path, family: &str) -> Option<PathBuf> {
-    let dir = module_dir.join(family);
-    (!family.is_empty() && dir.is_dir()).then_some(dir)
+pub fn family_dirs(module_dir: &Path, family: &str) -> Vec<&'static str> {
+    FAMILY_DIRS
+        .iter()
+        .filter(|(_, taken_on)| taken_on.contains(&family))
+        .map(|(name, _)| *name)
+        .filter(|name| module_dir.join(name).is_dir())
+        .collect()
 }
 
 /// GitHub's path, not this repository's choice, which is why it is written

@@ -30,7 +30,11 @@ install_packages 'curl'
 
 install_packages 'git'
 
+source /ctx/modules/core/shared/deb/module.sh
+
 source /ctx/modules/core/shared/debian/module.sh
+
+cp -rT /ctx/modules/core/shared/deb/files /
 
 cp -rT /ctx/modules/core/shared/debian/files /
 ==== generated/debian/finalize.sh
@@ -229,7 +233,11 @@ install_packages 'curl'
 
 install_packages 'git'
 
+source /ctx/modules/core/shared/deb/module.sh
+
 source /ctx/modules/core/shared/debian/module.sh
+
+cp -rT /ctx/modules/core/shared/deb/files /
 
 cp -rT /ctx/modules/core/shared/debian/files /
 ==== generated/forky/finalize.sh
@@ -433,6 +441,10 @@ source /ctx/lib/family.sh
 install_packages 'curl'
 
 install_packages 'vim'
+
+source /ctx/modules/core/shared/deb/module.sh
+
+cp -rT /ctx/modules/core/shared/deb/files /
 ==== generated/ubuntu/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
