@@ -7,10 +7,32 @@
 // takes the risk takes the decision, Renovate bumps it there like any other
 // pin, and `tect build` records the digest it actually resolved either way.
 
+// Probed 2026-09-06 against the tag with `test -e`. The row carried no
+// `provides-file` at all until then, which refused `login-access` on Fedora
+// for an `sshd` the image demonstrably ships.
+//
+// Under-claiming refuses a module and says why; over-claiming is silent —
+// `resolve::graph::suppress` drops a module the base covers entirely with no
+// diagnostic — so nothing goes in this node that has not been run against the
+// image. `/usr/bin/flatpak` is the one the probe found absent, which is why
+// this row claims no `flatpak` where every ublue row below it does.
+//
+// The five paths are the ones the collection contracts on: `login-access`
+// requires the first, and `deb-family/bootc-base` and
+// `deb-family/container-runtime` provide the other four on the families that
+// have to build them. Naming the same paths here is what makes a module
+// written against them family-neutral. `/usr/bin/dracut` and
+// `/usr/sbin/semodule` are here too and are deliberately not listed: they are
+// witnesses for `initramfs-generation` and `selinux-policy`, which this row
+// already claims, and a second spelling of a claim is a row to keep in step
+// for nothing. `rechunking` is the claim with no witness path at all and stays
+// hand-declared.
 base "quay.io/fedora/fedora-bootc:44" {
     about "Fedora 44, nothing above the base system"
     family "fedora"
     provides "rechunking" "initramfs-generation" "selinux-policy"
+    provides-file "/usr/sbin/sshd" "/usr/bin/bootc" "/usr/bin/bootupctl" \
+        "/usr/bin/podman" "/usr/bin/crun"
 }
 
 // Universal Blue Images

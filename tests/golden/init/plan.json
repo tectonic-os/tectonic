@@ -58,7 +58,13 @@
           "initramfs-generation",
           "selinux-policy"
         ],
-        "provides_files": [],
+        "provides_files": [
+          "/usr/sbin/sshd",
+          "/usr/bin/bootc",
+          "/usr/bin/bootupctl",
+          "/usr/bin/podman",
+          "/usr/bin/crun"
+        ],
         "requires": []
       },
       "flavours": [],
@@ -76,7 +82,13 @@
           "modules": [],
           "suppressed": [],
           "secrets": [],
-          "contract_files": [],
+          "contract_files": [
+            "/usr/sbin/sshd",
+            "/usr/bin/bootc",
+            "/usr/bin/bootupctl",
+            "/usr/bin/podman",
+            "/usr/bin/crun"
+          ],
           "verify_exceptions": [],
           "assets": [],
           "provides_files": {},

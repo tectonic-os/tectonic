@@ -223,6 +223,11 @@ graph LR
 
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
+| `/usr/bin/bootc` | file | `base` |  |  |
+| `/usr/bin/bootupctl` | file | `base` |  |  |
+| `/usr/bin/crun` | file | `base` |  |  |
+| `/usr/bin/podman` | file | `base` |  |  |
+| `/usr/sbin/sshd` | file | `base` |  |  |
 | `initramfs-generation` | capability | `base` |  |  |
 | `rechunking` | capability | `base` |  |  |
 | `selinux-policy` | capability | `base` |  |  |
@@ -230,6 +235,46 @@ graph LR
 {
   "image": "example",
   "capabilities": [
+    {
+      "name": "/usr/bin/bootc",
+      "kind": "file",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "/usr/bin/bootupctl",
+      "kind": "file",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "/usr/bin/crun",
+      "kind": "file",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "/usr/bin/podman",
+      "kind": "file",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "/usr/sbin/sshd",
+      "kind": "file",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    },
     {
       "name": "initramfs-generation",
       "kind": "capability",

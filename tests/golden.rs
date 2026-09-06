@@ -1404,8 +1404,10 @@ fn flows() {
         ],
     );
     let untouched = std::fs::read_to_string(typo.join("example.image.kdl")).unwrap();
+    // `module "sshd"` and not `sshd`: the fedora row's `provides-file` names
+    // `/usr/sbin/sshd`, so the bare substring is in every scaffolded image.
     assert!(
-        !untouched.contains("sshd") && !typo.join("modules/sshd").exists(),
+        !untouched.contains("module \"sshd\"") && !typo.join("modules/sshd").exists(),
         "the refusal leaves the repository as it was: {untouched}"
     );
 
