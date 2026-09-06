@@ -115,24 +115,29 @@ fn script(
 
     // The repo a module declares is sourced before its packages, so an
     // `enablerepo` names a repository that exists by the time it is enabled.
-    // The guard is `dnf5 config-manager`'s layout. A deb family writes its
-    // repo somewhere else, so the module's own `repo` file runs unguarded
-    // there and is what has to be idempotent.
+    // The guard is `dnf5 config-manager`'s layout and so is Fedora's alone: a
+    // deb family writes its archive somewhere `/etc/yum.repos.d` never names,
+    // where the guard would be a branch that is always taken. Its own `repo`
+    // file runs unguarded there and is what has to be idempotent.
+    //
+    // It **picks** a family copy rather than layering them, the way a
+    // collected file does: an archive is configured once, and the two
+    // families name it at different URLs rather than adding to one another.
     let on_disk = layout::module(root, entry.dir());
-    if on_disk.join("repo").is_file() {
-        match repo_id(&on_disk.join("repo")) {
+    if let Some(at) = layout::shipped(&on_disk, base_family, "repo") {
+        match repo_id(&on_disk.join(&at)).filter(|_| base_family == "fedora") {
             Some(id) => {
                 let _ = write!(
                     out,
                     "\nif [ -f /etc/yum.repos.d/{id}.repo ]; then\n\
                      \x20   echo \"repo {id} is already configured\"\n\
                      else\n\
-                     \x20   source {dir}/repo\n\
+                     \x20   source {dir}/{at}\n\
                      fi\n"
                 );
             }
             None => {
-                let _ = write!(out, "\nsource {dir}/repo\n");
+                let _ = write!(out, "\nsource {dir}/{at}\n");
             }
         }
     }

@@ -641,7 +641,14 @@ impl Module {
             standard_layer: true,
             content: crate::provenance::record::hash(&dir),
             imported: crate::provenance::record::read(&dir, issues),
-            repo: dir.join("repo").is_file(),
+            // Every family, since a manifest is read without one: a `repo`
+            // gated to a family this build is not for is still an archive the
+            // module configures somewhere.
+            repo: layout::FAMILY_DIRS
+                .iter()
+                .map(|(gated, _)| dir.join(gated).join("repo"))
+                .chain(std::iter::once(dir.join("repo")))
+                .any(|at| at.is_file()),
             src: src.clone(),
         };
 

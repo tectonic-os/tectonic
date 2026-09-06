@@ -258,9 +258,17 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
 /// is shell calling the family's config manager, so this reads what a person
 /// would look for rather than claiming to understand it.
 fn repo_urls(root: &std::path::Path, dir: &str) -> Vec<String> {
-    let Ok(text) = std::fs::read_to_string(layout::module(root, dir).join("repo")) else {
-        return Vec::new();
-    };
+    // Every family copy, not the one this build takes: `why` answers about
+    // the module as published, and a reader looking for an archive wants the
+    // one their own family would get too.
+    let at = layout::module(root, dir);
+    let text: String = layout::FAMILY_DIRS
+        .iter()
+        .map(|(gated, _)| at.join(gated).join("repo"))
+        .chain(std::iter::once(at.join("repo")))
+        .filter_map(|file| std::fs::read_to_string(file).ok())
+        .collect::<Vec<_>>()
+        .join("\n");
     let mut out: Vec<String> = Vec::new();
     for word in text.split(|c: char| c.is_whitespace() || c == '"' || c == '\'') {
         // A URL is as likely to be the value of a flag as a word of its own.

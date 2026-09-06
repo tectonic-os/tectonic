@@ -504,14 +504,14 @@ in the directory is convention.
 
 | Path | What the build does with it |
 | --- | --- |
-| `repo` | sourced first, unless its `REPO_ID` is already configured |
+| `repo` | sourced first; on Fedora, unless its `REPO_ID` is already configured |
 | `module.sh` | sourced as the install logic |
 | `selinux/*.te` | compiled and installed, where the image provides `selinux-policy` |
 | `apparmor/*` | validated and placed in `/etc/apparmor.d`, where the image provides `apparmor-policy` |
 | `files/` | copied over `/` |
 | `finalize.sh` | sourced by the finalize phase, in resolved order |
 | `Containerfile.inc` | placed verbatim by `fragment`, with `@MODULE@` replaced by the module's directory in the build context |
-| `<family>/` | `module.sh`, `files/`, `finalize.sh` and a collected file under `fedora/`, `debian/`, `ubuntu/` or `deb/`, each taken on the families that name is for |
+| `<family>/` | `repo`, `module.sh`, `files/`, `finalize.sh` and a collected file under `fedora/`, `debian/`, `ubuntu/` or `deb/`, each taken on the families that name is for |
 | a file another module collects | staged for it |
 
 A fragment is inlined verbatim and so cannot name its own directory. `@MODULE@`
@@ -613,11 +613,17 @@ modules/login-access/
 `fedora/`, `debian/`, `ubuntu/` and `deb/` are the four names; anything else in
 a module directory is the author's own and is read by nothing.
 
-A file another module collects gates too, and is the one case that **picks**
-rather than layers: a collector claims one filename across the image, so a
-module ships at most one copy of it and the most specific directory holding one
-wins — `debian/justfile.inc`, else `deb/justfile.inc`, else the one at the root.
-`contributes` names the file once and says nothing about where it came from.
+A file another module collects gates too, and is one of the two cases that
+**picks** rather than layers: a collector claims one filename across the image,
+so a module ships at most one copy of it and the most specific directory
+holding one wins — `debian/justfile.inc`, else `deb/justfile.inc`, else the one
+at the root. `contributes` names the file once and says nothing about where it
+came from.
+
+`repo` is the other. An archive is configured once and the two families name
+it at different URLs rather than adding to one another, so `debian/repo` wins
+over `deb/repo` wins over the one at the root, and only the winner is
+sourced.
 
 **The convention is additive and nothing has to be renamed to use it.** An
 ungated `module.sh` and `files/` at the module root mean exactly what they

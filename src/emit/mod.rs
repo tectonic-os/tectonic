@@ -34,10 +34,6 @@ pub(crate) const LIBRARIES: &[(&str, &str)] = &[
         include_str!("../../assets/lib/kernel-helpers.sh"),
     ),
     (
-        "repo-helpers.sh",
-        include_str!("../../assets/lib/repo-helpers.sh"),
-    ),
-    (
         "selinux-helpers.sh",
         include_str!("../../assets/lib/selinux-helpers.sh"),
     ),
