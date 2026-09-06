@@ -496,6 +496,30 @@ pub fn validate_image() -> Result<(), String> {
     println!("==> systemd unit verification");
     let mut arrived: Vec<String> = Vec::new();
     for scope in ["system", "user"] {
+        // `finalize.sh` applies these as `systemctl enable`/`disable` per line
+        // in glob order, so two modules asking opposite things about one unit
+        // are resolved by the alphabet and the loser's own check is what
+        // fails. The check catches it either way round; without this the
+        // failure names the unit and not the module that overruled it.
+        let contradicts = |unit: &str, verb: &str| -> Vec<String> {
+            let opposite = match verb {
+                "enable" => "disable",
+                _ => "enable",
+            };
+            presets(scope)
+                .iter()
+                .filter_map(|other| {
+                    let text = fs::read_to_string(other).ok()?;
+                    names(&text, opposite, unit).then(|| {
+                        other
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .into_owned()
+                    })
+                })
+                .collect()
+        };
         let unit_dirs = [
             PathBuf::from(format!("/usr/lib/systemd/{scope}")),
             PathBuf::from(format!("/etc/systemd/{scope}")),
@@ -530,14 +554,21 @@ pub fn validate_image() -> Result<(), String> {
 
                 let config_root = PathBuf::from(format!("/etc/systemd/{scope}"));
                 let links = enablement_links(&config_root, unit);
+                let overruled = match contradicts(unit, verb).as_slice() {
+                    [] => String::new(),
+                    named => format!(
+                        "; {} asks the opposite and the glob order decided it",
+                        named.join(" and ")
+                    ),
+                };
                 if verb == "enable" && links.is_empty() {
                     report.fail(format!(
-                        "{unit}: preset enables it, but nothing under {} does",
+                        "{unit}: preset enables it, but nothing under {} does{overruled}",
                         config_root.display()
                     ));
                 } else if verb == "disable" && !links.is_empty() {
                     report.fail(format!(
-                        "{unit}: preset disables it, but {} still enables it: {}",
+                        "{unit}: preset disables it, but {} still enables it: {}{overruled}",
                         config_root.display(),
                         links.join(" ")
                     ));
@@ -659,6 +690,16 @@ fn presets(scope: &str) -> Vec<PathBuf> {
     found
 }
 
+/// Whether a preset file says `<verb> <unit>` on a line of its own. Only the
+/// two fields, so a trailing comment or a `disable` of a template instance is
+/// not mistaken for the unit itself.
+fn names(preset: &str, verb: &str, unit: &str) -> bool {
+    preset.lines().any(|line| {
+        let mut fields = line.split_whitespace();
+        (fields.next(), fields.next()) == (Some(verb), Some(unit))
+    })
+}
+
 /// Whether `dir` holds a file named `unit`, at any depth.
 fn find_unit(dir: &Path, unit: &str) -> bool {
     let Ok(entries) = fs::read_dir(dir) else {
@@ -732,6 +773,22 @@ mod tests {
         );
         fs::remove_file(&path).unwrap();
         assert!(sha256_file(&path).is_err());
+    }
+
+    /// Two module presets asking opposite things about one unit is settled by
+    /// the glob order, so the loser's failure is what has to name the winner.
+    #[test]
+    fn a_preset_names_a_unit_only_on_the_verb_it_says() {
+        let policy = "# no sshd\ndisable sshd.service\nenable faillock.service\n";
+        assert!(names(policy, "disable", "sshd.service"));
+        assert!(!names(policy, "enable", "sshd.service"));
+        // The unit is the second field, not any word on the line.
+        assert!(!names(
+            "disable other.service sshd.service\n",
+            "disable",
+            "sshd.service"
+        ));
+        assert!(!names(policy, "disable", "sshd.service.d"));
     }
 
     #[test]
