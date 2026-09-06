@@ -258,12 +258,35 @@ fn datastream(list: &List, named: Option<&str>) -> Result<String, String> {
     .to_string())
 }
 
-/// Where a runner installs the content for one family.
+/// Where a family's SCAP content is, and **for both deb families the answer is
+/// that there is none**. This refuses rather than naming the nearest file,
+/// because the nearest file measures nothing at all and does it silently.
+///
+/// SSG writes one `<xccdf-1.2:platform>` on a benchmark and every rule inherits
+/// it. Fedora's names seven releases, `fedoraproject:fedora:39` through `:45`,
+/// so `fedora-bootc:44` is inside it. Each deb benchmark names exactly one:
+/// `debian_linux:13` and `canonical:ubuntu_linux:24.04::~~lts~~~`, against bases
+/// of `debian:forky` (14) and `ubuntu:26.04`. Measured 2026-09-07 against built
+/// images: **414 of 414 rules `notapplicable` on Debian and 648 of 648 on
+/// Ubuntu**, 0 pass and 0 fail on each, where the same Debian scan of the same
+/// image told it was Debian 13 returns 119 pass and 162 fail.
+///
+/// There is no newer content to reach for. ComplianceAsCode v0.1.82 publishes
+/// no Debian 14 product at all, and its `ubuntu2604` is a stub: **2 rules and
+/// no profiles**, against 648 rules and five profiles for `ubuntu2404`. The
+/// trigger for revisiting this is `ubuntu2604` growing profiles, which is
+/// upstream's to do and nothing here can hurry.
 fn installed(dir: &str, family: &str) -> Result<PathBuf, String> {
     let file = match family {
         "fedora" => "ssg-fedora-ds.xml",
-        "debian" => "ssg-debian12-ds.xml",
-        "ubuntu" => "ssg-ubuntu2404-ds.xml",
+        "debian" | "ubuntu" => {
+            return Err(format!(
+                "SSG publishes no content a `{family}` image can be measured against\n\nhelp: \
+                 every SSG benchmark names the one release it applies to, and there is no Debian \
+                 14 benchmark and no usable Ubuntu 26.04 one; drop `conforms` from this image, or \
+                 name content of your own with `--datastream <file>`"
+            ))
+        }
         _ => return Err(format!("no SSG content is known for the `{family}` family")),
     };
     Ok(Path::new(dir).join(file))
@@ -1044,6 +1067,29 @@ mod tests {
         assert!(content_at("/nowhere", "arch", None)
             .unwrap_err()
             .contains("no SSG content is known"));
+    }
+
+    /// The refusal a deb image declaring `conforms` gets, and the reason it is
+    /// a refusal rather than a filename: SSG's nearest content scores 0 of 414
+    /// on Debian and 0 of 648 on Ubuntu, and a scan reporting nothing measured
+    /// looks exactly like a scan reporting nothing wrong.
+    #[test]
+    fn a_deb_family_is_refused_rather_than_given_content_that_measures_nothing() {
+        for family in ["debian", "ubuntu"] {
+            let err = content_at("/nowhere", family, None).unwrap_err();
+            assert!(
+                err.contains(&format!("no content a `{family}` image")),
+                "{err}"
+            );
+            assert!(err.contains("drop `conforms`"), "{err}");
+        }
+        // A named datastream still wins: the refusal is about what is published,
+        // not about the family being unmeasurable by anything.
+        let given = fixture("tests/scap/datastream.xml");
+        assert_eq!(
+            content_at("/nowhere", "debian", Some(&given)).unwrap(),
+            given
+        );
     }
 
     #[test]
