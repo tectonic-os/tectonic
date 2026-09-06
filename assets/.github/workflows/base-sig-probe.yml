@@ -1,5 +1,9 @@
 ---
-name: Base image signature probe
+# `base-sig-probe` and not `base-probe`: the file name is the workflow id a
+# repository names in `repo.kdl`, so renaming it would move every consumer's
+# manifest for a label. It grew past signatures on 2026-09-06 and the display
+# name says so.
+name: Base image probe
 
 on:
   schedule:
@@ -31,11 +35,131 @@ jobs:
 
       - name: Probe each base and correct the declaration
         id: probe
+        # Every path this workflow manages, and what it manages it for. A row
+        # with a capability is a *witness*: the path decides whether the base
+        # claims that capability, and is never written into `provides-file`
+        # itself, because a second spelling of a claim is a line to keep in
+        # step for nothing. A row with `-` is a file contract — a path some
+        # module requires or provides — and is written into `provides-file`
+        # when it is there.
+        #
+        # `rechunking` is deliberately absent: it has no witness path, so it
+        # stays hand-declared. Nothing this table does not name is ever
+        # removed, which is what makes that safe.
+        #
+        # A path already declared is measured whether the table names it or
+        # not, because a claim the image does not carry has to come off however
+        # it got there. That is the direction that matters: an under-claim
+        # refuses a module and says so, while an over-claim is silent —
+        # `resolve::graph::suppress` drops a module the base covers entirely
+        # with no diagnostic at all.
+        env:
+          WITNESS: |
+            /usr/bin/flatpak     flatpak
+            /usr/sbin/semodule   selinux-policy
+            /usr/bin/dracut      initramfs-generation
+            /usr/sbin/sshd       -
+            /usr/bin/bootc       -
+            /usr/bin/bootupctl   -
+            /usr/bin/podman      -
+            /usr/bin/crun        -
         run: |
           set -euo pipefail
           ./scripts/tect.sh fetch modules
+
+          # To a file, and before the loop, because `plan --json` writes
+          # nothing at all when any module is refused. Read through a process
+          # substitution that would be an empty loop and a run reporting that
+          # every base matches, having measured none of them — and a refused
+          # module is exactly what an under-declared base causes. This probe
+          # keeps a repository that resolves honest as its bases move; it
+          # cannot repair one that has already stopped resolving, and it says
+          # so here rather than passing.
+          plan="$(mktemp)"
+          ./scripts/tect.sh plan --json > "${plan}"
+
+          # Reads the table, what the container answered and what the manifest
+          # says; rewrites the `provides` and `provides-file` nodes of every
+          # block naming this base, and prints what it changed. Silence is a
+          # base that already matches.
+          reconcile="$(mktemp)"
+          cat > "${reconcile}" <<'PYTHON'
+          import os
+          import pathlib
+
+          witness = {}
+          for line in os.environ["WITNESS"].splitlines():
+              row = line.split()
+              if len(row) == 2:
+                  witness[row[0]] = None if row[1] == "-" else row[1]
+
+          present = set(os.environ["MEASURED"].split())
+          base = os.environ["BASE"]
+          caps_were = os.environ["PROVIDES"].split()
+          files_were = os.environ["FILES"].split()
+
+          # A capability this table cannot witness is left exactly as it was,
+          # which is how `rechunking` survives a probe that cannot see it.
+          witnessed = {cap for path, cap in witness.items() if cap and path in present}
+          tabled = {cap for cap in witness.values() if cap}
+          caps = [c for c in caps_were if c not in tabled or c in witnessed]
+          caps += sorted(c for c in witnessed if c not in caps_were)
+
+          # A path keeps its place if the image still carries it, and a file
+          # contract the table names is appended when it turns up.
+          files = [p for p in files_were if p in present]
+          files += sorted(
+              p for p, cap in witness.items()
+              if cap is None and p in present and p not in files_were
+          )
+
+          if caps == caps_were and files == files_were:
+              raise SystemExit(0)
+
+          path = pathlib.Path(os.environ["IMAGE_FILE"])
+          lines = path.read_text().split("\n")
+          opens = f'base "{base}" {{'
+          out = []
+          index = 0
+          while index < len(lines):
+              line = lines[index]
+              out.append(line)
+              index += 1
+              if line.strip() != opens:
+                  continue
+              block = []
+              while index < len(lines) and lines[index].strip() != "}":
+                  block.append(lines[index])
+                  index += 1
+              indent = " " * (len(block[0]) - len(block[0].lstrip())) if block else "        "
+              kept = [b for b in block if b.split()[:1] not in (["provides"], ["provides-file"])]
+              nodes = []
+              for name, values in (("provides", caps), ("provides-file", files)):
+                  if values:
+                      nodes.append(indent + name + " " + " ".join(f'"{v}"' for v in values))
+              at = next(
+                  (n for n, b in enumerate(kept) if b.split()[:1] == ["family"]),
+                  -1,
+              ) + 1
+              out.extend(kept[:at] + nodes + kept[at:])
+          path.write_text("\n".join(out))
+
+          said = []
+          for name, was, now in (
+              ("provides", caps_were, caps), ("provides-file", files_were, files)
+          ):
+              gone = [v for v in was if v not in now]
+              came = [v for v in now if v not in was]
+              if gone:
+                  said.append(f"`{name}` lost " + ", ".join(f"`{v}`" for v in gone))
+              if came:
+                  said.append(f"`{name}` gained " + ", ".join(f"`{v}`" for v in came))
+          print("; ".join(said))
+          PYTHON
+
+          memos="$(mktemp -d)"
           changed=""
-          while IFS='|' read -r image base recorded file; do
+          while IFS='|' read -r image base recorded file provides files; do
             [ -n "${image}" ] || continue
             # `signed` records that a signature is published, which is not the
             # same as one a consumer can attribute. A keyless signature carries
@@ -55,13 +179,41 @@ jobs:
               kind="unsigned"
             fi
             echo "${image}: ${base} is ${kind}, recorded as ${recorded}"
-            [ "${actual}" != "${recorded}" ] || continue
+            if [ "${actual}" != "${recorded}" ]; then
+              sed -i "s/signed #${recorded}/signed #${actual}/" "${file}"
+              echo "  corrected ${file}: signed #${recorded} -> #${actual}"
+              changed="${changed}${changed:+, }\`${image}\` (\`${base}\`): \`signed #${recorded}\` to \`#${actual}\`"
+            fi
 
-            sed -i "s/signed #${recorded}/signed #${actual}/" "${file}"
-            echo "  corrected ${file}: signed #${recorded} -> #${actual}"
-            changed="${changed}${changed:+, }\`${image}\` (\`${base}\`): \`#${recorded}\` to \`#${actual}\`"
-          done < <(./scripts/tect.sh plan --json \
-            | jq -r '.images[] | "\(.id)|\(.base.image)|\(.base.signed)|\(.file)"')
+            # One pull and one container for the whole table, rather than one
+            # per path: the ublue bases are several gigabytes each and the
+            # runner has one disk. The image goes again straight afterwards for
+            # the same reason, and the answer is memoised, because two images
+            # in a repository on the same base is the ordinary case and it is a
+            # property of the base rather than of either of them.
+            probe="$(printf '%s\n%s\n' "${WITNESS}" "${files}" \
+              | awk '{ print $1 }' | grep '^/' | sort -u | tr '\n' ' ')"
+            memo="${memos}/$(printf '%s' "${base}" | md5sum | cut -d' ' -f1)"
+            if [ -f "${memo}" ]; then
+              measured="$(cat "${memo}")"
+            else
+              measured="$(podman run --rm --env "PATHS=${probe}" "${base}" \
+                sh -c 'for p in $PATHS; do [ -e "$p" ] && echo "$p"; done; true')"
+              printf '%s\n' "${measured}" > "${memo}"
+              podman rmi -f "${base}" > /dev/null 2>&1 || true
+            fi
+
+            correction="$(WITNESS="${WITNESS}" MEASURED="${measured}" \
+              PROVIDES="${provides}" FILES="${files}" IMAGE_FILE="${file}" \
+              BASE="${base}" python3 "${reconcile}")"
+            [ -n "${correction}" ] || continue
+            echo "  ${correction}"
+            changed="${changed}${changed:+, }\`${image}\` (\`${base}\`): ${correction}"
+          done < <(jq -r '.images[]
+                | [.id, .base.image, (.base.signed | tostring), .file,
+                   (.base.provides | join(" ")),
+                   (.base.provides_files | join(" "))]
+                | join("|")' "${plan}")
 
           if [ -z "${changed}" ]; then
             echo "every base matches its declaration"
@@ -79,7 +231,7 @@ jobs:
           SUMMARY: ${{ steps.probe.outputs.summary }}
         run: |
           set -euo pipefail
-          branch="base-signature-status"
+          branch="base-declaration-status"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -B "${branch}"
@@ -88,7 +240,7 @@ jobs:
           # file. This is the help that failure prints.
           ./scripts/tect.sh generate
           git add ./*.kdl generated
-          git commit -m "Record the base image signature status" \
+          git commit -m "Record what the base images carry" \
             -m "${SUMMARY}"
           # A fresh checkout has no remote-tracking ref to lease against, and
           # the branch is rebuilt from the base ref every run regardless.
@@ -102,33 +254,47 @@ jobs:
           body="$(mktemp)"
           printf '%s\n\n' "${SUMMARY}" > "${body}"
           cat >> "${body}" <<'EOF'
-          The `signed` field on a base records whether that image publishes a
-          cosign signature. It is maintained by
+          What a base declares about itself is maintained by
           [this workflow](.github/workflows/base-sig-probe.yml) rather than by
-          hand, so this PR only makes the declaration match the registry.
+          hand, so this PR only makes the declaration match the image. Half the
+          rows in the catalog are moving tags, which is why this is measured
+          nightly rather than audited once.
 
-          **Nothing about the build changes.** `signed` reaches no build arg and
-          no layer, and the images this repository publishes are cosign signed
-          either way. It does reach `generated/plan.json`, which is why this PR
-          carries the regenerated file beside the manifest.
+          ## If `signed` changed
 
-          ## If a base turned `#true`
+          `signed` records whether the base publishes a cosign signature. It
+          reaches no build arg and no layer, and the images this repository
+          publishes are cosign signed either way. It does reach
+          `generated/plan.json`, which is why this PR carries the regenerated
+          file beside the manifest.
 
-          The FROM pull can now be gated, which is the point of tracking this:
+          A base that turned `#true` can have its FROM pull gated, which is the
+          point of tracking it: add a `policy.json` and a `registries.d` entry
+          on the builder so the pull is verified rather than trusted, and bake
+          the base's public key into the image so `bootc` can verify the base
+          layer at upgrade time. A base that turned `#false` was publishing
+          signatures and has stopped, which is worth finding out about before
+          merging.
 
-          1. Add a `policy.json` and a `registries.d` entry on the builder so
-             the pull is verified rather than trusted.
-          2. Bake the base's public key into the image so `bootc` can verify
-             the base layer at upgrade time.
+          ## If `provides` or `provides-file` changed
 
-          ## If a base turned `#false`
+          **This one does change the build.** A capability or a path the base
+          carries is one no module has to build, and `tect check` refuses a
+          module whose `requires-file` nothing declares — so a claim that is
+          missing refuses a module for a binary the image ships.
 
-          A base that was publishing signatures has stopped. Worth finding out
-          why before merging.
+          A claim that is *added* is the quieter direction and the one to read
+          carefully: a module every one of whose `provides` the base now covers
+          comes off the build with no diagnostic. The PR title says which
+          modules those are if there are any.
+
+          `rechunking` is not measured — it has no witness path and stays
+          hand-declared — and no claim this workflow does not name is ever
+          removed.
           EOF
 
           gh pr create \
             --base "${GITHUB_REF_NAME}" \
             --head "${branch}" \
-            --title "Base image signature status changed" \
+            --title "What a base image declares has changed" \
             --body-file "${body}"

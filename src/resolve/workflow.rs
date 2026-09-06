@@ -90,7 +90,7 @@ pub const SHIPPED: &[Shipped] = &[
     ),
     shipped!(
         "base-sig-probe",
-        "checks each base for a signature and corrects it",
+        "measures what each base signs and ships, and fixes it",
         Needs::Nothing,
         Some((-6, "*"))
     ),
