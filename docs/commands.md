@@ -1,9 +1,11 @@
 # Commands
 
-`tect --help` lists the commands a person runs: `upgrade`, `create repo` and
-`install`, and the ones that need a repository. The two families at the end of this file — what a build
-runs against, and what runs inside a build layer — are the contract rather than
-the help, and are not in that list.
+`tect --help` lists the commands a person runs: `upgrade` and `create repo`,
+and the ones that need a repository. `installer` is documented here and is
+deliberately not in that list, nor in the picker — see its own section. The two
+families at the end of this file — what a build runs against, and what runs
+inside a build layer — are the contract rather than the help, and are not in
+that list either.
 
 `tect` with nothing after it opens a picker where the output is a terminal, and
 prints the list where it is not. A verb with no noun — `tect create`, `tect
@@ -131,7 +133,7 @@ location is defined in the command:
 
 ## Installing onto a machine
 
-### `install`
+### `installer`
 
 Installs a built tectonic image onto this machine's disk, from a payload rather
 than from a registry. `fisherman` is the backend and does the partitioning, the

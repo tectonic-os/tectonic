@@ -123,7 +123,7 @@ pub fn root() -> Result<PathBuf, String> {
         [device] => mounted(device),
         many => Err(format!(
             "{} partitions are labelled {LABEL}, so which one to install from is not \
-             clear: {}\n\nhelp: `tect install --from <root>` names one outright",
+             clear: {}\n\nhelp: `tect installer --from <root>` names one outright",
             many.len(),
             many.join(", ")
         )),
@@ -560,7 +560,7 @@ impl Found {
             // fails. That ordering is a screen's decision, not a flag's.
             Self::Repo(root) => Err(format!(
                 "{} is a repository and not a built image, so there is nothing here to install \
-                 yet\n\nhelp: `tect build` in it, then `tect install --from <the built payload>`",
+                 yet\n\nhelp: `tect build` in it, then `tect installer --from <the built payload>`",
                 root.display()
             )),
             Self::Nothing(root) => Err(format!(

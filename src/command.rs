@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Verb {
     Upgrade,
-    Install,
+    Installer,
     CreateRepo,
     CreateImage,
     CreateFlavour,
@@ -51,7 +51,7 @@ pub enum Verb {
 /// word nothing resolves to.
 pub const ALL: &[Verb] = &[
     Verb::Upgrade,
-    Verb::Install,
+    Verb::Installer,
     Verb::CreateRepo,
     Verb::CreateImage,
     Verb::CreateFlavour,
@@ -182,8 +182,8 @@ pub const COMMANDS: &[Spec] = &[
         takes: &[],
     },
     Spec {
-        verb: Verb::Install,
-        word: "install",
+        verb: Verb::Installer,
+        word: "installer",
         noun: "",
         arg: "",
         about: "install a built tectonic image onto this machine",
@@ -615,13 +615,27 @@ fn either(rows: &[&'static Spec]) -> String {
     }
 }
 
+/// Rows the help and the picker leave out, which is a fact about the command
+/// and so lives here rather than in either rendering. `installer` erases the
+/// disk it is pointed at, and `tect` alone is typed by people scaffolding a
+/// repository: right on the media, a loaded gun anywhere else. It still runs
+/// when it is typed, and `docs/commands.md` still documents it.
+const UNLISTED: &[Verb] = &[Verb::Installer];
+
 /// What a person is shown: what runs anywhere, then what needs a repository.
 pub fn listed() -> Vec<&'static Spec> {
+    let shown = |spec: &&'static Spec| !UNLISTED.contains(&spec.verb);
     let mut rows: Vec<&'static Spec> = COMMANDS
         .iter()
         .filter(|spec| spec.family == Family::Anywhere)
+        .filter(shown)
         .collect();
-    rows.extend(COMMANDS.iter().filter(|spec| spec.family == Family::Repo));
+    rows.extend(
+        COMMANDS
+            .iter()
+            .filter(|spec| spec.family == Family::Repo)
+            .filter(shown),
+    );
     rows
 }
 
@@ -875,6 +889,24 @@ mod tests {
             for here in [Context::Repo(".".into()), Context::Host, Context::Loose] {
                 assert!(usage(&here).contains(&spec.label()), "{}", spec.label());
             }
+        }
+    }
+
+    /// The one row neither rendering offers. It still resolves when it is
+    /// typed, which is the whole of the difference between hiding a command
+    /// and removing one.
+    #[test]
+    fn the_installer_is_in_no_list_and_still_runs() {
+        let installer = Verb::Installer.spec();
+        assert_eq!(installer.word, "installer");
+        assert!(resolve(&["installer"]).is_ok());
+        assert!(resolve(&["install"]).is_err());
+
+        assert!(!listed().iter().any(|spec| spec.verb == Verb::Installer));
+        for here in [Context::Repo(".".into()), Context::Host, Context::Loose] {
+            let (rows, _) = choices(&listed(), &here);
+            assert!(!rows.iter().any(|spec| spec.verb == Verb::Installer));
+            assert!(!usage(&here).contains(installer.about), "{}", usage(&here));
         }
     }
 

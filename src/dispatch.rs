@@ -412,7 +412,7 @@ pub fn dispatch(
         // the three flags are the person's half of the recipe, and with
         // nobody to ask each one fails naming itself rather than guessing a
         // disk to erase.
-        Verb::Install => {
+        Verb::Installer => {
             if let [word, ..] = rest {
                 return Err(Error::Invocation(format!(
                     "`{}` does not take {word}",

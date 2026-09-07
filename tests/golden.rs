@@ -2217,9 +2217,7 @@ fn flows() {
     );
 }
 
-/// The reference in docs/schema.md, re-rendered from the tables. The renderer
-/// is what checks that every marker names a schema and every schema is marked.
-/// Every screen `tect install` draws, over a payload root and on a real
+/// Every screen `tect installer` draws, over a payload root and on a real
 /// terminal: the name and the account as lines, the password masked and asked
 /// twice, the encryption picked, and the review that says what is erased.
 /// `esc` on that review is a leaving — exit 0, and no disk was touched, which
@@ -2248,7 +2246,7 @@ fn install_screens() {
         "flow-install-drawn",
         &dir,
         &format!(
-            "'{}' install --from . --disk /dev/null",
+            "'{}' installer --from . --disk /dev/null",
             env!("CARGO_BIN_EXE_tect")
         ),
         // The discovery line, which is the last thing printed before the first
@@ -2266,6 +2264,8 @@ fn install_screens() {
     assert!(!transcript.contains("hunter2"), "{transcript}");
 }
 
+/// The reference in docs/schema.md, re-rendered from the tables. The renderer
+/// is what checks that every marker names a schema and every schema is marked.
 #[test]
 fn schema_doc() {
     let path = crate_dir().join("docs/schema.md");
