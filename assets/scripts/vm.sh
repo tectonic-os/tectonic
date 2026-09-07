@@ -176,7 +176,7 @@ build_disk() {
 
 # The boot menu a deb image needs and a fedora one does not: their signed GRUB
 # reads no BLS entries, so it is rendered from the entries `bootc` just wrote.
-# `tect install` does this after fisherman; this is the other path that writes a
+# The installer does this after fisherman; this is the other path that writes a
 # disk, and it needs it for the same reason — no `--bootloader` is passed above,
 # so bootc picks one itself, and an image carrying `bootupd` now gets GRUB.
 #
@@ -306,7 +306,7 @@ install_disk() {
 # every one of them depends on --target, --tag and $IMAGE_REGISTRY, which are
 # build-time and not commit-time, or on the tree being built from.
 build_iso() {
-    local tools=localhost/tect-installer-tools:latest tbx="${staged}/tacklebox" cid
+    local tools=localhost/tect-installer-tools:latest tbx="${PWD}/${staged}/tacklebox"
     # Absolute, because tacklebox splices the build directory into a
     # `containers-storage:[overlay@<dir>+<run>]` transport name for the offline
     # store, and skopeo refuses that with `path name is not absolute`.
@@ -320,52 +320,62 @@ build_iso() {
     # without a second copy. `load_rootful` brings the payload across.
     load_rootful
 
-    # fisherman ships inside the live environment; tacklebox assembles the
-    # media around it and runs here, so it is copied out of the same stage.
-    sudoif podman build --target tools -t "$tools" "$staged"
-    cid="$(sudoif podman create "$tools")"
-    sudoif podman cp "${cid}:/out/tacklebox" "$tbx"
-    sudoif podman rm "$cid" > /dev/null
-    sudoif chown "$(id -u):$(id -g)" "$tbx"
-
-    sudoif podman build -t "$live_image" "$staged"
-
-    # tacklebox leaves its offline-store overlay mounted and then trips over it
-    # on the next run. Cleared before *and* after: before, because a tree left
-    # by an older run is what the next one trips over, and after, because a
-    # mount nobody unmounts is one `rm -rf out` answers `Device or resource
-    # busy` on, with nothing to tell the person which path is held or why.
-    unmount_offline_store "$build"
-
     # Written beside the media and moved onto it last, so a failed build leaves
-    # the iso that was already there. tacklebox shells out to bare `sudo`
-    # throughout and sudo timestamps are per-tty, so the whole binary runs under
-    # one sudo and its internal calls are then no-ops; HOME comes with it,
-    # because it writes there.
-    #
-    # The staging tree is chowned back on the failing path too. Everything
-    # tacklebox writes is root's, and a failed build that keeps it that way
-    # leaves a tree the person who ran this cannot read, delete or retry over.
+    # the iso that was already there.
     rm -f "${image_file}.part"
-    if ! sudoif env HOME=/root "$tbx" build "${PWD}/${staged}/media.json" \
-        --iso "${PWD}/${image_file}.part" -b "$build"; then
-        unmount_offline_store "$build"
-        sudoif chown -R "$(id -u):$(id -g)" "$staged"
-        die "tacklebox could not assemble the media; it left its staging under ${build}"
+
+    # One sudo for the whole root half. sudo's timestamp lasts five minutes and
+    # the tools image, the live environment and tacklebox each hold the
+    # terminal for longer than that on their own, so a `sudoif` per step asks
+    # for the password once per step.
+    #
+    # A refresher in the background cannot fix that: with no tty sudo keys its
+    # timestamp by parent process, so a backgrounded loop refreshes a timestamp
+    # of its own that nothing else uses.
+    #
+    # tacklebox shells out to bare `sudo` throughout and is already inside this
+    # one, so its internal calls are no-ops. HOME comes with it, because it
+    # writes there.
+    sudoif env HOME=/root \
+        TOOLS="$tools" LIVE="$live_image" STAGED="${PWD}/${staged}" TBX="$tbx" \
+        BUILD="$build" ISO="${PWD}/${image_file}.part" OWNER="$(id -u):$(id -g)" \
+        bash -s << 'ROOT' || die "the media could not be assembled; the staging is under ${build}"
+set -euo pipefail
+
+# tacklebox leaves its offline-store overlay mounted and then trips over it on
+# the next run. Cleared before *and* after: before, because a tree left by an
+# older run is what the next one trips over, and after, because a mount nobody
+# unmounts is one `rm -rf out` answers `Device or resource busy` on, with
+# nothing to tell the person which path is held or why.
+unmount_offline_store() {
+    if mountpoint -q "${BUILD}/tbox-offline-store/overlay" 2> /dev/null; then
+        umount "${BUILD}/tbox-offline-store/overlay"
     fi
-    unmount_offline_store "$build"
-    sudoif chown -R "$(id -u):$(id -g)" "$staged"
-    mv -f "${image_file}.part" "$image_file"
 }
 
-# The one mount tacklebox makes and does not remove. Quiet where there is none,
-# because this runs on the path where the build has already failed as well as
-# on the one where it worked.
-unmount_offline_store() {
-    local overlay="$1/tbox-offline-store/overlay"
-    if mountpoint -q "$overlay" 2> /dev/null; then
-        sudoif umount "$overlay"
-    fi
+# On the failing path too. Everything root writes here is root's, and a failed
+# build that keeps it that way leaves a tree the person who ran this cannot
+# read, delete or retry over.
+finish() {
+    unmount_offline_store
+    chown -R "$OWNER" "$STAGED"
+}
+trap finish EXIT
+
+# fisherman ships inside the live environment; tacklebox assembles the media
+# around it and runs here, so it is copied out of the same stage.
+podman build --target tools -t "$TOOLS" "$STAGED"
+cid="$(podman create "$TOOLS")"
+podman cp "${cid}:/out/tacklebox" "$TBX"
+podman rm "$cid" > /dev/null
+
+podman build -t "$LIVE" "$STAGED"
+
+unmount_offline_store
+env HOME=/root "$TBX" build "${STAGED}/media.json" --iso "$ISO" -b "$BUILD"
+ROOT
+
+    mv -f "${image_file}.part" "$image_file"
 }
 
 login_credentials() {
