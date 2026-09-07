@@ -1,12 +1,17 @@
-Computer Name [deb2]: 
+tect: ghcr.io/tectonic-os/deb2:latest, from .
+[6n
 
-Username: tect
+[1;1H[1m[38;5;6;49mComputer Name[2;1H[22m[2m[39;49mdeb2[3;1Henter confirms[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hComputer Name: deb2
 
 [6n
 
-[1;1H[1m[38;5;6;49mPassword:[3;1H[22m[2m[39;49mtyped and not shown, enter confirms[39m[49m[59m[0m[?25l[2;1H*[39m[49m[59m[0m[?25l[2;2H*[39m[49m[59m[0m[?25l[2;3H*[39m[49m[59m[0m[?25l[2;4H*[39m[49m[59m[0m[?25l[2;5H*[39m[49m[59m[0m[?25l[2;6H*[39m[49m[59m[0m[?25l[2;7H*[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25h[6n
+[1;1H[1m[38;5;6;49mUsername[3;1H[22m[2m[39;49menter confirms[39m[49m[59m[0m[?25l[2;1Ht[39m[49m[59m[0m[?25l[2;2He[39m[49m[59m[0m[?25l[2;3Hc[39m[49m[59m[0m[?25l[2;4Ht[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hUsername: tect
 
-[1;1H[1m[38;5;6;49mRetype password:[3;1H[22m[2m[39;49mtyped and not shown, enter confirms[39m[49m[59m[0m[?25l[2;1H*[39m[49m[59m[0m[?25l[2;2H*[39m[49m[59m[0m[?25l[2;3H*[39m[49m[59m[0m[?25l[2;4H*[39m[49m[59m[0m[?25l[2;5H*[39m[49m[59m[0m[?25l[2;6H*[39m[49m[59m[0m[?25l[2;7H*[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hPassword: set
+[6n
+
+[1;1H[1m[38;5;6;49mPassword[3;1H[22m[2m[39;49mtyped and not shown, enter confirms[39m[49m[59m[0m[?25l[2;1H*[39m[49m[59m[0m[?25l[2;2H*[39m[49m[59m[0m[?25l[2;3H*[39m[49m[59m[0m[?25l[2;4H*[39m[49m[59m[0m[?25l[2;5H*[39m[49m[59m[0m[?25l[2;6H*[39m[49m[59m[0m[?25l[2;7H*[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25h[6n
+
+[1;1H[1m[38;5;6;49mRetype password[3;1H[22m[2m[39;49mtyped and not shown, enter confirms[39m[49m[59m[0m[?25l[2;1H*[39m[49m[59m[0m[?25l[2;2H*[39m[49m[59m[0m[?25l[2;3H*[39m[49m[59m[0m[?25l[2;4H*[39m[49m[59m[0m[?25l[2;5H*[39m[49m[59m[0m[?25l[2;6H*[39m[49m[59m[0m[?25l[2;7H*[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hPassword: set
 
 [6n
 

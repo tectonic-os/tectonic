@@ -2251,7 +2251,10 @@ fn install_screens() {
             "'{}' install --from . --disk /dev/null",
             env!("CARGO_BIN_EXE_tect")
         ),
-        "Computer Name [deb2]: ",
+        // The discovery line, which is the last thing printed before the first
+        // widget draws: anchoring on it keeps every question in the golden,
+        // including the two that used to be plain lines.
+        "tect: ghcr.io/tectonic-os/deb2:latest, from .\r\n",
         &[b"\r", b"tect\r", b"hunter2\r", b"hunter2\r", b"\r", b"\x1b"],
     );
     // The one thing this screen exists to guarantee: what was typed is not in

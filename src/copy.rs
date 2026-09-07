@@ -120,8 +120,8 @@ pub const NO_ISO_SPAWN: &str = "systemd-vmspawn cannot boot an iso";
 pub const INSTALL_DISK: &str = "Installation Disk:";
 pub const INSTALL_NAME: &str = "Computer Name:";
 pub const INSTALL_USER: &str = "Username:";
-pub const INSTALL_PASSWORD: &str = "Password:";
-pub const PASSWORD_AGAIN: &str = "Retype password:";
+pub const INSTALL_PASSWORD: &str = "Password";
+pub const PASSWORD_AGAIN: &str = "Retype password";
 pub const NO_MATCH: &str = "Passwords did not match.";
 pub const INSTALL_ENCRYPTION: &str = "Encryption type";
 pub const LUKS_PASSPHRASE: &str = "LUKS passphrase";
@@ -164,6 +164,9 @@ pub const NEST: &str = "filter, space toggles, ←/→ opens, enter confirms";
 pub const REVIEW_KEYS: &str = "enter to change a field, Create to write, esc cancels";
 pub const INSTALL_KEYS: &str = "enter to change a field, esc cancels";
 pub const SECRET_KEYS: &str = "typed and not shown, enter confirms";
+/// No esc here: with a default it takes the default and with none it
+/// fails naming the flag, which is what enter on an empty line does too.
+pub const LINE_KEYS: &str = "enter confirms";
 
 // The review screen `create repo` draws over its collected answers before
 // anything is written. Every row is a piece of configuration, said as what the
