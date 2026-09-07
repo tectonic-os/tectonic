@@ -1052,10 +1052,11 @@ fn chrome(frame: &mut Frame, title: Option<&str>, rows: u16, keys: &str) -> Rect
         // Inside the box they cost a row and read as content; on the border
         // they are what they are, which is a legend.
         .title_bottom(
-            Line::from(Span::styled(
-                keys.to_string(),
-                Style::new().fg(Color::DarkGray),
-            ))
+            Line::from(vec![
+                Span::styled("\u{2500} ", Style::new().fg(ACCENT)),
+                Span::styled(keys.to_string(), Style::new().fg(Color::DarkGray)),
+                Span::raw(" "),
+            ])
             .left_aligned(),
         );
     let inside = block.inner(box_area);
