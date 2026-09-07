@@ -150,14 +150,16 @@ RUN set -eux; \
     else \
         dnf install -y --setopt=install_weak_deps=False \
             podman fuse-overlayfs cryptsetup skopeo openssl \
-            util-linux dosfstools e2fsprogs xfsprogs; \
+            util-linux dosfstools e2fsprogs xfsprogs kmscon; \
         dnf clean all; \
     fi; \
     for tool in podman fuse-overlayfs skopeo cryptsetup systemd-cryptenroll \
         openssl sfdisk mkfs.fat mkfs.ext4 mkfs.xfs; do \
         command -v "$tool" > /dev/null 2>&1 \
             || { echo "the live environment has no ${tool}" >&2; exit 1; }; \
-    done
+    done; \
+    command -v kmscon > /dev/null 2>&1 \
+        || echo "no kmscon here; the console falls back to the kernel VT" >&2
 
 # Fisherman is the backend and nothing here reimplements partitioning, LUKS or
 # TPM2 enrolment. Its recipe is baked in at a fixed path rather than written
@@ -219,7 +221,32 @@ ExecStart=
 ExecStart=-/sbin/agetty -o '-p -f -- \\u' --autologin root --noclear %I $TERM
 AUTOLOGIN
 
-RUN systemctl enable var-lib-tectonic-store.mount
+# The kernel's own console draws a bitmap font of at most 512 glyphs in sixteen
+# colours, and no console font carries the box-drawing arcs this screen uses —
+# neither `kbd`'s faces nor Terminus. `setfont` loads bitmaps, so a TTF is not
+# an answer to that either.
+#
+# kmscon draws on DRM through pango, so it takes any font fontconfig can see
+# and renders truecolor. `monospace` already resolves to Adwaita Mono in this
+# base, so there is nothing to configure and nothing to install beside it.
+#
+# The serial console is deliberately untouched. It is how this media is driven
+# headless, its glyphs belong to whatever terminal is on the other end, and a
+# graphical console that fails must not take the headless path with it.
+COPY <<'KMSCON' /usr/lib/systemd/system/kmsconvt@.service.d/autologin.conf
+[Service]
+ExecStart=
+ExecStart=kmscon --vt=%I --no-switchvt --login -- /bin/login -f root
+KMSCON
+
+# `kmsconvt@.service` ships `Conflicts=getty@%i.service` and, the half that
+# matters here, `OnFailure=getty@%i.service` — so a kmscon that cannot open DRM
+# hands tty1 back to the plain VT with its own autologin above, rather than
+# leaving the console dead. The enable is guarded because the apt arm of this
+# file has no such package and must still build.
+RUN systemctl enable var-lib-tectonic-store.mount \
+    && { [ ! -f /usr/lib/systemd/system/kmsconvt@.service ] \
+        || systemctl enable kmsconvt@tty1.service; }
 
 # The frontend, staged into this build context from the running binary by
 # `tect vm build iso`. `--version` runs it here rather than on the console, so
