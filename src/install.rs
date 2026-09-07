@@ -771,6 +771,11 @@ fn stage(recipe: &Json) -> Result<PathBuf, String> {
 /// `PATH`, and a headless run elsewhere is free to shadow it.
 const BACKEND: &str = "fisherman";
 
+/// How long the screen waits for a line before it redraws anyway. Fast enough
+/// that the spinner turns, slow enough that a quiet install is not a loop
+/// repainting a console eight times a second.
+const TICK: std::time::Duration = std::time::Duration::from_millis(120);
+
 impl Found {
     /// The payload, or why this root has none. Asked *before* a person is
     /// asked for a disk to erase, because a precondition that can be checked
@@ -1057,12 +1062,36 @@ pub fn run(payload: &Payload, answers: &Answers, prompt: &Prompt) -> Result<(), 
     };
     let mut recovery = None;
     {
+        // **The lines are read on a thread and taken with a timeout**, so the
+        // screen has something to do while fisherman has nothing to say. A
+        // step can hold the machine for minutes between two messages, and a
+        // blocking read gives the region no chance to show it is still alive.
+        //
         // Both write ends were moved into the child, so this side holds none
-        // and the read ends when the child does.
-        for line in std::io::BufReader::new(events)
-            .lines()
-            .map_while(Result::ok)
-        {
+        // and the read ends when the child does; the channel then disconnects
+        // and so does this loop.
+        let (lines, arriving) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            for line in std::io::BufReader::new(events)
+                .lines()
+                .map_while(Result::ok)
+            {
+                if lines.send(line).is_err() {
+                    return;
+                }
+            }
+        });
+        loop {
+            let line = match arriving.recv_timeout(TICK) {
+                Ok(line) => line,
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    if let Some(region) = &mut region {
+                        let _ = region.tick();
+                    }
+                    continue;
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            };
             let event = Event::of(&line);
             if let Event::Recovery(key) = &event {
                 recovery = Some(key.clone());

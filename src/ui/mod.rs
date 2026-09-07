@@ -765,6 +765,8 @@ pub struct Progress {
     /// How many messages have arrived during it, which is the only signal
     /// there is for how far into it the machine has got.
     within: u32,
+    /// Which frame of the spinner is drawn beside the step.
+    turn: usize,
     step: String,
     notes: Vec<String>,
     foot: String,
@@ -787,6 +789,7 @@ impl Progress {
             pct: 0,
             flight: 0,
             within: 0,
+            turn: 0,
             step: String::new(),
             notes: Vec::new(),
             foot: foot.to_string(),
@@ -819,6 +822,16 @@ impl Progress {
         crept(self.pct, self.flight, self.within)
     }
 
+    /// Time passing, and nothing else. A step can hold the machine for minutes
+    /// between two messages — `Deploying image` is one line and then silence —
+    /// and a screen that has not changed in that long is one nobody can tell
+    /// from a screen that has stopped. Only the spinner moves: the bar counts
+    /// messages and there have been none.
+    pub fn tick(&mut self) -> Result<(), String> {
+        self.turn = self.turn.wrapping_add(1);
+        self.show()
+    }
+
     /// A line under the gauge, oldest dropped.
     pub fn note(&mut self, text: &str) -> Result<(), String> {
         self.within += 1;
@@ -830,14 +843,15 @@ impl Progress {
     }
 
     fn show(&mut self) -> Result<(), String> {
-        let (pct, step, notes, foot) = (
+        let (pct, turn, step, notes, foot) = (
             self.at(),
+            self.turn,
             self.step.as_str(),
             self.notes.as_slice(),
             self.foot.as_str(),
         );
         render(&mut self.terminal, ROWS, foot, |frame, area| {
-            working(frame, area, pct, step, notes, foot)
+            working(frame, area, pct, turn, step, notes, foot)
         })
     }
 
@@ -848,7 +862,15 @@ impl Progress {
 
 /// The bar, the step it is on, the messages in a pane of their own, and the
 /// line that does not move.
-fn working(frame: &mut Frame, area: Rect, pct: u16, step: &str, notes: &[String], foot: &str) {
+fn working(
+    frame: &mut Frame,
+    area: Rect,
+    pct: u16,
+    turn: usize,
+    step: &str,
+    notes: &[String],
+    foot: &str,
+) {
     let [meter, name, body, tail] = Layout::vertical([
         Constraint::Length(1),
         Constraint::Length(1),
@@ -857,7 +879,14 @@ fn working(frame: &mut Frame, area: Rect, pct: u16, step: &str, notes: &[String]
     ])
     .areas(area);
     frame.render_widget(bar(pct, meter.width), meter);
-    frame.render_widget(Line::from(step.bold().cyan()), name);
+    frame.render_widget(
+        Line::from(vec![
+            Span::styled(TURNING[turn % TURNING.len()], Style::new().fg(HIGHLIGHT)),
+            Span::raw(" "),
+            Span::styled(step.to_string(), Style::new().fg(HIGHLIGHT).bold()),
+        ]),
+        name,
+    );
     // The pane the output is bounded by, which is the whole reason a log had
     // to go somewhere: what scrolls out of it is gone from the screen.
     let pane = Block::new()
@@ -918,6 +947,15 @@ fn bar<'a>(pct: u16, width: u16) -> Line<'a> {
 
 /// The bar's unfilled length, and the legend on the box's edge.
 const TRACK: Color = Color::DarkGray;
+
+/// The spinner beside the running step. Braille, which the media's console
+/// draws and a kernel VT has no glyphs for — it is the one thing on this
+/// screen that does not survive the fallback, and it carries no information a
+/// stopped screen does not already give.
+const TURNING: [&str; 10] = [
+    "\u{280b}", "\u{2819}", "\u{2839}", "\u{2838}", "\u{283c}", "\u{2834}", "\u{2826}", "\u{2827}",
+    "\u{2807}", "\u{280f}",
+];
 
 /// How far along the gradient cell `at` of `room` is.
 fn blend(at: usize, room: usize) -> Color {
@@ -1773,6 +1811,7 @@ mod tests {
                     frame,
                     frame.area(),
                     50,
+                    0,
                     "7/12 install OS",
                     &notes,
                     "log: /run/tect-install.log",
@@ -1782,6 +1821,16 @@ mod tests {
         let drawn = terminal.backend().to_string();
         assert!(drawn.contains("50%"), "{drawn}");
         assert!(drawn.contains("7/12 install OS"), "{drawn}");
+        // The spinner turns beside the step, which is the only thing on this
+        // screen that moves when fisherman has gone quiet.
+        assert!(drawn.contains(TURNING[0]), "{drawn}");
+        assert_eq!(
+            TURNING
+                .iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len(),
+            10
+        );
         assert!(
             drawn.contains("first") && drawn.contains("second"),
             "{drawn}"
