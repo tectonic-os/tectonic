@@ -166,23 +166,64 @@ and hands it over.
   With none, the root is `/usr/share/tectonic`, which is where installer media
   carries its own recipe beside the manifest — so a labelled partition
   overrides the media, and someone who attached one did that deliberately.
-- **On a terminal the flags are screens instead**: the disk offered as the whole
-  disks `/sys/block` holds with their size, model and whether they are
-  removable; the password and the passphrase typed masked and asked twice, since
-  neither is visible to correct and a mistyped one is a machine nobody can log
-  into; and the whole set reviewed on one screen, which says what is erased
-  before it offers to erase it and lets any row be answered again. Leaving that
-  screen exits 0 having touched nothing.
+- **On a terminal there is one screen and every field is on it**, answered
+  where it stands. The flags and the payload seed a form — disk, computer name,
+  username, password, confirm, encryption, passphrase — and enter on a row edits
+  it in place: text is typed into the row, and the disk list opens *under* its
+  own row. Nothing hides the other answers while one of them is being changed.
+- **`Install` is dim and unpickable until nothing is missing**, with what it is
+  waiting for written under it: a disk, a username, a password, and — for the
+  two encryption forms named for one — a passphrase. It is also where the two
+  halves of the password are compared, since both are on screen at once and can
+  be checked against each other instead of asked for twice.
+- **`Shut down` sits beside it** and is never blocked. A screen nobody can leave
+  is worse than one nobody can finish.
+- **Taking `Install` asks once more**, over a summary of what it would do:
+  *Everything on `/dev/sda` will be erased. Are you sure?*, answered `Continue`
+  or `Go back`. The summary rows cannot be landed on, so the cursor reaches only
+  the two answers, and it opens on `Go back`.
+- The disk is offered as the whole disks `/sys/block` holds, with their size,
+  model and whether they are removable. `$TECT_SYS_BLOCK` names that directory
+  instead where it is set, which is how the drawn golden stops depending on the
+  disks of whichever machine runs it. The password and the passphrase are typed
+  masked, since neither is visible to correct and a mistyped one is a machine
+  nobody can log into.
+- **The installer owns the console.** It clears the screen at its entry — what
+  is above it is a login banner and a discovery line — and everything after that
+  is drawn in one centred, titled box naming the image. On a Fedora live
+  environment the console itself is kmscon, which draws TrueType through DRM;
+  where it cannot start, systemd hands tty1 back to the kernel VT and the same
+  screen draws in that font instead.
+- **Esc inside a field goes back to the form and changes nothing.** A field you
+  leave keeps what it had, which is nothing the first time; `Install` then names
+  it among the values it is waiting for. No question in the installer can end
+  the run.
+- **Esc on the form itself is a question, not an exit**, and so is Ctrl+C
+  anywhere: keep going, start again from the first question, or leave to a
+  shell. Only the third leaves, and it exits 0 having touched nothing.
 - Encryption is fisherman's, and the two forms whose name ends in `passphrase`
   are the two it refuses the recipe without one. The `tpm2-` forms are shown and
   not pickable on a machine with no `/dev/tpmrm0`. For `tpm2-luks` fisherman
   prints a recovery key once, and the install echoes it on a line of its own:
   it is the only copy there will ever be.
-- Fisherman writes a JSON event per line, and each one is rendered as a line —
-  `[ 45%] 7/12 install OS` — over whatever else it prints. Nothing here draws a
-  full-screen progress view: an alternate screen takes the transcript with it
-  when it exits, and this is the one program whose failures happen on someone
-  else's machine.
+- Fisherman writes a JSON event per line. On a terminal they are drawn as a
+  bar with the step under it and the last few messages in a bounded pane under
+  that; with no terminal each one is rendered as a line — `[ 45%] 7/12 install
+  OS` — over whatever else it prints. **The bar's two ends differ by glyph as
+  well as by colour**, so a console that drops the colour escapes still reads a
+  partial bar.
+- **The whole of that output is written to `tect-install.log`**, which is what
+  makes the bounded region safe: the screen is no longer the only copy of the
+  transcript a failure on someone else's machine is diagnosed from. It goes
+  beside the payload where the `TECT` partition can be remounted writable, and
+  in `/run` where there is none — an iso-only boot has no writable partition at
+  all. Which of the two happened is on screen under the gauge and said again at
+  the end.
+- **The recovery key is the one thing that file never holds.** A key written to
+  removable media turns the stick into the thing that opens the disk, so it
+  stays on screen and nowhere else, said once more after the install finishes.
+- **Finishing offers the restart**, defaulting to it, rather than returning
+  silently to a root shell with the stick still in the machine.
 - **A payload wins over a repository, which is the opposite of how a repository
   wins over a booted image everywhere else.** For authoring, the repository is
   the source and is the more specific answer. For installing, the payload is the

@@ -2217,11 +2217,16 @@ fn flows() {
     );
 }
 
-/// Every screen `tect installer` draws, over a payload root and on a real
-/// terminal: the name and the account as lines, the password masked and asked
-/// twice, the encryption picked, and the review that says what is erased.
-/// `esc` on that review is a leaving — exit 0, and no disk was touched, which
-/// is the property that makes the screen safe to reach.
+/// The installer's one screen, over a payload root and on a real terminal.
+/// **Every question is on it at once** and each is answered in place: the disk
+/// list opens under its own row, the two halves of the password are two rows
+/// compared against each other, and `Install` is dim until nothing is missing.
+///
+/// The steps walk that screen — down to a row, enter, answer, and on — then
+/// take `Install`, which asks the one question that costs a disk over a summary
+/// of what it would do. `Go back` there returns to the form, and `esc` on the
+/// form asks whether to leave. Exit 0, and no disk was touched, which is the
+/// property that makes the screen safe to reach.
 #[test]
 fn install_screens() {
     let dir = empty("flow-install-drawn");
@@ -2240,20 +2245,55 @@ fn install_screens() {
 "#,
     )
     .unwrap();
-    // `--disk` is given so the picker does not read this machine's own
-    // `/sys/block`, which no two hosts agree on.
+    // The disks the form offers are this machine's, and no two machines agree
+    // on those — so the golden brings its own `/sys/block`, the same way it
+    // brings its own `$TECT_TPM`.
+    let sys = dir.join("sys-block");
+    for (name, size, removable, model) in [
+        ("vda", "134217728", "0", "QEMU HARDDISK"),
+        ("sdb", "31457280", "1", "Cruzer Blade"),
+    ] {
+        let disk = sys.join(name);
+        std::fs::create_dir_all(disk.join("device")).unwrap();
+        std::fs::write(disk.join("size"), size).unwrap();
+        std::fs::write(disk.join("removable"), removable).unwrap();
+        std::fs::write(disk.join("device/model"), model).unwrap();
+    }
     drawn_flow(
         "flow-install-drawn",
         &dir,
         &format!(
-            "'{}' installer --from . --disk /dev/null",
+            "TECT_SYS_BLOCK='{}' '{}' installer --from .",
+            sys.display(),
             env!("CARGO_BIN_EXE_tect")
         ),
         // The discovery line, which is the last thing printed before the first
-        // widget draws: anchoring on it keeps every question in the golden,
-        // including the two that used to be plain lines.
+        // widget draws: anchoring on it keeps every question in the golden.
         "tect: ghcr.io/tectonic-os/deb2:latest, from .\r\n",
-        &[b"\r", b"tect\r", b"hunter2\r", b"hunter2\r", b"\r", b"\x1b"],
+        &[
+            // The disk list opens under its own row; down past the removable
+            // one and take the disk, all without leaving the screen.
+            b"\r",
+            b"\x1b[B\r",
+            // Down to the account, typed in place.
+            b"\x1b[B\x1b[B\r",
+            b"tect\r",
+            // Both halves of the password, two rows apart and compared.
+            b"\x1b[B\r",
+            b"hunter2\r",
+            b"\x1b[B\r",
+            b"hunter2\r",
+            // Past encryption and the passphrase to the actions, and take
+            // `Install` — pickable only because nothing is missing now.
+            b"\x1b[B\x1b[B\x1b[B\r",
+            // The last question, answered `Go back`, which is the whole reason
+            // it is a question. **Nothing here runs fisherman**: `Continue` is
+            // an install, and this rig has no disk to give one.
+            b"\x1b[B\r",
+            // Esc on the form asks, and the third answer leaves.
+            b"\x1b",
+            b"\x1b[B\x1b[B\r",
+        ],
     );
     // The one thing this screen exists to guarantee: what was typed is not in
     // the transcript, which is what a serial console keeps and what a failed
@@ -2262,6 +2302,21 @@ fn install_screens() {
         std::fs::read_to_string(crate_dir().join("tests/golden/flow-install-drawn/transcript.txt"))
             .unwrap();
     assert!(!transcript.contains("hunter2"), "{transcript}");
+    // **`Install` was reachable**, which is the half a green golden cannot show
+    // on its own: a run that leaves at the end exits 0 whether or not the
+    // action ever became pickable. It did not, once, because the reason it was
+    // blocked was computed before the form opened and never asked again.
+    //
+    // **Assert on contiguous text only.** ratatui writes the cells a frame
+    // changed, so a label that overlaps what was under it arrives in fragments
+    // with cursor moves between the words — `Go back` is not greppable here
+    // even when it is on screen, and neither is `Keep going`.
+    assert!(transcript.contains("Are you sure"), "{transcript}");
+    assert!(transcript.contains(tect::copy::CONTINUE), "{transcript}");
+    // Both disks were offered under the row, and the one taken is the one the
+    // steps moved to.
+    assert!(transcript.contains("Cruzer"), "{transcript}");
+    assert!(transcript.contains("/dev/vda"), "{transcript}");
 }
 
 /// The reference in docs/schema.md, re-rendered from the tables. The renderer

@@ -426,6 +426,9 @@ pub fn dispatch(
             let found = crate::install::classify(&root)?;
             let payload = found.payload()?;
             eprintln!("tect: {}, from {}", payload.image, root.display());
+            // From here the installer owns the console: the banner and the
+            // line above are not worth the room.
+            crate::install::own_screen(payload, prompt);
             let given = crate::install::Given {
                 disk,
                 hostname,
@@ -438,7 +441,7 @@ pub fn dispatch(
             let Some(answers) = crate::install::Answers::collect(payload, given, prompt)? else {
                 return Ok(ExitCode::SUCCESS);
             };
-            crate::install::run(payload, &answers)?;
+            crate::install::run(payload, &answers, prompt)?;
             Ok(ExitCode::SUCCESS)
         }
         Verb::CreateRepo => {

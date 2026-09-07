@@ -185,6 +185,18 @@ fn tpm() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from(TPM))
 }
 
+/// Where the whole disks are read from.
+const SYS_BLOCK: &str = "/sys/block";
+
+/// `$TECT_SYS_BLOCK` names it instead where it is set, for the same reason
+/// `$TECT_TPM` exists: the form draws the disks this machine has, and no two
+/// machines running the drawn golden agree on what those are.
+fn sys_block() -> PathBuf {
+    std::env::var_os("TECT_SYS_BLOCK")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(SYS_BLOCK))
+}
+
 pub struct Encryption {
     pub kind: String,
     pub passphrase: String,
@@ -215,7 +227,7 @@ pub struct Answers {
 /// What the flags gave, which the first pass reads and a re-ask does not: a
 /// field asked again opens on the answer it has, not on the flag that seeded
 /// it.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Given {
     pub disk: Option<String>,
     pub hostname: Option<String>,
@@ -225,50 +237,207 @@ pub struct Given {
     pub passphrase: Option<String>,
 }
 
+/// What a leave key is answered with. All three are true for as long as no
+/// disk has been touched, which is the whole of when this is asked.
+enum Leave {
+    /// Back to the screen the key was pressed on, with the answers kept.
+    Back,
+    /// The questions again, from the first one.
+    Over,
+    /// Out, having written nothing.
+    Shell,
+}
+
+/// Whether a widget's error is a person wanting out rather than a failure.
+/// Esc is the other half of that and is a `None`, not an error.
+fn leaving(err: &str) -> bool {
+    err == crate::ui::INTERRUPTED
+}
+
+/// What a leave key asks before it leaves, and the reason it is three answers
+/// and not two: a loop with no exit is worse than the exit it replaces.
+fn leave(prompt: &Prompt) -> Result<Leave, String> {
+    // Only a drawn run can reach a leave key at all, and this is what stops a
+    // run that cannot be asked from looping over a question it never sees.
+    if !prompt.draws() {
+        return Ok(Leave::Shell);
+    }
+    let options = [
+        Choice::new(copy::LEAVE_BACK, ""),
+        Choice::new(copy::LEAVE_OVER, ""),
+        Choice::new(copy::LEAVE_SHELL, ""),
+    ];
+    // A leave key on the question about leaving is not a second leaving.
+    match prompt.choose(copy::LEAVING, &options) {
+        Ok(Some(1)) => Ok(Leave::Over),
+        Ok(Some(2)) => Ok(Leave::Shell),
+        Ok(_) => Ok(Leave::Back),
+        Err(err) if leaving(&err) => Ok(Leave::Back),
+        Err(err) => Err(err),
+    }
+}
+
 impl Answers {
-    /// The screens, in order, then the review over them. `None` is a leaving:
-    /// nothing has been written and no disk has been touched.
+    /// The screens, in order, then the review over them, and around both the
+    /// question every leave key asks first. `None` is a leaving that was
+    /// confirmed: nothing has been written and no disk has been touched.
     pub fn collect(
         payload: &Payload,
         given: Given,
         prompt: &Prompt,
     ) -> Result<Option<Self>, String> {
-        let mut answers = Self {
-            disk: ask_disk(given.disk, None, prompt)?,
-            hostname: prompt.text(
-                given.hostname,
-                copy::INSTALL_NAME,
-                "--hostname",
-                Some(&payload.hostname),
-            )?,
-            user: prompt.text(given.user, copy::INSTALL_USER, "--user", None)?,
-            password: prompt.secret(given.password, copy::INSTALL_PASSWORD, "--password")?,
-            encryption: ask_encryption(
-                given.encryption,
-                given.passphrase,
-                &Encryption::none(),
-                prompt,
-            )?,
-        };
-        while prompt.draws() {
-            let rows = answers.rows();
-            match crate::ui::review(
-                &copy::erasing(&answers.disk),
-                &rows,
-                copy::INSTALL,
-                copy::INSTALL_KEYS,
-            )? {
-                None => return Ok(None),
-                Some(at) if at == rows.len() => break,
-                Some(at) => answers.ask(at, prompt)?,
+        let seeded = Self::seeded(payload, given, prompt)?;
+        // No screen, no form: the flags are the whole of the answer and
+        // `seeded` has already refused anything they left empty.
+        if !prompt.draws() {
+            return Ok(Some(seeded));
+        }
+        let mut fields = seeded.fields();
+        loop {
+            let actions = [copy::INSTALL, copy::SHUT_DOWN];
+            let filled = crate::ui::form(&mut fields, &actions, short_of, copy::INSTALL_KEYS);
+            match filled {
+                Ok(crate::ui::Filled::Took(0)) => {
+                    let answers = Self::of(&fields);
+                    // The one question that costs a disk, asked over what it
+                    // would do, after the form is complete and never before.
+                    if crate::ui::confirm_over(
+                        &copy::erasing(&answers.disk),
+                        &answers.summary(),
+                        copy::CONTINUE,
+                        copy::GO_BACK,
+                    )? {
+                        return Ok(Some(answers));
+                    }
+                }
+                // Every other action is a way off this screen.
+                Ok(crate::ui::Filled::Took(_)) => {
+                    power_off()?;
+                    return Ok(None);
+                }
+                Ok(crate::ui::Filled::Left) => match leave(prompt)? {
+                    Leave::Shell => return Ok(None),
+                    Leave::Over => {
+                        fields = Self::seeded(payload, Given::default(), prompt)?.fields()
+                    }
+                    Leave::Back => {}
+                },
+                Err(err) if leaving(&err) => match leave(prompt)? {
+                    Leave::Shell => return Ok(None),
+                    Leave::Over => {
+                        fields = Self::seeded(payload, Given::default(), prompt)?.fields()
+                    }
+                    Leave::Back => {}
+                },
+                Err(err) => return Err(err),
             }
         }
-        Ok(Some(answers))
     }
 
-    /// The password is a row so it can be asked again; it is the one value
-    /// that cannot read back as itself.
-    fn rows(&self) -> Vec<(String, String)> {
+    /// Every field before any of them is asked. **On a screen nothing is asked
+    /// here at all**: the flags and the defaults seed the form, and the form is
+    /// where the questions are, so all of them are visible at once and none is
+    /// reached by answering the ones before it.
+    ///
+    /// With no screen there is no form, so this is the whole of the collection
+    /// and a value no flag gave is a refusal naming the flag.
+    fn seeded(payload: &Payload, given: Given, prompt: &Prompt) -> Result<Self, String> {
+        if !prompt.draws() {
+            return Ok(Self {
+                disk: ask_disk(given.disk, None, prompt)?,
+                hostname: prompt.text(
+                    given.hostname,
+                    copy::INSTALL_NAME,
+                    "--hostname",
+                    Some(&payload.hostname),
+                )?,
+                user: prompt.text(given.user, copy::INSTALL_USER, "--user", None)?,
+                password: prompt.secret(given.password, copy::INSTALL_PASSWORD, "--password")?,
+                encryption: ask_encryption(
+                    given.encryption,
+                    given.passphrase,
+                    &Encryption::none(),
+                    prompt,
+                )?,
+            });
+        }
+        Ok(Self {
+            disk: given.disk.unwrap_or_default(),
+            hostname: given
+                .hostname
+                .filter(|name| !name.is_empty())
+                .unwrap_or_else(|| payload.hostname.clone()),
+            user: given.user.unwrap_or_default(),
+            password: given.password.unwrap_or_default(),
+            encryption: Encryption {
+                // A flag naming a kind fisherman has not got is refused here.
+                // Drawn as a row, it would be one nobody can correct.
+                kind: match given.encryption {
+                    Some(kind) => named(kind)?,
+                    None => NONE.to_string(),
+                },
+                passphrase: given.passphrase.unwrap_or_default(),
+            },
+        })
+    }
+
+    /// The form's rows, in the order `ROW_*` names them. The passphrase is
+    /// always one of them: the row list is built once and the encryption kind
+    /// is chosen inside the form, so a row that came and went would have to
+    /// rebuild the screen under the person editing it.
+    fn fields(&self) -> Vec<crate::ui::Field> {
+        use crate::ui::Field;
+        let found = disks(&sys_block());
+        let at = found.iter().position(|(disk, _)| *disk == self.disk);
+        let disk = match found.is_empty() {
+            // A machine whose `/sys/block` says nothing is typed into rather
+            // than picked from an empty list.
+            true => Field::text(copy::ROW_DISK, &self.disk),
+            false => Field::pick(
+                copy::ROW_DISK,
+                found
+                    .iter()
+                    .map(|(disk, detail)| Choice::new(disk, detail))
+                    .collect(),
+                at,
+            ),
+        };
+        vec![
+            disk,
+            Field::text(copy::ROW_HOSTNAME, &self.hostname),
+            Field::text(copy::ROW_ACCOUNT, &self.user),
+            Field::secret(copy::ROW_PASSWORD, &self.password),
+            Field::secret(copy::ROW_CONFIRM, &self.password),
+            Field::pick(
+                copy::ROW_ENCRYPTION,
+                kinds(tpm().exists()),
+                KINDS
+                    .iter()
+                    .position(|(name, _)| *name == self.encryption.kind),
+            ),
+            Field::secret(copy::ROW_PASSPHRASE, &self.encryption.passphrase),
+        ]
+    }
+
+    /// The answers the form holds. Only reached where `short_of` is empty, so
+    /// every value here is one somebody typed or chose.
+    fn of(fields: &[crate::ui::Field]) -> Self {
+        let at = |row: usize| fields[row].value();
+        Self {
+            disk: at(ROW_DISK),
+            hostname: at(ROW_HOSTNAME),
+            user: at(ROW_ACCOUNT),
+            password: at(ROW_PASSWORD),
+            encryption: Encryption {
+                kind: at(ROW_ENCRYPTION),
+                passphrase: at(ROW_PASSPHRASE),
+            },
+        }
+    }
+
+    /// What the confirmation is asked over: the answers, with the password as
+    /// the one value that cannot read back as itself.
+    fn summary(&self) -> Vec<(String, String)> {
         vec![
             (copy::ROW_DISK.to_string(), self.disk.clone()),
             (copy::ROW_HOSTNAME.to_string(), self.hostname.clone()),
@@ -283,22 +452,57 @@ impl Answers {
             ),
         ]
     }
+}
 
-    /// One row asked again, in `rows`'s order. Nothing here gates anything
-    /// else — a disk does not change what an account is — so a field is asked
-    /// alone rather than by re-entering the whole procedure at it.
-    fn ask(&mut self, row: usize, prompt: &Prompt) -> Result<(), String> {
-        match row {
-            0 => self.disk = ask_disk(None, Some(&self.disk), prompt)?,
-            1 => {
-                self.hostname =
-                    prompt.text(None, copy::INSTALL_NAME, "--hostname", Some(&self.hostname))?
-            }
-            2 => self.user = prompt.text(None, copy::INSTALL_USER, "--user", Some(&self.user))?,
-            3 => self.password = prompt.secret(None, copy::INSTALL_PASSWORD, "--password")?,
-            _ => self.encryption = ask_encryption(None, None, &self.encryption, prompt)?,
-        }
-        Ok(())
+/// The form's rows, by position. `Answers::of` reads them back by the same
+/// names, so a row added in one place and not the other does not compile.
+const ROW_DISK: usize = 0;
+const ROW_HOSTNAME: usize = 1;
+const ROW_ACCOUNT: usize = 2;
+const ROW_PASSWORD: usize = 3;
+const ROW_CONFIRM: usize = 4;
+const ROW_ENCRYPTION: usize = 5;
+const ROW_PASSPHRASE: usize = 6;
+
+/// What the form is still short of, which is what `Install` says instead of
+/// being pickable. These are the values nothing derives and no default stands
+/// in for, plus the one thing a form can check that a sequence of questions
+/// had to ask twice for: that both halves of the password agree.
+fn short_of(fields: &[crate::ui::Field]) -> Option<String> {
+    let at = |row: usize| fields[row].value();
+    if !at(ROW_PASSWORD).is_empty() && at(ROW_PASSWORD) != at(ROW_CONFIRM) {
+        return Some(copy::NO_MATCH_ROW.to_string());
+    }
+    let wants = Encryption::wants_passphrase(&at(ROW_ENCRYPTION));
+    let missing: Vec<&str> = [
+        (at(ROW_DISK).is_empty(), copy::ROW_DISK),
+        (at(ROW_ACCOUNT).is_empty(), copy::ROW_ACCOUNT),
+        (at(ROW_PASSWORD).is_empty(), copy::ROW_PASSWORD),
+        (wants && at(ROW_PASSPHRASE).is_empty(), copy::ROW_PASSPHRASE),
+    ]
+    .into_iter()
+    .filter(|(missing, _)| *missing)
+    .map(|(_, name)| name)
+    .collect();
+    match missing.is_empty() {
+        true => None,
+        false => Some(copy::still_needs(&missing)),
+    }
+}
+
+/// The other way off the installer's screen. The live environment is a
+/// systemd one, which is what put this on a console in the first place.
+fn power_off() -> Result<(), String> {
+    let out = Command::new("systemctl")
+        .arg("poweroff")
+        .output()
+        .map_err(|err| format!("systemctl: {err}, and it is what stops a machine"))?;
+    match out.status.success() {
+        true => Ok(()),
+        false => Err(format!(
+            "systemctl poweroff: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        )),
     }
 }
 
@@ -364,7 +568,7 @@ fn ask_disk(
     if let Some(disk) = given.filter(|disk| !disk.is_empty()) {
         return Ok(disk);
     }
-    let found = disks(Path::new("/sys/block"));
+    let found = disks(&sys_block());
     if !prompt.asks() || found.is_empty() {
         return prompt.text(None, copy::INSTALL_DISK, "--disk", current);
     }
@@ -377,11 +581,26 @@ fn ask_disk(
         .unwrap_or(0);
     match prompt.choose_current(copy::INSTALL_DISK, &options, at)? {
         Some(at) => Ok(found[at].0.clone()),
-        None => Err(format!(
-            "give --disk, since nothing was chosen: {}",
-            copy::INSTALL_DISK.trim_end_matches(':')
-        )),
+        // Left unanswered: keep whatever the form had. That is nothing the
+        // first time, and it is what blocks the action.
+        None => Ok(current.unwrap_or_default().to_string()),
     }
+}
+
+/// The kind, if fisherman has one by that name. The form validates a flag this
+/// way without asking anything, which is why it is not inline in the question.
+fn named(kind: String) -> Result<String, String> {
+    if KINDS.iter().any(|(name, _)| *name == kind) {
+        return Ok(kind);
+    }
+    Err(format!(
+        "`{kind}` is not one of {}",
+        KINDS
+            .iter()
+            .map(|(name, _)| *name)
+            .collect::<Vec<_>>()
+            .join(", ")
+    ))
 }
 
 /// A `tpm2-` form on a machine with no TPM is shown and not pickable rather
@@ -406,18 +625,8 @@ fn ask_encryption(
     current: &Encryption,
     prompt: &Prompt,
 ) -> Result<Encryption, String> {
-    let names = || {
-        KINDS
-            .iter()
-            .map(|(name, _)| *name)
-            .collect::<Vec<_>>()
-            .join(", ")
-    };
     let kind = match given {
-        Some(kind) if !KINDS.iter().any(|(name, _)| *name == kind) => {
-            return Err(format!("`{kind}` is not one of {}", names()))
-        }
-        Some(kind) => kind,
+        Some(kind) => named(kind)?,
         None if !prompt.asks() => current.kind.clone(),
         None => {
             let options = kinds(tpm().exists());
@@ -432,9 +641,13 @@ fn ask_encryption(
         }
     };
     Ok(Encryption {
-        passphrase: match Encryption::wants_passphrase(&kind) {
-            false => String::new(),
-            true => prompt.secret(passphrase, copy::LUKS_PASSPHRASE, "--passphrase")?,
+        passphrase: match (Encryption::wants_passphrase(&kind), prompt.draws()) {
+            (false, _) => String::new(),
+            // The form's own re-ask, where leaving the question keeps the
+            // passphrase already held and the action stays blocked while there
+            // is none.
+            (true, true) => prompt.secret_current(copy::LUKS_PASSPHRASE, &current.passphrase)?,
+            (true, false) => prompt.secret(passphrase, copy::LUKS_PASSPHRASE, "--passphrase")?,
         },
         kind,
     })
@@ -572,33 +785,72 @@ impl Found {
     }
 }
 
-/// One line of fisherman's event stream as a line of ours. Anything that is
-/// not one of its events passes through unchanged: what it writes is the
-/// transcript a failure on someone else's machine is diagnosed from, and this
-/// draws no screen that could take it away.
-fn say(line: &str) -> String {
-    let Ok(event) = Json::parse(line) else {
-        return line.to_string();
-    };
-    let text = |key: &str| json::text(&event, key).unwrap_or_default();
-    let count = |key: &str| json::number(&event, key).unwrap_or(0);
-    match json::text(&event, "type").as_deref() {
-        Some("step") => format!(
-            "[{:>3}%] {}/{} {}",
-            count("cumulative_pct"),
-            count("step"),
-            count("total_steps"),
-            text("step_name")
-        ),
-        Some("info" | "substep") => format!("       {}", text("message")),
-        Some("complete") => format!("[100%] {}", text("message")),
-        // The only copy of it there will ever be, and the disk does not open
-        // without it if the TPM stops answering.
-        Some("recovery_key") => format!(
-            "\nwrite this down, it is the recovery key: {}\n",
-            text("key")
-        ),
-        _ => line.to_string(),
+/// One line of fisherman's event stream as the thing it is. A gauge and a log
+/// want different halves of the same line — how far through, and what it said
+/// — so the line is read once and rendered where it is needed.
+enum Event {
+    /// How far through, the share this step carries, and what is happening.
+    /// `cumulative_pct` is the work finished *before* this step, so without
+    /// `weight_pct` beside it a bar cannot show the span it is inside.
+    Step(u16, u16, String),
+    /// A line under the step.
+    Note(String),
+    /// The last step, which is always the whole of it.
+    Done(String),
+    /// The only copy of it there will ever be, and the disk does not open
+    /// without it if the TPM stops answering. It is also the one thing the log
+    /// must not hold — a key on removable media turns the stick into the thing
+    /// that opens the disk.
+    Recovery(String),
+    /// Not one of its events, and kept as it came: what fisherman's own
+    /// backends write is half of what a failed install is read back from.
+    Other(String),
+}
+
+impl Event {
+    fn of(line: &str) -> Self {
+        let Ok(event) = Json::parse(line) else {
+            return Self::Other(line.to_string());
+        };
+        let text = |key: &str| json::text(&event, key).unwrap_or_default();
+        let count = |key: &str| json::number(&event, key).unwrap_or(0);
+        match json::text(&event, "type").as_deref() {
+            Some("step") => Self::Step(
+                count("cumulative_pct") as u16,
+                count("weight_pct") as u16,
+                format!(
+                    "{}/{} {}",
+                    count("step"),
+                    count("total_steps"),
+                    text("step_name")
+                ),
+            ),
+            Some("info" | "substep") => Self::Note(text("message")),
+            Some("complete") => Self::Done(text("message")),
+            Some("recovery_key") => Self::Recovery(text("key")),
+            _ => Self::Other(line.to_string()),
+        }
+    }
+
+    /// What the log holds, which is everything except the key. A recovery key
+    /// written to removable media turns the stick into the thing that opens
+    /// the disk, which is the opposite of what encrypting it was for.
+    fn logged(&self) -> Option<String> {
+        match self {
+            Self::Recovery(_) => None,
+            said => Some(said.say()),
+        }
+    }
+
+    /// The line this reads as: what a run with no screen to draw on prints.
+    fn say(&self) -> String {
+        match self {
+            Self::Step(pct, _, what) => format!("[{pct:>3}%] {what}"),
+            Self::Note(message) => format!("       {message}"),
+            Self::Done(message) => format!("[100%] {message}"),
+            Self::Recovery(key) => format!("\n{}\n", copy::recovery(key)),
+            Self::Other(line) => line.clone(),
+        }
     }
 }
 
@@ -709,36 +961,180 @@ fn run_renderer(image: &str, root: &str) -> Result<bool, String> {
     }
 }
 
-/// Completes the recipe and runs fisherman over it, rendering its event stream
-/// as it goes. Not an `exec`: the events are only worth reading if something
-/// reads them, and the staged recipe is only removable if something outlives
-/// the install.
-pub fn run(payload: &Payload, answers: &Answers) -> Result<(), String> {
+/// The name the whole of fisherman's output is written under.
+const LOG: &str = "tect-install.log";
+
+/// Where it goes when nothing else can hold it: RAM, which is the whole of
+/// what an iso-only boot has.
+const IN_RAM: &str = "/run";
+
+/// Where the log goes, which is the question a bounded progress region
+/// creates: the screen stops being the only copy of the transcript, so there
+/// has to be another one.
+///
+/// Beside the payload where the payload is on a partition that can be
+/// remounted writable — `root()` mounts it read-only, and an image's own
+/// `/usr/share/tectonic` never can be. In RAM otherwise, which is every
+/// iso-only boot, since there is no writable partition on one at all. Which of
+/// the two happened is said rather than left to be found.
+fn open_log(payload: &Payload) -> (Option<std::fs::File>, Option<PathBuf>) {
+    if payload.recipe.parent() == Some(Path::new(MOUNTPOINT)) && remounted_rw(MOUNTPOINT) {
+        let path = Path::new(MOUNTPOINT).join(LOG);
+        if let Ok(file) = std::fs::File::create(&path) {
+            return (Some(file), Some(path));
+        }
+    }
+    let path = Path::new(IN_RAM).join(LOG);
+    match std::fs::File::create(&path) {
+        Ok(file) => (Some(file), Some(path)),
+        // Neither, which is a live environment with nothing writable at all.
+        // The screen is then the only copy and says so.
+        Err(_) => (None, None),
+    }
+}
+
+/// The payload partition is mounted read-only, so a log beside the payload is
+/// a deliberate remount rather than an accident of where it landed.
+fn remounted_rw(at: &str) -> bool {
+    Command::new("mount")
+        .args(["-o", "remount,rw", at])
+        .output()
+        .is_ok_and(|out| out.status.success())
+}
+
+/// Completes the recipe and runs fisherman over it, drawing its event stream
+/// into a bounded region and writing all of it to a file. Not an `exec`: the
+/// events are only worth reading if something reads them, and the staged
+/// recipe is only removable if something outlives the install.
+///
+/// A failed draw is not a failed install, so nothing here is `?` on the
+/// region: past this point the disk is gone and the screen is the least
+/// important thing on the machine.
+pub fn run(payload: &Payload, answers: &Answers, prompt: &Prompt) -> Result<(), String> {
     let path = stage(&complete(&payload.recipe, answers)?)?;
-    eprintln!(
-        "tect: installing {} as {} onto {}",
-        payload.image, answers.hostname, answers.disk
-    );
+    let (mut log, at) = open_log(payload);
+    // Only where nothing is drawn. On the installer's own screen this landed
+    // above the box and stayed there, because a bounded region redraws itself
+    // and never the row over it.
+    if !prompt.draws() {
+        eprintln!(
+            "tect: installing {} as {} onto {}, {}",
+            payload.image,
+            answers.hostname,
+            answers.disk,
+            copy::logging(at.as_deref())
+        );
+    }
+    // **One pipe for both streams**, which is `2>&1` and is here for the same
+    // reason: fisherman's stderr was inherited, so its diagnostics printed
+    // straight onto the console the region is drawn on and the log never held
+    // them. Merged, they are events like any other — read, logged, and shown
+    // under the bar.
+    let (events, writer) = std::io::pipe().map_err(|err| format!("{BACKEND}: {err}"))?;
+    let errors = writer
+        .try_clone()
+        .map_err(|err| format!("{BACKEND}: {err}"))?;
     let mut child = Command::new(BACKEND)
         .arg(&path)
-        .stdout(Stdio::piped())
+        .stdout(Stdio::from(writer))
+        .stderr(Stdio::from(errors))
         .spawn()
         .map_err(|err| format!("{BACKEND}: {err}"))?;
-    if let Some(events) = child.stdout.take() {
+    let mut region = match prompt.draws() {
+        true => crate::ui::Progress::open(&copy::writing(at.as_deref())).ok(),
+        false => None,
+    };
+    let mut recovery = None;
+    {
+        // Both write ends were moved into the child, so this side holds none
+        // and the read ends when the child does.
         for line in std::io::BufReader::new(events)
             .lines()
             .map_while(Result::ok)
         {
-            println!("{}", say(&line));
+            let event = Event::of(&line);
+            if let Event::Recovery(key) = &event {
+                recovery = Some(key.clone());
+            }
+            if let (Some(said), Some(log)) = (event.logged(), &mut log) {
+                let _ = writeln!(log, "{said}");
+            }
+            match &mut region {
+                None => println!("{}", event.say()),
+                Some(region) => {
+                    let _ = match &event {
+                        Event::Step(pct, flight, what) => region.step(*pct, *flight, what),
+                        Event::Done(message) => region.step(100, 0, message),
+                        // Held back until the region closes: it is the one
+                        // thing on this screen worth reading twice.
+                        Event::Recovery(_) => Ok(()),
+                        Event::Note(message) => region.note(message),
+                        Event::Other(line) => region.note(line),
+                    };
+                }
+            }
         }
     }
-    let status = child.wait().map_err(|err| format!("{BACKEND}: {err}"))?;
+    let finished = child.wait().map_err(|err| format!("{BACKEND}: {err}"));
+    if let Some(region) = region {
+        region.close();
+    }
     // It carries the password hash and the passphrase, and the install is over.
     let _ = std::fs::remove_file(&path);
+    let status = finished?;
     if !status.success() {
-        return Err(format!("{BACKEND} did not finish: {status}"));
+        return Err(format!(
+            "{BACKEND} did not finish: {status}, and {}",
+            copy::logging(at.as_deref())
+        ));
     }
-    render_menu(&payload.image, &answers.disk)
+    render_menu(&payload.image, &answers.disk)?;
+    finish(recovery.as_deref(), at.as_deref(), prompt)
+}
+
+/// What the last screen owes: the recovery key, on screen because it is
+/// deliberately in no file, and the restart, because the stick is still in the
+/// machine and nothing else says what to do next.
+fn finish(recovery: Option<&str>, log: Option<&Path>, prompt: &Prompt) -> Result<(), String> {
+    if let Some(key) = recovery {
+        println!("\n{}", copy::recovery(key));
+        println!("{}\n", copy::KEY_NOT_LOGGED);
+    }
+    eprintln!("tect: {}", copy::logging(log));
+    match prompt.confirm(copy::INSTALL_DONE, copy::RESTART, copy::LEAVE_SHELL)? {
+        false => Ok(()),
+        true => restart(),
+    }
+}
+
+/// The live environment is a systemd one, which is what puts the installer on
+/// its console in the first place.
+fn restart() -> Result<(), String> {
+    let out = Command::new("systemctl")
+        .arg("reboot")
+        .output()
+        .map_err(|err| format!("systemctl: {err}, and it is what restarts a machine"))?;
+    match out.status.success() {
+        true => Ok(()),
+        false => Err(format!(
+            "systemctl reboot: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        )),
+    }
+}
+
+/// The installer takes the console here, and every widget after it draws full
+/// screen under one title bar. What is above it is a login banner and a
+/// discovery line, and neither is worth the room.
+pub fn own_screen(payload: &Payload, prompt: &Prompt) {
+    if !prompt.draws() {
+        return;
+    }
+    // Not a terminal's own `clear`: none is open yet, and this has to work as
+    // the first thing the process writes.
+    print!("\u{1b}[2J\u{1b}[H");
+    let _ = std::io::stdout().flush();
+    crate::ui::own_screen(copy::installing(&payload.image));
 }
 
 #[cfg(test)]
@@ -960,7 +1356,7 @@ mod tests {
     /// asked for again.
     #[test]
     fn every_event_reads_as_a_line_and_anything_else_passes_through() {
-        let said = |line: &str| say(line);
+        let said = |line: &str| Event::of(line).say();
         assert_eq!(
             said(
                 r#"{"type":"step","step":7,"total_steps":12,"step_name":"install OS","cumulative_pct":9,"weight_pct":87,"elapsed_ms":4210}"#
@@ -984,8 +1380,19 @@ mod tests {
         assert_eq!(said("bootc: pulling layer 3/9"), "bootc: pulling layer 3/9");
     }
 
-    /// Every row is asked again by the index the review answers with, and the
-    /// password is the one that cannot read back as itself.
+    /// The whole of the rule that lets the screen be a gauge: everything
+    /// fisherman says is in the log except the one line that would put a
+    /// recovery key on removable media.
+    #[test]
+    fn the_log_holds_every_event_but_the_key() {
+        let logged = |line: &str| Event::of(line).logged();
+        assert!(logged(r#"{"type":"recovery_key","key":"abcd-efgh"}"#).is_none());
+        assert!(logged(r#"{"type":"info","message":"Live environment"}"#).is_some());
+        assert!(logged("bootc: pulling layer 3/9").is_some());
+    }
+
+    /// What the last question is asked over, and the one value on it that
+    /// cannot read back as itself.
     #[test]
     fn the_confirm_screen_shows_what_is_about_to_be_erased() {
         let answers = Answers {
@@ -996,7 +1403,7 @@ mod tests {
             encryption: Encryption::none(),
         };
         assert_eq!(
-            answers.rows(),
+            answers.summary(),
             vec![
                 (copy::ROW_DISK.to_string(), "/dev/vda".to_string()),
                 (copy::ROW_HOSTNAME.to_string(), "deb2".to_string()),
@@ -1014,6 +1421,40 @@ mod tests {
             "{question}"
         );
         assert!(!question.contains("hunter2"));
+    }
+
+    /// The four things nothing derives, and the one thing a form can check
+    /// that a sequence of questions had to ask twice for.
+    #[test]
+    fn the_action_says_what_the_form_is_short_of() {
+        use crate::ui::{Choice, Field};
+        let form = |password: &str, confirm: &str, kind: &str, passphrase: &str| {
+            vec![
+                Field::text(copy::ROW_DISK, "/dev/vda"),
+                Field::text(copy::ROW_HOSTNAME, "deb2"),
+                Field::text(copy::ROW_ACCOUNT, "tect"),
+                Field::secret(copy::ROW_PASSWORD, password),
+                Field::secret(copy::ROW_CONFIRM, confirm),
+                Field::pick(copy::ROW_ENCRYPTION, vec![Choice::new(kind, "")], Some(0)),
+                Field::secret(copy::ROW_PASSPHRASE, passphrase),
+            ]
+        };
+        assert!(short_of(&form("hunter2", "hunter2", NONE, "")).is_none());
+        // Both halves are on screen at once, so they are compared rather than
+        // asked for twice.
+        let differ = short_of(&form("hunter2", "hunter3", NONE, "")).unwrap();
+        assert_eq!(differ, copy::NO_MATCH_ROW);
+        // A passphrase is owed only by the forms named for one.
+        assert!(short_of(&form("hunter2", "hunter2", "luks-passphrase", "")).is_some());
+        assert!(short_of(&form("hunter2", "hunter2", "luks-passphrase", "x")).is_none());
+        // And an empty account is named beside an empty password.
+        let mut bare = form("", "", NONE, "");
+        bare[ROW_ACCOUNT] = Field::text(copy::ROW_ACCOUNT, "");
+        let short = short_of(&bare).unwrap();
+        assert!(
+            short.contains(copy::ROW_ACCOUNT) && short.contains(copy::ROW_PASSWORD),
+            "{short}"
+        );
     }
 
     /// Neither of the two cases that cannot install says nothing; each names

@@ -1,14 +1,19 @@
 //! Every string a person is asked by a prompt, in one place.
 //!
 //! Prompts only: the questions, the labels of the answers beside them, the
-//! hints under the widgets, and the detail written for a choice rather than
-//! read from a catalogue. A base's `about`, a module's description, a rule's
+//! hints under the widgets, and the detail written here for a choice no
+//! catalogue describes. A base's `about`, a module's description, a rule's
 //! title and a workflow's `about` are catalogue content and stay where the
 //! catalogue holds them.
 //!
 //! Not here, deliberately: diagnostics, errors, the `next` lines and the
 //! command table. They are a different voice with a different job, and moving
 //! them is a different session's question.
+
+/// The name of the thing, which is what prose calls it. `tect` is the command
+/// and belongs in a command line, a flag or a diagnostic prefix; a title or a
+/// sentence a person reads says this.
+pub const PRODUCT: &str = "Tectonic";
 
 // The repository
 
@@ -47,7 +52,7 @@ pub const WHICH_MODULE: &str = "Which module?";
 pub const WHICH_MODULES: &str = "Which modules?";
 pub const LIST_IN_IMAGES: &str = "Which images list it?";
 
-/// One image with no flavours is a yes or a no rather than a list.
+/// One image with no flavours is answered yes or no.
 pub fn list_in(target: &str) -> String {
     format!("List it in {target}?")
 }
@@ -117,9 +122,9 @@ pub const NO_ISO_SPAWN: &str = "systemd-vmspawn cannot boot an iso";
 // The machine an install writes to. The image and the boot chain are the
 // payload's; these five are the half nothing derives.
 
-pub const INSTALL_DISK: &str = "Installation Disk:";
-pub const INSTALL_NAME: &str = "Computer Name:";
-pub const INSTALL_USER: &str = "Username:";
+pub const INSTALL_DISK: &str = "Installation disk";
+pub const INSTALL_NAME: &str = "Computer name";
+pub const INSTALL_USER: &str = "Username";
 pub const INSTALL_PASSWORD: &str = "Password";
 pub const PASSWORD_AGAIN: &str = "Retype password";
 pub const NO_MATCH: &str = "Passwords did not match.";
@@ -132,10 +137,11 @@ pub const ENC_BOTH: &str = "TPM with passphrase fallback";
 pub const NO_TPM: &str = "No TPM available";
 pub const REMOVABLE: &str = "removable";
 
-/// The one screen that carries what installing costs, so it says it rather
-/// than naming the disk and leaving the rest understood.
+/// The question asked over the summary, once, after the form is complete and
+/// before anything is written. It carries what installing costs, said in one
+/// sentence: a second restating it is filler.
 pub fn erasing(disk: &str) -> String {
-    format!("Everything on {disk} is erased. Nothing survives.")
+    format!("Everything on {disk} will be erased. Are you sure?")
 }
 
 // The command surface
@@ -149,7 +155,7 @@ pub const NO: &str = "No";
 pub const SKIP: &str = "Skip";
 pub const SKIP_REMOTE: &str = "Skip Github repo creation";
 
-// The detail beside a choice, where it is written rather than read.
+// The detail beside a choice, for the choices no catalogue describes.
 
 pub const HOST_GITHUB: &str = "Github, and the workflows Tectonic ships";
 pub const HOST_FORGEJO: &str = "a Forgejo instance, whose address you give";
@@ -162,7 +168,8 @@ pub const EITHER: &str = "up and down to move, enter to answer";
 /// No `j` and `k` here: every printable key is the filter being typed.
 pub const NEST: &str = "filter, space toggles, ←/→ opens, enter confirms";
 pub const REVIEW_KEYS: &str = "enter to change a field, Create to write, esc cancels";
-pub const INSTALL_KEYS: &str = "enter to change a field, esc cancels";
+pub const INSTALL_KEYS: &str = "enter to change a field, esc to leave";
+pub const FORM_KEYS: &str = "up and down to move, enter to change a field";
 pub const SECRET_KEYS: &str = "typed and not shown, enter confirms";
 /// No esc here: with a default it takes the default and with none it
 /// fails naming the flag, which is what enter on an empty line does too.
@@ -170,7 +177,7 @@ pub const LINE_KEYS: &str = "enter confirms";
 
 // The review screen `create repo` draws over its collected answers before
 // anything is written. Every row is a piece of configuration, said as what the
-// repository will have rather than as the question that reached it.
+// repository will have.
 
 pub const REVIEW: &str = "Review what will be created";
 pub const CREATE: &str = "Create";
@@ -192,19 +199,89 @@ pub const ON_EVERY_PUSH: &str = "on every push";
 pub const ON_EVERY_BUILD: &str = "on every build";
 pub const ON_SCHEDULED: &str = "on scheduled builds only";
 
-// The same screen over an install's answers, where the action is not a write
-// but a wipe.
+// The same screen over an install's answers, where the action is a wipe.
 
-pub const INSTALL: &str = "Erase and install";
+pub const INSTALL: &str = "Install";
+pub const SHUT_DOWN: &str = "Shut down";
+pub const CONTINUE: &str = "Continue";
+pub const GO_BACK: &str = "Go back";
+pub const ROW_CONFIRM: &str = "confirm";
+/// A form holds both halves of a password at once, so the two are compared on
+/// the screen rather than by asking twice.
+pub const NO_MATCH_ROW: &str = "the passwords do not match";
 pub const ROW_DISK: &str = "disk";
-pub const ROW_HOSTNAME: &str = "machine name";
-pub const ROW_ACCOUNT: &str = "user name";
+pub const ROW_HOSTNAME: &str = "computer name";
+pub const ROW_ACCOUNT: &str = "username";
 pub const ROW_PASSWORD: &str = "password";
 pub const ROW_ENCRYPTION: &str = "encryption";
+pub const ROW_PASSPHRASE: &str = "passphrase";
 pub const PASSWORD_SET: &str = "set";
+/// What a field nobody has answered yet reads as. On a form the difference
+/// between a value and a gap has to be on the screen.
+pub const NOT_SET: &str = "not set";
+
+/// Why the action cannot be taken yet, said beside it while it is dim. These
+/// are the fields nothing derives and no default stands in for.
+pub fn still_needs(fields: &[&str]) -> String {
+    format!("still needs a {}", fields.join(", a "))
+}
+
+// The installer owns the console, so it also owns what leaving it means and
+// what finishing it offers.
+
+/// The title bar over every widget the installer draws, with the image it is
+/// installing beside it: the one thing on screen that never changes.
+pub fn installing(image: &str) -> String {
+    format!("{PRODUCT} installer \u{2014} {image}")
+}
+
+/// Where the whole of the install's output went, or that it went nowhere.
+/// A live environment with nothing writable on it is the second case, and
+/// saying so is the difference between a log and a log nobody can find.
+pub fn logging(log: Option<&std::path::Path>) -> String {
+    match log {
+        Some(at) => format!("the install log is at {}", at.display()),
+        None => "nothing here is writable, so this screen is the only copy".to_string(),
+    }
+}
+
+/// The line under the bar, which says both things a person watching an install
+/// needs and cannot ask for: that the disk it is writing to is already gone,
+/// and where the transcript is. Short, because it is one line inside a box.
+pub fn writing(log: Option<&std::path::Path>) -> String {
+    match log {
+        Some(at) => format!("no going back from here \u{2014} log: {}", at.display()),
+        None => "no going back from here \u{2014} and this screen is the log".to_string(),
+    }
+}
+
+/// The only copy of it there will ever be, and the disk does not open
+/// without it if the TPM stops answering.
+pub fn recovery(key: &str) -> String {
+    format!("write this down, it is the recovery key: {key}")
+}
+
+pub const LEAVING: &str = "Leave the installer?";
+pub const LEAVE_BACK: &str = "Keep going";
+pub const LEAVE_OVER: &str = "Start the form again";
+pub const LEAVE_SHELL: &str = "Leave to a shell";
+pub const INSTALL_DONE: &str = "The installation finished.";
+pub const RESTART: &str = "Restart now";
+/// Said on its own line before the restart is offered, because the key is on
+/// screen and the log deliberately has no copy of it.
+pub const KEY_NOT_LOGGED: &str = "It is not in the install log.";
 
 #[cfg(test)]
 mod tests {
+    /// The one question that costs a disk names the disk, and asks rather than
+    /// announces: it is the last thing between a person and a wipe.
+    #[test]
+    fn the_cost_names_the_disk_and_asks() {
+        let said = super::erasing("/dev/vda");
+        assert!(said.contains("/dev/vda"), "{said}");
+        assert!(said.ends_with('?'), "{said}");
+    }
+
     /// A question is drawn into a one-line head, so one that wraps loses
     /// everything after its first line. Reading the file is what keeps this
     /// true of a question added later without one being added here too.

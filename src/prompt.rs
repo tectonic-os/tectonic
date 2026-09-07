@@ -186,6 +186,26 @@ impl Prompt {
         }
     }
 
+    /// The same, editing a field on a form: **nothing typed keeps what is
+    /// there**. The form it goes back to holds the answer already, and draws
+    /// the refusal for a field that still has none.
+    ///
+    /// Only for a screen. A run with nothing to draw on has no form to go back
+    /// to, so it uses `secret` and gets the refusal naming the flag.
+    pub fn secret_current(&self, question: &str, current: &str) -> Result<String, String> {
+        loop {
+            let typed = crate::ui::secret(question)?;
+            if typed.is_empty() {
+                return Ok(current.to_string());
+            }
+            if typed == crate::ui::secret(crate::copy::PASSWORD_AGAIN)? {
+                println!("{}: {}\n", stem(question), crate::copy::PASSWORD_SET);
+                return Ok(typed);
+            }
+            println!("{}", crate::copy::NO_MATCH);
+        }
+    }
+
     /// The same, asked over two lines: the question on its own, the answer
     /// typed after `prefix`, so what the answer belongs to stays visible.
     pub fn line(
