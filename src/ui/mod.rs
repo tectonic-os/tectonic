@@ -154,6 +154,16 @@ pub fn select_current(
     })
 }
 
+/// One thing to do, or not. The way out is esc and `keys` is what says so, so
+/// leaving is not drawn as a row competing with the action.
+pub fn offer(question: &str, action: &str, keys: &str) -> Result<bool, String> {
+    let options = [Choice::new(action, "")];
+    let chosen = inline(height(options.len()), |terminal| {
+        pick(terminal, question, &options, keys, 0)
+    })?;
+    Ok(chosen == Some(0))
+}
+
 /// Which of `yes` and `no`, drawn as the two answers they are.
 pub fn confirm(question: &str, yes: &str, no: &str) -> Result<bool, String> {
     confirm_current(question, yes, no, true)
@@ -888,8 +898,10 @@ const HELD: f64 = 0.97;
 /// One fill that only ever grows, with the percentage after it. What advances
 /// it is `Progress::at`, which is where the arithmetic lives.
 ///
-/// **The two ends differ by glyph as well as by colour**: a console that drops
-/// the truecolor escapes would otherwise draw a full bar at every percentage.
+/// Solid the whole way across, with the track in grey. The media's console
+/// renders both, so the bar reads as a bar rather than as two textures; the
+/// kernel VT it falls back to has grey as its own colour 8 and still separates
+/// the two.
 fn bar<'a>(pct: u16, width: u16) -> Line<'a> {
     let label = format!(" {pct:>3}%");
     let room = usize::from(width).saturating_sub(label.chars().count());
@@ -897,12 +909,15 @@ fn bar<'a>(pct: u16, width: u16) -> Line<'a> {
     let mut spans: Vec<Span> = (0..room)
         .map(|at| match at < done {
             true => Span::styled("\u{2588}", Style::new().fg(blend(at, room))),
-            false => Span::styled("\u{2591}", Style::new().dim()),
+            false => Span::styled("\u{2588}", Style::new().fg(TRACK)),
         })
         .collect();
     spans.push(Span::styled(label, Style::new().bold()));
     Line::from(spans)
 }
+
+/// The bar's unfilled length, and the legend on the box's edge.
+const TRACK: Color = Color::DarkGray;
 
 /// How far along the gradient cell `at` of `room` is.
 fn blend(at: usize, room: usize) -> Color {
@@ -1072,7 +1087,7 @@ fn chrome(frame: &mut Frame, title: Option<&str>, rows: u16, keys: &str) -> Rect
         .title_bottom(
             Line::from(vec![
                 Span::styled("\u{2500} ", Style::new().fg(ACCENT)),
-                Span::styled(keys.to_string(), Style::new().fg(Color::DarkGray)),
+                Span::styled(keys.to_string(), Style::new().fg(TRACK)),
                 Span::raw(" "),
             ])
             .left_aligned(),

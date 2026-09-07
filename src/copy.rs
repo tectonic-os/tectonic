@@ -265,8 +265,11 @@ pub const LEAVING: &str = "Leave the installer?";
 pub const LEAVE_BACK: &str = "Keep going";
 pub const LEAVE_OVER: &str = "Start the form again";
 pub const LEAVE_SHELL: &str = "Leave to a shell";
-pub const INSTALL_DONE: &str = "The installation finished.";
+pub const INSTALL_DONE: &str = "Installation Complete!";
 pub const RESTART: &str = "Restart now";
+/// The other way off the last screen is esc, which the legend already names,
+/// so it is not a row.
+pub const DONE_KEYS: &str = "enter to restart, esc for a shell";
 /// Said on its own line before the restart is offered, because the key is on
 /// screen and the log deliberately has no copy of it.
 pub const KEY_NOT_LOGGED: &str = "It is not in the install log.";

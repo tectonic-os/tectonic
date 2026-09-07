@@ -1112,7 +1112,10 @@ fn finish(recovery: Option<&str>, log: Option<&Path>, prompt: &Prompt) -> Result
         println!("{}\n", copy::KEY_NOT_LOGGED);
     }
     eprintln!("tect: {}", copy::logging(log));
-    match prompt.confirm(copy::INSTALL_DONE, copy::RESTART, copy::LEAVE_SHELL)? {
+    if !prompt.draws() {
+        return Ok(());
+    }
+    match crate::ui::offer(copy::INSTALL_DONE, copy::RESTART, copy::DONE_KEYS)? {
         false => Ok(()),
         true => restart(),
     }
