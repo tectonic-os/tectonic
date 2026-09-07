@@ -748,10 +748,13 @@ const ROWS: u16 = NOTED as u16 + 4;
 /// every other widget in this file.
 pub struct Progress {
     terminal: DefaultTerminal,
+    /// What was finished before the step now running.
     pct: u16,
-    /// The share of the whole that the step now running carries, which is what
-    /// makes a bar move during a step instead of only between them.
+    /// The share of the whole that step carries.
     flight: u16,
+    /// How many messages have arrived during it, which is the only signal
+    /// there is for how far into it the machine has got.
+    within: u32,
     step: String,
     notes: Vec<String>,
     foot: String,
@@ -773,6 +776,7 @@ impl Progress {
             terminal,
             pct: 0,
             flight: 0,
+            within: 0,
             step: String::new(),
             notes: Vec::new(),
             foot: foot.to_string(),
@@ -784,13 +788,30 @@ impl Progress {
     pub fn step(&mut self, pct: u16, flight: u16, name: &str) -> Result<(), String> {
         self.pct = pct.min(100);
         self.flight = flight.min(100);
+        self.within = 0;
         self.step = name.to_string();
         self.notes.clear();
         self.show()
     }
 
+    /// How far along the whole install the bar is drawn.
+    ///
+    /// fisherman says what a step weighs and never how far into it the machine
+    /// has got, and one step carries most of the weight — so a bar drawn from
+    /// `cumulative_pct` alone reads the same number for almost the whole
+    /// install. Each message during a step takes a fixed share of what is left
+    /// of that step, so the number climbs while work is happening and never
+    /// reaches where the next step begins.
+    ///
+    /// ponytail: counted, not measured. Replace it with real sub-step progress
+    /// the day fisherman emits any.
+    fn at(&self) -> u16 {
+        crept(self.pct, self.flight, self.within)
+    }
+
     /// A line under the gauge, oldest dropped.
     pub fn note(&mut self, text: &str) -> Result<(), String> {
+        self.within += 1;
         if self.notes.len() == NOTED {
             self.notes.remove(0);
         }
@@ -799,15 +820,14 @@ impl Progress {
     }
 
     fn show(&mut self) -> Result<(), String> {
-        let (pct, flight, step, notes, foot) = (
-            self.pct,
-            self.flight,
+        let (pct, step, notes, foot) = (
+            self.at(),
             self.step.as_str(),
             self.notes.as_slice(),
             self.foot.as_str(),
         );
         render(&mut self.terminal, ROWS, foot, |frame, area| {
-            working(frame, area, pct, flight, step, notes, foot)
+            working(frame, area, pct, step, notes, foot)
         })
     }
 
@@ -818,15 +838,7 @@ impl Progress {
 
 /// The bar, the step it is on, the messages in a pane of their own, and the
 /// line that does not move.
-fn working(
-    frame: &mut Frame,
-    area: Rect,
-    pct: u16,
-    flight: u16,
-    step: &str,
-    notes: &[String],
-    foot: &str,
-) {
+fn working(frame: &mut Frame, area: Rect, pct: u16, step: &str, notes: &[String], foot: &str) {
     let [meter, name, body, tail] = Layout::vertical([
         Constraint::Length(1),
         Constraint::Length(1),
@@ -834,7 +846,7 @@ fn working(
         Constraint::Length(1),
     ])
     .areas(area);
-    frame.render_widget(bar(pct, flight, meter.width), meter);
+    frame.render_widget(bar(pct, meter.width), meter);
     frame.render_widget(Line::from(step.bold().cyan()), name);
     // The pane the output is bounded by, which is the whole reason a log had
     // to go somewhere: what scrolls out of it is gone from the screen.
@@ -859,27 +871,33 @@ const HOT: (u8, u8, u8) = (0xee, 0x6f, 0xf8);
 /// Hand-drawn. `Gauge` fills one flat colour and writes its label over the
 /// middle of the bar. No partial blocks here: a serial console has none.
 ///
-/// **Three tones, and the middle one is why this exists.** fisherman's
-/// `cumulative_pct` is the work finished *before* the step now running, and one
-/// step carries most of the weight — `install OS` is 87 of 100 — so a bar drawn
-/// from `cumulative_pct` alone sits still for almost the whole install and then
-/// jumps at the end. `flight` is that step's own `weight_pct`, drawn between
-/// what is done and what is left, so the span the machine is inside is on
-/// screen rather than implied.
+/// Where the bar stands: what finished before this step, plus a share of what
+/// this step weighs for each message that has arrived during it. Held out of
+/// `Progress` so it can be read without a terminal.
+fn crept(pct: u16, flight: u16, within: u32) -> u16 {
+    // Tuned to the messages the long step actually emits: `install OS` copies
+    // a blob per layer and there are dozens, so the share has to be small
+    // enough that a hundred of them do not run out of bar.
+    let left = HELD.powi(within.min(400) as i32);
+    pct + (f64::from(flight) * (1.0 - left)) as u16
+}
+
+/// What is left of a step after one more message during it.
+const HELD: f64 = 0.97;
+
+/// One fill that only ever grows, with the percentage after it. What advances
+/// it is `Progress::at`, which is where the arithmetic lives.
 ///
-/// **The tones differ by glyph as well as by colour**: a console that drops the
-/// truecolor escapes would otherwise draw a full bar at every percentage.
-fn bar<'a>(pct: u16, flight: u16, width: u16) -> Line<'a> {
+/// **The two ends differ by glyph as well as by colour**: a console that drops
+/// the truecolor escapes would otherwise draw a full bar at every percentage.
+fn bar<'a>(pct: u16, width: u16) -> Line<'a> {
     let label = format!(" {pct:>3}%");
     let room = usize::from(width).saturating_sub(label.chars().count());
-    let cell = |share: u16| room * usize::from(share.min(100)) / 100;
-    let done = cell(pct);
-    let running = cell(pct.saturating_add(flight));
+    let done = room * usize::from(pct.min(100)) / 100;
     let mut spans: Vec<Span> = (0..room)
-        .map(|at| match (at < done, at < running) {
-            (true, _) => Span::styled("\u{2588}", Style::new().fg(blend(at, room))),
-            (false, true) => Span::styled("\u{2592}", Style::new().fg(blend(at, room)).dim()),
-            _ => Span::styled("\u{2591}", Style::new().dim()),
+        .map(|at| match at < done {
+            true => Span::styled("\u{2588}", Style::new().fg(blend(at, room))),
+            false => Span::styled("\u{2591}", Style::new().dim()),
         })
         .collect();
     spans.push(Span::styled(label, Style::new().bold()));
@@ -1704,6 +1722,29 @@ mod tests {
         assert!(rows[last].contains(crate::copy::INSTALL_KEYS), "{drawn}");
     }
 
+    /// The number has to move while a step is running, because one step is
+    /// most of an install: `install OS` weighs 87 of 100 and everything before
+    /// it comes to 2. Counted messages are the only signal there is for how
+    /// far into it the machine has got, so each one takes a share of what is
+    /// left of the step and the bar never reaches where the next step begins.
+    #[test]
+    fn the_bar_climbs_through_a_step_and_stops_short_of_the_next() {
+        let seen: Vec<u16> = (0..400).map(|within| crept(2, 87, within)).collect();
+        assert_eq!(seen[0], 2);
+        // It only ever grows.
+        assert!(
+            seen.windows(2).all(|pair| pair[1] >= pair[0]),
+            "{:?}",
+            &seen[..40]
+        );
+        // It is off the mark within a handful of messages, and past halfway by
+        // the time a layered image has copied its layers.
+        assert!(seen[10] > 10, "{}", seen[10]);
+        assert!(seen[50] > 45, "{}", seen[50]);
+        // And it never reaches where the next step begins.
+        assert!(seen.iter().all(|at| *at < 89), "{}", seen[399]);
+    }
+
     /// The region the install log stopped being the only copy of: a gauge on
     /// the percentage, the step under it, the last few messages under that,
     /// and the one line that does not move.
@@ -1717,7 +1758,6 @@ mod tests {
                     frame,
                     frame.area(),
                     50,
-                    20,
                     "7/12 install OS",
                     &notes,
                     "log: /run/tect-install.log",
