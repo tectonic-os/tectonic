@@ -295,7 +295,8 @@ impl Answers {
         let mut fields = seeded.fields();
         loop {
             let actions = [copy::INSTALL, copy::SHUT_DOWN];
-            let filled = crate::ui::form(&mut fields, &actions, short_of, copy::INSTALL_KEYS);
+            let filled =
+                crate::ui::form(&mut fields, &actions, short_of, asked, copy::INSTALL_KEYS);
             match filled {
                 Ok(crate::ui::Filled::Took(0)) => {
                     let answers = Self::of(&fields);
@@ -463,6 +464,16 @@ const ROW_PASSWORD: usize = 3;
 const ROW_CONFIRM: usize = 4;
 const ROW_ENCRYPTION: usize = 5;
 const ROW_PASSPHRASE: usize = 6;
+
+/// Which rows are questions. The passphrase is one only for the two encryption
+/// forms named for one; on the others it is not a field a person can answer
+/// wrongly, so it is not a field.
+fn asked(fields: &[crate::ui::Field]) -> Vec<usize> {
+    let wants = Encryption::wants_passphrase(&fields[ROW_ENCRYPTION].value());
+    (0..fields.len())
+        .filter(|row| *row != ROW_PASSPHRASE || wants)
+        .collect()
+}
 
 /// What the form is still short of, which is what `Install` says instead of
 /// being pickable. These are the values nothing derives and no default stands
@@ -1421,6 +1432,31 @@ mod tests {
             "{question}"
         );
         assert!(!question.contains("hunter2"));
+    }
+
+    /// A passphrase is a question only for the two forms named for one. On the
+    /// others it is not a field somebody can answer wrongly, so it is not a
+    /// field at all.
+    #[test]
+    fn the_passphrase_is_a_row_only_where_it_is_owed() {
+        use crate::ui::{Choice, Field};
+        let form = |kind: &str| {
+            vec![
+                Field::text(copy::ROW_DISK, "/dev/vda"),
+                Field::text(copy::ROW_HOSTNAME, "deb2"),
+                Field::text(copy::ROW_ACCOUNT, "tect"),
+                Field::secret(copy::ROW_PASSWORD, "hunter2"),
+                Field::secret(copy::ROW_CONFIRM, "hunter2"),
+                Field::pick(copy::ROW_ENCRYPTION, vec![Choice::new(kind, "")], Some(0)),
+                Field::secret(copy::ROW_PASSPHRASE, ""),
+            ]
+        };
+        assert!(!asked(&form(NONE)).contains(&ROW_PASSPHRASE));
+        assert!(!asked(&form("tpm2-luks")).contains(&ROW_PASSPHRASE));
+        assert!(asked(&form("luks-passphrase")).contains(&ROW_PASSPHRASE));
+        assert!(asked(&form("tpm2-luks-passphrase")).contains(&ROW_PASSPHRASE));
+        // Every other row is a question whatever the encryption is.
+        assert_eq!(asked(&form(NONE)).len(), 6);
     }
 
     /// The four things nothing derives, and the one thing a form can check

@@ -312,6 +312,7 @@ pub fn form(
     fields: &mut [Field],
     actions: &[&str],
     blocked: impl Fn(&[Field]) -> Option<String>,
+    shown: impl Fn(&[Field]) -> Vec<usize>,
     keys: &str,
 ) -> Result<Filled, String> {
     let rows = fields.len() + 3;
@@ -320,14 +321,21 @@ pub fn form(
         let mut button = 0usize;
         let mut mode = Mode::Rows;
         loop {
+            // Which rows there are is asked on every draw, for the same reason
+            // `blocked` is: a field can decide whether another one is a
+            // question at all, and the answer changes on this screen.
+            let visible = shown(fields);
+            cursor = cursor.min(visible.len());
+            let at_row = visible.get(cursor).copied();
             let blocked = blocked(fields);
             let open = match mode {
                 Mode::Open(at) => Some(at),
                 _ => None,
             };
             let typing = matches!(mode, Mode::Typing);
-            let shown = laid_out(
+            let lines = laid_out(
                 fields,
+                &visible,
                 cursor,
                 button,
                 open,
@@ -335,19 +343,41 @@ pub fn form(
                 actions,
                 blocked.as_deref(),
             );
-            render(terminal, shown.len() as u16 + 1, |frame, area| {
-                sheet_of(frame, area, &shown, keys)
+            render(terminal, lines.len() as u16 + 1, keys, |frame, area| {
+                sheet_of(frame, area, &lines, keys)
             })?;
             let Some(key) = read()? else { continue };
+            let Some(row) = at_row else {
+                // The actions row, which is the one row that is not a field.
+                match key {
+                    KeyCode::Esc | KeyCode::Char('q') => return Ok(Filled::Left),
+                    KeyCode::Up | KeyCode::Char('k') => cursor = cursor.saturating_sub(1),
+                    KeyCode::Left => button = button.saturating_sub(1),
+                    KeyCode::Right => button = (button + 1).min(actions.len() - 1),
+                    // The first action is the one `blocked` speaks for. The
+                    // rest are always there, because a screen you cannot leave
+                    // is worse than one you cannot finish.
+                    KeyCode::Enter if button > 0 || blocked.is_none() => {
+                        return Ok(Filled::Took(button))
+                    }
+                    _ => {}
+                }
+                continue;
+            };
             match &mut mode {
                 Mode::Typing => match key {
-                    KeyCode::Enter | KeyCode::Esc => mode = Mode::Rows,
-                    KeyCode::Backspace => fields[cursor].pop(),
-                    KeyCode::Char(letter) => fields[cursor].push(letter),
+                    // Answering a field moves on to the next and opens it, so a
+                    // form is filled top to bottom without a key between one
+                    // answer and the next question. Esc is not an answer and
+                    // stays where it is.
+                    KeyCode::Enter => mode = onward(fields, &visible, &mut cursor),
+                    KeyCode::Esc => mode = Mode::Rows,
+                    KeyCode::Backspace => fields[row].pop(),
+                    KeyCode::Char(letter) => fields[row].push(letter),
                     _ => {}
                 },
                 Mode::Open(at) => {
-                    let Field::Pick { options, .. } = &fields[cursor] else {
+                    let Field::Pick { options, .. } = &fields[row] else {
                         mode = Mode::Rows;
                         continue;
                     };
@@ -355,10 +385,10 @@ pub fn form(
                         KeyCode::Enter => {
                             let taken = *at;
                             if available(options, taken) {
-                                if let Field::Pick { at: held, .. } = &mut fields[cursor] {
+                                if let Field::Pick { at: held, .. } = &mut fields[row] {
                                     *held = Some(taken);
                                 }
-                                mode = Mode::Rows;
+                                mode = onward(fields, &shown(fields), &mut cursor);
                             }
                         }
                         KeyCode::Esc | KeyCode::Char('q') => mode = Mode::Rows,
@@ -372,26 +402,33 @@ pub fn form(
                 Mode::Rows => match key {
                     KeyCode::Esc | KeyCode::Char('q') => return Ok(Filled::Left),
                     KeyCode::Up | KeyCode::Char('k') => cursor = cursor.saturating_sub(1),
-                    KeyCode::Down | KeyCode::Char('j') => cursor = (cursor + 1).min(fields.len()),
-                    KeyCode::Left => button = button.saturating_sub(1),
-                    KeyCode::Right => button = (button + 1).min(actions.len() - 1),
-                    KeyCode::Enter if cursor == fields.len() => {
-                        // The first action is the one `blocked` speaks for;
-                        // the rest are always there, because a screen you
-                        // cannot leave is worse than one you cannot finish.
-                        if button > 0 || blocked.is_none() {
-                            return Ok(Filled::Took(button));
-                        }
-                    }
-                    KeyCode::Enter => match &fields[cursor] {
-                        Field::Pick { at, .. } => mode = Mode::Open(at.unwrap_or(0)),
-                        _ => mode = Mode::Typing,
-                    },
+                    KeyCode::Down | KeyCode::Char('j') => cursor = (cursor + 1).min(visible.len()),
+                    KeyCode::Enter => mode = opened(&fields[row]),
                     _ => {}
                 },
             }
         }
     })
+}
+
+/// The row after this one, opened. A form is a list of questions and answering
+/// one asks the next; the actions row is where that stops, since taking an
+/// action is a decision and not an answer.
+fn onward(fields: &[Field], visible: &[usize], cursor: &mut usize) -> Mode {
+    *cursor = (*cursor + 1).min(visible.len());
+    match visible.get(*cursor) {
+        Some(row) => opened(&fields[*row]),
+        None => Mode::Rows,
+    }
+}
+
+/// What editing a field means, which is the only thing that differs between
+/// one that is typed and one that is chosen.
+fn opened(field: &Field) -> Mode {
+    match field {
+        Field::Pick { at, .. } => Mode::Open(at.unwrap_or(0)),
+        _ => Mode::Typing,
+    }
 }
 
 /// The rows as they are drawn: every field, the options under whichever one is
@@ -402,6 +439,7 @@ pub fn form(
 #[allow(clippy::too_many_arguments)]
 fn laid_out(
     fields: &[Field],
+    visible: &[usize],
     cursor: usize,
     button: usize,
     open: Option<usize>,
@@ -409,13 +447,14 @@ fn laid_out(
     actions: &[&str],
     blocked: Option<&str>,
 ) -> Vec<Line<'static>> {
-    let width = fields
+    let width = visible
         .iter()
-        .map(|field| field.label().chars().count())
+        .map(|row| fields[*row].label().chars().count())
         .max()
         .unwrap_or(0);
     let mut lines: Vec<Line<'static>> = Vec::new();
-    for (at, field) in fields.iter().enumerate() {
+    for (at, row) in visible.iter().enumerate() {
+        let field = &fields[*row];
         let here = at == cursor;
         let unanswered = field.value().is_empty();
         // The block is the caret: this draws no cursor of its own, and a field
@@ -424,12 +463,21 @@ fn laid_out(
             true => format!("{}\u{2588}", field.typing()),
             false => field.shown(),
         };
+        // The row the cursor is on carries the accent, label and all. A marker
+        // alone is what a list uses; a form is read down its labels.
+        let label = match here {
+            true => Style::new().fg(HIGHLIGHT).bold(),
+            false => Style::new(),
+        };
         lines.push(Line::from(vec![
-            Span::raw(match here {
-                true => "> ",
-                false => "  ",
-            }),
-            Span::raw(format!("{:<width$}  ", field.label())),
+            Span::styled(
+                match here {
+                    true => "> ",
+                    false => "  ",
+                },
+                label,
+            ),
+            Span::styled(format!("{:<width$}  ", field.label()), label),
             match unanswered && !typing {
                 true => Span::styled(value, Style::new().dim()),
                 false => Span::raw(value),
@@ -439,15 +487,20 @@ fn laid_out(
             continue;
         };
         for (n, choice) in options.iter().enumerate() {
-            let row = match choice.available {
-                true => Style::new(),
-                false => Style::new().dim(),
+            let on_it = n == open;
+            let row = match (choice.available, on_it) {
+                (false, _) => Style::new().dim(),
+                (true, true) => Style::new().fg(HIGHLIGHT).bold(),
+                (true, false) => Style::new(),
             };
             lines.push(Line::from(vec![
-                Span::raw(match n == open {
-                    true => "    > ",
-                    false => "      ",
-                }),
+                Span::styled(
+                    match on_it {
+                        true => "    > ",
+                        false => "      ",
+                    },
+                    row,
+                ),
                 Span::styled(choice.label.clone(), row),
                 Span::raw("  "),
                 Span::styled(choice.detail.clone(), Style::new().dim()),
@@ -456,7 +509,7 @@ fn laid_out(
     }
 
     lines.push(Line::default());
-    let on_actions = cursor == fields.len();
+    let on_actions = cursor == visible.len();
     let mut buttons: Vec<Span<'static>> = vec![Span::raw("  ")];
     for (n, action) in actions.iter().enumerate() {
         // Only the first action is ever blocked. The rest are the way off this
@@ -484,7 +537,15 @@ fn laid_out(
 /// The rows, and the keys under them. No question head: a form's rows say what
 /// they are, and the container's title says what is being filled in.
 fn sheet_of(frame: &mut Frame, area: Rect, lines: &[Line<'static>], keys: &str) {
-    let [body, foot] = Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(area);
+    // The row is only reserved where this widget is the one drawing the hint.
+    // Inside a box the box's bottom edge has it, and a blank row under the
+    // actions is a row of nothing.
+    let keys = hint_row(keys);
+    let [body, foot] = Layout::vertical([
+        Constraint::Min(1),
+        Constraint::Length(u16::from(!keys.is_empty())),
+    ])
+    .areas(area);
     frame.render_widget(Paragraph::new(lines.to_vec()), body);
     frame.render_widget(Line::from(keys.dim()), foot);
 }
@@ -591,7 +652,7 @@ pub fn secret(question: &str) -> Result<String, String> {
     inline(3, |terminal| {
         let mut typed = String::new();
         loop {
-            render(terminal, 3, |frame, area| {
+            render(terminal, 3, SECRET_KEYS, |frame, area| {
                 masked(frame, area, question, typed.chars().count())
             })?;
             let Some(key) = read()? else { continue };
@@ -619,7 +680,7 @@ pub fn line(question: &str, prefix: &str, default: Option<&str>) -> Result<Strin
     inline(3, |terminal| {
         let mut typed = String::new();
         loop {
-            render(terminal, 3, |frame, area| {
+            render(terminal, 3, LINE_KEYS, |frame, area| {
                 written(frame, area, question, prefix, &typed, default)
             })?;
             let Some(key) = read()? else { continue };
@@ -658,7 +719,7 @@ fn written(
         _ => Span::raw(typed),
     };
     frame.render_widget(Line::from(vec![Span::raw(prefix), answer]), body);
-    frame.render_widget(Line::from(LINE_KEYS.dim()), foot);
+    frame.render_widget(Line::from(hint_row(LINE_KEYS).dim()), foot);
 }
 
 fn masked(frame: &mut Frame, area: Rect, question: &str, typed: usize) {
@@ -670,7 +731,7 @@ fn masked(frame: &mut Frame, area: Rect, question: &str, typed: usize) {
     .areas(area);
     frame.render_widget(Line::from(question.bold().cyan()), head);
     frame.render_widget(Line::from("*".repeat(typed)), body);
-    frame.render_widget(Line::from(SECRET_KEYS.dim()), foot);
+    frame.render_widget(Line::from(hint_row(SECRET_KEYS).dim()), foot);
 }
 
 /// How many of the messages under the gauge are kept. They are what a step is
@@ -745,7 +806,7 @@ impl Progress {
             self.notes.as_slice(),
             self.foot.as_str(),
         );
-        render(&mut self.terminal, ROWS, |frame, area| {
+        render(&mut self.terminal, ROWS, foot, |frame, area| {
             working(frame, area, pct, flight, step, notes, foot)
         })
     }
@@ -784,11 +845,11 @@ fn working(
     let inside = pane.inner(body);
     frame.render_widget(pane, body);
     frame.render_widget(Paragraph::new(notes.join("\n")).dim(), inside);
-    frame.render_widget(Line::from(foot.dim()), tail);
+    frame.render_widget(Line::from(hint_row(foot).dim()), tail);
 }
 
-/// The two ends of the bar's gradient, which is the one place this tool spends
-/// colour on something that is not information.
+/// The two ends of the gradient, and of the palette: `ACCENT` and `HIGHLIGHT`
+/// are these, so nothing on the screen can drift away from the bar.
 const COLD: (u8, u8, u8) = (0x5a, 0x56, 0xe0);
 const HOT: (u8, u8, u8) = (0xee, 0x6f, 0xf8);
 
@@ -928,11 +989,12 @@ fn inline<T>(
 fn render<B: Backend>(
     terminal: &mut ratatui::Terminal<B>,
     rows: u16,
+    keys: &str,
     body: impl FnOnce(&mut Frame, Rect),
 ) -> Result<(), String> {
     terminal
         .draw(|frame| {
-            let area = chrome(frame, CHROME.get().map(String::as_str), rows);
+            let area = chrome(frame, CHROME.get().map(String::as_str), rows, keys);
             body(frame, area);
         })
         .map(|_| ())
@@ -943,9 +1005,11 @@ fn render<B: Backend>(
 /// two hundred columns is a question read twice.
 const WIDEST: u16 = 76;
 
-/// The colour the box, the highlight and the far end of the bar share. One
-/// accent, so nothing on screen has to be told which program drew it.
-const ACCENT: Color = Color::Cyan;
+/// Everything coloured on this screen comes off the bar's gradient: the box is
+/// its cold end and the row the cursor is on is its hot one. One palette, so
+/// the screen reads as one thing.
+const ACCENT: Color = Color::Rgb(COLD.0, COLD.1, COLD.2);
+const HIGHLIGHT: Color = Color::Rgb(HOT.0, HOT.1, HOT.2);
 
 /// The room between the border and what it holds. A box drawn tight around its
 /// content reads as a table.
@@ -958,7 +1022,7 @@ const PAD_Y: u16 = 1;
 /// that owns the console draws. The mode is a `OnceLock` and `cargo test` is
 /// one process: a test that set it would put a title bar on every other test
 /// drawing in parallel.
-fn chrome(frame: &mut Frame, title: Option<&str>, rows: u16) -> Rect {
+fn chrome(frame: &mut Frame, title: Option<&str>, rows: u16, keys: &str) -> Rect {
     let Some(title) = title else {
         return frame.area();
     };
@@ -977,10 +1041,35 @@ fn chrome(frame: &mut Frame, title: Option<&str>, rows: u16) -> Rect {
         .border_type(BorderType::Rounded)
         .border_style(Style::new().fg(ACCENT))
         .padding(Padding::symmetric(PAD_X, PAD_Y))
-        .title(Line::from(format!(" {} ", title.trim())).bold());
+        // The title starts one cell in, so the corner reads as a corner with a
+        // line coming off it rather than as a bracket around the words.
+        .title(Line::from(vec![
+            Span::styled("\u{2500} ", Style::new().fg(ACCENT)),
+            Span::styled(title.trim().to_string(), Style::new().bold()),
+            Span::raw(" "),
+        ]))
+        // The keys sit on the bottom edge, where the title sits on the top.
+        // Inside the box they cost a row and read as content; on the border
+        // they are what they are, which is a legend.
+        .title_bottom(
+            Line::from(Span::styled(
+                keys.to_string(),
+                Style::new().fg(Color::DarkGray),
+            ))
+            .left_aligned(),
+        );
     let inside = block.inner(box_area);
     frame.render_widget(block, box_area);
     inside
+}
+
+/// The hint a widget draws under itself, which is nothing where a box is
+/// already drawing it on its bottom edge.
+fn hint_row(keys: &str) -> &str {
+    match CHROME.get() {
+        Some(_) => "",
+        None => keys,
+    }
 }
 
 /// `area`, no larger than `width` by `height`, in the middle of it.
@@ -1004,7 +1093,7 @@ fn pick<B: Backend>(
 ) -> Result<Option<usize>, String> {
     let mut state = ListState::default().with_selected(Some(selected));
     loop {
-        render(terminal, height(options.len()), |frame, area| {
+        render(terminal, height(options.len()), hint, |frame, area| {
             draw(frame, area, question, options, None, hint, &mut state)
         })?;
         let Some(key) = read()? else { continue };
@@ -1045,7 +1134,7 @@ fn toggle<B: Backend>(
     let mut state = ListState::default().with_selected(Some(0));
     let mut on: Vec<usize> = held.to_vec();
     loop {
-        render(terminal, height(options.len()), |frame, area| {
+        render(terminal, height(options.len()), TOGGLE, |frame, area| {
             draw(
                 frame,
                 area,
@@ -1177,7 +1266,7 @@ fn draw(
     let rows = items.len();
     frame.render_stateful_widget(List::new(items).highlight_symbol("> "), body, state);
     frame.render_widget(
-        Line::from(hint(hint_text, state, body.height, rows).dim()),
+        Line::from(hint(hint_row(hint_text), state, body.height, rows).dim()),
         foot,
     );
 }
@@ -1320,7 +1409,7 @@ fn nest<B: Backend>(
     let mut state = ListState::default().with_selected(Some(0));
     loop {
         let rows = shown(&tree, options, &open, &filter);
-        render(terminal, height(tree.len()) + 2, |frame, area| {
+        render(terminal, height(tree.len()) + 2, NEST, |frame, area| {
             nested(
                 frame, area, question, options, &tree, &rows, &open, &on, &filter, &mut state,
             )
@@ -1558,8 +1647,10 @@ mod tests {
             Field::text("computer name", "deb2"),
             Field::secret("password", ""),
         ];
+        let visible: Vec<usize> = (0..fields.len()).collect();
         let shown = laid_out(
             &fields,
+            &visible,
             0,
             0,
             None,
@@ -1570,7 +1661,12 @@ mod tests {
         let mut terminal = Terminal::new(TestBackend::new(64, 16)).unwrap();
         terminal
             .draw(|frame| {
-                let area = chrome(frame, Some("Tectonic installer"), shown.len() as u16 + 1);
+                let area = chrome(
+                    frame,
+                    Some("Tectonic installer"),
+                    shown.len() as u16 + 1,
+                    crate::copy::INSTALL_KEYS,
+                );
                 sheet_of(frame, area, &shown, crate::copy::INSTALL_KEYS)
             })
             .unwrap();
@@ -1642,8 +1738,10 @@ mod tests {
                 Some(0),
             ),
         ];
+        let visible: Vec<usize> = (0..fields.len()).collect();
         let shown = laid_out(
             &fields,
+            &visible,
             0,
             0,
             Some(1),

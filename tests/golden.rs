@@ -2272,20 +2272,21 @@ fn install_screens() {
         "tect: ghcr.io/tectonic-os/deb2:latest, from .\r\n",
         &[
             // The disk list opens under its own row; down past the removable
-            // one and take the disk, all without leaving the screen.
+            // one and take the disk. Answering a field opens the next one, so
+            // from here every step is an answer and nothing navigates.
             b"\r",
             b"\x1b[B\r",
-            // Down to the account, typed in place.
-            b"\x1b[B\x1b[B\r",
+            // The computer name, already seeded from the payload.
+            b"\r",
             b"tect\r",
-            // Both halves of the password, two rows apart and compared.
-            b"\x1b[B\r",
+            // Both halves of the password, compared against each other.
             b"hunter2\r",
-            b"\x1b[B\r",
             b"hunter2\r",
-            // Past encryption and the passphrase to the actions, and take
-            // `Install` — pickable only because nothing is missing now.
-            b"\x1b[B\x1b[B\x1b[B\r",
+            // Encryption, whose list opened by itself. Taking `none` drops the
+            // passphrase row, so the next row is the actions.
+            b"\r",
+            // `Install`, pickable only because nothing is missing now.
+            b"\r",
             // The last question, answered `Go back`, which is the whole reason
             // it is a question. **Nothing here runs fisherman**: `Continue` is
             // an install, and this rig has no disk to give one.
@@ -2314,8 +2315,9 @@ fn install_screens() {
     assert!(transcript.contains("Are you sure"), "{transcript}");
     assert!(transcript.contains(tect::copy::CONTINUE), "{transcript}");
     // Both disks were offered under the row, and the one taken is the one the
-    // steps moved to.
-    assert!(transcript.contains("Cruzer"), "{transcript}");
+    // steps moved to. Device names survive contiguously where their models do
+    // not, for the reason above.
+    assert!(transcript.contains("/dev/sdb"), "{transcript}");
     assert!(transcript.contains("/dev/vda"), "{transcript}");
 }
 

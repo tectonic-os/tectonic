@@ -221,6 +221,16 @@ ExecStart=
 ExecStart=-/sbin/agetty -o '-p -f -- \\u' --autologin root --noclear %I $TERM
 AUTOLOGIN
 
+# Kernel messages go to the journal and not to the console. The installer draws
+# a bounded box and redraws only the cells it changed, so a `printk` landing in
+# the middle of it stays there until something else writes that cell — on the
+# media this filled the box with audit lines. `4` is the default for everything
+# but the console level, which drops to `1`: a panic still reaches the screen,
+# and `journalctl` still has all of it.
+COPY <<'QUIET' /usr/lib/sysctl.d/50-tect-installer-console.conf
+kernel.printk = 1 4 1 4
+QUIET
+
 # The kernel's own console draws a bitmap font of at most 512 glyphs in sixteen
 # colours, and no console font carries the box-drawing arcs this screen uses —
 # neither `kbd`'s faces nor Terminus. `setfont` loads bitmaps, so a TTF is not

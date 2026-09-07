@@ -168,7 +168,7 @@ pub const EITHER: &str = "up and down to move, enter to answer";
 /// No `j` and `k` here: every printable key is the filter being typed.
 pub const NEST: &str = "filter, space toggles, ←/→ opens, enter confirms";
 pub const REVIEW_KEYS: &str = "enter to change a field, Create to write, esc cancels";
-pub const INSTALL_KEYS: &str = "enter to change a field, esc to leave";
+pub const INSTALL_KEYS: &str = "\u{2191}\u{2193} move, enter change, esc leave";
 pub const FORM_KEYS: &str = "up and down to move, enter to change a field";
 pub const SECRET_KEYS: &str = "typed and not shown, enter confirms";
 /// No esc here: with a default it takes the default and with none it
@@ -205,7 +205,7 @@ pub const INSTALL: &str = "Install";
 pub const SHUT_DOWN: &str = "Shut down";
 pub const CONTINUE: &str = "Continue";
 pub const GO_BACK: &str = "Go back";
-pub const ROW_CONFIRM: &str = "confirm";
+pub const ROW_CONFIRM: &str = "password (confirm)";
 /// A form holds both halves of a password at once, so the two are compared on
 /// the screen rather than by asking twice.
 pub const NO_MATCH_ROW: &str = "the passwords do not match";
