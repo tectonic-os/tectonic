@@ -207,6 +207,11 @@ pub enum Field {
         options: Vec<Choice>,
         at: Option<usize>,
     },
+    /// Shown and not answerable. It is on the form because a person about to
+    /// erase a disk should see what is going onto it, and it is not a question
+    /// because there is only one right answer and getting it wrong is a disk
+    /// that is erased and then does not boot.
+    Fixed { label: String, value: String },
 }
 
 impl Field {
@@ -232,18 +237,34 @@ impl Field {
         }
     }
 
+    pub fn fixed(label: &str, value: &str) -> Self {
+        Self::Fixed {
+            label: label.to_string(),
+            value: value.to_string(),
+        }
+    }
+
+    /// Whether a person can answer it, which is what the cursor skips over
+    /// when a field is answered and the next one opens.
+    fn answerable(&self) -> bool {
+        !matches!(self, Self::Fixed { .. })
+    }
+
     fn label(&self) -> &str {
         match self {
-            Self::Text { label, .. } | Self::Secret { label, .. } | Self::Pick { label, .. } => {
-                label
-            }
+            Self::Text { label, .. }
+            | Self::Secret { label, .. }
+            | Self::Pick { label, .. }
+            | Self::Fixed { label, .. } => label,
         }
     }
 
     /// The answer, as the caller reads it back.
     pub fn value(&self) -> String {
         match self {
-            Self::Text { value, .. } | Self::Secret { value, .. } => value.clone(),
+            Self::Text { value, .. } | Self::Secret { value, .. } | Self::Fixed { value, .. } => {
+                value.clone()
+            }
             Self::Pick { options, at, .. } => at
                 .and_then(|at| options.get(at))
                 .map(|choice| choice.label.clone())
@@ -275,7 +296,7 @@ impl Field {
     fn push(&mut self, letter: char) {
         match self {
             Self::Text { value, .. } | Self::Secret { value, .. } => value.push(letter),
-            Self::Pick { .. } => {}
+            Self::Pick { .. } | Self::Fixed { .. } => {}
         }
     }
 
@@ -284,7 +305,7 @@ impl Field {
             Self::Text { value, .. } | Self::Secret { value, .. } => {
                 value.pop();
             }
-            Self::Pick { .. } => {}
+            Self::Pick { .. } | Self::Fixed { .. } => {}
         }
     }
 }
@@ -382,6 +403,14 @@ pub fn form(
                     // stays where it is.
                     KeyCode::Enter => mode = onward(fields, &visible, &mut cursor),
                     KeyCode::Esc => mode = Mode::Rows,
+                    // **Up and down move between fields while one is being
+                    // typed into**, because every field opens for typing as the
+                    // cursor reaches it — so without this the arrow keys stop
+                    // working the moment the form starts being filled in.
+                    // Nothing is lost by leaving: a key edits the field where it
+                    // stands, so what was typed is already the field's value.
+                    KeyCode::Up => mode = backward(fields, &visible, &mut cursor),
+                    KeyCode::Down => mode = onward(fields, &visible, &mut cursor),
                     KeyCode::Backspace => fields[row].pop(),
                     KeyCode::Char(letter) => fields[row].push(letter),
                     _ => {}
@@ -425,10 +454,29 @@ pub fn form(
 /// one asks the next; the actions row is where that stops, since taking an
 /// action is a decision and not an answer.
 fn onward(fields: &[Field], visible: &[usize], cursor: &mut usize) -> Mode {
-    *cursor = (*cursor + 1).min(visible.len());
-    match visible.get(*cursor) {
-        Some(row) => opened(&fields[*row]),
-        None => Mode::Rows,
+    loop {
+        *cursor = (*cursor + 1).min(visible.len());
+        match visible.get(*cursor) {
+            // A row nobody can answer is not a stop on the way down.
+            Some(row) if !fields[*row].answerable() && *cursor < visible.len() => continue,
+            Some(row) => return opened(&fields[*row]),
+            None => return Mode::Rows,
+        }
+    }
+}
+
+/// The row before this one, opened. The pair to `onward`, for the arrow that
+/// goes the other way.
+fn backward(fields: &[Field], visible: &[usize], cursor: &mut usize) -> Mode {
+    loop {
+        let above = cursor.saturating_sub(1);
+        let stuck = above == *cursor;
+        *cursor = above;
+        match visible.get(*cursor) {
+            Some(row) if !fields[*row].answerable() && !stuck => continue,
+            Some(row) => return opened(&fields[*row]),
+            None => return Mode::Rows,
+        }
     }
 }
 
@@ -437,6 +485,7 @@ fn onward(fields: &[Field], visible: &[usize], cursor: &mut usize) -> Mode {
 fn opened(field: &Field) -> Mode {
     match field {
         Field::Pick { at, .. } => Mode::Open(at.unwrap_or(0)),
+        Field::Fixed { .. } => Mode::Rows,
         _ => Mode::Typing,
     }
 }
@@ -475,9 +524,12 @@ fn laid_out(
         };
         // The row the cursor is on carries the accent, label and all. A marker
         // alone is what a list uses; a form is read down its labels.
-        let label = match here {
-            true => Style::new().fg(HIGHLIGHT).bold(),
-            false => Style::new(),
+        let label = match (here, field.answerable()) {
+            (true, _) => Style::new().fg(HIGHLIGHT).bold(),
+            // A row nobody answers is dim, so the form says which of its rows
+            // are questions without being told.
+            (false, false) => Style::new().dim(),
+            (false, true) => Style::new(),
         };
         lines.push(Line::from(vec![
             Span::styled(

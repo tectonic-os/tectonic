@@ -206,6 +206,28 @@ pub const SHUT_DOWN: &str = "Shut down";
 pub const CONTINUE: &str = "Continue";
 pub const GO_BACK: &str = "Go back";
 pub const ROW_CONFIRM: &str = "password (confirm)";
+pub const ROW_LAYOUT: &str = "layout";
+
+/// What the disk is cut into, said in one row on the form. Nobody chooses any
+/// of it: the base family settles the filesystem and the bootloader settles
+/// whether there is a separate `/boot` at all.
+pub fn layout(filesystem: &str, bootloader: &str) -> String {
+    match bootloader {
+        "systemd" => format!("esp + {filesystem} root"),
+        _ => format!("esp + ext4 /boot + {filesystem} root"),
+    }
+}
+
+/// The same, spelled out over the confirmation, a row per partition. This is
+/// the half of what is about to be written that no question above covers.
+pub fn written_over(bootloader: &str, filesystem: &str) -> Vec<(String, String)> {
+    let mut rows = vec![("esp".to_string(), "2 GB  fat32".to_string())];
+    if bootloader != "systemd" {
+        rows.push(("/boot".to_string(), "2 GB  ext4".to_string()));
+    }
+    rows.push(("root".to_string(), format!("the rest  {filesystem}")));
+    rows
+}
 /// A form holds both halves of a password at once, so the two are compared on
 /// the screen rather than by asking twice.
 pub const NO_MATCH_ROW: &str = "the passwords do not match";
