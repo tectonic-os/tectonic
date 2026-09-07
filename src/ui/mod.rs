@@ -1665,10 +1665,14 @@ mod tests {
                 let area = chrome(
                     frame,
                     Some("Tectonic installer"),
-                    shown.len() as u16 + 1,
+                    shown.len() as u16,
                     crate::copy::INSTALL_KEYS,
                 );
-                sheet_of(frame, area, &shown, crate::copy::INSTALL_KEYS)
+                // What the widget is given inside a box, which is what
+                // `hint_row` answers there: the box has the legend, so the
+                // widget draws none. Passing the keys here would render a
+                // second one that the installer never draws.
+                sheet_of(frame, area, &shown, "")
             })
             .unwrap();
         let drawn = terminal.backend().to_string();
@@ -1686,6 +1690,18 @@ mod tests {
         assert!(drawn.contains(crate::copy::INSTALL), "{drawn}");
         assert!(drawn.contains(crate::copy::SHUT_DOWN), "{drawn}");
         assert!(drawn.contains("still needs a disk, a password"), "{drawn}");
+        // Exactly one legend, on the bottom edge. Two is what a widget drawing
+        // its own foot inside a box that already has one looks like.
+        assert_eq!(
+            drawn.matches(crate::copy::INSTALL_KEYS).count(),
+            1,
+            "{drawn}"
+        );
+        let last = rows
+            .iter()
+            .rposition(|row| row.contains('\u{2570}'))
+            .unwrap();
+        assert!(rows[last].contains(crate::copy::INSTALL_KEYS), "{drawn}");
     }
 
     /// The region the install log stopped being the only copy of: a gauge on
