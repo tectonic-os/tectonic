@@ -45,7 +45,7 @@ ARG LIVE_BASE=quay.io/fedora/fedora-bootc:44
 # Fisherman is pinned to **upstream** and this project carries no fisherman fork
 # any more. It did carry one commit — running the deployment's own
 # `/usr/libexec/grub-menu-from-bls` against the target while it was still
-# mounted — and that became redundant on 2026-09-04 when `tect install` learned
+# mounted — and that became redundant on 2026-09-04 when the installer learned
 # to render after fisherman returns. Both ran for a while and wrote the same
 # file; measured in one install log as fisherman's `test -f
 # /mnt/fisherman-target/…/grub-menu-from-bls` followed by `tect: wrote the boot
@@ -127,7 +127,7 @@ FROM ${LIVE_BASE}
 # error text says to install systemd. tunaOS lost an image, an ISO and a live
 # boot to that, so this asserts the binaries and never the packages.
 #
-# openssl is `tect install`'s password hash. Fisherman hands the recipe's
+# openssl is the installer's password hash. Fisherman hands the recipe's
 # password to chpasswd, and only a `$`-prefixed crypt string takes the `-e`
 # branch: a plaintext one goes through PAM and dies after the OS is already on
 # the disk. `openssl passwd -6 -stdin` is what produces it, and crypt(3) is not
@@ -205,7 +205,7 @@ CONF
 # partitions disks and calls `bootc install`, so a console that cannot become
 # root cannot install anything — and this image is not the target: it is built
 # per target as `<published>-installer`, boots only from the media, and is
-# never what lands on the disk. The `tect install` that autostarts below runs
+# never what lands on the disk. The installer that autostarts below runs
 # as root for the same reason.
 COPY <<'AUTOLOGIN' /usr/lib/systemd/system/serial-getty@.service.d/autologin.conf
 [Service]
@@ -230,13 +230,18 @@ RUN /usr/bin/tect --version
 
 # Autostart is a login shell's profile and not a unit, and that is the whole
 # reason it is one line: root already autologins on both consoles above, an
-# installer that leaves — esc on the first screen — falls back to the shell it
-# was started from rather than to a dead service, and there is no tty to hand
-# between a unit and a getty. `/etc/profile.d` is read by bash and sh alike on
-# both families. `ui::inline` sets the window size itself, so a serial console
-# reporting none needs nothing here.
-COPY <<'START' /etc/profile.d/tect-install.sh
+# installer answering `Leave to a shell` falls back to the shell it was started
+# from, and there is no tty to hand between a unit and a getty.
+# `/etc/profile.d` is read by bash and sh alike on both families. `ui::inline`
+# sets the window size itself, so a serial console reporting none needs nothing
+# here.
+#
+# **The word here is the command table's.** Nothing else ties a command typed
+# as text to the table that resolves it, so a rename leaves this line naming a
+# verb that no longer exists and the media boots to `unknown command`.
+# `the_verb_the_live_environment_autostarts_is_one_that_resolves` is the tie.
+COPY <<'START' /etc/profile.d/tect-installer.sh
 if [ "$(id -u)" = 0 ] && [ -t 0 ]; then
-    tect install
+    tect installer
 fi
 START

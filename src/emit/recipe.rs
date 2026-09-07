@@ -305,6 +305,24 @@ mod tests {
         assert!(media(&deb, "not-a-target", "image", "imgref").is_none());
     }
 
+    /// The live environment starts the installer by typing its name, and
+    /// nothing else ties that word to the command table. A rename that misses
+    /// it is a medium that boots to `unknown command`, which no other test
+    /// here can see.
+    #[test]
+    fn the_verb_the_live_environment_autostarts_is_one_that_resolves() {
+        let typed: Vec<&str> = LIVE_ENV
+            .lines()
+            .map(str::trim)
+            .find(|line| line.starts_with("tect "))
+            .expect("the live environment types one command")
+            .split_whitespace()
+            .skip(1)
+            .collect();
+        let resolved = crate::command::resolve(&typed);
+        assert!(resolved.is_ok(), "{typed:?}: {:?}", resolved.err());
+    }
+
     /// No family, no recipe. The refusal is the point: `bootc install` reaches
     /// a bootloader minutes after the disk is wiped.
     #[test]
