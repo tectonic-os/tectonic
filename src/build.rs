@@ -127,9 +127,9 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
 
     // Resolved here rather than emitted as an image identity ARG: a flavour may
     // declare its own, and the generated file is one per image.
-    let conforms = image
-        .conforms_of(flavour.as_deref().unwrap_or(NO_FLAVOUR))
-        .to_string();
+    let conforms =
+        crate::scap::profile_name(image.conforms_of(flavour.as_deref().unwrap_or(NO_FLAVOUR)))
+            .to_string();
     // Refused rather than guessed: a base measured against the wrong benchmark
     // returns numbers, and the image is remediated to a profile nobody chose.
     let scap_content = match conforms.is_empty() {

@@ -82,7 +82,14 @@ pub fn conformance(
         None => None,
     };
     let mut out = Vec::new();
-    for image in list.images.iter().filter(|i| !i.conforms.is_empty()) {
+    // A flavour may declare a `conforms` the image does not, and `tect build`
+    // remediates on that answer, so a check reading the ungated one alone would
+    // review every target except the ones it acts on.
+    let measured = list
+        .images
+        .iter()
+        .filter(|i| !i.conforms.is_empty() || i.flavours.iter().any(|f| !f.conforms.is_empty()));
+    for image in measured {
         out.extend(unremediated(image, index));
         if let Some(content) = &content {
             out.extend(claimed_and_refused(image, content));
@@ -982,6 +989,13 @@ impl Profile {
     pub fn is(&self, declared: &str) -> bool {
         !declared.is_empty() && (self.id == declared || self.name() == declared)
     }
+}
+
+/// The tail of a profile id, which is the form `autotailor` and `oscap
+/// --profile` both take. `conforms` accepts either spelling, and the full one
+/// would be namespaced a second time on the way into a tailoring file.
+pub fn profile_name(id: &str) -> &str {
+    id.rsplit_once("_profile_").map_or(id, |(_, tail)| tail)
 }
 
 /// The tail of a rule id, which names it without the datastream's own prefix.
