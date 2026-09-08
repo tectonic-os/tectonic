@@ -71,7 +71,7 @@ const KEY: Node = Node::new("key",
             .arg(Arg::One(&GENERATORS), Say::new("`{}` is not a generator the tool has",
                 "not a generator",
                 "the generators are `cosign`, `openssl` and `ssh-keygen`; a manifest picks one \
-                 of them rather than naming a command of its own"))
+                 of them by name"))
             .once("")
             .missing(NEEDED)
             .props(&[
@@ -107,14 +107,8 @@ const KEY: Node = Node::new("key",
 /// The nodes a `family` block may hold, which `MODULE` holds too: outside a
 /// gate is every family the module supports, inside one is the families it
 /// names. Each is a const of its own because `MODULE` is a `const Node` whose
-/// `.children(&[..])` cannot name the list it is itself part of.
-///
-/// What is not here is family-neutral on purpose. `description` and `supports`
-/// are what the module is and what it claims, `option`, `variant` and `asset`
-/// are the image author's interface and must not change shape under them, and
-/// `key`, `collects`, `contributes` and `helpers` are contracts with other
-/// modules. `provides` is left out because a capability offered on one family
-/// and not another is a module that should have been two.
+/// `.children(&[..])` cannot name the list it is itself part of. Everything
+/// absent here is family-neutral.
 const GATED: &[Node] = &[PACKAGES, PACKAGE_GROUPS, COPR, REQUIRES, AFTER, SATISFIES];
 
 #[rustfmt::skip]
@@ -168,8 +162,8 @@ const COPR: Node = Node::new("copr",
 
 #[rustfmt::skip]
 const SATISFIES: Node = Node::new("satisfies",
-    "The benchmarks and rules this module claims to harden, as an audit declaration the tool \
-     records rather than certifies.")
+    "The benchmarks and rules this module claims to harden, as an audit declaration. The tool \
+     records it and certifies nothing.")
     .once("a module makes one claim set per gate; two blocks in one place split it")
     .children(&[
         Node::new("", "One benchmark, and the rule IDs it covers.")
@@ -178,18 +172,16 @@ const SATISFIES: Node = Node::new("satisfies",
     ], Say::NONE);
 
 /// The gate. Nodes inside are taken only on the families it names; nodes
-/// outside any gate are taken on every family the module supports, so a module
-/// that gates nothing writes none of this. Files are gated by a directory of
-/// the same name rather than from in here -- see `layout::family_dir` -- since
-/// the manifest names none of them today and inventing nodes for what is
-/// deliberately convention would be the larger change.
+/// outside any gate are taken on every family the module supports. Files are
+/// gated by a directory of the same name -- see `layout::family_dir` -- and
+/// never by a node here.
 #[rustfmt::skip]
 const FAMILY: Node = Node::new("family",
     "The declarations inside taken only on the base families named, everything outside a gate \
      being taken on every family the module supports.")
     .arg(Arg::Strs, Say::new("`family` needs at least one family name", "nothing named",
         "`family \"debian\" \"ubuntu\" { packages \"vim\" }`; one gate takes as many families as \
-         share the declaration, rather than one gate each"))
+         share the declaration"))
     .empty(Say::new("`{}` gates nothing", "an empty block",
         "a gate with nothing in it says the module does something on that family and then does \
          not; drop it, or move the declaration inside"))
@@ -251,7 +243,7 @@ pub const MODULE: Node = Node::new("module",
             .arg(Arg::Strs, Say::new("`helpers` needs a path", "nothing named", "")),
 
         Node::new("allow-verify",
-            "One `tect validate-image` diagnostic accepted on one unit rather than image-wide.")
+            "One `tect validate-image` diagnostic accepted on one unit, leaving the rest of the image checked.")
             .arg(Arg::Str, Say::NONE)
             .props(&[
                 Prop { name: "unit", kind: Kind::Str,
@@ -400,11 +392,9 @@ fn batch(
 }
 
 /// A batch declared outside a gate installs on every family the module
-/// supports: the gate's own rule -- outside is everywhere -- applied to a node
-/// that is not in one. It waits for the whole manifest because `supports` may
-/// be written below the `packages` leaning on it, and because a Fedora-only
-/// diagnostic is about the families a batch resolved to rather than the ones it
-/// wrote down.
+/// supports. It waits for the whole manifest because `supports` may be written
+/// below the `packages` leaning on it, and because a Fedora-only diagnostic is
+/// about the families a batch resolved to.
 fn spread(
     batches: &mut Vec<PackageGroup>,
     supports: &[String],
@@ -414,7 +404,7 @@ fn spread(
     issues: &mut Issues,
 ) {
     // A gate naming two families is two batches off one declaration, so what is
-    // said about it is said once, against the node rather than against each.
+    // said about it is said once, against the node.
     let mut said: Option<Span> = None;
     for mut batch in std::mem::take(batches) {
         let families: Vec<String> = match batch.family.is_empty() {
@@ -454,9 +444,7 @@ fn spread(
 }
 
 /// The families one `family` gate names, each held to the set this repository
-/// builds on. A gate takes as many as share the declaration: sixteen of the
-/// collection's modules carried byte-identical `debian` and `ubuntu` lists
-/// before there was one place to write them.
+/// builds on. A gate takes as many as share the declaration.
 fn gate_families(node: &KdlNode, src: &Source, issues: &mut Issues) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for name in string_args(node) {
@@ -483,7 +471,7 @@ fn gate_families(node: &KdlNode, src: &Source, issues: &mut Issues) -> Vec<Strin
 /// What the gated nodes have put into a module so far, so a gate this image is
 /// not built for can be read for its diagnostics and then dropped. `packages`
 /// and `package-groups` are absent because a batch carries the family it
-/// resolved to and is filtered where it is used, the way it always was.
+/// resolved to and is filtered where it is used.
 struct Gated {
     coprs: usize,
     requires: usize,
@@ -498,7 +486,7 @@ fn priority(node: &KdlNode) -> Option<u32> {
 }
 
 /// Whether a `priority=` is there but not a number the schema accepts, which is
-/// its diagnostic rather than a second one here.
+/// its diagnostic. A second one here would say it twice.
 fn bad_priority(node: &KdlNode) -> bool {
     prop_span(node, "priority").is_some() && priority(node).is_none()
 }
@@ -662,9 +650,8 @@ impl Module {
                 continue;
             }
             // A gate this image is not built for is read all the same, so a
-            // module published for families this repository does not build is
-            // held to the same checks as one it does. What it declared is then
-            // dropped, rather than never having been looked at.
+            // module published for other families is held to the same checks.
+            // What it declared is then dropped.
             let gate = gate_families(node, src, issues);
             gated.extend(
                 gate.iter()
@@ -700,8 +687,7 @@ impl Module {
             issues,
         );
 
-        // The public half is a contract path, derived rather than declared a
-        // second line down.
+        // The public half is a contract path, derived.
         return Self::rest(module, path, root, &dir, &gated, src, issues);
     }
 
@@ -973,7 +959,7 @@ impl Module {
         if module.supports.is_empty() {
             issues.push(
                 Issue::new(format!("`{}` declares no `supports`", path), src)
-                    .help("a module has to say which base families it can build on, so a portability gap surfaces at lint rather than mid-build"),
+                    .help("a module has to say which base families it can build on, so a portability gap surfaces at lint, while the build is still cheap"),
             );
         }
 
@@ -1146,7 +1132,8 @@ impl Module {
                     .at(span, "incomplete")
                     .help(
                         "`allow-verify \"man-page-missing\" unit=\"plasmalogin.service\"`, \
-                         which accepts one diagnostic on one unit rather than image-wide",
+                         which accepts one diagnostic on one unit and leaves the rest of the \
+                         image checked",
                     ),
             );
             return;
@@ -1157,7 +1144,7 @@ impl Module {
                 Issue::new(format!("`{class}` is not a verify diagnostic class"), src)
                     .at(span, "not one of the known classes")
                     .help(format!(
-                        "known classes: {}. They are named rather than written as patterns, and `tect validate-image` holds what each one stands for",
+                        "known classes: {}. Each is named in full, and `tect validate-image` holds what it stands for",
                         class_names()
                     )),
             );
@@ -1359,8 +1346,8 @@ impl Module {
         });
     }
 
-    /// `package-groups "kde-desktop"` The same shape as `packages`, installed by
-    /// the family adapter's group verb rather than its package one.
+    /// `package-groups "kde-desktop"` The same shape as `packages`, installed
+    /// by the family adapter's group verb.
     fn parse_package_groups(
         &mut self,
         node: &KdlNode,
@@ -1433,7 +1420,7 @@ pub fn parse_key(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Ke
         issues.push(
             Issue::new(format!("`{name}` is not a filename"), src)
                 .at(private.name().span(), "the private half is written here")
-                .help("the private half is written under keys/private/ and never committed, so it is a plain name rather than a path"),
+                .help("the private half is written under keys/private/ and never committed, so it is a plain name"),
         );
         return None;
     }
@@ -1482,8 +1469,7 @@ pub struct Summary {
     /// workflow may run here at all.
     pub args: Vec<String>,
     /// Every benchmark number it claims, over all the benchmarks it names,
-    /// since a number resolves against the content rather than against the
-    /// benchmark it was written under.
+    /// since a number resolves against the content.
     pub satisfies: Vec<String>,
 }
 
@@ -1753,7 +1739,7 @@ copr "owner/pro ject"
     }
 
     /// An `enablerepo` naming a COPR is a reference, so the module has to
-    /// declare the repository it reaches into rather than assume it.
+    /// declare the repository it reaches into.
     #[test]
     fn an_enablerepo_naming_a_copr_needs_the_declaration() {
         let mut issues = Issues::default();
@@ -1782,9 +1768,7 @@ packages "thing" enablerepo="other/project"
     }
 
     /// The gate, on the two nodes it exists for. A block the image is not built
-    /// for contributes nothing and is still read: a `satisfies` that would be a
-    /// declaration failure on a deb scan, and an `after` that would dangle
-    /// there, both survive on Fedora and both disappear elsewhere.
+    /// for contributes nothing and is still read.
     #[test]
     fn a_gate_is_taken_on_its_families_and_read_on_every_other() {
         let manifest = r#"

@@ -11,8 +11,8 @@ REPO="tectonic-os/tectonic"
 
 # One declared value out of the manifest, and nothing derived from it. A
 # repository that declares no `tect-version` is not pinned and takes the latest
-# release, resolved through the redirect `releases/latest` answers with rather
-# than through the API, which rate-limits unauthenticated callers.
+# release, resolved through the redirect `releases/latest` answers with. The API
+# rate-limits unauthenticated callers.
 line="$(sed -n '/^[[:space:]]*tect-version[[:space:]]/p' repo.kdl)"
 if [[ "$line" =~ ^[[:space:]]*tect-version[[:space:]]+\"([^\"]+)\"(.*)$ ]]; then
     version="${BASH_REMATCH[1]}"
@@ -74,7 +74,7 @@ if [ ! -x "$bin" ]; then
     trap - EXIT
 fi
 
-# Where the binary is, rather than running it: the build mounts it.
+# Where the binary is: the build mounts it.
 if [ "${1:-}" = "--path" ]; then
     echo "$bin"
     exit 0

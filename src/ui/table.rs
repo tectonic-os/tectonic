@@ -123,9 +123,9 @@ fn longest_word(text: &str) -> usize {
         .unwrap_or(0)
 }
 
-/// `text` folded to `room` at spaces, and mid-word where one word is wider
-/// than the column: a cell clips what it cannot draw, and a clipped name is a
-/// wrong answer rather than a short one.
+/// `text` folded to `room` at spaces, and mid-word where one word is wider than
+/// the column: a cell clips what it cannot draw, and a clipped name is a wrong
+/// answer.
 pub(crate) fn wrap(text: &str, room: usize) -> Vec<String> {
     let mut lines = vec![String::new()];
     for word in text.split_whitespace() {
@@ -179,7 +179,7 @@ fn ansi(buffer: &Buffer) -> String {
 }
 
 /// A cell's style with what it does not set left unset, so an unstyled run
-/// carries no escape at all rather than three resets.
+/// carries no escape at all. Setting every field would emit three resets.
 fn style_of(cell: &ratatui::buffer::Cell) -> Style {
     let mut style = Style::new().add_modifier(cell.modifier);
     if cell.fg != Color::Reset {

@@ -135,7 +135,7 @@ fn place(source: &Path, dir: &Path, pin: &Pin) -> Result<(), String> {
 }
 
 /// Every pin, first declaration wins, so two images pinning one module agree by
-/// construction rather than by fetch order.
+/// construction.
 fn pins(root: &Path, list: &List) -> Result<Vec<Pin>, String> {
     let mut out: Vec<Pin> = Vec::new();
     let mut trees: Vec<(String, PathBuf)> = Vec::new();
@@ -422,7 +422,7 @@ mod tests {
         std::fs::remove_dir_all(&root).unwrap();
     }
     /// A file the collection deleted is gone from the tree the next fetch
-    /// places, rather than surviving into a `plan.json` CI will disagree with.
+    /// places. Surviving into a `plan.json` leaves CI disagreeing with it.
     #[test]
     fn a_deleted_file_does_not_survive_the_next_fetch() {
         let root = std::env::temp_dir().join(format!("tect-fetch-stale.{}", std::process::id()));
@@ -480,12 +480,10 @@ mod tests {
             "stale file survived: {said:?}"
         );
 
-        // The same thing pinned, because the `current` stamp short-circuit is
-        // the arm an unpinned collection never reaches: with no `sha256` there
-        // is nothing to stamp, so `place` runs every time and the guard is
-        // never asked a question. A pin makes the stamp load-bearing, and what
-        // it has to prove is that the stamp moves with the content rather than
-        // outliving a change it cannot see.
+        // The same thing pinned: with no `sha256` there is nothing to stamp, so
+        // an unpinned collection never reaches the `current` short-circuit. A
+        // pin makes the stamp load-bearing, and it has to move with the
+        // content.
         let hash = || {
             let out = std::process::Command::new("sha256sum")
                 .arg(&archive)

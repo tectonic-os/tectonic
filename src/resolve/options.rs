@@ -85,7 +85,7 @@ pub fn resolve(
                     list_src,
                 )
                 .at(*span, "set again here")
-                .help("resolution is a single pass, so a second value is an error rather than a merge"),
+                .help("resolution is a single pass, so a second value is an error"),
             );
             continue;
         }

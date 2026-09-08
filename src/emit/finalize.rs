@@ -51,7 +51,8 @@ pub fn script(image: &Image, collection: &Collection, root: &Path) -> (PathBuf, 
     let mut out = String::from(HEADER);
     for (dest, parts) in &collection.assembled {
         // A part whose contributor is gated out of this build is not there,
-        // which is why the list is filtered rather than passed straight to cat.
+        // which is why the list is filtered. `cat` over the whole of it would
+        // fail on the missing part.
         let _ = write!(
             out,
             r#"

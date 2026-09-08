@@ -4,8 +4,8 @@ use miette::{Diagnostic, LabeledSpan, NamedSource, SourceSpan};
 use std::fmt;
 use std::sync::Arc;
 
-/// One file, read once and shared by every diagnostic that points into it, so
-/// a diagnostic names its source rather than carrying a copy of it.
+/// One file, read once and shared by every diagnostic that points into it, so a
+/// diagnostic names its source.
 #[derive(Clone)]
 pub struct Source(Arc<NamedSource<String>>);
 
@@ -22,8 +22,8 @@ impl Source {
     }
 }
 
-/// A byte range in a source file: what the model carries, rather than the
-/// parser's own span type.
+/// A byte range in a source file: what the model carries, so no KDL span type
+/// reaches it.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Span {
     pub offset: usize,
@@ -139,8 +139,7 @@ impl Issues {
     /// Prints every issue and returns whether any were found.
     ///
     /// `context` is every file that was read, in read order. The closing line
-    /// splits it: the ones a problem was found in, then the ones none was, so
-    /// two images in one repository do not read as two broken images.
+    /// splits it: the ones a problem was found in, then the ones none was.
     pub fn report(self, context: &str) -> bool {
         let found = !self.0.is_empty();
         let count = self.0.len();
@@ -152,11 +151,7 @@ impl Issues {
         }
         // A source a problem was found in is not always one of the files read:
         // a module manifest is reached through an image, and a generated file
-        // nothing emits is reached through neither.
-        //
-        // One entry is never split. It is either the file the problem is in,
-        // which leaves nothing to say, or the root directory `context` falls
-        // back to when nothing parsed, which is not a file that came out clean.
+        // nothing emits is reached through neither. One entry is never split.
         let clean: Vec<&str> = match context.contains(", ") {
             false => Vec::new(),
             true => context

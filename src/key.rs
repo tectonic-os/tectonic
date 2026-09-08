@@ -2,9 +2,8 @@
 //! of it goes and what generates it come out of the module declaring it; the
 //! generators, and the text that follows one, are the tool's.
 //!
-//! The two verbs differ in one thing and share everything else. `create`
-//! invents a key and writes both halves; `set` records a public half the
-//! person already holds, which is the only half a repository ever commits.
+//! `create` invents a key and writes both halves; `set` records a public half
+//! the person already holds, which is the only half a repository ever commits.
 
 use crate::copy;
 use crate::layout;
@@ -115,7 +114,7 @@ impl Key {
     }
 
     /// What the key is not usable without, which is prose and therefore the
-    /// tool's rather than the manifest's. One follow-up per generator.
+    /// tool's. One follow-up per generator.
     fn next(&self, root: &Path) -> String {
         let public = shown(root, &self.public);
         let private = shown(root, &self.private);
@@ -150,9 +149,7 @@ impl Key {
 }
 
 /// A public half the person already holds, recorded where the module says it
-/// goes. Only that half: a cosign key signs in CI, a MOK signs a kernel module
-/// and an authorized key logs a person in, and none of the three wants its
-/// private half copied into a repository.
+/// goes. Only that half: no private half is ever copied into a repository.
 pub struct Recorded {
     from: PathBuf,
     public: PathBuf,
@@ -168,7 +165,7 @@ impl Recorded {
     ) -> Result<Self, String> {
         let declared = declared("set key", root, kind, module, prompt)?;
         // Before the path is asked for, so a key that is already there is said
-        // so rather than after a person has typed one out.
+        // so before a person types one out.
         let public = layout::public_key(root, &declared.public);
         unwritten(&public)?;
         let from = PathBuf::from(prompt.text(from, copy::KEY_FROM, "`--from`", None)?);
@@ -192,7 +189,7 @@ impl Recorded {
 
 /// Whether a file is the public half the declaration describes. A key recorded
 /// in the wrong form is a build that fails a long way from here, so the shape
-/// is read now rather than trusted.
+/// is read now.
 fn holds(declared: &Declared, bytes: &[u8]) -> Result<(), String> {
     let text = String::from_utf8_lossy(bytes);
     let (ok, wanted) = match declared.generator.as_str() {
@@ -360,9 +357,9 @@ fn cosign(work: &Path) -> Result<(PathBuf, PathBuf), String> {
     Ok((work.join("cosign.pub"), work.join("cosign.key")))
 }
 
-/// The keypair a person logs in with. ed25519 rather than the declared `bits`,
-/// which is an RSA size and means nothing here: the curve is the only choice
-/// there is, and it is the one every current OpenSSH has.
+/// The keypair a person logs in with. ed25519. The declared `bits` is an RSA
+/// size and says nothing here: the curve is the only choice there is, and it is
+/// the one every current OpenSSH has.
 fn ssh(work: &Path, kind: &str) -> Result<(PathBuf, PathBuf), String> {
     let private = work.join(kind);
     let mut generate = Command::new("ssh-keygen");
@@ -499,7 +496,7 @@ fn module_signing(cn: &str) -> String {
 }
 
 /// The scaffolded `.gitignore` covers every private half. One that does not is
-/// said so rather than edited: the tool never rewrites a file it did not write.
+/// said so: the tool never rewrites a file it did not write.
 fn warn_unignored(root: &Path) {
     let name = "keys/private/";
     let ignored =
@@ -542,8 +539,8 @@ key "ssh" {
 "#;
 
     /// Whether the tool is installed, which is whether it starts at all.
-    /// `ssh-keygen` has no `version` subcommand — it prints usage and exits 1 —
-    /// so asking for a successful exit skipped the test on every machine.
+    /// `ssh-keygen` has no `version` subcommand — it prints usage and exits 1,
+    /// so a successful exit is not what says it is there.
     fn have(tool: &str) -> bool {
         Command::new(tool)
             .arg("version")
@@ -562,7 +559,7 @@ key "ssh" {
 
     /// The pair the build needs: `sign-file` reads the PEM key and the DER
     /// certificate, so both parse and both carry the same public key. Then that
-    /// the second run refuses rather than replacing either half.
+    /// the second run refuses.
     #[test]
     fn a_secure_boot_key_is_well_formed() {
         if !have("openssl") {
@@ -688,8 +685,8 @@ key "ssh" {
     }
 
     /// `set key`: the destination comes out of the module's `public`
-    /// declaration, and a file in the wrong form is refused rather than
-    /// committed and discovered by a build.
+    /// declaration, and a file in the wrong form is refused. Committed, it is
+    /// discovered by a build a long way from here.
     #[test]
     fn a_recorded_key_lands_where_the_module_says_and_is_read_before_it_does() {
         let root = repo("tect-set-key-test", SSH);

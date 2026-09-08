@@ -47,7 +47,7 @@ pub(crate) fn check_path(path: &str, span: Span, src: &Source, issues: &mut Issu
 }
 
 /// Every `{...}` in a URL template. An unclosed brace is the rest of the URL,
-/// so it is reported rather than skipped.
+/// so it is reported.
 pub(crate) fn placeholders(url: &str) -> impl Iterator<Item = &str> {
     url.match_indices('{').map(|(at, _)| {
         url[at..]
@@ -81,7 +81,7 @@ pub(crate) fn check_sha256(
 }
 
 /// A syntax error as one issue, carrying what the parser found so it is
-/// reported through the collector rather than beside it.
+/// reported through the collector.
 pub(crate) fn syntax_issue(err: &kdl::KdlError, file: &str, src: &Source) -> Issue {
     let mut issue = Issue::new(format!("{file} is not valid KDL"), src);
     for found in &err.diagnostics {

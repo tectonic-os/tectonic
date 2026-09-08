@@ -176,15 +176,13 @@ build_disk() {
 
 # The boot menu a deb image needs and a fedora one does not: their signed GRUB
 # reads no BLS entries, so it is rendered from the entries `bootc` just wrote.
-# The installer does this after fisherman; this is the other path that writes a
-# disk, and it needs it for the same reason — no `--bootloader` is passed above,
-# so bootc picks one itself, and an image carrying `bootupd` now gets GRUB.
+# No `--bootloader` is passed above, so bootc picks one itself.
 #
-# The renderer is run *from the image*: a composefs deployment on the disk is
-# sealed erofs with no walkable /usr to read it out of. An image that ships none
-# is a family that needs none, which is exit 3 and not a failure. Two layouts
-# and one mount point: the entries sit at the top of a /boot partition and a
-# level down when /boot is a directory on the root filesystem.
+# The renderer is run from the image: a composefs deployment on the disk is
+# sealed erofs with no walkable /usr. An image that ships none is a family that
+# needs none, which is exit 3 and not a failure. Two layouts and one mount
+# point: the entries sit at the top of a /boot partition and a level down when
+# /boot is a directory on the root filesystem.
 render_menu() {
     local raw="$1" lo target device root=""
     target="$(mktemp -d)"
@@ -224,7 +222,7 @@ render_menu() {
 
 # `bootc install to-disk`, for a family bootc-image-builder cannot convert. It
 # writes a raw disk to a file with no loop device of its own: `--via-loopback`
-# is what removes the `losetup -P` the recipe used to need.
+# is what removes the need for a `losetup -P`.
 install_disk() {
     command -v skopeo > /dev/null 2>&1 \
         || die "skopeo is not installed, and it writes the layout bootc installs from"
@@ -235,20 +233,15 @@ install_disk() {
 
     # Everything is written beside the disk and moved onto it at the end, so a
     # run that fails or is interrupted leaves the disk that was already there.
-    # Truncating in place would replace a bootable disk with a sparse hole that
-    # both this script and `tect vm` then read as finished.
     local raw="out/${type}/disk.raw.part" layout="out/oci-cache" key_args=() key_mount=()
     mkdir -p "out/${type}"
     rm -f "$raw"
     truncate -s "${DISK_SIZE:-20G}" "$raw"
 
     # `--composefs-backend` refuses a containers-storage image with `Invalid
-    # splitstream content type`, which is about how the image is stored rather
-    # than how it is named: measured 2026-09-02, `--source-imgref
-    # containers-storage:` refuses identically. An OCI layout is a different
-    # transport and it is accepted, so the bytes are copied out to one and
-    # bootc is pointed at that. This used to stand up a transient `registry:2`
-    # for the same job, with a port scan and signal traps to match.
+    # splitstream content type`, and `--source-imgref containers-storage:`
+    # refuses identically. An OCI layout is a different transport and is
+    # accepted, so the bytes are copied out to one.
     rm -rf "$layout"
     skopeo copy "containers-storage:${ref}" "oci:${layout}"
 
@@ -258,15 +251,12 @@ install_disk() {
         key_args=(--root-ssh-authorized-keys /root-ssh-authorized-keys)
     fi
 
-    # `load_rootful` is what keeps root's store from holding a ten-minute-old
-    # image of the same name — it compares the two stores by image id and
-    # copies across when they differ — so nothing here has to pull to be sure
-    # it is running what was just built.
+    # `load_rootful` keeps root's store from holding a stale image of the same
+    # name, so nothing here has to pull.
     #
-    # --pid=host and --net=host are carried from the recipe this was measured
-    # with and are not individually justified here. Nothing reaches the network
-    # any more, but whether bootc's own machinery wants either was never
-    # separated out. Do not drop them as tidying without re-running an install.
+    # --pid=host and --net=host were never separated out from the recipe this
+    # was built against. Do not drop them as tidying without re-running an
+    # install.
     load_rootful
     sudoif podman run \
         --rm --privileged --pull=never \
@@ -297,14 +287,12 @@ install_disk() {
 }
 
 # The installer media. Nothing here converts the image into a disk: the media
-# boots a live environment that installs the target through podman, which is
-# why one live environment installs every family and there is no branch here.
+# boots a live environment that installs the target through podman, so one live
+# environment installs every family and there is no branch here.
 #
-# `tect vm build iso` stages the whole build context — both recipes, the
-# Containerfile, the one patch tacklebox needs and the tect binary the live
-# console autostarts — under out/bootiso/ before it execs this script, because
-# every one of them depends on --target, --tag and $IMAGE_REGISTRY, which are
-# build-time and not commit-time, or on the tree being built from.
+# `tect vm build iso` stages the whole build context under out/bootiso/ before
+# it execs this script: every part of it depends on --target, --tag and
+# $IMAGE_REGISTRY, or on the tree being built from.
 build_iso() {
     local tools=localhost/tect-installer-tools:latest tbx="${PWD}/${staged}/tacklebox"
     # Absolute, because tacklebox splices the build directory into a
@@ -325,17 +313,13 @@ build_iso() {
     rm -f "${image_file}.part"
 
     # One sudo for the whole root half. sudo's timestamp lasts five minutes and
-    # the tools image, the live environment and tacklebox each hold the
-    # terminal for longer than that on their own, so a `sudoif` per step asks
-    # for the password once per step.
+    # the tools image, the live environment and tacklebox each hold the terminal
+    # longer than that, so a `sudoif` per step asks for the password per step. A
+    # background refresher cannot fix it: with no tty sudo keys its timestamp by
+    # parent process.
     #
-    # A refresher in the background cannot fix that: with no tty sudo keys its
-    # timestamp by parent process, so a backgrounded loop refreshes a timestamp
-    # of its own that nothing else uses.
-    #
-    # tacklebox shells out to bare `sudo` throughout and is already inside this
-    # one, so its internal calls are no-ops. HOME comes with it, because it
-    # writes there.
+    # tacklebox shells out to bare `sudo` and is already inside this one, so its
+    # internal calls are no-ops. HOME comes with it, because it writes there.
     sudoif env HOME=/root \
         TOOLS="$tools" LIVE="$live_image" STAGED="${PWD}/${staged}" TBX="$tbx" \
         BUILD="$build" ISO="${PWD}/${image_file}.part" OWNER="$(id -u):$(id -g)" \
@@ -343,10 +327,8 @@ build_iso() {
 set -euo pipefail
 
 # tacklebox leaves its offline-store overlay mounted and then trips over it on
-# the next run. Cleared before *and* after: before, because a tree left by an
-# older run is what the next one trips over, and after, because a mount nobody
-# unmounts is one `rm -rf out` answers `Device or resource busy` on, with
-# nothing to tell the person which path is held or why.
+# the next run. Cleared before and after: a mount nobody unmounts is one
+# `rm -rf out` answers `Device or resource busy` on.
 unmount_offline_store() {
     if mountpoint -q "${BUILD}/tbox-offline-store/overlay" 2> /dev/null; then
         umount "${BUILD}/tbox-offline-store/overlay"
@@ -405,12 +387,9 @@ login_credentials() {
     echo "vm: login as ${vm_user}; credentials provision the account on its first boot"
 }
 
-# Measured 2026-09-02 on qemux `Podman v7.49`, QEMU 11.1.0, an amdgpu host with
-# Vulkan: `GPU=Y` makes qemux build a `virtio-vga-gl` line carrying
-# `host3d_blob_limit`, its own QEMU refuses the property, and the machine never
-# boots. So this passes qemux's own variable through at qemux's own default
-# rather than forcing hardware rendering on: `GPU=Y ./scripts/vm.sh run qcow2`
-# asks for it on a host where it works, and nothing else has to.
+# `GPU=Y` makes qemux build a `virtio-vga-gl` line carrying `host3d_blob_limit`,
+# which its own QEMU refuses, and the machine never boots. So qemux's own
+# variable is passed through at qemux's own default.
 run_qemu() {
     local port=8006 arguments sysusers_base64 credential_args=() storage=()
     # An iso boots an installer, so the disk it installs onto has to outlive the
@@ -448,11 +427,10 @@ run_qemu() {
 
 if [ "$command" = build ] || [ "$rebuild" = 1 ] || [ ! -f "$image_file" ]; then
     if [ "$rebuild" = 1 ]; then
-        # The whole chain, in the only order it works in: `fetch modules`
-        # brings the pinned trees down, `generate` writes the committed files
-        # off what they hold, and `build` proves those files rather than
-        # writing them. This is the one path that changes the repository — a
-        # plain `build` and a run without --rebuild boot what is already there.
+        # The whole chain, in the only order it works in: `fetch modules` brings
+        # the pinned trees down, `generate` writes the committed files off what
+        # they hold, and `build` proves those files. This is the one path that
+        # changes the repository.
         ./scripts/tect.sh fetch modules
         ./scripts/tect.sh generate
         args=(--tag "$ref")

@@ -62,9 +62,8 @@ pub fn file(list: &List) -> Option<(PathBuf, String)> {
 }
 
 /// One collection the seeded repository fetches its modules through. How the
-/// pin is kept current is left out: that is a decision about the repository
-/// holding it, which this is not. One that has no hash to be kept current
-/// against is not, since a seeded repository is fetching it unverified.
+/// pin is kept current is left out, and one with no hash to keep it current
+/// against gets none: a seeded repository is fetching it unverified.
 fn source(collection: &Collection, out: &mut String) {
     let name = &collection.name;
     match &collection.at {

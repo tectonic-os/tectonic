@@ -167,8 +167,8 @@ pub fn select(question: &str, options: &[Choice]) -> Result<Option<usize>, Strin
     select_current(question, options, 0)
 }
 
-/// The same, editing an existing answer: it opens on `at` rather than on the
-/// first row, so a question asked again is not navigated again.
+/// The same, editing an existing answer: it opens on `at`, so a question asked
+/// again is not navigated again.
 pub fn select_current(
     question: &str,
     options: &[Choice],
@@ -195,8 +195,7 @@ pub fn confirm_current(question: &str, yes: &str, no: &str, current: bool) -> Re
 
 /// Any of `options`, or none. `on` is what is already true, which a question
 /// editing a declaration opens with. Options carrying a `group` are drawn as a
-/// collapsed tree with a filter, since a few hundred rows are neither readable
-/// nor reachable as a flat list.
+/// collapsed tree with a filter.
 pub fn multi(question: &str, options: &[Choice], on: &[usize]) -> Result<Answer, String> {
     if options.iter().any(|choice| !choice.group.is_empty()) {
         let rows = nodes(options).len();
@@ -223,9 +222,7 @@ pub enum Field {
         at: Option<usize>,
     },
     /// Shown and not answerable. It is on the form because a person about to
-    /// erase a disk should see what is going onto it, and it is not a question
-    /// because there is only one right answer and getting it wrong is a disk
-    /// that is erased and then does not boot.
+    /// erase a disk should see what is going onto it.
     Fixed { label: String, value: String },
 }
 
@@ -343,17 +340,11 @@ enum Mode {
 
 /// A screen holding every question at once. `actions` are the buttons under the
 /// rows, and `blocked` answers why the first of them cannot be taken — drawn
-/// dim and refusing the key, with the reason under it, so nothing can be
-/// chosen and then refused.
+/// dim and refusing the key, with the reason under it.
 ///
-/// **`blocked` is asked on every draw, not once.** The fields it judges are the
-/// ones being edited on this screen, so a reason computed before the loop is a
-/// reason about a form nobody has filled in yet, and the action stays dim
-/// however complete the answers become.
-///
-/// The fields are edited in place. A form that opens a screen per question is
-/// the thing this replaces: the answers stop being visible at the moment one of
-/// them is being changed, which is when they matter most.
+/// `blocked` is asked on every draw. It judges the fields being edited on this
+/// screen, so a reason computed before the loop leaves the action dim however
+/// complete the answers become.
 pub fn form(
     fields: &mut [Field],
     actions: &[&str],
@@ -413,17 +404,14 @@ pub fn form(
             match &mut mode {
                 Mode::Typing => match key {
                     // Answering a field moves on to the next and opens it, so a
-                    // form is filled top to bottom without a key between one
-                    // answer and the next question. Esc is not an answer and
+                    // form is filled top to bottom. Esc is not an answer and
                     // stays where it is.
                     KeyCode::Enter => mode = onward(fields, &visible, &mut cursor),
                     KeyCode::Esc => mode = Mode::Rows,
-                    // **Up and down move between fields while one is being
-                    // typed into**, because every field opens for typing as the
-                    // cursor reaches it — so without this the arrow keys stop
-                    // working the moment the form starts being filled in.
-                    // Nothing is lost by leaving: a key edits the field where it
-                    // stands, so what was typed is already the field's value.
+                    // Up and down move between fields while one is being typed
+                    // into: every field opens for typing as the cursor reaches
+                    // it, so without this the arrow keys stop working the moment
+                    // the form starts being filled in.
                     KeyCode::Up => mode = backward(fields, &visible, &mut cursor),
                     KeyCode::Down => mode = onward(fields, &visible, &mut cursor),
                     KeyCode::Backspace => fields[row].pop(),
@@ -631,15 +619,10 @@ fn sheet_of(frame: &mut Frame, area: Rect, lines: &[Line<'static>], keys: &str) 
 /// with `action` under them. `Some(rows.len())` is `action`, anything smaller
 /// is the row to ask again, and `None` is a cancel.
 ///
-/// It sizes to its rows rather than to `VISIBLE`, which exists for lists
-/// nothing bounds. This one is bounded by the questions the command has, which
-/// is known and small, so the action cannot scroll off.
-/// `blocked` is why the action cannot be taken yet, which draws it dim and
-/// unpickable with the reason beside it. Nothing can choose the action and then
-/// be refused. `None` is a screen whose answers are complete.
-///
-/// `at` is the row it opens on, so a form returned to after a field was edited
-/// does not send the cursor back to the top.
+/// It sizes to its rows, which the command's questions bound, so the action
+/// cannot scroll off. `blocked` is why the action cannot be taken yet, which
+/// draws it dim and unpickable with the reason beside it; `None` is a screen
+/// whose answers are complete. `at` is the row it opens on.
 pub fn review(
     question: &str,
     rows: &[(String, String)],
@@ -664,11 +647,7 @@ pub fn review(
 
 /// A question over a read-only summary of what answering it would do: the rows
 /// are shown and cannot be landed on, and the two answers sit under them.
-/// `true` is `yes`; esc is `no`, because the way back is what esc means on
-/// every other screen here.
-///
-/// Reuses `pick` rather than adding a loop: an unpickable row is the mechanism
-/// `Choice::unavailable` already exists for.
+/// `true` is `yes`; esc is `no`.
 pub fn confirm_over(
     question: &str,
     rows: &[(String, String)],
@@ -684,12 +663,8 @@ pub fn confirm_over(
 }
 
 /// One thing to do, over the same read-only rows `confirm_over` draws. The way
-/// out is esc and `keys` says so, so leaving is not drawn as a row competing
-/// with the action.
-///
-/// This is what a screen carrying something a person has to read draws, since
-/// a widget that sets `CHROME` opens full screen and paints over anything
-/// printed under it.
+/// out is esc and `keys` says so. A widget that sets `CHROME` opens full screen
+/// and paints over anything already printed under it.
 pub fn offer_over(
     question: &str,
     rows: Vec<Choice>,
@@ -771,11 +746,8 @@ pub fn secret(question: &str) -> Result<String, String> {
 
 /// A line typed and shown: `secret` with the characters left visible and a
 /// default standing in until one is typed. Empty is what esc answers, and the
-/// caller turns that into its default or the refusal naming its flag.
-///
-/// `prefix` stands before the answer and is not part of it, so a question whose
-/// answer only means something after a host or a path shows that where it will
-/// be rather than in the question.
+/// caller turns that into its default or the refusal naming its flag. `prefix`
+/// stands before the answer and is not part of it.
 pub fn line(question: &str, prefix: &str, default: Option<&str>) -> Result<String, String> {
     inline(3, |terminal| {
         let mut typed = String::new();
@@ -797,8 +769,8 @@ pub fn line(question: &str, prefix: &str, default: Option<&str>) -> Result<Strin
     })
 }
 
-/// The default is drawn dim where the answer will be rather than in the
-/// question, because it is what enter takes.
+/// The default is drawn dim where the answer will be, because it is what enter
+/// takes.
 fn written(
     frame: &mut Frame,
     area: Rect,
@@ -835,8 +807,7 @@ fn masked(frame: &mut Frame, area: Rect, question: &str, typed: usize) {
 }
 
 /// How many of the messages under the gauge are kept. They are what a step is
-/// doing rather than the record of it — the record is the log file — so a few
-/// is the whole point.
+/// doing. The record of it is the log file, so a few is the whole point.
 const NOTED: usize = 5;
 
 /// The bar, the step, the messages under their rule, and the line that does
@@ -844,8 +815,8 @@ const NOTED: usize = 5;
 const ROWS: u16 = NOTED as u16 + 4;
 
 /// A bounded region over something that takes a while, held open across an
-/// event stream, which is why this is a handle rather than a closure like
-/// every other widget in this file.
+/// event stream, which is why this is a handle. Every other widget in this
+/// file is a closure.
 pub struct Progress {
     terminal: DefaultTerminal,
     /// What was finished before the step now running.
@@ -866,11 +837,9 @@ impl Progress {
     /// `foot` is the one line that stays put under the messages: where the
     /// transcript is being written, and what cancelling would now mean.
     ///
-    /// **Raw mode is turned back off**, which every other widget here needs
-    /// and this one does not: nothing is read from the keyboard while it is
-    /// open, and leaving it on would make Ctrl+C a key nobody reads instead of
-    /// the signal it is outside a widget. A region held over an hour of work
-    /// that can hang must stay interruptible.
+    /// Raw mode is turned back off: nothing is read from the keyboard while
+    /// this is open, and leaving it on would make Ctrl+C a key nobody reads.
+    /// A region held over an hour of work that can hang must stay interruptible.
     pub fn open(foot: &str) -> Result<Self, String> {
         let terminal = open(ROWS)?;
         let _ = terminal::disable_raw_mode();
@@ -899,24 +868,18 @@ impl Progress {
 
     /// How far along the whole install the bar is drawn.
     ///
-    /// fisherman says what a step weighs and never how far into it the machine
-    /// has got, and one step carries most of the weight — so a bar drawn from
-    /// `cumulative_pct` alone reads the same number for almost the whole
-    /// install. Each message during a step takes a fixed share of what is left
-    /// of that step, so the number climbs while work is happening and never
-    /// reaches where the next step begins.
-    ///
-    /// ponytail: counted, not measured. Replace it with real sub-step progress
-    /// the day fisherman emits any.
+    /// fisherman says what a step weighs, never how far into it the machine
+    /// has got, and one step carries most of the weight. Each message during a
+    /// step takes a fixed share of what is left of that step, so the number
+    /// climbs and never reaches where the next step begins. Counted, since
+    /// fisherman emits no sub-step progress.
     fn at(&self) -> u16 {
         crept(self.pct, self.flight, self.within)
     }
 
     /// Time passing, and nothing else. A step can hold the machine for minutes
-    /// between two messages — `Deploying image` is one line and then silence —
-    /// and a screen that has not changed in that long is one nobody can tell
-    /// from a screen that has stopped. Only the spinner moves: the bar counts
-    /// messages and there have been none.
+    /// between two messages, and a screen that has not changed in that long
+    /// cannot be told from one that has stopped. Only the spinner moves.
     pub fn tick(&mut self) -> Result<(), String> {
         self.turn = self.turn.wrapping_add(1);
         self.show()
@@ -994,19 +957,12 @@ fn working(
 const COLD: (u8, u8, u8) = (0x5a, 0x56, 0xe0);
 const HOT: (u8, u8, u8) = (0xee, 0x6f, 0xf8);
 
-/// A bar the width of its room, filled left to right, each filled cell a step
-/// along the gradient, with the percentage written after it.
-///
-/// Hand-drawn. `Gauge` fills one flat colour and writes its label over the
-/// middle of the bar. No partial blocks here: a serial console has none.
-///
 /// Where the bar stands: what finished before this step, plus a share of what
 /// this step weighs for each message that has arrived during it. Held out of
 /// `Progress` so it can be read without a terminal.
 fn crept(pct: u16, flight: u16, within: u32) -> u16 {
-    // Tuned to the messages the long step actually emits: `install OS` copies
-    // a blob per layer and there are dozens, so the share has to be small
-    // enough that a hundred of them do not run out of bar.
+    // `install OS` copies a blob per layer and there are dozens, so the share
+    // has to be small enough that a hundred of them do not run out of bar.
     let left = HELD.powi(within.min(400) as i32);
     pct + (f64::from(flight) * (1.0 - left)) as u16
 }
@@ -1014,13 +970,10 @@ fn crept(pct: u16, flight: u16, within: u32) -> u16 {
 /// What is left of a step after one more message during it.
 const HELD: f64 = 0.97;
 
-/// One fill that only ever grows, with the percentage after it. What advances
-/// it is `Progress::at`, which is where the arithmetic lives.
-///
-/// Solid the whole way across, with the track in grey. The media's console
-/// renders both, so the bar reads as a bar rather than as two textures; the
-/// kernel VT it falls back to has grey as its own colour 8 and still separates
-/// the two.
+/// One fill that only ever grows, with the percentage after it; `Progress::at`
+/// advances it. Solid the whole way across with the track in grey — no partial
+/// blocks, since a serial console has none, and the kernel VT the media falls
+/// back to has grey as its own colour 8.
 fn bar<'a>(pct: u16, width: u16) -> Line<'a> {
     let label = format!(" {pct:>3}%");
     let room = usize::from(width).saturating_sub(label.chars().count());
@@ -1039,9 +992,7 @@ fn bar<'a>(pct: u16, width: u16) -> Line<'a> {
 const TRACK: Color = Color::DarkGray;
 
 /// The spinner beside the running step. Braille, which the media's console
-/// draws and a kernel VT has no glyphs for — it is the one thing on this
-/// screen that does not survive the fallback, and it carries no information a
-/// stopped screen does not already give.
+/// draws and a kernel VT has no glyphs for.
 const TURNING: [&str; 10] = [
     "\u{280b}", "\u{2819}", "\u{2839}", "\u{2838}", "\u{283c}", "\u{2834}", "\u{2826}", "\u{2827}",
     "\u{2807}", "\u{280f}",
@@ -1094,8 +1045,7 @@ fn height(rows: usize) -> u16 {
 
 /// A serial console comes up 0x0 and nothing on it ever sends `SIGWINCH`, so a
 /// viewport laid out for the size it is told draws nothing at all. Setting the
-/// size here fixes every way the tool is started, which is the point: an
-/// installer is reached from a unit, from a shell and by hand.
+/// size here covers every way the tool is started.
 fn give_size() {
     if !unsized_tty(terminal::size().ok()) {
         return;
@@ -1117,10 +1067,7 @@ fn unsized_tty(size: Option<(u16, u16)>) -> bool {
 /// which is also what puts them all in a full-screen viewport. Unset is the
 /// normal case: a bounded region of the scroll, with no chrome.
 ///
-/// ponytail: global, so two modes in one process is not expressible. Threading
-/// it would put a parameter that is constant for the life of the process
-/// through every widget and every call site of one; make it a parameter if a
-/// second command ever wants a different answer.
+/// Global, so one process expresses one mode.
 static CHROME: OnceLock<String> = OnceLock::new();
 
 /// Called once, at the entry of a command that owns the screen until it is
@@ -1164,14 +1111,11 @@ fn inline<T>(
 }
 
 /// What the container leaves a widget to draw in: the whole frame where there
-/// is no chrome, and the inside of the box where there is. Every event loop
-/// draws through this, and it is the one caller of `terminal.draw`, which keeps
-/// the chrome in one place.
+/// is no chrome, and the inside of the box where there is. The one caller of
+/// `terminal.draw`.
 ///
-/// `rows` is what the widget wants, which every loop already knows because it
-/// is what `height` is built from. Inline it is the viewport and this ignores
-/// it; in a box it is what the box is sized and centred on, so a widget with
-/// five rows does not leave forty blank ones under it on a large terminal.
+/// `rows` is what the widget wants. Inline it is the viewport and this ignores
+/// it; in a box it is what the box is sized and centred on.
 fn render<B: Backend>(
     terminal: &mut ratatui::Terminal<B>,
     rows: u16,
@@ -1203,10 +1147,8 @@ const PAD_X: u16 = 3;
 const PAD_Y: u16 = 1;
 
 /// Paints the box, if there is one, and answers with the room left inside it.
-///
-/// Takes the title as a parameter, so a test can render the screen a command
-/// that owns the console draws. The mode is a `OnceLock` and `cargo test` is
-/// one process: a test that set it would put a title bar on every other test
+/// Takes the title as a parameter: the mode is a `OnceLock` and `cargo test` is
+/// one process, so a test that set it would put a title bar on every other test
 /// drawing in parallel.
 fn chrome(frame: &mut Frame, title: Option<&str>, rows: u16, keys: &str) -> Rect {
     let Some(title) = title else {
@@ -1220,15 +1162,14 @@ fn chrome(frame: &mut Frame, title: Option<&str>, rows: u16, keys: &str) -> Rect
     );
     let block = Block::new()
         .borders(Borders::ALL)
-        // The installer media draws through kmscon, which renders TrueType on
-        // DRM. Where it cannot start, systemd hands tty1 back to the kernel
-        // VT, whose bitmap font has no arc glyphs, and these corners come out
-        // as `+`.
+        // The installer media draws through kmscon. Where it cannot start,
+        // systemd hands tty1 back to the kernel VT, whose bitmap font has no
+        // arc glyphs and draws these corners as `+`.
         .border_type(BorderType::Rounded)
         .border_style(Style::new().fg(ACCENT))
         .padding(Padding::symmetric(PAD_X, PAD_Y))
         // The title starts one cell in, so the corner reads as a corner with a
-        // line coming off it rather than as a bracket around the words.
+        // line coming off it. Flush against the words it reads as a bracket.
         .title(Line::from(vec![
             Span::styled("\u{2500} ", Style::new().fg(ACCENT)),
             Span::styled(title.trim().to_string(), Style::new().bold()),
@@ -1299,8 +1240,8 @@ fn pick<B: Backend>(
 }
 
 /// A row with no label is a spacer, which the cursor passes over in whichever
-/// direction it was sent rather than landing on. Only the review screen has
-/// one, and it is what puts a blank line above `Create`.
+/// direction it was sent. Only the review screen has one, and it is what puts a
+/// blank line above `Create`.
 fn skip_spacers(code: KeyCode, options: &[Choice], state: &mut ListState) {
     for _ in 0..options.len() {
         match state.selected() {
@@ -1376,8 +1317,8 @@ fn branch(options: &[Choice], at: usize) -> &'static str {
 }
 
 /// What the interrupt is answered with, and the one error a caller is meant to
-/// read rather than report: Ctrl+C in raw mode is a key and not a signal, so
-/// this is the whole of how a widget says a person wants out.
+/// read. Ctrl+C in raw mode arrives as a key, so this is the whole of how a
+/// widget says a person wants out.
 pub const INTERRUPTED: &str = "interrupted";
 
 /// The next key pressed, None for an event that is not one, and an error only
@@ -1526,7 +1467,7 @@ fn leaves(nodes: &[Node], at: usize) -> Vec<usize> {
         .collect()
 }
 
-/// Containment, not the contradiction `Choice::parent` describes: a branch
+/// Containment, which is what `Choice::parent` contradicts: a branch
 /// holds what is under it, and turns all of it on until all of it is.
 fn check(on: &mut Vec<usize>, nodes: &[Node], at: usize) {
     let leaves = leaves(nodes, at);
@@ -1635,8 +1576,8 @@ fn nest<B: Backend>(
 }
 
 /// The rows, the detail of whatever is highlighted, and the filter as it is
-/// typed. A rule's description is prose and belongs under the list, not beside
-/// a label.
+/// typed. A rule's description is prose and belongs under the list, which has
+/// the room a label has not.
 #[allow(clippy::too_many_arguments)]
 fn nested(
     frame: &mut Frame,
@@ -1721,8 +1662,7 @@ mod tests {
 
     /// The completion screen draws the recovery key. It is generated at install
     /// time, kept out of the log on purpose and written to no file, so this
-    /// screen is the only copy there is. It was a `println!` under the widget
-    /// that covers it.
+    /// screen is the only copy there is.
     #[test]
     fn the_completion_screen_draws_the_recovery_key() {
         // 32 random bytes as hex, which is what fisherman's RandomPassphrase
@@ -1893,9 +1833,7 @@ mod tests {
     }
 
     /// The default stands where the answer will be until one is typed, and the
-    /// prefix stands before both. Nothing drawn drives the prefixed form —
-    /// `create repo`'s owner question is the only caller and its goldens are
-    /// scripted.
+    /// prefix stands before both.
     #[test]
     fn a_default_is_shown_until_something_is_typed_over_it() {
         let empty = typed_line("github.com/", "", Some("someone"));
@@ -1906,8 +1844,7 @@ mod tests {
         assert!(over.contains("github.com/else"), "{over}");
         assert!(!over.contains("someone"), "{over}");
 
-        // A question with no default leaves the answer's line empty rather
-        // than standing anything in it.
+        // A question with no default leaves the answer's line empty.
         let bare = typed_line("", "", None);
         assert!(bare.contains("who owns it"), "{bare}");
         // The backend quotes each row, so the quotes come off before reading it.
@@ -1915,13 +1852,8 @@ mod tests {
         assert_eq!(answer.trim(), "", "{bare}");
     }
 
-    /// The screen a command that owns the console draws: one rounded box,
-    /// centred, with the same widget inside it. The widget is unchanged — that
-    /// is the whole claim of the change, so the test draws a real one, and a
-    /// real form: two fields answered, two not, and an action that says what it
     /// The installer's screen as it is drawn: one box, centred, with the form
-    /// inside it. The form is the same widget a test draws bare — that is the
-    /// whole claim of the container swap, so this draws a real one.
+    /// inside it: two fields answered, two not, and an action under them.
     #[test]
     fn a_command_that_owns_the_screen_draws_one_box_around_the_form() {
         let fields = [
@@ -1953,10 +1885,8 @@ mod tests {
                     shown.len() as u16,
                     crate::copy::INSTALL_KEYS,
                 );
-                // What the widget is given inside a box, which is what
-                // `hint_row` answers there: the box has the legend, so the
-                // widget draws none. Passing the keys here would render a
-                // second one that the installer never draws.
+                // What the widget is given inside a box: the box has the
+                // legend, so passing the keys here would draw a second one.
                 sheet_of(frame, area, &shown, "")
             })
             .unwrap();
@@ -1989,11 +1919,10 @@ mod tests {
         assert!(rows[last].contains(crate::copy::INSTALL_KEYS), "{drawn}");
     }
 
-    /// The number has to move while a step is running, because one step is
-    /// most of an install: `install OS` weighs 87 of 100 and everything before
-    /// it comes to 2. Counted messages are the only signal there is for how
-    /// far into it the machine has got, so each one takes a share of what is
-    /// left of the step and the bar never reaches where the next step begins.
+    /// The number has to move while a step is running, because one step is most
+    /// of an install: `install OS` weighs 87 of 100 and everything before it
+    /// comes to 2. Each counted message takes a share of what is left of the
+    /// step, and the bar never reaches where the next step begins.
     #[test]
     fn the_bar_climbs_through_a_step_and_stops_short_of_the_next() {
         let seen: Vec<u16> = (0..400).map(|within| crept(2, 87, within)).collect();

@@ -1,5 +1,5 @@
 //! One walk of the repository's trees, for everything that asks what is on
-//! disk rather than what an image enables.
+//! disk.
 
 use crate::diag::{Issues, Source};
 use crate::layout;

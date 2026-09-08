@@ -1,9 +1,8 @@
 //! The installation recipe one target installs from.
 //!
 //! An installer asks a person for the disk, the account and the encryption.
-//! Everything else in a recipe is a property of the image, and a wrong answer
-//! to one of those is a disk that is erased and then does not boot — so they
-//! are derived from the declaration here rather than offered as questions.
+//! Everything else is a property of the image and is derived from the
+//! declaration here: a wrong answer erases a disk that then does not boot.
 
 use crate::emit::json::Json;
 use crate::model::image::List;
@@ -29,12 +28,9 @@ struct Family {
 /// reaching a partition table.
 fn family(name: &str) -> Option<Family> {
     Some(match name {
-        // Fedora ships bootupd, so `--generic-image` — which exists to skip
-        // the bootupd check `bootc install` otherwise aborts on — stays off,
-        // the boot chain is the grub2 bootupd installs, and nothing seals the
-        // deployment. Not measured here: this is the path fisherman documents
-        // for the images that do carry bootupd, and no tect image has been
-        // installed through it yet.
+        // Fedora ships bootupd, so `--generic-image` — which skips the bootupd
+        // check `bootc install` aborts on — stays off, the boot chain is the
+        // grub2 bootupd installs, and nothing seals the deployment.
         FEDORA => Family {
             composefs: false,
             generic: false,
@@ -42,22 +38,13 @@ fn family(name: &str) -> Option<Family> {
             filesystem: "xfs",
             admin: "wheel",
         },
-        // Debian packages no bootupd at all, so the install aborts without
-        // `--generic-image`. This project's own base seals the deployment with
-        // composefs, and a sealed one needs fs-verity: xfs has none and drops
-        // into a dracut emergency shell, and a sealed btrfs deployment fails
-        // to mount. Measured `NEXT-40`.
-        //
-        // `grub2` and not `systemd`, because the base builds bootupd from
-        // source and stages Debian's own signed shim and GRUB as its payload,
-        // so the installed disk boots with Secure Boot on — where the unsigned
-        // systemd-boot this row used to ask for needed it turned off. The
-        // signed GRUB reads no BLS entries, so the image also ships
-        // `/usr/libexec/grub-menu-from-bls`; the installer runs it against the
-        // target it still has mounted, since bootupd installs the bootloader
-        // before the entries exist. Flipping this row without an installer
-        // that renders the menu is a worse failure than the unsigned one it
-        // replaces: GRUB comes up to an empty menu rather than booting.
+        // Debian packages no bootupd, so the install aborts without
+        // `--generic-image`. The sealed composefs deployment needs fs-verity:
+        // xfs has none and drops into a dracut emergency shell, and sealed
+        // btrfs fails to mount. `grub2` because the base stages Debian's signed
+        // shim and GRUB, so the disk boots with Secure Boot on; that GRUB reads
+        // no BLS entries, so the image ships `/usr/libexec/grub-menu-from-bls`
+        // and the installer runs it, and without it the menu comes up empty.
         "debian" | "ubuntu" => Family {
             composefs: true,
             generic: true,
@@ -70,12 +57,10 @@ fn family(name: &str) -> Option<Family> {
 }
 
 /// The recipe for one target: `image` is the bytes installed and `imgref` the
-/// reference the installed machine updates from, which is the whole of what
-/// keeps a local build off a machine's update origin. `stores` are host paths
-/// carrying that image offline, empty where it is pulled.
-///
-/// `None` when nothing publishes under that name, when the image declares no
-/// base, or when the family has no answer above.
+/// reference the installed machine updates from. `stores` are host paths
+/// carrying that image offline, empty where it is pulled. `None` when nothing
+/// publishes under that name, when the image declares no base, or when the
+/// family has no answer above.
 pub fn build(
     list: &List,
     name: &str,
@@ -112,20 +97,15 @@ pub fn build(
 }
 
 /// Where the media carries the selected image, and where the live environment
-/// registers it as an additional image store. `bootc install` is handed this
-/// path, and so is the live environment's own `storage.conf`: fisherman pulls
-/// before it starts the install container, and that pull knows nothing about
-/// the recipe.
+/// registers it as an additional image store. Handed to `bootc install` and
+/// written into the live environment's `storage.conf`: fisherman pulls before
+/// it starts the install container, and that pull knows nothing of the recipe.
 pub const STORE: &str = "/var/lib/tectonic/store";
 
-/// The staging ceiling the media is assembled in, not a cost: the ISO stage 1
-/// measured off a 20G recipe was 518 MB.
+/// The staging ceiling the media is assembled in, not a cost.
 const SIZE: &str = "20G";
 
 /// The live environment the media boots, layered on the image being installed.
-/// A compile-time asset rather than a generated file: it varies with nothing
-/// but the recipe staged beside it, so committing it into every repository
-/// would buy nothing and every fixture would gain it.
 pub const LIVE_ENV: &str = include_str!("installer.Containerfile");
 
 /// The one patch this project carries upstream, applied to tacklebox in the
@@ -133,22 +113,18 @@ pub const LIVE_ENV: &str = include_str!("installer.Containerfile");
 /// applies it, and both are staged into the same build context.
 pub const EFI_PATCH: &str = include_str!("installer-efi-from-image.patch");
 
-/// What the live environment is built and tagged as. Per target rather than
-/// one name for every repository, because the media's recipe is baked into it
-/// and root's image store is shared: a stale tag there ships silently.
+/// What the live environment is built and tagged as. Per target, because the
+/// media's recipe is baked into it and root's image store is shared: a stale
+/// tag there ships silently.
 pub fn live(published: &str) -> String {
     format!("localhost/{published}-installer:latest")
 }
 
 /// The media the installer is assembled into, as the recipe tacklebox takes.
-///
-/// `image` is the local build embedded in the media and `imgref` the name it
-/// is embedded *under*, so the installed machine's update origin is the
-/// published one while no byte of the install came from a registry. That pair
-/// is the whole of the split, and it is one recipe field rather than a design.
-///
-/// `None` on the same three refusals `build` makes, so the two documents on
-/// one medium cannot disagree about whether the target is installable.
+/// `image` is the local build embedded in the media and `imgref` the name it is
+/// embedded under, so the installed machine's update origin is the published one
+/// while no byte of the install came from a registry. `None` on the same three
+/// refusals `build` makes.
 pub fn media(list: &List, name: &str, image: &str, imgref: &str) -> Option<Json> {
     let target = list.targets().into_iter().find(|t| t.to_string() == name)?;
     let declared = list.images.iter().find(|i| i.id == target.image)?;
@@ -158,20 +134,11 @@ pub fn media(list: &List, name: &str, image: &str, imgref: &str) -> Option<Json>
     Some(Json::object([
         ("media_name", Json::string(format!("{published}-install"))),
         ("size", Json::string(SIZE)),
-        // `esp_partition` is deliberately not set, so tacklebox keeps its own
-        // default of off. Appending the ESP as a 0xEF partition costs CD-ROM
-        // boot outright: xorriso then records the El Torito EFI image with a
-        // load size of 0, because the image *is* the appended partition and
-        // its length is not known when the catalog is written. Measured on
-        // this media — `El Torito boot img: 1 UEFI y none 0x0000 0x00 0
-        // 829579`, and firmware attached as a DVD-ROM answers `Not Found`.
-        // A block device boots either way — measured both directions on this
-        // media under OVMF, USB attach and DVD-ROM, Secure Boot on — because
-        // EDK2's El Torito driver runs on any block device. That is the whole
-        // of what was proved: no physical stick has been written, so firmware
-        // that looks for a 0xEF partition instead of scanning El Torito is a
-        // risk this turns back on, and it is the risk that predates the
-        // appended partition rather than a new one.
+        // `esp_partition` stays unset, so tacklebox keeps its default of off.
+        // Appending the ESP as a 0xEF partition costs CD-ROM boot: xorriso
+        // records the El Torito EFI image with a load size of 0, because the
+        // image is the appended partition and its length is not known when the
+        // catalog is written.
         (
             "bootable_environments",
             Json::array([Json::object([
@@ -211,8 +178,8 @@ mod tests {
         list
     }
 
-    /// The whole of what this decides, on the two families that exist, read
-    /// off real declarations rather than a constructed one.
+    /// The whole of what this decides, on the two families that exist, read off
+    /// real declarations.
     #[test]
     fn the_family_settles_the_boot_chain_and_nothing_else_does() {
         let deb = fixture("deb-families");
@@ -237,8 +204,8 @@ mod tests {
         );
 
         // An ubuntu image is the same family answer, and a fedora one is the
-        // other: a constant wrong in either direction would install a disk
-        // that does not boot rather than fail a build.
+        // other: a constant wrong in either direction would install a disk that
+        // does not boot, with no build failure anywhere to catch it.
         let field =
             |list: &List, name: &str, key: &str| match build(list, name, "image", "imgref", &[]) {
                 Some(Json::Object(fields)) => fields
@@ -273,8 +240,8 @@ mod tests {
             Some("{\n  \"groups\": [\n    \"wheel\"\n  ]\n}")
         );
 
-        // A store nothing carries is an absent key rather than an empty list,
-        // because fisherman bind-mounts every path it is given.
+        // A store nothing carries is an absent key, because fisherman
+        // bind-mounts every path it is given.
         assert!(field(&deb, "forky", "additionalImageStores").is_none());
     }
 
@@ -306,9 +273,7 @@ mod tests {
     }
 
     /// The live environment starts the installer by typing its name, and
-    /// nothing else ties that word to the command table. A rename that misses
-    /// it is a medium that boots to `unknown command`, which no other test
-    /// here can see.
+    /// nothing else ties that word to the command table.
     #[test]
     fn the_verb_the_live_environment_autostarts_is_one_that_resolves() {
         let typed: Vec<&str> = LIVE_ENV

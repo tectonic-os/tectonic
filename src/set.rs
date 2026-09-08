@@ -2,7 +2,7 @@
 //! which `generate` then acts on: nothing here writes an artifact.
 //!
 //! Collect-then-apply like every other flow, so `create repo` holds one of
-//! these rather than calling the command.
+//! these.
 
 use crate::copy;
 use crate::create::Field;
@@ -125,9 +125,8 @@ impl Workflows {
                     })
                     .collect();
                 // An edited base, or a declaration written before one changed,
-                // can put a chosen workflow out of reach. It is cleared rather
-                // than carried into a refusal that would cost every other
-                // answer with it, and the clearing is said rather than silent.
+                // can put a chosen workflow out of reach. It is cleared, and the
+                // clearing is said aloud.
                 for shipped in SHIPPED
                     .iter()
                     .filter(|shipped| on.contains(&shipped.stem) && !shipped.met(basis))
@@ -200,7 +199,7 @@ impl Workflows {
     }
 
     /// The same questions asked again, opening on the answers already held.
-    /// `basis` is passed rather than kept, because an edited base changes the
+    /// `basis` is passed on every call, because an edited base changes the
     /// family and so changes which workflows are reachable at all.
     pub fn again(
         &self,
@@ -220,8 +219,8 @@ impl Workflows {
     }
 
     /// The review screen's rows for the CI, said as the settings repo.kdl will
-    /// hold rather than as the questions that reached them. A row is here only
-    /// where the question behind it was reachable: no `build`, no cadence.
+    /// hold. A row is here only where the question behind it was reachable: no
+    /// `build`, no cadence.
     pub fn rows(&self) -> Vec<(Field, &'static str, String)> {
         let mut rows = vec![(
             Field::Workflows,
@@ -309,8 +308,7 @@ impl Workflows {
 
 /// A `conforms` is the scan gate, so writing one costs a scan on every build,
 /// and in an enforcing repository it costs the build itself. `measured` is the
-/// subject already quoted, since an offer elsewhere may name more than one
-/// image.
+/// subject already quoted, since an offer elsewhere may name more than one image.
 pub(crate) fn cost(measured: &str, enforce: bool) -> String {
     match enforce {
         false => format!(
@@ -498,15 +496,14 @@ fn group(number: &str) -> &str {
 }
 
 /// The benchmark numbers one module claims, chosen out of the rules a profile
-/// selects rather than typed. A claim is recorded here and measured by `tect
-/// scap`; nothing in this command reads a scan.
+/// selects. A claim is recorded here and measured by `tect scap`; nothing in
+/// this command reads a scan.
 pub struct Claims {
     /// The manifest, from the repository root.
     file: PathBuf,
     /// What the numbers are written under, which is the profile they were
     /// chosen out of and is decorative: a number resolves against the content,
-    /// never against this. The family is not folded in, because `supports`
-    /// already declares it and a second spelling can disagree with the first.
+    /// never against this.
     profile: String,
     /// Every number the block will hold, chosen or kept.
     numbers: Vec<String>,
@@ -559,8 +556,8 @@ impl Claims {
         };
         let profile = &content.profiles[chosen];
 
-        // A rule no number reaches is one nothing can claim, so it is left out
-        // rather than drawn as a row that would write nothing.
+        // A rule no number reaches is one nothing can claim, so it is left out.
+        // A row drawn for it would write nothing.
         let selected = content.selected(&profile.id);
         let mut rules: Vec<(&String, &BTreeSet<String>)> = selected
             .iter()
@@ -664,9 +661,8 @@ impl Claims {
     }
 
     /// One benchmark node, since declaring one twice is a diagnostic, and one
-    /// number per line through KDL's own continuation, since a claim is read
-    /// and reviewed a number at a time. Claiming nothing declares no block, the
-    /// way generating no CI declares none.
+    /// number per line through KDL's own continuation. Claiming nothing declares
+    /// no block.
     fn block(&self) -> String {
         match self.numbers.is_empty() {
             true => String::new(),
@@ -685,8 +681,7 @@ impl Claims {
 
 /// Which modules elsewhere claim rules the profile selects that the image does
 /// not have, as the question whether to bring them. A claimant the repository
-/// owns needs a line rather than an import, which is what `check`'s own
-/// conformance notice already says.
+/// owns needs a line, which `check`'s conformance notice already says.
 fn offer(
     image: &crate::model::image::Image,
     content: &Content,
@@ -813,10 +808,9 @@ mod tests {
         assert_eq!(again.at, (7, 30));
     }
 
-    /// An edited base can put a workflow out of reach, and so can a
-    /// declaration written before one changed. Carrying it into the list only
-    /// to refuse it would cost every other answer with it; it opens cleared,
-    /// dim and unpickable instead, with a line above saying so.
+    /// An edited base can put a workflow out of reach, and so can a declaration
+    /// written before one changed. It opens cleared, dim and unpickable, with a
+    /// line above saying so.
     #[test]
     fn a_workflow_the_basis_cannot_run_opens_cleared_rather_than_refused() {
         let held = set(&["build", "build-disk"], DEFAULT_AT);

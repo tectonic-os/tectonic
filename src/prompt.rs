@@ -12,14 +12,14 @@ fn stem(question: &str) -> &str {
     question.trim_end_matches(':')
 }
 
-/// A file of answers, one per line, which a run answers from instead of asking.
+/// A file of answers, one per line, which a run answers from without asking.
 /// What the transcript goldens drive the binary with.
 const SCRIPT: &str = "TECT_ANSWERS";
 
 pub struct Prompt {
     ask: bool,
-    /// Whether an answer may be asked for with a widget rather than plain
-    /// lines, which redirected output rules out.
+    /// Whether an answer may be asked for with a widget, which redirected
+    /// output rules out.
     draw: bool,
     /// The answers a scripted run reads, and how far through them it is.
     script: Option<(Vec<String>, Cell<usize>)>,
@@ -49,7 +49,8 @@ impl Prompt {
     }
 
     /// The answers in order, whatever the terminal is. A question they run out
-    /// for fails, so an unexpected one is a failure rather than a wait.
+    /// for fails, so an unexpected one is a failure. Waiting would hang a
+    /// scripted run.
     pub fn scripted(answers: Vec<String>) -> Self {
         Self {
             ask: true,
@@ -59,13 +60,13 @@ impl Prompt {
     }
 
     /// Whether there is anyone to ask, which is what a line standing with a
-    /// question rather than before one has to know.
+    /// question has to know.
     pub fn asks(&self) -> bool {
         self.ask
     }
 
     /// Whether an answer may be drawn, which is what a command with nothing to
-    /// do but ask has to know before it opens a picker instead of refusing.
+    /// do but ask has to know: it opens a picker, or it refuses.
     pub fn draws(&self) -> bool {
         self.draw
     }
@@ -136,8 +137,8 @@ impl Prompt {
     }
 
     /// The drawn half of both free-text questions. The default is the widget's
-    /// to show, so the question is passed bare rather than carrying it twice,
-    /// and nothing is echoed for an answer that ends in the refusal.
+    /// to show, so the question is passed bare. Nothing is echoed for an answer
+    /// that ends in the refusal.
     fn written(
         &self,
         question: &str,
@@ -155,9 +156,8 @@ impl Prompt {
     }
 
     /// The same, not echoed, and asked twice: a mistyped passphrase is a disk
-    /// that does not unlock and a mistyped password an account nobody can log
-    /// into, and neither is visible to correct. A redirected or scripted run
-    /// has no screen to hide it from and reads it as a line.
+    /// that does not unlock, and nothing echoed is visible to correct. A
+    /// redirected or scripted run reads it as a line.
     pub fn secret(
         &self,
         given: Option<String>,
@@ -186,11 +186,8 @@ impl Prompt {
         }
     }
 
-    /// The same, editing a field on a form: **nothing typed keeps what is
-    /// there**. The form it goes back to holds the answer already, and draws
-    /// the refusal for a field that still has none.
-    ///
-    /// Only for a screen. A run with nothing to draw on has no form to go back
+    /// The same, editing a field on a form: nothing typed keeps what is there.
+    /// Only for a screen — a run with nothing to draw on has no form to go back
     /// to, so it uses `secret` and gets the refusal naming the flag.
     pub fn secret_current(&self, question: &str, current: &str) -> Result<String, String> {
         loop {
@@ -253,7 +250,7 @@ impl Prompt {
     }
 
     /// A confirmation editing an existing answer, which opens on and defaults
-    /// to that answer rather than always opening on yes.
+    /// to that answer. Always opening on yes would discard it.
     pub fn confirm_current(
         &self,
         question: &str,
@@ -287,10 +284,6 @@ impl Prompt {
 
     /// The same, editing an existing answer: it opens on that answer, marks it
     /// in the numbered list, and takes an empty answer as keeping it.
-    ///
-    /// `set conforms`'s profile question and `set claims`'s image question edit
-    /// declarations that already exist and should open on them; both still call
-    /// `choose`.
     pub fn choose_current(
         &self,
         question: &str,
@@ -423,7 +416,7 @@ fn said(answer: &Answer, options: &[Choice]) -> String {
 }
 
 /// What answers by number the question takes, which is one number when there is
-/// one option rather than a range of one.
+/// one option.
 fn range(options: &[Choice]) -> String {
     match options.len() {
         1 => "1".to_string(),

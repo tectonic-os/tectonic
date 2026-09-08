@@ -40,6 +40,5 @@
     :                 `-- set again here
  15 |         }
     `----
-  help: resolution is a single pass, so a second value is an error rather than
-        a merge
+  help: resolution is a single pass, so a second value is an error
 

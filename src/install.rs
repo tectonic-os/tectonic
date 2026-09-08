@@ -1,29 +1,12 @@
 //! What a root offers an installer, and the install that runs from it.
 //!
-//! `emit::recipe` writes the half of a recipe the declaration answers. This is
-//! the other end: find a payload, read that document back, add the half that is
-//! the person's — the disk and the account — and hand the result to fisherman,
-//! which owns partitioning, LUKS, TPM2 enrolment and `bootc install`.
+//! Find a payload, read back the recipe `emit::recipe` wrote, add the person's
+//! half — the disk and the account — and hand it to fisherman, which owns
+//! partitioning, LUKS, TPM2 enrolment and `bootc install`.
 //!
-//! **The discovery rule is one sentence: a payload root carries
-//! `install-recipe.json`.** That document names the image and the store beside
-//! it, so nothing here opens a container image or re-derives a boot chain —
-//! which it could not do anyway, since the baked manifest carries no bootupd,
-//! composefs or bootloader field and `emit::recipe` derives all three from the
-//! base family in a resolved plan. A repository is the other case, and it is
-//! the source rather than the artifact.
-//!
-//! **A payload wins over a repository, which is the opposite of
-//! `command::Context::of`'s precedence, and the inversion is deliberate.** For
-//! authoring, a repository beats a baked document because it is the source. For
-//! installing, the payload wins: it is already built, and rebuilding it here to
-//! reach the same bytes is the slowest possible way to be less certain. Do not
-//! "fix" one to match the other.
-//!
-//! Where the roots come from is a separate question with its own rule — the
-//! filesystem label `TECT`, one mount, refuse rather than pick when there is
-//! more than one. `--from` names a root outright, and the media's own payload
-//! is the default a `TECT` partition overrides.
+//! A payload root is one carrying `install-recipe.json`. A payload wins over a
+//! repository here, the opposite of `command::Context::of`'s precedence. Roots
+//! are found by the filesystem label `TECT`; more than one is refused.
 
 use crate::copy;
 use crate::emit::json::{self, Json};
@@ -79,9 +62,9 @@ pub enum Found {
     Nothing(PathBuf),
 }
 
-/// A malformed recipe is a refusal naming the file rather than a fall-through
-/// to the next case: a stick that carries a payload and cannot install it is
-/// not a stick that carries nothing.
+/// A malformed recipe is a refusal naming the file. Falling through to the
+/// next case would treat a stick that carries a payload and cannot install it
+/// as a stick that carries nothing.
 pub fn classify(root: &Path) -> Result<Found, String> {
     let recipe = root.join(RECIPE);
     if recipe.is_file() {
@@ -120,9 +103,8 @@ pub const LABEL: &str = "TECT";
 const MOUNTPOINT: &str = "/run/tect-payload";
 
 /// The root to classify when no `--from` named one. A `TECT` partition
-/// overrides the media's own payload — someone who attached a labelled drive
-/// did it deliberately — and more than one is refused naming them rather than
-/// picked between, since picking wrong erases a disk from the wrong image.
+/// overrides the media's own payload; more than one is refused naming them,
+/// since picking wrong erases a disk from the wrong image.
 pub fn root() -> Result<PathBuf, String> {
     let listed = Command::new("blkid")
         .args(["-t", &format!("LABEL={LABEL}"), "-o", "device"])
@@ -156,7 +138,7 @@ fn labelled(listed: &str) -> Vec<String> {
 /// and this environment ends at the reboot.
 fn mounted(device: &str) -> Result<PathBuf, String> {
     let at = PathBuf::from(MOUNTPOINT);
-    // A second run finds its own mount rather than failing over it.
+    // A second run finds its own mount and carries on over it.
     if at.join(RECIPE).is_file() {
         return Ok(at);
     }
@@ -186,10 +168,8 @@ const KINDS: [(&str, &str); 4] = [
 const NONE: &str = "none";
 
 /// What a machine with a TPM has, and what the two `tpm2-` forms need.
-///
-/// `$TECT_TPM` names it instead where it is set, which is how the drawn golden
-/// stops depending on whether the machine running it has one — the same reason
-/// that flow is given a `--disk` rather than reading `/sys/block`.
+/// `$TECT_TPM` overrides the path, so the drawn golden does not depend on the
+/// machine running it having one.
 const TPM: &str = "/dev/tpmrm0";
 
 fn tpm() -> PathBuf {
@@ -261,14 +241,13 @@ enum Leave {
     Shell,
 }
 
-/// Whether a widget's error is a person wanting out rather than a failure.
-/// Esc is the other half of that and is a `None`, not an error.
+/// Whether a widget's error is a person wanting out. Esc is the other half of
+/// that and is a `None`, not an error.
 fn leaving(err: &str) -> bool {
     err == crate::ui::INTERRUPTED
 }
 
-/// What a leave key asks before it leaves, and the reason it is three answers
-/// and not two: a loop with no exit is worse than the exit it replaces.
+/// What a leave key asks before it leaves.
 fn leave(prompt: &Prompt) -> Result<Leave, String> {
     // Only a drawn run can reach a leave key at all, and this is what stops a
     // run that cannot be asked from looping over a question it never sees.
@@ -350,13 +329,10 @@ impl Answers {
         }
     }
 
-    /// Every field before any of them is asked. **On a screen nothing is asked
-    /// here at all**: the flags and the defaults seed the form, and the form is
-    /// where the questions are, so all of them are visible at once and none is
-    /// reached by answering the ones before it.
-    ///
-    /// With no screen there is no form, so this is the whole of the collection
-    /// and a value no flag gave is a refusal naming the flag.
+    /// Every field before any of them is asked. On a screen nothing is asked
+    /// here: the flags and defaults seed the form, and the form asks. With no
+    /// screen there is no form, and a value no flag gave is a refusal naming
+    /// the flag.
     fn seeded(payload: &Payload, given: Given, prompt: &Prompt) -> Result<Self, String> {
         if !prompt.draws() {
             return Ok(Self {
@@ -397,17 +373,15 @@ impl Answers {
         })
     }
 
-    /// The form's rows, in the order `ROW_*` names them. The passphrase is
-    /// always one of them: the row list is built once and the encryption kind
-    /// is chosen inside the form, so a row that came and went would have to
-    /// rebuild the screen under the person editing it.
+    /// The form's rows, in the order `ROW_*` names them. The passphrase row is
+    /// always present: the list is built once, so a row that came and went
+    /// would rebuild the screen under the person editing it.
     fn fields(&self, filesystem: &str, bootloader: &str) -> Vec<crate::ui::Field> {
         use crate::ui::Field;
         let found = disks(&sys_block(), &in_use_now());
         let at = found.iter().position(|(disk, _)| *disk == self.disk);
         let disk = match found.is_empty() {
-            // A machine whose `/sys/block` says nothing is typed into rather
-            // than picked from an empty list.
+            // A machine whose `/sys/block` says nothing is typed into.
             true => Field::text(copy::ROW_DISK, &self.disk),
             false => Field::pick(
                 copy::ROW_DISK,
@@ -498,10 +472,9 @@ fn asked(fields: &[crate::ui::Field]) -> Vec<usize> {
         .collect()
 }
 
-/// What the form is still short of, which is what `Install` says instead of
-/// being pickable. These are the values nothing derives and no default stands
-/// in for, plus the one thing a form can check that a sequence of questions
-/// had to ask twice for: that both halves of the password agree.
+/// What the form is still short of, which is what `Install` says while it is
+/// unpickable: the values nothing derives and no default covers, plus that both
+/// halves of the password agree.
 fn short_of(fields: &[crate::ui::Field]) -> Option<String> {
     let at = |row: usize| fields[row].value();
     if !at(ROW_PASSWORD).is_empty() && at(ROW_PASSWORD) != at(ROW_CONFIRM) {
@@ -555,14 +528,11 @@ fn in_use_now() -> String {
 
 /// Whether the running system is already using this disk.
 ///
-/// **On installer media that is the medium itself.** It carries the live root,
-/// it is a whole disk like any other, and `/sys/block` says nothing about which
-/// one somebody booted — so without this it is offered beside the machine's own
-/// disks and choosing it partitions the wrong thing.
-///
-/// The question asked is what is mounted, not what is writable. A read-only
-/// flag catches a medium only where the medium happens to be read-only, which a
-/// stick written with `dd` is not.
+/// On installer media that is the medium itself: a whole disk like any other,
+/// and `/sys/block` says nothing about which one was booted, so without this it
+/// is offered beside the machine's own disks and partitioning it erases the
+/// wrong thing. The question is what is mounted, not what is writable — a stick
+/// written with `dd` is not read-only.
 fn in_use(disk: &Path, name: &str, mounts: &str) -> bool {
     let is_source = |dev: &str| {
         mounts
@@ -584,8 +554,7 @@ fn in_use(disk: &Path, name: &str, mounts: &str) -> bool {
 
 /// The whole disks this machine has, as `/sys/block` holds them, with what a
 /// person needs to tell one from another beside each. `mounts` is
-/// `/proc/mounts`, which is what keeps the medium this is running from out of
-/// the list.
+/// `/proc/mounts`, which keeps the medium this is running from out of the list.
 pub fn disks(sys: &Path, mounts: &str) -> Vec<(String, String)> {
     let Ok(entries) = std::fs::read_dir(sys) else {
         return Vec::new();
@@ -636,7 +605,7 @@ pub fn disks(sys: &Path, mounts: &str) -> Vec<(String, String)> {
 
 /// No default disk anywhere: with nobody to ask, a missing one is a refusal
 /// naming `--disk`, and a machine whose `/sys/block` says nothing is typed
-/// into rather than guessed at.
+/// into.
 fn ask_disk(
     given: Option<String>,
     current: Option<&str>,
@@ -680,8 +649,8 @@ fn named(kind: String) -> Result<String, String> {
     ))
 }
 
-/// A `tpm2-` form on a machine with no TPM is shown and not pickable rather
-/// than left out: what it needs is the reason it is worth showing.
+/// A `tpm2-` form on a machine with no TPM is shown and refuses the key that
+/// would pick it: what it needs is the reason it is worth showing.
 fn kinds(tpm: bool) -> Vec<Choice> {
     KINDS
         .iter()
@@ -692,10 +661,8 @@ fn kinds(tpm: bool) -> Vec<Choice> {
         .collect()
 }
 
-/// A `tpm2-` form on a machine with no TPM is shown and not pickable, the way
-/// every unmet option in this tool is: what it needs is the reason it is worth
-/// showing. The passphrase is asked every time the kind is, so editing the row
-/// can change it.
+/// A `tpm2-` form on a machine with no TPM is shown and not pickable. The
+/// passphrase is asked every time the kind is, so editing the row can change it.
 fn ask_encryption(
     given: Option<String>,
     passphrase: Option<String>,
@@ -732,7 +699,7 @@ fn ask_encryption(
 
 /// Replaces the value under `key`, or appends it. Anything that is not an
 /// object is left alone, so a recipe whose `user` is a string fails in
-/// fisherman's own reader rather than here.
+/// fisherman's own reader.
 fn set(value: &mut Json, key: &str, field: Json) {
     let Json::Object(fields) = value else { return };
     match fields.iter_mut().find(|(name, _)| name == key) {
@@ -741,10 +708,9 @@ fn set(value: &mut Json, key: &str, field: Json) {
     }
 }
 
-/// The recipe with the person's half in it. `user` is merged rather than
-/// replaced: the groups already in it are the *target's* admin group, which
-/// `emit::recipe` derives from the base family and `useradd` refuses the whole
-/// call over when it names a group the target has not got.
+/// The recipe with the person's half in it. `user` is merged: the groups
+/// already in it are the target's admin group, and `useradd` refuses the whole
+/// call when it names a group the target has not got.
 pub fn complete(recipe: &Path, answers: &Answers) -> Result<Json, String> {
     let raw =
         std::fs::read_to_string(recipe).map_err(|err| format!("{}: {err}", recipe.display()))?;
@@ -776,18 +742,11 @@ pub fn complete(recipe: &Path, answers: &Answers) -> Result<Json, String> {
     Ok(doc)
 }
 
-/// A `$`-prefixed crypt string, because fisherman hands the field to
-/// `chpasswd` and only a `$` takes the `-e` branch. A plaintext one goes
-/// through PAM instead, which reads the *target's* `pam.d` with the live
-/// environment's modules and dies `pam_chauthtok() failed, error: Module is
-/// unknown` — **after the OS is already on the disk**, losing a completed
-/// install to its last step. Measured `NEXT-40` stage 3, and it is not
-/// something a person can be asked to remember.
-///
-/// `openssl passwd` rather than a crypt(3) of our own: the C one is in
-/// libcrypt rather than libc on glibc, which is a link-time dependency this
-/// binary does not have, and SHA-512 by hand is a hundred and fifty lines of
-/// cryptography written to avoid one process. `-stdin` keeps it out of `ps`.
+/// A `$`-prefixed crypt string: fisherman hands the field to `chpasswd` and
+/// only a `$` takes the `-e` branch. Plaintext goes through PAM and dies
+/// `pam_chauthtok() failed, error: Module is unknown` after the OS is already
+/// on the disk. `openssl passwd` because crypt(3) lives in libcrypt, which this
+/// binary does not link; `-stdin` keeps it out of `ps`.
 fn hashed(password: &str) -> Result<String, String> {
     let mut child = Command::new("openssl")
         .args(["passwd", "-6", "-stdin"])
@@ -849,13 +808,12 @@ impl Found {
     pub fn payload(&self) -> Result<&Payload, String> {
         match self {
             Self::Image(payload) => Ok(payload),
-            // Building here is the middle row of the plan's three, and it is
-            // not this: the scratch has to go on the target disk, which means
-            // partitioning before the build and an erased disk when the build
-            // fails. That ordering is a screen's decision, not a flag's.
+            // Not built here: the scratch has to go on the target disk, which
+            // means partitioning before the build and an erased disk when the
+            // build fails.
             Self::Repo(root) => Err(format!(
-                "{} is a repository and not a built image, so there is nothing here to install \
-                 yet\n\nhelp: `tect build` in it, then `tect installer --from <the built payload>`",
+                "{} is a repository, so there is nothing here to install yet\n\nhelp: \
+                 `tect build` in it, then `tect installer --from <the built payload>`",
                 root.display()
             )),
             Self::Nothing(root) => Err(format!(
@@ -879,10 +837,9 @@ enum Event {
     Note(String),
     /// The last step, which is always the whole of it.
     Done(String),
-    /// The only copy of it there will ever be, and the disk does not open
-    /// without it if the TPM stops answering. It is also the one thing the log
-    /// must not hold — a key on removable media turns the stick into the thing
-    /// that opens the disk.
+    /// The only copy there will ever be, and the disk does not open without it
+    /// if the TPM stops answering. It must never reach the log — a key on
+    /// removable media turns the stick into the thing that opens the disk.
     Recovery(String),
     /// Not one of its events, and kept as it came: what fisherman's own
     /// backends write is half of what a failed install is read back from.
@@ -914,9 +871,7 @@ impl Event {
         }
     }
 
-    /// What the log holds, which is everything except the key. A recovery key
-    /// written to removable media turns the stick into the thing that opens
-    /// the disk, which is the opposite of what encrypting it was for.
+    /// What the log holds, which is everything except the recovery key.
     fn logged(&self) -> Option<String> {
         match self {
             Self::Recovery(_) => None,
@@ -937,25 +892,18 @@ impl Event {
 }
 
 /// The renderer a deb image ships and a fedora one does not: their signed GRUB
-/// reads no BLS entries, so the menu is rendered from the entries `bootc` just
-/// wrote. Run *from the image* — a composefs deployment on the disk is sealed
-/// erofs with no walkable `/usr` to read it out of.
+/// reads no BLS entries. Run from the image — a composefs deployment on the
+/// disk is sealed erofs with no walkable `/usr`.
 const RENDERER: &str = "/usr/libexec/grub-menu-from-bls";
 
 /// Where the target's boot filesystem is mounted while the menu is written.
-/// The renderer takes a root and looks under `<root>/boot`, so the filesystem
-/// carrying the entries is mounted *at* `boot` beneath this, which is the same
-/// shape whether the target keeps /boot on its own partition or on the root.
+/// The renderer takes a root and looks under `<root>/boot`.
 const TARGET: &str = "/run/tect-target";
 
 /// The menu the installed machine boots from, written after fisherman has
-/// finished and unmounted: `bootc` installs the bootloader before it writes
-/// the entries, so nothing during the install itself can render them.
-///
-/// Silence is the failure this exists to avoid. An image with no renderer is a
-/// family that needs none and is skipped; anything else is an error, because a
-/// disk that installs and then reaches an empty GRUB menu looks like a broken
-/// image rather than a missing file.
+/// finished and unmounted: `bootc` installs the bootloader before it writes the
+/// entries, so nothing during the install can render them. An image with no
+/// renderer is skipped; anything else is an error.
 fn render_menu(image: &str, disk: &str) -> Result<(), String> {
     let at = PathBuf::from(TARGET);
     let boot = at.join("boot");
@@ -979,15 +927,9 @@ fn render_menu(image: &str, disk: &str) -> Result<(), String> {
 }
 
 /// The first partition of `disk` whose filesystem carries the boot entries,
-/// left mounted at `boot`, with the root the renderer wants for it.
-///
-/// Two layouts and one mount point: a target whose /boot is its own partition
-/// has the entries at the top of it, and one whose /boot is a directory on the
-/// root filesystem has them a level down. The mount is the same either way and
-/// only the root moves, so nothing has to know which the backend chose.
-///
-/// Found by content and not by label, so this depends on nothing about how the
-/// backend names its partitions.
+/// left mounted at `boot`, with the root the renderer wants for it: the top of
+/// a /boot partition, a level down where /boot is a directory on the root.
+/// Found by content, not by partition label.
 fn boot_partition(disk: &str, boot: &Path) -> Result<Option<(String, &'static str)>, String> {
     let listed = Command::new("lsblk")
         .args(["-nrpo", "NAME", disk])
@@ -1050,15 +992,10 @@ const LOG: &str = "tect-install.log";
 /// what an iso-only boot has.
 const IN_RAM: &str = "/run";
 
-/// Where the log goes, which is the question a bounded progress region
-/// creates: the screen stops being the only copy of the transcript, so there
-/// has to be another one.
-///
-/// Beside the payload where the payload is on a partition that can be
-/// remounted writable — `root()` mounts it read-only, and an image's own
-/// `/usr/share/tectonic` never can be. In RAM otherwise, which is every
-/// iso-only boot, since there is no writable partition on one at all. Which of
-/// the two happened is said rather than left to be found.
+/// Where the log goes: beside the payload where its partition can be remounted
+/// writable — `root()` mounts it read-only, and an image's own
+/// `/usr/share/tectonic` never can be — and in RAM otherwise, which is every
+/// iso-only boot. Which of the two happened is printed.
 fn open_log(payload: &Payload) -> (Option<std::fs::File>, Option<PathBuf>) {
     if payload.recipe.parent() == Some(Path::new(MOUNTPOINT)) && remounted_rw(MOUNTPOINT) {
         let path = Path::new(MOUNTPOINT).join(LOG);
@@ -1076,7 +1013,7 @@ fn open_log(payload: &Payload) -> (Option<std::fs::File>, Option<PathBuf>) {
 }
 
 /// The payload partition is mounted read-only, so a log beside the payload is
-/// a deliberate remount rather than an accident of where it landed.
+/// a deliberate remount.
 fn remounted_rw(at: &str) -> bool {
     Command::new("mount")
         .args(["-o", "remount,rw", at])
@@ -1085,19 +1022,15 @@ fn remounted_rw(at: &str) -> bool {
 }
 
 /// Completes the recipe and runs fisherman over it, drawing its event stream
-/// into a bounded region and writing all of it to a file. Not an `exec`: the
-/// events are only worth reading if something reads them, and the staged
-/// recipe is only removable if something outlives the install.
+/// into a bounded region and writing all of it to a file.
 ///
-/// A failed draw is not a failed install, so nothing here is `?` on the
-/// region: past this point the disk is gone and the screen is the least
-/// important thing on the machine.
+/// A failed draw is not a failed install, so nothing here is `?` on the region.
 pub fn run(payload: &Payload, answers: &Answers, prompt: &Prompt) -> Result<(), String> {
     let path = stage(&complete(&payload.recipe, answers)?)?;
     let (mut log, at) = open_log(payload);
-    // Only where nothing is drawn. On the installer's own screen this landed
-    // above the box and stayed there, because a bounded region redraws itself
-    // and never the row over it.
+    // Only where nothing is drawn. On the installer's own screen this would
+    // land above the box and stay there, because a bounded region redraws
+    // itself and never the row over it.
     if !prompt.draws() {
         eprintln!(
             "tect: installing {} as {} onto {}, {}",
@@ -1107,11 +1040,8 @@ pub fn run(payload: &Payload, answers: &Answers, prompt: &Prompt) -> Result<(), 
             copy::logging(at.as_deref())
         );
     }
-    // **One pipe for both streams**, which is `2>&1` and is here for the same
-    // reason: fisherman's stderr was inherited, so its diagnostics printed
-    // straight onto the console the region is drawn on and the log never held
-    // them. Merged, they are events like any other — read, logged, and shown
-    // under the bar.
+    // One pipe for both streams, so fisherman's stderr is an event like any
+    // other. Inherited, it would print straight onto the drawn region.
     let (events, writer) = std::io::pipe().map_err(|err| format!("{BACKEND}: {err}"))?;
     let errors = writer
         .try_clone()
@@ -1128,14 +1058,10 @@ pub fn run(payload: &Payload, answers: &Answers, prompt: &Prompt) -> Result<(), 
     };
     let mut recovery = None;
     {
-        // **The lines are read on a thread and taken with a timeout**, so the
-        // screen has something to do while fisherman has nothing to say. A
-        // step can hold the machine for minutes between two messages, and a
-        // blocking read gives the region no chance to show it is still alive.
-        //
-        // Both write ends were moved into the child, so this side holds none
-        // and the read ends when the child does; the channel then disconnects
-        // and so does this loop.
+        // Read on a thread and taken with a timeout, so the region keeps
+        // drawing while fisherman is silent; a step can hold the machine for
+        // minutes between two messages. Both write ends moved into the child,
+        // so the read ends when the child does and this loop with it.
         let (lines, arriving) = std::sync::mpsc::channel();
         std::thread::spawn(move || {
             for line in std::io::BufReader::new(events)
@@ -1379,7 +1305,7 @@ mod tests {
     }
 
     /// A machine with no TPM still sees the two forms that need one, dim and
-    /// saying why, rather than a shorter list that explains nothing.
+    /// saying why. A shorter list explains nothing.
     #[test]
     fn the_tpm_forms_are_shown_and_unpickable_where_there_is_no_tpm() {
         let shown = kinds(false);
@@ -1409,8 +1335,8 @@ mod tests {
             &Encryption::none(),
             &Prompt::silent(),
         )
-        // `.err()` rather than `unwrap_err`, which would want a `Debug` on a
-        // struct holding a passphrase.
+        // `.err()`, because `unwrap_err` would want a `Debug` on a struct
+        // holding a passphrase.
         .err()
         .expect("a refusal");
         assert!(refused.contains("tpm2-luks-passphrase"), "{refused}");
@@ -1490,8 +1416,8 @@ tmpfs /run tmpfs rw,nosuid,nodev 0 0
         let _ = std::fs::remove_dir_all(&sys);
     }
 
-    /// The scan refuses rather than picks, because picking wrong erases a disk
-    /// from the wrong image.
+    /// The scan refuses, because picking wrong erases a disk from the wrong
+    /// image.
     #[test]
     fn more_than_one_labelled_partition_is_named_rather_than_chosen() {
         assert!(labelled("\n").is_empty());
@@ -1629,8 +1555,7 @@ tmpfs /run tmpfs rw,nosuid,nodev 0 0
             ]
         };
         assert!(short_of(&form("hunter2", "hunter2", NONE, "")).is_none());
-        // Both halves are on screen at once, so they are compared rather than
-        // asked for twice.
+        // Both halves are on screen at once, so they are compared there.
         let differ = short_of(&form("hunter2", "hunter3", NONE, "")).unwrap();
         assert_eq!(differ, copy::NO_MATCH_ROW);
         // A passphrase is owed only by the forms named for one.

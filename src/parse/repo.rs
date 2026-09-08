@@ -15,7 +15,7 @@ use std::path::Path;
 /// repo.kdl's grammar, and the whole of it.
 #[rustfmt::skip]
 pub const REPO: Node = Node::new("repo",
-    "What is true of the repository rather than of any image in it.")
+    "What is true of the repository, leaving each image to say what is true of itself.")
     .children(&[
         Node::new("schema-version",
             "The schema release this repository is written against, which picks the reader.")
@@ -136,8 +136,8 @@ pub const REPO: Node = Node::new("repo",
                  provenance fact and fails on none of them"))
             .children(&[
                 Node::new("enforce",
-                    "Whether a provenance fact that is missing or does not match stops the run \
-                     rather than being reported.")
+                    "Whether a provenance fact that is missing or does not match stops the run. \
+                     Off, it is reported and the run carries on.")
                     .arg(Arg::Bool, Say::new("`enforce` needs #true or #false", "not a boolean",
                         "`enforce #true` makes an unverified import, a module edited since \
                          import, a base that will not resolve and an unstamped build into \
@@ -150,7 +150,7 @@ pub const REPO: Node = Node::new("repo",
          `seed`, a \
          `workflows` block, a `sources` block, a `manifest` block and an `audit` block: what is \
          true of the \
-         repository rather than of any image in it. An image goes in a file of its own"));
+         repository. An image goes in a file of its own"));
 
 /// `image.kdl` or `<name>.image.kdl` at the root, holding whatever images it
 /// likes.
@@ -160,8 +160,7 @@ const IMAGE_FILE: Node = Node::new("image file",
      an image is called what it declares, so one file may hold as many as suit the repository.")
     .children(&[IMAGE], Say::new("unknown top-level node `{}`", "not part of the schema",
         "an image file holds `image` nodes and nothing else; `base`, `flavours` and `modules` are \
-         declared inside one, because they are what the image is rather than what the repository \
-         is"));
+         declared inside one, because they are what the image is"));
 
 /// What repo.kdl declares about which tool reads it.
 struct Pins {
@@ -171,10 +170,9 @@ struct Pins {
     src: Source,
 }
 
-/// Read directly rather than through the grammar, and before anything else,
-/// because they decide whether this release reads the rest at all. A repo.kdl
-/// that is missing, unparseable or declares neither falls through to the
-/// reader, which is what reports it.
+/// Read directly, and before anything else, because they decide whether this
+/// release reads the rest at all. A repo.kdl that is missing, unparseable or
+/// declares neither falls through to the reader, which is what reports it.
 fn pins(root: &Path) -> Option<Pins> {
     let path = root.join(layout::REPO_FILE);
     let text = std::fs::read_to_string(&path).ok()?;
@@ -195,11 +193,9 @@ fn pins(root: &Path) -> Option<Pins> {
 }
 
 /// Whether this release may work in the repository at all. `parse/` understands
-/// one schema, so a repository written against another is refused rather than
-/// read against the wrong grammar. That is the whole gate: `tect-version` names
-/// a release rather than a grammar, and every node the walker accepts is in a
-/// schema table, so a pin naming another release says nothing about whether the
-/// declarations here can be read. See `pinned_elsewhere`.
+/// one schema, so a repository written against another is refused. A pin naming
+/// another release says nothing about whether the declarations here can be
+/// read — see `pinned_elsewhere`.
 pub fn compatible(root: &Path) -> Issues {
     let mut issues = Issues::default();
     let Some(pins) = pins(root) else {
@@ -237,12 +233,10 @@ pub fn compatible(root: &Path) -> Issues {
 
 /// The release a repository pins, when that is not this one.
 ///
-/// A notice rather than a refusal. What a pin protects is *generated output*,
-/// not readability: a different release writes different workflow bodies, and
-/// `verify` already reports that as drift with `generate` to resolve it.
-/// Refusing instead made every repository unusable between releases, patch
-/// bumps included, while `schema-version` — the thing that does decide whether
-/// the declarations parse — sat unchanged.
+/// A notice. A pin protects generated output: a different release writes
+/// different workflow bodies, and `verify` already reports that as drift with
+/// `generate` to resolve it. `schema-version` is what decides whether the
+/// declarations parse.
 pub fn pinned_elsewhere(root: &Path) -> Option<String> {
     let version = pins(root)?.tect?.0;
     (version != TECT_VERSION).then_some(version)
@@ -259,11 +253,10 @@ pub fn pinned_unverified(root: &Path) -> Option<String> {
         .map(|(version, _)| version)
 }
 
-/// The collections a `sources` block declares, read out of text rather than
-/// out of a repository: what a repository that is not written yet will have,
-/// which is the only thing `create repo` can offer modules against. Anything
-/// wrong with the block is the scaffold's own and is reported where the
-/// repository is read.
+/// The collections a `sources` block declares, read out of text: what a
+/// repository that is not written yet will have, which is the only thing
+/// `create repo` can offer modules against. Anything wrong with the block is
+/// reported where the repository is read.
 pub fn sources_in(text: &str) -> Vec<crate::model::remote::Collection> {
     let src = Source::new(layout::REPO_FILE, text);
     let Ok(doc) = text.parse::<KdlDocument>() else {
@@ -311,7 +304,7 @@ impl List {
     }
 
     /// repo.kdl, which is repo context, and every image file beside it. A root
-    /// `.kdl` that is neither is nobody's, and is reported rather than read.
+    /// `.kdl` that is neither is nobody's, and is reported.
     fn read(root: &Path) -> (Self, Issues) {
         let mut issues = Issues::default();
         let mut list = List::empty(root);
@@ -530,7 +523,7 @@ impl List {
                 )
                 .help(format!(
                     "`schema-version {SCHEMA_VERSION}`, so a tool from a different release \
-                     says so plainly instead of reporting every node it does not recognise"
+                     says so plainly. Without it, it reports every node it does not recognise"
                 )),
             );
         }
@@ -754,7 +747,7 @@ mod tests {
     use super::*;
 
     /// A repo.kdl holding `text` and nothing else, since both readers under
-    /// test take a root rather than a document.
+    /// test take a root.
     fn root(name: &str, text: &str) -> std::path::PathBuf {
         let dir = std::env::temp_dir().join(format!("tect-pin-{name}"));
         let _ = std::fs::remove_dir_all(&dir);

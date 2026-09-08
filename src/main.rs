@@ -10,7 +10,7 @@ use tect::model::image::TECT_VERSION;
 use tect::prompt::Prompt;
 
 /// Where a person who has run out of commands is sent, which is what an
-/// operation that failed says instead of the whole surface.
+/// operation that failed says. The whole surface is too much to print.
 const COMMANDS: &str = "You can find the available commands by typing 'tect' or 'tect --help'";
 
 /// Whether the banner is already on one of the streams.
@@ -75,7 +75,8 @@ impl Args {
         self.words.len() != before
     }
 
-    /// A flag the command does not read is a failure rather than a silent no-op.
+    /// A flag the command does not read is a failure. Ignored, it is a silent
+    /// no-op.
     fn only(&self, spec: &Spec) -> Result<(), Error> {
         match self.given.iter().find(|flag| !spec.takes.contains(flag)) {
             Some(flag) => Err(Error::Invocation(format!(
@@ -88,8 +89,9 @@ impl Args {
 }
 
 fn main() -> ExitCode {
-    // Rust ignores SIGPIPE, so `tect plan | head` panics on the write rather
-    // than ending the run. Every print here is a person's or a script's.
+    // Rust ignores SIGPIPE, so `tect plan | head` panics on the write. The
+    // default handler ends the run quietly. Every print here is a person's or a
+    // script's.
     unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
 
     match run() {
@@ -116,10 +118,9 @@ fn main() -> ExitCode {
     }
 }
 
-/// Whether the words are a list rather than a command: nothing typed at all,
-/// or a verb alone where every form of it takes a noun. `scap` and `fetch` are
-/// neither, since a picker of their nouns would hide the half that takes an
-/// argument instead.
+/// Whether the words are a list: nothing typed at all, or a verb alone where
+/// every form of it takes a noun. `scap` and `fetch` are neither, since a
+/// picker of their nouns would hide the half that takes an argument instead.
 fn picking(words: &[&str], prompt: &Prompt, here: &Context) -> bool {
     prompt.draws()
         && match words {

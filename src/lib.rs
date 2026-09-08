@@ -66,8 +66,8 @@ fn context(list: &List, root: &Path) -> String {
 /// and the counts `check` reports.
 pub struct Run {
     pub stdout: String,
-    /// What a read-out says, as data, for a terminal to draw instead of the
-    /// markdown in `stdout`.
+    /// What a read-out says, as data, for a terminal to draw. `stdout` carries
+    /// the markdown.
     pub parts: Vec<emit::Part>,
     /// What `generate` produced, as the path each file is written at relative
     /// to the repository root, and its contents.
@@ -87,14 +87,13 @@ pub struct Run {
     /// build a different tree tomorrow. `check`'s alone, like `shadowed`.
     pub unpinned: Vec<String>,
     /// Imported modules whose content no longer matches the record beside them.
-    /// Forking one is legitimate, so this is a read-out rather than a
-    /// diagnostic; `check`'s alone.
+    /// Forking one is legitimate, so this is a read-out; `check`'s alone.
     pub modified: Vec<String>,
     /// Who provides what, as the run saw it: `check`'s conformance notice
     /// asks it what would claim a rule the image is missing.
     pub(crate) index: provider::Index,
     /// The reading this ran against, so a caller that needs one after a command
-    /// acts on what the command saw rather than reading the tree again.
+    /// acts on what the command saw.
     pub(crate) list: List,
     /// Beside `list`, and in the same order as its images.
     pub(crate) resolved: Vec<Resolved>,
@@ -470,9 +469,9 @@ fn verify(root: &Path, files: &[(PathBuf, String)], issues: &mut Issues) {
         [] => {}
         [name] => issues
             .push(Issue::new(format!("`{name}` is not there"), &Source::new(name, "")).help(HELP)),
-        // Named for the tree rather than for whichever of them sorted first:
-        // the finding is about all of them, and pointing the summary line at
-        // one arbitrary file reads as that file being the problem.
+        // Named for the tree: the finding is about all of them, and pointing
+        // the summary line at one arbitrary file reads as that file being the
+        // problem.
         many => issues.push(
             Issue::new(
                 format!("{} generated files are not there", many.len()),
@@ -501,9 +500,9 @@ fn verify(root: &Path, files: &[(PathBuf, String)], issues: &mut Issues) {
 
 /// Writes what `generate` produced, after clearing the directory so an image or
 /// a module that is gone leaves with its files. Everything under `generated/`
-/// is written from here, and so is every workflow the repository declares,
-/// which is what `verify` holds both to. A workflow it no longer declares is
-/// removed by name: one the tool does not ship is the repository's own.
+/// is written from here, and so is every workflow the repository declares. A
+/// workflow it no longer declares is removed by name: one the tool does not
+/// ship is the repository's own.
 pub fn write_generated(root: &Path, files: &[(PathBuf, String)]) -> Result<(), String> {
     let dir = layout::generated(root);
     if dir.is_dir() {

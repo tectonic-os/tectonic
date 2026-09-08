@@ -2,9 +2,8 @@
 //! collection it came from, what pinned that collection, and what the directory
 //! hashed to at the time.
 //!
-//! It is a sibling of `module.kdl` and never part of it. `module.kdl` is the
-//! author's file, and rewriting it on import would fork it from upstream and
-//! break the very comparison the hash exists to make.
+//! A sibling of `module.kdl`, never part of it: rewriting the author's file on
+//! import would fork it from upstream and break the hash comparison.
 
 use crate::diag::{Issues, Source};
 use crate::layout;
@@ -146,8 +145,8 @@ pub fn hash(dir: &Path) -> Option<String> {
 }
 
 /// Every imported module whose content no longer matches what its record says.
-/// Forking a module is legitimate, so this is a read-out rather than a
-/// diagnostic; what it buys is that the fork is visible.
+/// Forking a module is legitimate, so this is a read-out; what it buys is that
+/// the fork is visible.
 pub fn modified(root: &Path) -> Vec<String> {
     let mut out = Vec::new();
     for dir in dirs(&layout::modules(root)) {

@@ -1,17 +1,12 @@
-//! The build record: what was **resolved**, where `plan.json` is what was
-//! **declared**.
+//! The build record: what was resolved, where `plan.json` is what was declared.
 //!
-//! A moving reference with a recorded resolution is fully auditable and fully
-//! fresh, which is the whole reason to be on bootc. There are exactly three of
-//! them and they get one treatment: a base image tag resolves to a manifest
-//! digest, a cloned asset's ref to a commit, and an unpinned collection's ref
-//! to what the tarball actually hashed to.
+//! Three moving references get one treatment: a base image tag resolves to a
+//! manifest digest, a cloned asset's ref to a commit, and an unpinned
+//! collection's ref to what the tarball hashed to.
 //!
 //! The resolution cannot go in `plan.json`: that file is committed and byte
-//! compared, so a daily-changing value would fail `verify` every morning. This
-//! document is written in-layer from ARGs instead, exactly the way `tect
-//! os-release` writes `/usr/lib/os-release`, so nothing under `generated/` ever
-//! holds it and `verify` never sees it.
+//! compared, so a daily-changing value would fail `verify`. This document is
+//! written in-layer from ARGs, so nothing under `generated/` holds it.
 
 use crate::emit::json::Json;
 use std::path::Path;
@@ -29,8 +24,8 @@ fn env(name: &str) -> Option<String> {
 }
 
 /// What `<program> <args>` printed, or None when it is not installed or said
-/// nothing. A resolution that fails is recorded as absent rather than fatal;
-/// `audit { enforce }` is what makes it an error.
+/// nothing. A resolution that fails is recorded as absent; `audit { enforce }`
+/// is what makes it an error.
 fn output(program: &str, args: &[&str]) -> Option<String> {
     let out = Command::new(program).args(args).output().ok()?;
     if !out.status.success() {
@@ -207,13 +202,13 @@ mod tests {
         assert!(out.contains("\"backend\": \"buildah\""));
         assert!(out.contains("\"path\": \"apps/browser\""));
         assert!(out.contains("\"selector\": \"B7\""));
-        // Nothing was declared, so the record says so rather than staying silent.
+        // Nothing was declared, so the record says so.
         assert!(out.contains("\"enforce\": false"));
         assert!(out.contains("\"verified\": null"));
     }
 
     /// A reference that already names a digest is not asked about again, which
-    /// is what makes `BASE` in the environment one resolution rather than two.
+    /// is what makes `BASE` in the environment one resolution.
     #[test]
     fn a_reference_that_already_carries_a_digest_resolves_to_itself() {
         let pinned = "quay.io/fedora/fedora-bootc:44@sha256:abc";

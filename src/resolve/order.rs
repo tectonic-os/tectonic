@@ -33,9 +33,7 @@ pub fn sort(image: &Image, issues: &mut Issues) -> Vec<usize> {
         }
         // A module shipping MAC policy is one too: the layer calls the helper
         // the provider installed, so it builds after whoever provides the MAC
-        // even though it requires nothing of it. Measured 2026-09-02 — `yubikey`
-        // above `deb-bootc-base/apparmor` dies on a missing
-        // `apparmor_parser`, and the same build the other way round passes.
+        // even though it requires nothing of it.
         let soft = module
             .after
             .iter()
@@ -104,8 +102,8 @@ pub fn apply(image: &mut Image, order: &[usize]) {
 }
 
 /// Everything left when the sort runs out of ready modules is waiting on
-/// something else that is also waiting, so the message names the edges rather
-/// than just reporting that an order could not be found.
+/// something else that is also waiting, so the message names the edges.
+/// Reporting only that an order could not be found says nothing about which.
 fn report_cycle(image: &Image, waits_on: &[Vec<usize>], remaining: &[usize], issues: &mut Issues) {
     let name = |index: usize| match &image.entries[index].flavour {
         Some(flavour) => format!("{} [{flavour}]", image.entries[index].path),

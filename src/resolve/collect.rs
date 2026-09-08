@@ -25,7 +25,7 @@ pub struct Collection {
     /// the same plan.
     pub destinations: Vec<String>,
     /// Each destination and the staged parts it is assembled from, ordered by
-    /// the priority each contribution declared rather than by build order.
+    /// the priority each contribution declared.
     pub assembled: BTreeMap<String, Vec<String>>,
 }
 
@@ -65,7 +65,7 @@ pub fn resolve_collects(
 
     // A contribution is a file the module ships, so it gates the way the rest
     // of them do. One file lands per module and the collector claims one name,
-    // so this picks the most specific copy rather than layering them.
+    // so this picks the most specific copy.
     let family = image.base.as_ref().map_or("", |base| base.family.as_str());
     for module in image.modules() {
         let dir = layout::module(root, &module.dir);

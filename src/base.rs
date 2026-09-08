@@ -1,7 +1,6 @@
 //! The bases the tool knows: what family each belongs to, and what it already
-//! ships. Reference data, not a module. A base that is not in here is not an
-//! error; it is a base nothing can describe, so `check` reports what is
-//! unsatisfied.
+//! ships. A base that is not in here is not an error; it is a base nothing can
+//! describe, so `check` reports what is unsatisfied.
 //!
 //! The shipped catalog is compiled in as a fallback for the runtime asset. A
 //! collection extends the selected catalog with a `bases.kdl` at its root,
@@ -57,9 +56,8 @@ pub struct Shadow {
 }
 
 /// The runtime catalog when present, otherwise its embedded snapshot, and then
-/// what every collection already on this machine adds to it.
-/// A collection that is not there is not read: the catalog costs no network, so
-/// a base picker works in a repository nothing has been fetched into.
+/// what every collection already on this machine adds to it. A collection that
+/// is not there is not read, so the catalog costs no network.
 pub fn catalog(
     root: &Path,
     sources: &[Collection],
@@ -119,10 +117,9 @@ pub fn catalog(
     (bases, shadows)
 }
 
-/// The reference with any `@sha256:…` taken off. A digest is a consumer's pin
-/// on a base the catalog already describes, not a second base: the family it
-/// belongs to and what it ships do not change with the digest, so both sides of
-/// a lookup are compared without one.
+/// The reference with any `@sha256:…` taken off. A digest pins a base the
+/// catalog already describes; the family it belongs to and what it ships do not
+/// change with it, so both sides of a lookup are compared without one.
 fn undigested(image: &str) -> &str {
     image.split_once('@').map_or(image, |(before, _)| before)
 }

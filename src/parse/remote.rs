@@ -8,8 +8,8 @@ use crate::parse::{kids, string_arg};
 use crate::provenance::evidence::{read, Role, PIN};
 use kdl::KdlNode;
 
-/// One collection in the registry, named by the owner rather than by the
-/// schema, which is why the node's name is empty.
+/// One collection in the registry, named by the owner, which is why the node's
+/// name is empty.
 #[rustfmt::skip]
 pub const COLLECTION: Node = Node::new("",
     "One module collection, named by the owner its references use.")

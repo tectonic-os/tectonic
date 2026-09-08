@@ -1,66 +1,28 @@
-# The installer live environment. It is a fixed Fedora base rather than a layer
-# on the image being installed, and that is a decision about Secure Boot.
-#
-# The media's boot chain decides whether a stranger's machine will boot the
-# stick at all, and it is independent of what gets installed: fisherman runs
-# the target image through podman, so the family installing is not the family
-# installed. Fedora ships a shim signed by the Microsoft UEFI CA that firmware
+# The installer live environment: a fixed Fedora base, which is a decision about
+# Secure Boot. Fedora ships a shim signed by the Microsoft UEFI CA that firmware
 # already trusts; Debian ships an unsigned systemd-boot and no shim, which
-# firmware with Secure Boot on — the factory default — refuses with `Access
-# Denied` before the installer draws anything. Deriving from the payload made
-# that refusal a property of which target was being installed, which is the
-# wrong thing for it to depend on. Fedora/RHEL-derived images are also most of
-# the bootc ecosystem, so this is the best-travelled live environment rather
-# than merely the one that boots signed.
+# firmware with Secure Boot on refuses with `Access Denied` before the installer
+# draws anything. fisherman runs the target image through podman, so the family
+# installing is independent of the family installed.
 #
-# Measured 2026-09-03: media built this way boots from a USB block device under
-# Secure Boot firmware with the default keys enrolled, and the kernel reports
-# `Kernel is locked down from EFI Secure Boot mode` — the whole chain verified,
-# with no key for anyone to enrol.
+# Two costs: the media no longer carries the payload's own kernel, so media that
+# boots does not prove the installed system will, and a stick for a non-Fedora
+# target grows, since the live rootfs and the offline store share nothing.
 #
-# Two costs, both real and neither hidden. The media no longer carries the
-# payload's own kernel, so a media that boots no longer proves the installed
-# system will. And a stick for a non-Fedora target grows — measured 996 MB to
-# 1.88 GB for the Debian one — because the live rootfs and the offline store
-# are then different images with nothing to share.
-#
-# The installed disk is a separate question from the media, and the family
-# table answers it: the deb row asks for grub2, and the deb base stages
-# Debian's own signed shim and GRUB as bootupd's payload, so the installed
-# machine boots with Secure Boot on as well.
-#
-# Staged into out/bootiso/ by `tect vm build iso` and never committed: it
-# varies with nothing but the recipe beside it, and eighty lines of installer
-# plumbing in every repository buys nothing.
+# Staged into out/bootiso/ by `tect vm build iso` and never committed.
 
 # renovate: datasource=docker depName=docker.io/library/golang
 ARG GO_IMAGE=docker.io/library/golang:1.26
 # renovate: datasource=docker depName=quay.io/fedora/fedora-bootc
 ARG LIVE_BASE=quay.io/fedora/fedora-bootc:44
 
-# Neither project publishes a binary worth pinning — fisherman's one release
-# asset is 174 commits behind its own tip, and tacklebox has no releases at all
-# — so both are source archives pinned by sha256 and built here.
+# Neither project publishes a binary worth pinning, so both are source archives
+# pinned by sha256 and built here.
 #
-# Fisherman is pinned to **upstream** and this project carries no fisherman fork
-# any more. It did carry one commit — running the deployment's own
-# `/usr/libexec/grub-menu-from-bls` against the target while it was still
-# mounted — and that became redundant on 2026-09-04 when the installer learned
-# to render after fisherman returns. Both ran for a while and wrote the same
-# file; measured in one install log as fisherman's `test -f
-# /mnt/fisherman-target/…/grub-menu-from-bls` followed by `tect: wrote the boot
-# menu`. Dropping the fork loses nothing here, and the render is still worth
-# submitting upstream for anyone else building on fisherman — the case is in
-# `FISHERMAN-FORK.md`, outside this repository.
-#
-# The base it forks from is `tuna-os` deliberately, and that repository's own
-# description says otherwise: it reads `MOVED -> github.com/projectbluefin/
-# fisherman`, and that destination is a fork whose tip is 123 commits and a
-# month behind this one. The `composefs-backend requires fs-verity, which XFS
-# does not support` guard — the one rule that catches a wrong `filesystem` in
-# the recipe emitted beside this file — landed there ten days after the fork
-# stopped. A redirect a project asserts about itself is not evidence of where
-# its code is. Do not "correct" this pin.
+# Fisherman is pinned to upstream and this project carries no fisherman fork.
+# The base it forks from is `tuna-os` deliberately: that repository's own
+# description reads `MOVED -> github.com/projectbluefin/fisherman`, and that
+# destination is a fork well behind this one. Do not "correct" this pin.
 #
 # CGO_ENABLED=0 because tacklebox's default build links `net` and `os/user`
 # against the builder's libc, and it is copied out of this stage to a host.
@@ -70,37 +32,22 @@ FROM ${GO_IMAGE} AS tools
 ARG FISHERMAN_ORG=tuna-os
 ARG FISHERMAN_COMMIT=027fa25c1d8bc01e2ac97d119cda9e8bb9c99ac7
 ARG FISHERMAN_SHA256=ffab2a2c1094fa02a9b4862958c280045c9390425c93195855a9f0f93956c72e
-# Tacklebox is the one fork left, and unlike the fisherman pin above that is not
-# a preference about where the code lives — the media needs a change upstream
-# has not got. **The pin is `secure-boot-media`, not the wider `tectonic`
-# branch**: it stages the payload's signed shim so the stick boots a machine
-# with Secure Boot on, which is the factory default and refused the unsigned
-# systemd-boot with `Access Denied`. Upstream has most of this already in
-# `purefs.DetectBootChain`, wired only into `cmd/purebuild` and `cmd/tbwasm`;
-# the right upstream shape is `iso.go` calling it. Report it rather than keep it.
+# Tacklebox is the one fork left: the media needs a change upstream has not got.
+# The pin is `secure-boot-media`, which stages the payload's signed shim so the
+# stick boots a machine with Secure Boot on. Upstream has most of this in
+# `purefs.DetectBootChain`, wired only into `cmd/purebuild` and `cmd/tbwasm`.
 #
-# **The `esp-partition` branch is deliberately not pinned any more.** It
-# appended the ESP as a `0xEF` partition so firmware would find it on a USB
-# block device, and it cost CD-ROM boot outright — see `emit::recipe::media`,
-# where `esp_partition` is no longer set. Measured both directions under OVMF:
-# a block device boots either way, a DVD-ROM only without it. So the fork now
-# carries Secure Boot work and nothing else, which is the shape it should have
-# been submitted in.
-#
-# The pin does still carry a fourth layout for the signed pair: the deb families
+# The pin also carries a fourth layout for the signed pair: the deb families
 # keep theirs under `/usr/lib/shim` and `/usr/lib/grub/x86_64-efi-signed`, which
-# none of the three bootupd/ostree layouts upstream knows covers, so a deb
-# `LIVE_BASE` fell through to unsigned media without saying so. Inert while
-# `LIVE_BASE` is Fedora, which it is by default.
+# none of the three upstream layouts covers, so a deb `LIVE_BASE` fell through
+# to unsigned media without saying so. Inert while `LIVE_BASE` is Fedora.
 ARG TACKLEBOX_ORG=tectonic-os
 ARG TACKLEBOX_COMMIT=b3f3b9a744d65c93dc2536cc55e4bb3030e0535c
 ARG TACKLEBOX_SHA256=3c9d9904d6ae0ef9fbd949435c63d1c20ab0cab940543b17668fd94e0330e278
 # `ExtractEFIBinary` takes an image argument, never reads it, and looks only at
-# two host paths — so a host with no systemd-boot-unsigned is a hard stop, and
-# on a cross-distro builder the host is the wrong source anyway: the media
-# should boot with the bootloader its own image ships. The patch makes
-# tacklebox's own error message true, and it is the one patch this project
-# carries upstream. Report it rather than keep it.
+# two host paths, so a host with no systemd-boot-unsigned is a hard stop and on
+# a cross-distro builder the host is the wrong source. The patch makes
+# tacklebox's own error message true.
 COPY efi-from-image.patch /tmp/efi-from-image.patch
 RUN set -eux; \
     fetch() { \
@@ -120,25 +67,18 @@ RUN set -eux; \
 FROM ${LIVE_BASE}
 
 # podman runs the install container, so the family installing is irrelevant to
-# the family installed and there is one live environment rather than one per
-# family. fuse-overlayfs is what reads the offline store, and
-# systemd-cryptenroll is what fisherman aborts before touching a disk without
-# — Debian ships it in systemd-cryptsetup and not in systemd, and its own
-# error text says to install systemd. tunaOS lost an image, an ISO and a live
-# boot to that, so this asserts the binaries and never the packages.
+# the family installed and there is one live environment. fuse-overlayfs reads
+# the offline store; systemd-cryptenroll is what fisherman aborts before
+# touching a disk without, and Debian ships it in systemd-cryptsetup and not in
+# systemd. So this asserts the binaries and never the packages.
 #
-# openssl is the installer's password hash. Fisherman hands the recipe's
+# openssl is the installer's password hash: fisherman hands the recipe's
 # password to chpasswd, and only a `$`-prefixed crypt string takes the `-e`
-# branch: a plaintext one goes through PAM and dies after the OS is already on
-# the disk. `openssl passwd -6 -stdin` is what produces it, and crypt(3) is not
-# an option here — glibc keeps it in libcrypt rather than libc.
+# branch. crypt(3) is not an option — glibc keeps it in libcrypt.
 #
-# The dnf arm is the one that runs, since the base above is Fedora. The apt arm
-# is kept because `LIVE_BASE` is overridable and a Debian live environment is
-# the fallback for anyone who cannot use this one — it produces unsigned media.
-# Measured 2026-09-03: the dnf arm assembles an ISO that boots. The assertion
-# below is what makes a wrong package name a failed ISO build rather than a
-# wiped disk.
+# The dnf arm is the one that runs; the apt arm is kept because `LIVE_BASE` is
+# overridable, and it produces unsigned media. The assertion below makes a wrong
+# package name a failed ISO build and not a wiped disk.
 RUN set -eux; \
     if command -v apt-get > /dev/null 2>&1; then \
         apt-get update -y; \
@@ -167,10 +107,10 @@ RUN set -eux; \
 COPY --from=tools /out/fisherman /usr/bin/fisherman
 COPY recipe.json /usr/share/tectonic/install-recipe.json
 
-# Tacklebox writes the payload to LiveOS/store.squashfs.img and mounts the
-# media at /run/initramfs/live, but ships no unit to mount the store — tunaOS
-# carries its own. No path component here holds a dash, so the unit name is the
-# mount point with slashes swapped and no \x2d escaping to get wrong.
+# Tacklebox writes the payload to LiveOS/store.squashfs.img and mounts the media
+# at /run/initramfs/live, but ships no unit to mount the store. No path
+# component here holds a dash, so the unit name is the mount point with slashes
+# swapped and no \x2d escaping to get wrong.
 COPY <<'MOUNT' /usr/lib/systemd/system/var-lib-tectonic-store.mount
 [Unit]
 Description=Offline image store carried by the installer media
@@ -187,9 +127,8 @@ WantedBy=multi-user.target
 MOUNT
 
 # Naming the store in the recipe is not enough. `additionalImageStores` is
-# handed to the bootc install container, while fisherman's pull step runs
-# before that and is a plain `podman pull` that knows nothing about it. Until
-# this file named the store too, every install tried the network.
+# handed to the bootc install container, while fisherman's pull step runs before
+# that and is a plain `podman pull` that knows nothing about it.
 COPY <<'CONF' /etc/containers/storage.conf
 [storage]
 driver = "overlay"
@@ -205,10 +144,8 @@ CONF
 
 # Root on the console, without a password, on installer media only. Fisherman
 # partitions disks and calls `bootc install`, so a console that cannot become
-# root cannot install anything — and this image is not the target: it is built
-# per target as `<published>-installer`, boots only from the media, and is
-# never what lands on the disk. The installer that autostarts below runs
-# as root for the same reason.
+# root cannot install anything. This image is built per target as
+# `<published>-installer`, boots only from the media, and never lands on a disk.
 COPY <<'AUTOLOGIN' /usr/lib/systemd/system/serial-getty@.service.d/autologin.conf
 [Service]
 ExecStart=
@@ -223,59 +160,48 @@ AUTOLOGIN
 
 # Kernel messages go to the journal and not to the console. The installer draws
 # a bounded box and redraws only the cells it changed, so a `printk` landing in
-# the middle of it stays there until something else writes that cell — on the
-# media this filled the box with audit lines. `4` is the default for everything
-# but the console level, which drops to `1`: a panic still reaches the screen,
-# and `journalctl` still has all of it.
+# the middle of it stays there until something else writes that cell. `4` is the
+# default for everything but the console level, which drops to `1`: a panic
+# still reaches the screen, and `journalctl` still has all of it.
 COPY <<'QUIET' /usr/lib/sysctl.d/50-tect-installer-console.conf
 kernel.printk = 1 4 1 4
 QUIET
 
 # The kernel's own console draws a bitmap font of at most 512 glyphs in sixteen
-# colours, and no console font carries the box-drawing arcs this screen uses —
-# neither `kbd`'s faces nor Terminus. `setfont` loads bitmaps, so a TTF is not
-# an answer to that either.
+# colours, and no console font carries the box-drawing arcs this screen uses.
+# `setfont` loads bitmaps, so a TTF is not an answer either. kmscon draws on DRM
+# through pango, and `monospace` already resolves to Adwaita Mono in this base.
 #
-# kmscon draws on DRM through pango, so it takes any font fontconfig can see
-# and renders truecolor. `monospace` already resolves to Adwaita Mono in this
-# base, so there is nothing to configure and nothing to install beside it.
-#
-# The serial console is deliberately untouched. It is how this media is driven
-# headless, its glyphs belong to whatever terminal is on the other end, and a
-# graphical console that fails must not take the headless path with it.
+# The serial console is untouched: it is how this media is driven headless, and
+# a graphical console that fails must not take the headless path with it.
 COPY <<'KMSCON' /usr/lib/systemd/system/kmsconvt@.service.d/autologin.conf
 [Service]
 ExecStart=
 ExecStart=kmscon --vt=%I --no-switchvt --login -- /bin/login -f root
 KMSCON
 
-# `kmsconvt@.service` ships `Conflicts=getty@%i.service` and, the half that
-# matters here, `OnFailure=getty@%i.service` — so a kmscon that cannot open DRM
-# hands tty1 back to the plain VT with its own autologin above, rather than
-# leaving the console dead. The enable is guarded because the apt arm of this
-# file has no such package and must still build.
+# `kmsconvt@.service` ships `OnFailure=getty@%i.service`, so a kmscon that
+# cannot open DRM hands tty1 back to the plain VT with its own autologin above.
+# The enable is guarded because the apt arm of this file has no such package.
 RUN systemctl enable var-lib-tectonic-store.mount \
     && { [ ! -f /usr/lib/systemd/system/kmsconvt@.service ] \
         || systemctl enable kmsconvt@tty1.service; }
 
 # The frontend, staged into this build context from the running binary by
-# `tect vm build iso`. `--version` runs it here rather than on the console, so
-# a binary that cannot execute in this environment fails the ISO build instead
-# of the boot it was assembled for.
+# `tect vm build iso`. `--version` runs it here, so a binary that cannot execute
+# in this environment fails the ISO build instead of the boot.
 COPY tect /usr/bin/tect
 RUN /usr/bin/tect --version
 
-# Autostart is a login shell's profile and not a unit, and that is the whole
-# reason it is one line: root already autologins on both consoles above, an
-# installer answering `Leave to a shell` falls back to the shell it was started
-# from, and there is no tty to hand between a unit and a getty.
-# `/etc/profile.d` is read by bash and sh alike on both families. `ui::inline`
-# sets the window size itself, so a serial console reporting none needs nothing
-# here.
+# Autostart is a login shell's profile and not a unit: root already autologins
+# on both consoles above, an installer answering `Leave to a shell` falls back
+# to the shell it was started from, and there is no tty to hand between a unit
+# and a getty. `/etc/profile.d` is read by bash and sh alike on both families.
+# `ui::inline` sets the window size itself.
 #
-# **The word here is the command table's.** Nothing else ties a command typed
-# as text to the table that resolves it, so a rename leaves this line naming a
-# verb that no longer exists and the media boots to `unknown command`.
+# The word here is the command table's. Nothing else ties a command typed as
+# text to the table that resolves it, so a rename leaves the media booting to
+# `unknown command`; the test
 # `the_verb_the_live_environment_autostarts_is_one_that_resolves` is the tie.
 COPY <<'START' /etc/profile.d/tect-installer.sh
 if [ "$(id -u)" = 0 ] && [ -t 0 ]; then

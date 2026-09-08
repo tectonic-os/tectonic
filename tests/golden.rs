@@ -29,11 +29,8 @@ fn compare(name: &str, file: &str, actual: &str) {
 }
 
 /// Where two goldens first part, as escaped bytes either side of the offset.
-///
-/// A transcript golden is mostly escape sequences, so a diff nobody can run —
-/// on CI, where there is no working tree to regenerate into — has to travel in
-/// the failure itself. Windowed rather than whole: the point is which byte
-/// moved, not the file.
+/// A transcript golden is mostly escape sequences and CI has no working tree to
+/// regenerate into, so the difference has to travel in the failure itself.
 fn first_difference(expected: &str, actual: &str) -> String {
     let at = expected
         .bytes()
@@ -338,8 +335,8 @@ fn copied(name: &str, root: &Path) {
         tect::provenance::record::modified(here)
     ));
 
-    // Forking an imported module is legitimate, so the edit is reported rather
-    // than diagnosed.
+    // Forking an imported module is legitimate, so the edit is reported. A
+    // diagnostic would call it a fault.
     std::fs::write("modules/flatpak/module.sh", "echo forked\n").unwrap();
     out.push_str(&format!(
         "==== modified after an edit\n{:?}\n{}",
@@ -427,9 +424,7 @@ fn why(name: &str, root: &Path, module: &str) {
 
 /// `summary`, both readings. The repository's comes off the resolved plan and
 /// the host's off the manifest that plan bakes into the image, so for one
-/// target the two have to be the same document. Every fixture target is
-/// walked, since a flavour gate and a suppressed module are what a second
-/// renderer gets wrong.
+/// target the two have to be the same document. Every fixture target is walked.
 fn summary_on_host(root: &Path) {
     std::env::set_current_dir(root).expect("fixture root exists");
     let here = Path::new(".");
@@ -464,7 +459,7 @@ fn summary_on_host(root: &Path) {
 
 /// The two names `why` resolves but cannot read out of the plan: a module the
 /// base suppresses, which is listed and never built, and one whose manifest
-/// never loaded. Both used to resolve to exactly one path and then panic.
+/// never loaded.
 fn why_unbuilt(root: &Path) {
     let temp = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("why-unbuilt");
     let _ = std::fs::remove_dir_all(&temp);
@@ -479,14 +474,14 @@ fn why_unbuilt(root: &Path) {
     let bare = tect::run(Command::Why, Some("flatpak"), here).stdout;
     out.push_str(&bare);
 
-    // A full path names it too, and names it the same. Worth an assertion
-    // rather than a second copy of the read-out.
+    // A full path names it too, and names it the same. Worth an assertion; a
+    // second copy of the read-out only repeats it.
     let full = tect::run(Command::Why, Some("apps/flatpak"), here).stdout;
     assert_eq!(bare, full, "the full path is a name like any other");
 
-    // Suppressed by one image is not suppressed by the other. A second image
-    // on a base that ships nothing it provides builds it, and the read-out has
-    // to say both things rather than the first one it finds.
+    // Suppressed by one image is not suppressed by the other. A second image on
+    // a base that ships nothing it provides builds it, and the read-out has to
+    // say both things. Stopping at the first it finds loses the other.
     std::fs::write(
         temp.join("also.image.kdl"),
         "image {\n    name \"Also\"\n\n    base \"ghcr.io/ublue-os/bazzite:stable\" {\n        \
@@ -504,7 +499,7 @@ fn why_unbuilt(root: &Path) {
     std::fs::remove_file(temp.join("also.image.kdl")).unwrap();
 
     // Listed, but its manifest was deleted out from under the image: there is
-    // nothing to read out, and that is a diagnostic rather than a crash.
+    // nothing to read out, and that is a diagnostic. A crash names nothing.
     std::fs::remove_dir_all(temp.join("modules/apps/flatpak")).unwrap();
     out.push_str("==== and one whose manifest never loaded\n");
     let run = tect::run(Command::Why, Some("flatpak"), here);
@@ -545,8 +540,8 @@ fn unenforced(root: &Path) {
 }
 
 /// An unpinned collection is verified against nothing, so enforcement refuses
-/// the import rather than the build: hashing afterwards pins what you got, not
-/// what you should have got. The refusal lands before anything is fetched.
+/// the import. Refusing at the build is too late: hashing afterwards pins
+/// whatever arrived. The refusal lands before anything is fetched.
 fn unpinned_import(root: &Path) {
     std::env::set_current_dir(root).expect("fixture root exists");
     let (list, _, _) = tect::declarations(Path::new("."));
@@ -682,15 +677,10 @@ fn flow(name: &str, dir: &Path, gh: Option<&str>, args: &[&str]) {
 }
 
 /// `create repo` where the scaffolded collection is a pinned archive on this
-/// machine, which is the one flow that reaches the fetching branch: a fresh
-/// repository has read nothing, so the offer cannot name a module without
-/// downloading the collection first.
-///
-/// Sealed like every other flow — the pin is a `file://` URL and the only tools
-/// added are the two that unpack it — so this exercises the fetch, the scratch
-/// cache and the offer without touching the network. Without it the offer path
-/// in `create repo` is never run, and the other `create repo` goldens are green
-/// only because nothing on their `PATH` can fetch.
+/// machine, the one flow that reaches the fetching branch: a fresh repository
+/// has read nothing, so the offer cannot name a module without downloading the
+/// collection first. Sealed — the pin is a `file://` URL and the only tools
+/// added are the two that unpack it — so nothing touches the network.
 fn flow_offering(name: &str, dir: &Path) {
     use std::os::unix::fs::PermissionsExt;
     let work = tmp().join(format!("{name}-src"));
@@ -1097,7 +1087,7 @@ const KEYHOLDER: &str = "description \"Signs the modules it builds\"\n\n\
      }\n";
 
 /// Every flow that prompts, answered from a script: what a person sees, and
-/// that a question the script does not answer fails rather than waits.
+/// that a question the script does not answer fails. Waiting hangs the run.
 #[test]
 fn flows() {
     let repo = ["create", "repo"];
@@ -1210,7 +1200,7 @@ fn flows() {
 
     // Tier 2 over a `conforms` naming a profile the datastream does not carry.
     // A typo reaches this, and the notice has to say what the content does
-    // hold rather than report nothing found.
+    // hold. Reporting nothing found leaves the typo invisible.
     let stranger = flow_repo("flow-conforms-stranger");
     let image = stranger.join("example.image.kdl");
     let declared = std::fs::read_to_string(&image).unwrap().replace(
@@ -1300,8 +1290,7 @@ fn flows() {
     // Declaring what the image is measured against: the profile is chosen out
     // of the content a scan of it would read, and the collection member
     // claiming its rules is offered with it. A second run replaces the
-    // declaration rather than writing a second one, and by then the claimant
-    // is listed, so there is nothing left to offer.
+    // declaration, and by then there is nothing left to offer.
     let measured = flow_repo_claiming("flow-set-conforms-in");
     for name in ["flow-set-conforms", "flow-set-conforms-again"] {
         flow(
@@ -1385,9 +1374,9 @@ fn flows() {
         );
     }
 
-    // A named datastream that does not read is a typo, and refuses rather than
-    // importing in silence. One this machine merely happens to lack is the
-    // other arm, and it is the one every flow above takes.
+    // A named datastream that does not read is a typo, and refuses. Importing
+    // in silence hides it. One this machine merely happens to lack is the other
+    // arm, and it is the one every flow above takes.
     let typo = flow_repo_claiming("flow-import-datastream-in");
     flow(
         "flow-import-datastream",
@@ -1430,7 +1419,7 @@ fn flows() {
 
     // The same offer down the copy path, which is the same path: a vendored
     // module claiming rules a profile selects is exactly as worth measuring as
-    // a referenced one, and the offer used to reach only the reference.
+    // a referenced one.
     let vendored = flow_repo_claiming("flow-copy-conforms-in");
     flow(
         "flow-copy-conforms",
@@ -1453,8 +1442,8 @@ fn flows() {
     );
 
     // The claim the module author makes, chosen out of the rules a profile
-    // selects rather than typed. The second run opens on what the first wrote
-    // and replaces the block rather than adding a second one.
+    // selects. The second run opens on what the first wrote and replaces the
+    // block, leaving one.
     let claimed = flow_repo("flow-set-claims-in");
     lists_sshd(&claimed);
     std::fs::create_dir_all(claimed.join("modules/sshd")).unwrap();
@@ -1658,7 +1647,7 @@ fn flows() {
     );
 
     // What a module requires and nothing in the image provides comes with it,
-    // and the CI it makes runnable is offered rather than left to be found.
+    // and the CI it makes runnable is offered. Left to be found, it is not run.
     let requires = flow_repo_sourced("flow-requires");
     flow(
         "flow-import-requires",
@@ -1789,7 +1778,8 @@ fn flows() {
 
     // A fresh clone: the collection `create repo` scaffolds is declared and is
     // not on this machine, and resolution never fetches. The help has to name
-    // the fetch rather than conclude that nothing anywhere provides it.
+    // the fetch. Concluding that nothing anywhere provides it sends a person
+    // looking for a module that exists.
     let unfetched = flow_repo("flow-unfetched");
     std::fs::create_dir_all(unfetched.join("modules/core/one")).unwrap();
     std::fs::write(
@@ -2048,8 +2038,8 @@ fn flows() {
     );
 
     // A member that ships a path another listed module ships: the import says
-    // so the moment it writes, in `check`'s own sentence, and the next
-    // `check` reports the same pair rather than a second opinion.
+    // so the moment it writes, in `check`'s own sentence, and the next `check`
+    // reports the same pair.
     let collide = flow_repo_sourced("flow-collides");
     let remotes = "modules/editor/files/usr/share/example";
     std::fs::create_dir_all(collide.join(remotes)).unwrap();
@@ -2107,8 +2097,8 @@ fn flows() {
         &["--root", ".", "check"],
     );
 
-    // The same nested member, copied rather than referenced: it vendors to
-    // the same depth it is named at, which the scanner and the checks walk.
+    // The same nested member, copied into the tree: it vendors to the same
+    // depth it is named at, which the scanner and the checks walk.
     let copied_nested = flow_repo_with("flow-copy-nested", "four");
     flow(
         "flow-copy-nested",
@@ -2207,8 +2197,7 @@ fn flows() {
         &["--root", ".", "create", "key", "sbom"],
     );
 
-    // No kind named and nothing to prompt from, which is the path that used to
-    // print the literal `<kind>`.
+    // No kind named and nothing to prompt from.
     flow(
         "flow-key-no-kind",
         &flow_repo("flow-key-no-kind"),
@@ -2218,15 +2207,10 @@ fn flows() {
 }
 
 /// The installer's one screen, over a payload root and on a real terminal.
-/// **Every question is on it at once** and each is answered in place: the disk
-/// list opens under its own row, the two halves of the password are two rows
-/// compared against each other, and `Install` is dim until nothing is missing.
-///
-/// The steps walk that screen — down to a row, enter, answer, and on — then
-/// take `Install`, which asks the one question that costs a disk over a summary
-/// of what it would do. `Go back` there returns to the form, and `esc` on the
-/// form asks whether to leave. Exit 0, and no disk was touched, which is the
-/// property that makes the screen safe to reach.
+/// Every question is on it at once and answered in place, and `Install` is dim
+/// until nothing is missing. The steps walk that screen, then take `Install`,
+/// which asks the one question that costs a disk. Exit 0, and no disk was
+/// touched.
 #[test]
 fn install_screens() {
     let dir = empty("flow-install-drawn");
@@ -2303,15 +2287,12 @@ fn install_screens() {
         std::fs::read_to_string(crate_dir().join("tests/golden/flow-install-drawn/transcript.txt"))
             .unwrap();
     assert!(!transcript.contains("hunter2"), "{transcript}");
-    // **`Install` was reachable**, which is the half a green golden cannot show
-    // on its own: a run that leaves at the end exits 0 whether or not the
-    // action ever became pickable. It did not, once, because the reason it was
-    // blocked was computed before the form opened and never asked again.
+    // `Install` was reachable, which a green golden cannot show on its own: a
+    // run that leaves at the end exits 0 either way.
     //
-    // **Assert on contiguous text only.** ratatui writes the cells a frame
-    // changed, so a label that overlaps what was under it arrives in fragments
-    // with cursor moves between the words — `Go back` is not greppable here
-    // even when it is on screen, and neither is `Keep going`.
+    // Assert on contiguous text only. ratatui writes the cells a frame changed,
+    // so a label overlapping what was under it arrives in fragments with cursor
+    // moves between the words: `Go back` is not greppable here.
     assert!(transcript.contains("Are you sure"), "{transcript}");
     assert!(transcript.contains(tect::copy::CONTINUE), "{transcript}");
     // Both disks were offered under the row, and the one taken is the one the
@@ -2520,8 +2501,8 @@ fn scap() {
     let _ = std::fs::remove_dir_all(&root);
     copy(&enforced, &root);
 
-    // Unenforced, so a finding is the plain line rather than a rendering that
-    // depends on the terminal it is read on.
+    // Unenforced, so a finding is the plain line. A rendering depends on the
+    // terminal it is read on.
     let repo = root.join("repo.kdl");
     let text = std::fs::read_to_string(&repo).unwrap();
     let (before, rest) = text.split_once("audit {").expect("the fixture enforces");
@@ -2578,7 +2559,7 @@ fn scap() {
 
     // The bare base's own pass set beside the image's. A claim the base already
     // passes is a notice and never a finding, and one the base passed that the
-    // image now fails names the base rather than the module that claimed it.
+    // image now fails names the base.
     let base = fixtures.join("base.json");
     let against_base = [
         "--root",

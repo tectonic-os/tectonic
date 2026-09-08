@@ -49,7 +49,7 @@ impl Copr {
     }
 
     /// The repository id dnf gives it, left disabled so it is enabled for one
-    /// install rather than for the shipped image.
+    /// install.
     pub fn selector(&self) -> String {
         format!(
             "copr:copr.fedorainfracloud.org:{}:{}",
@@ -134,10 +134,8 @@ pub struct Module {
     /// Soft: ordering and cache preference, never fails.
     pub after: Vec<Decl>,
     /// The MAC capabilities this module ships policy for, read off its
-    /// directory rather than declared: a profile is emitted against whatever
-    /// the image turned out to carry, so the module never names one. It is an
-    /// ordering edge and nothing else — an image with no MAC ships no policy
-    /// and owes no provider.
+    /// directory: a profile is emitted against whatever the image turned out to
+    /// carry, so the module never names one. An ordering edge and nothing else.
     pub policies: Vec<&'static str>,
     /// Exact paths one module writes and another reads.
     pub provides_files: Vec<Decl>,
@@ -150,14 +148,14 @@ pub struct Module {
     pub overrides: Vec<Decl>,
     /// Verify diagnostics this module's own units are allowed to produce.
     pub verify_exceptions: Vec<VerifyException>,
-    /// The flavour this module is gated to, from the list rather than the
-    /// manifest: a module never names a flavour.
+    /// The flavour this module is gated to, from the list: a module never names
+    /// a flavour.
     pub flavour: Option<String>,
     pub collects: Vec<Collect>,
     pub contributes: Vec<Contribution>,
     pub modes: Vec<FileMode>,
     /// Keys this module declares. Each one's `public` is a contract path,
-    /// derived rather than declared a second time.
+    /// derived.
     pub keys: Vec<Key>,
     /// Build inputs the field sets cover, so that needing a secret or a build
     /// arg does not force a module to hand-write a whole RUN block.
@@ -173,7 +171,6 @@ pub struct Module {
     /// Package groups keyed to base family, installed after the ordinary
     /// packages and before module.sh runs.
     pub groups: Vec<PackageGroup>,
-    /// COPR repositories this module declares for its package installs.
     /// COPR repositories made reachable before anything is installed. Fedora
     /// only, since COPR is a Fedora build service.
     pub coprs: Vec<Copr>,
@@ -193,12 +190,11 @@ pub struct Module {
     /// record. `plan.json` carries it, so `verify` fails on an edit that was
     /// never regenerated.
     pub content: Option<String>,
-    /// The record `copy module` left inside it, for a module that was
-    /// copied rather than written here.
+    /// The record `copy module` left inside it, for a module that was copied
+    /// in.
     pub imported: Option<Record>,
     /// Whether it ships a `repo` file, which enables a third-party package
     /// repository inside the layer. There is no grammar for one: it is shell
-    /// calling the family's config manager, and a node restating it would be a
-    /// second source of truth that drifts.
+    /// calling the family's config manager.
     pub repo: bool,
 }

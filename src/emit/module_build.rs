@@ -115,14 +115,11 @@ fn script(
 
     // The repo a module declares is sourced before its packages, so an
     // `enablerepo` names a repository that exists by the time it is enabled.
-    // The guard is `dnf5 config-manager`'s layout and so is Fedora's alone: a
-    // deb family writes its archive somewhere `/etc/yum.repos.d` never names,
-    // where the guard would be a branch that is always taken. Its own `repo`
-    // file runs unguarded there and is what has to be idempotent.
+    // The guard is `/etc/yum.repos.d` and so is Fedora's alone; a deb family's
+    // own `repo` file runs unguarded and has to be idempotent.
     //
-    // It **picks** a family copy rather than layering them, the way a
-    // collected file does: an archive is configured once, and the two
-    // families name it at different URLs rather than adding to one another.
+    // It picks one family copy: an archive is configured once, and the two
+    // families name it at different URLs.
     let on_disk = layout::module(root, entry.dir());
     if let Some(at) = layout::shipped(&on_disk, base_family, "repo") {
         match repo_id(&on_disk.join(&at)).filter(|_| base_family == "fedora") {
@@ -187,8 +184,8 @@ fn script(
     }
 
     // Where this module's files are read from: its own directory, then the
-    // family subtree. Ungated first, so a family adds to what runs everywhere
-    // rather than replacing it, and a file it ships lands over the shared one.
+    // family subtree. Ungated first, so a family adds to what runs everywhere,
+    // and a file it ships lands over the shared one.
     let mut roots = vec![(on_disk.clone(), dir.clone())];
     for gated in layout::family_dirs(&on_disk, base_family) {
         roots.push((on_disk.join(gated), format!("{dir}/{gated}")));
@@ -242,7 +239,7 @@ fn script(
         let _ = write!(out, "\ncp -rT {ctx}/files /\n");
     }
     // A mode is declared once and applies to the path whichever overlay put it
-    // there, so the chmods run after the last copy rather than after each.
+    // there, so the chmods run after the last copy.
     if !overlays.is_empty() {
         for declared in &module.modes {
             let _ = writeln!(

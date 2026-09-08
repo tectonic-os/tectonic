@@ -76,7 +76,7 @@
 
   x `core/nameless` declares no `supports`
   help: a module has to say which base families it can build on, so a
-        portability gap surfaces at lint rather than mid-build
+        portability gap surfaces at lint, while the build is still cheap
 
   x `core/missing` has no module.kdl
     ,-[./image.kdl:11:9]

@@ -16,8 +16,8 @@
    `----
   help: repo.kdl holds `schema-version`, `tect-version`, `name`, `default-
         image`, `pr-image`, `seed`, a `workflows` block, a `sources` block, a
-        `manifest` block and an `audit` block: what is true of the repository
-        rather than of any image in it. An image goes in a file of its own
+        `manifest` block and an `audit` block: what is true of the repository.
+        An image goes in a file of its own
 
   x unknown top-level node `palette`
    ,-[./second.image.kdl:1:1]
@@ -28,7 +28,7 @@
    `----
   help: an image file holds `image` nodes and nothing else; `base`, `flavours`
         and `modules` are declared inside one, because they are what the image
-        is rather than what the repository is
+        is
 
   x ./second.image.kdl declares no image
   help: an image file holds at least one `image` node: `image { name "Name" }

@@ -86,7 +86,7 @@ case "$assetsdir" in
     *) die "refusing to remove $assetsdir" ;;
 esac
 
-# Swapped rather than merged: an asset a release dropped must not survive.
+# Swapped whole: an asset a release dropped must not survive.
 rm -rf "$assetsdir"
 mv "$tmp/assets" "$assetsdir" || die "cannot place $assetsdir"
 mv -f "$tmp/tect" "$bindir/tect" || die "cannot place $bindir/tect"

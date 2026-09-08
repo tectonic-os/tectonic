@@ -68,13 +68,10 @@ pub fn content_on_host(image: &Json, target: &Json) -> Result<Verdict, String> {
 }
 
 /// What `check` says about an image declaring `conforms`, in two tiers. A
-/// notice, never an error: `conforms` is what an image is measured against,
-/// not what it passes, and declaring one before reaching it is the point.
-///
-/// Without a datastream nothing here knows which rules a profile selects, so
-/// it can only report an image that declares one and lists nothing claiming
-/// anything. With one it names the rules nothing listed claims and the modules
-/// that would. Neither tier concludes from a search that did not run.
+/// notice, never an error: declaring a profile before reaching it is the point.
+/// Without a datastream nothing knows which rules a profile selects, so it can
+/// only report an image that declares one and claims nothing; with one it names
+/// the unclaimed rules and the modules that would claim them.
 pub fn conformance(
     list: &List,
     index: &Index,
@@ -91,9 +88,9 @@ pub fn conformance(
             None if image.modules().any(|m| !m.satisfies.is_empty()) => {}
             None => out.push(format!(
                 "`{}` conforms to `{}` and no module it lists declares `satisfies`, so nothing \
-                 here claims a rule of it. Nothing read a datastream, so that counts \
-                 declarations rather than rules: `tect check --datastream <file>` says which of \
-                 the profile's rules are unclaimed",
+                 here claims a rule of it. Nothing read a datastream, so that is a count of \
+                 declarations: `tect check --datastream <file>` says which of the profile's \
+                 rules are unclaimed",
                 image.id, image.conforms
             )),
         }
@@ -116,9 +113,8 @@ pub struct Owed<'a> {
 }
 
 /// Which of a profile's rules an image is still missing, and who would claim
-/// them. The claim resolves **forward** through `Content::rules`; the search
-/// for who would help runs **backward** through `Content::numbering`, and the
-/// two are not interchangeable.
+/// them. The claim resolves forward through `Content::rules`; the search for
+/// who would help runs backward through `Content::numbering`.
 pub fn owed<'a>(image: &Image, content: &Content, profile: &Profile, index: &'a Index) -> Owed<'a> {
     let selected = content.selected(&profile.id);
     let claimed = reached(
@@ -258,24 +254,10 @@ fn datastream(list: &List, named: Option<&str>) -> Result<String, String> {
     .to_string())
 }
 
-/// Where a family's SCAP content is, and **for both deb families the answer is
-/// that there is none**. This refuses rather than naming the nearest file,
-/// because the nearest file measures nothing at all and does it silently.
-///
-/// SSG writes one `<xccdf-1.2:platform>` on a benchmark and every rule inherits
-/// it. Fedora's names seven releases, `fedoraproject:fedora:39` through `:45`,
-/// so `fedora-bootc:44` is inside it. Each deb benchmark names exactly one:
-/// `debian_linux:13` and `canonical:ubuntu_linux:24.04::~~lts~~~`, against bases
-/// of `debian:forky` (14) and `ubuntu:26.04`. Measured 2026-09-07 against built
-/// images: **414 of 414 rules `notapplicable` on Debian and 648 of 648 on
-/// Ubuntu**, 0 pass and 0 fail on each, where the same Debian scan of the same
-/// image told it was Debian 13 returns 119 pass and 162 fail.
-///
-/// There is no newer content to reach for. ComplianceAsCode v0.1.82 publishes
-/// no Debian 14 product at all, and its `ubuntu2604` is a stub: **2 rules and
-/// no profiles**, against 648 rules and five profiles for `ubuntu2404`. The
-/// trigger for revisiting this is `ubuntu2604` growing profiles, which is
-/// upstream's to do and nothing here can hurry.
+/// Where a family's SCAP content is. Both deb families refuse: SSG writes one
+/// `<xccdf-1.2:platform>` per benchmark and every rule inherits it, so against
+/// bases of `debian:forky` and `ubuntu:26.04` the nearest content marks every
+/// rule `notapplicable` — a scan that measures nothing, silently.
 fn installed(dir: &str, family: &str) -> Result<PathBuf, String> {
     let file = match family {
         "fedora" => "ssg-fedora-ds.xml",
@@ -293,9 +275,8 @@ fn installed(dir: &str, family: &str) -> Result<PathBuf, String> {
 }
 
 /// The content a profile is chosen out of: what was named, else the copy this
-/// machine has for the family. **This probes the host deliberately**, unlike
-/// `coverage`, because a profile written into an image has to be one the scan
-/// that measures it will carry; a command whose output is a golden must not.
+/// machine has for the family. This probes the host, so no command whose output
+/// is a golden may reach it.
 pub fn content_path(family: &str, given: Option<&Path>) -> Result<PathBuf, String> {
     content_at(CONTENT, family, given)
 }
@@ -483,8 +464,8 @@ fn claims(out: &mut String, found: &mut Vec<Finding>, m: Measured) {
                         ),
                         at,
                         help: Some(
-                            "the declaration is wrong rather than the image: a number is only \
-                             usable where the scanned family's content carries it"
+                            "a number is only usable where the scanned family's content \
+                             carries it, so the declaration is what has to change"
                                 .into(),
                         ),
                     });
@@ -578,7 +559,7 @@ fn base_cell(base: Option<&BTreeSet<String>>, id: Option<&str>) -> String {
 }
 
 /// A claim the base alone passed and the built image now fails, which is the
-/// base moving under the image rather than the module failing to act.
+/// base moving under the image.
 fn regressed(image: &Image) -> String {
     format!(
         "{} alone passed this rule when the base scan was taken, so the image lost it rather \
@@ -789,9 +770,9 @@ pub struct Content {
     /// against every reference, ident and version the way the datastream's own
     /// numbering is written.
     pub rules: BTreeMap<String, String>,
-    /// The inverse of `rules`: a rule to every number that resolves to it, so
-    /// a number a later rule also carries is absent here rather than pointing
-    /// at a rule a claim would not reach.
+    /// The inverse of `rules`: a rule to every number that resolves to it, so a
+    /// number a later rule also carries is absent here. Kept, it would point at
+    /// a rule a claim would not reach.
     pub numbers: BTreeMap<String, BTreeSet<String>>,
     /// A rule to its title, which is the one line naming it a person reads.
     pub titles: BTreeMap<String, String>,
@@ -1069,10 +1050,8 @@ mod tests {
             .contains("no SSG content is known"));
     }
 
-    /// The refusal a deb image declaring `conforms` gets, and the reason it is
-    /// a refusal rather than a filename: SSG's nearest content scores 0 of 414
-    /// on Debian and 0 of 648 on Ubuntu, and a scan reporting nothing measured
-    /// looks exactly like a scan reporting nothing wrong.
+    /// A deb image declaring `conforms` is refused: a scan reporting nothing
+    /// measured looks exactly like a scan reporting nothing wrong.
     #[test]
     fn a_deb_family_is_refused_rather_than_given_content_that_measures_nothing() {
         for family in ["debian", "ubuntu"] {

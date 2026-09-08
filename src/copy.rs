@@ -1,14 +1,10 @@
 //! Every string a person is asked by a prompt, in one place.
 //!
-//! Prompts only: the questions, the labels of the answers beside them, the
-//! hints under the widgets, and the detail written here for a choice no
-//! catalogue describes. A base's `about`, a module's description, a rule's
-//! title and a workflow's `about` are catalogue content and stay where the
-//! catalogue holds them.
-//!
-//! Not here, deliberately: diagnostics, errors, the `next` lines and the
-//! command table. They are a different voice with a different job, and moving
-//! them is a different session's question.
+//! Prompts only: the questions, the labels of the answers beside them, and the
+//! hints under the widgets. Catalogue content — a base's `about`, a module's
+//! description, a rule's title, a workflow's `about` — stays where the catalogue
+//! holds it, and so do diagnostics, errors, `next` lines and the command
+//! table.
 
 /// The name of the thing, which is what prose calls it. `tect` is the command
 /// and belongs in a command line, a flag or a diagnostic prefix; a title or a
@@ -57,10 +53,9 @@ pub fn list_in(target: &str) -> String {
     format!("List it in {target}?")
 }
 
-// What an import or a copy offers to bring with it. The clauses these
-// questions used to carry are still reachable: the modules a `requires` offer
-// named are the rows of the import that follows it, and the rules a claims
-// offer counted are what `tect coverage` prints.
+// What an import or a copy offers to bring with it. The modules a `requires`
+// offer names are the rows of the import that follows it, and the rules a
+// claims offer counts are what `tect coverage` prints.
 
 /// Asked by both commands, and answered by whichever one asked: an import
 /// references what it brings, a copy vendors it.
@@ -138,8 +133,8 @@ pub const NO_TPM: &str = "No TPM available";
 pub const REMOVABLE: &str = "removable";
 
 /// The question asked over the summary, once, after the form is complete and
-/// before anything is written. It carries what installing costs, said in one
-/// sentence: a second restating it is filler.
+/// before anything is written. It carries what installing costs, in one
+/// sentence.
 pub fn erasing(disk: &str) -> String {
     format!("Everything on {disk} will be erased. Are you sure?")
 }
@@ -229,7 +224,7 @@ pub fn written_over(bootloader: &str, filesystem: &str) -> Vec<(String, String)>
     rows
 }
 /// A form holds both halves of a password at once, so the two are compared on
-/// the screen rather than by asking twice.
+/// the screen.
 pub const NO_MATCH_ROW: &str = "the passwords do not match";
 pub const ROW_DISK: &str = "disk";
 pub const ROW_HOSTNAME: &str = "computer name";
@@ -302,8 +297,8 @@ pub const KEY_NOT_LOGGED: &str = "It is not in the install log.";
 
 #[cfg(test)]
 mod tests {
-    /// The one question that costs a disk names the disk, and asks rather than
-    /// announces: it is the last thing between a person and a wipe.
+    /// The one question that costs a disk names the disk and ends in a question
+    /// mark: it is the last thing between a person and a wipe.
     #[test]
     fn the_cost_names_the_disk_and_asks() {
         let said = super::erasing("/dev/vda");

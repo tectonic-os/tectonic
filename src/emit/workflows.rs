@@ -98,13 +98,13 @@ mod tests {
     }
 
     /// A scan costs a full pull, install and eval per target, so the matrix is
-    /// what declared a `conforms` rather than everything that was built.
+    /// what declared a `conforms`.
     #[test]
     fn only_a_target_asking_to_be_measured_is_scanned() {
         assert!(BODY.contains("target: ${{ fromJson(needs.compute-matrix.outputs.scanned) }}"));
         assert!(BODY.contains("select(.conforms != \"\") | .name"));
-        // Every scan `if` turns an empty matrix away, which is an error rather
-        // than a skipped job.
+        // Every scan `if` turns an empty matrix away, because GitHub errors on
+        // one.
         for facts in [
             &["no-kernel", "push-scan"][..],
             &["no-kernel", "scheduled-scan"][..],

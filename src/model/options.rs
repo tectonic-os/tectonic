@@ -86,8 +86,8 @@ pub(crate) fn env_value(ty: OptType, values: &[Value]) -> String {
 }
 
 /// Values have to survive being written into a RUN env prefix, so the
-/// characters that would end the quoting or start an expansion are rejected
-/// rather than escaped.
+/// characters that would end the quoting or start an expansion are rejected.
+/// Escaping them is a second quoting rule to keep right.
 pub(crate) fn check_values(
     name: &str,
     ty: OptType,
@@ -150,7 +150,7 @@ pub(crate) fn check_values(
             if s.contains(['"', '\\', '$', '`', '\n']) {
                 bad(
                     format!("value {s:?} on option `{name}` contains a shell metacharacter"),
-                    "option values are written into a RUN env prefix, so \" \\ $ ` and newlines are rejected rather than escaped",
+                    "option values are written into a RUN env prefix, so \" \\ $ ` and newlines are rejected",
                 );
                 ok = false;
             }

@@ -1,32 +1,19 @@
-// No row here carries a digest, which is a decision rather than an omission.
-// Pinning in this file would make every digest roll a tool release, and a row
-// that goes stale between releases is one nobody can fix without waiting for
-// the next one — worse on a base whose registry retires the old digest, where
-// a stale catalog pin stops resolving at all. So the catalog offers the tag,
-// and the digest belongs in the image file built on it: the repository that
-// takes the risk takes the decision, Renovate bumps it there like any other
-// pin, and `tect build` records the digest it actually resolved either way.
+// No row here carries a digest: pinning in this file would make every digest
+// roll a tool release, and a stale pin stops resolving once a registry retires
+// the digest. The catalog offers the tag, the digest belongs in the image file
+// built on it, and `tect build` records what it resolved either way.
 
-// Probed 2026-09-06 against the tag with `test -e`. The row carried no
-// `provides-file` at all until then, which refused `login-access` on Fedora
-// for an `sshd` the image demonstrably ships.
-//
 // Under-claiming refuses a module and says why; over-claiming is silent —
 // `resolve::graph::suppress` drops a module the base covers entirely with no
 // diagnostic — so nothing goes in this node that has not been run against the
-// image. `/usr/bin/flatpak` is the one the probe found absent, which is why
-// this row claims no `flatpak` where every ublue row below it does.
+// image.
 //
 // The five paths are the ones the collection contracts on: `login-access`
 // requires the first, and `deb-family/bootc-base` and
-// `deb-family/container-runtime` provide the other four on the families that
-// have to build them. Naming the same paths here is what makes a module
-// written against them family-neutral. `/usr/bin/dracut` and
-// `/usr/sbin/semodule` are here too and are deliberately not listed: they are
-// witnesses for `initramfs-generation` and `selinux-policy`, which this row
-// already claims, and a second spelling of a claim is a row to keep in step
-// for nothing. `rechunking` is the claim with no witness path at all and stays
-// hand-declared.
+// `deb-family/container-runtime` provide the other four, which is what makes a
+// module written against them family-neutral. `/usr/bin/dracut` and
+// `/usr/sbin/semodule` are witnesses for claims this row already makes and are
+// left out. `rechunking` has no witness path and stays hand-declared.
 base "quay.io/fedora/fedora-bootc:44" {
     about "Fedora 44, nothing above the base system"
     family "fedora"
@@ -72,11 +59,9 @@ base "ghcr.io/ublue-os/kinoite-main:44" {
 // bootc and no AppArmor userspace, so a module set has to make it bootable
 // before anything else in an image on it means anything.
 //
-// forky and not trixie, measured 2026-09-01. `--composefs-backend` is what
-// reaches a bootloader on a base with no `bootupd`, Debian packages no
-// `bootupd`, and every bootc carrying that flag needs libostree >= 2025.3.
-// trixie ships 2025.2, with nothing newer in backports or proposed-updates.
-// forky carries 2026.4 and becomes Debian 14.
+// forky, because `--composefs-backend` is what reaches a bootloader on a base
+// with no `bootupd`, Debian packages none, and every bootc carrying that flag
+// needs libostree >= 2025.3. trixie ships 2025.2; forky carries 2026.4.
 base "docker.io/library/debian:forky" {
     about "Debian 14, which a module set has to turn into a bootc image"
     family "debian"
@@ -84,18 +69,14 @@ base "docker.io/library/debian:forky" {
     signed #false
 }
 
-// Ubuntu, measured 2026-09-03 against the gates that chose forky over trixie.
-// It clears all of them and one forky cannot: `VERSION_ID` is present, which
-// `bootc-image-builder` refuses to write a manifest without. An LTS rather
-// than a rolling testing suite, and its package database is real, so the audit
-// argument that condemns every published deb bootc base does not condemn this.
+// Ubuntu. It clears the gates that chose forky over trixie and one forky
+// cannot: `VERSION_ID` is present, which `bootc-image-builder` refuses to write
+// a manifest without. An LTS, and its package database is real.
 //
-// One thing it needs that Debian does not: `ubuntu:*` ships
-// `/etc/dpkg/dpkg.cfg.d/excludes`, which path-excludes man pages, most of
-// `/usr/share/doc` and the locale catalogues from every package any derived
-// image ever unpacks. `deb-bootc-base` removes it and reinstalls every
-// recorded package, because deleting the file restores nothing already
-// stripped. See §8 of cannot-claim.md: that is a repair, not an absence.
+// `ubuntu:*` ships `/etc/dpkg/dpkg.cfg.d/excludes`, which path-excludes man
+// pages, most of `/usr/share/doc` and the locale catalogues from every package
+// any derived image unpacks. `deb-bootc-base` removes it and reinstalls every
+// recorded package, since deleting the file restores nothing already stripped.
 base "docker.io/library/ubuntu:26.04" {
     about "Ubuntu 26.04 LTS, which a module set has to turn into a bootc image"
     family "ubuntu"

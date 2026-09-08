@@ -12,19 +12,16 @@ use std::path::{Path, PathBuf};
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Needs {
     Nothing,
-    /// The disk workflow, measured 2026-08-31: it dies in the **SELinux
-    /// relabel**, `setfiles` against a policy a deb image does not carry. It
-    /// built an installer iso too until the Anaconda path was deleted, and
-    /// that half is now `tect vm build iso`, which needs no builder and no
-    /// family.
+    /// The disk workflow: it dies in the SELinux relabel, `setfiles` against a
+    /// policy a deb image does not carry.
     Fedora,
     /// A module taking a `KERNEL` build arg, which is what it tracks.
     Kernel,
 }
 
 impl Needs {
-    /// What a row says instead of what the workflow is for, when it cannot run
-    /// here.
+    /// What a row says when the workflow cannot run here, in the column that
+    /// otherwise says what it is for.
     pub fn unmet(self) -> &'static str {
         match self {
             Self::Nothing => "",
@@ -110,9 +107,8 @@ pub const SHIPPED: &[Shipped] = &[
         "smoke-test",
         "installs the image to a disk and boots it under qemu",
         // Nothing in its body is a family: it installs out of the published
-        // image with `bootc install to-disk` and boots that, with no builder,
-        // no Anaconda and no relabel. Whether a base can install itself is the
-        // base's fact and the run is what measures it.
+        // image with `bootc install to-disk` and boots that, with no builder
+        // and no relabel.
         Needs::Nothing,
         Some((-9, "1"))
     ),
@@ -134,7 +130,7 @@ pub struct Basis {
 
 impl Basis {
     /// A repository already declared. `kernel` is a module taking the arg the
-    /// freshness workflow flips, which is the fact rather than the preference.
+    /// freshness workflow flips, which is a fact about the repository.
     pub fn of(list: &List) -> Self {
         Self {
             fedora: list.images.iter().any(|image| {
@@ -168,9 +164,9 @@ pub(crate) const FEDORA: &str = "fedora";
 const KERNEL_ARG: &str = "KERNEL";
 
 /// The workflows a module declaring `args` would make runnable that the
-/// repository does not already declare. `Basis::of` derives the fact; this is
-/// what asks about it. Nothing where the block names a workflow the tool does
-/// not ship, since it cannot be rewritten without dropping that line.
+/// repository does not already declare. Nothing where the block names a
+/// workflow the tool does not ship, since it cannot be rewritten without
+/// dropping that line.
 pub fn unlocked(list: &List, args: &[String]) -> Vec<&'static Shipped> {
     if list.workflows.is_empty() || list.workflows.iter().any(|w| find(&w.name).is_none()) {
         return Vec::new();
@@ -313,7 +309,7 @@ mod tests {
         assert_eq!(cron((12, 30), 0, "*"), "30 12 * * *");
         assert_eq!(cron((12, 30), 2, "*"), "30 14 * * *");
         assert_eq!(cron((12, 30), -6, "*"), "30 6 * * *");
-        // Before midnight rather than a negative hour.
+        // The hour wraps back into the previous day.
         assert_eq!(cron((3, 0), -9, "1"), "0 18 * * 1");
     }
 

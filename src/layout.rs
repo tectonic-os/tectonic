@@ -22,8 +22,7 @@ pub const OVERLAY: &str = "files";
 /// Mandatory access control policy a module ships: which directory holds it,
 /// what marks a file in there as policy, and the capability that says the
 /// image has that MAC. A module may ship for more than one and is built for
-/// whichever the image has, the way a `packages` batch is taken for the base's
-/// family. Discovery is shared; what the layer then does is not symmetric.
+/// whichever the image has.
 pub struct Policy {
     pub dir: &'static str,
     /// The suffix a policy source carries, or nothing where the filename is
@@ -69,16 +68,9 @@ impl Policy {
 }
 
 /// Every directory name a module may gate files behind, and the families each
-/// is taken on. `debian/module.sh`, `debian/files/` and `debian/finalize.sh`
-/// are taken on Debian alone, the way `selinux/` is taken only where the image
-/// has that MAC: `Policy` names a capability where this names a family, and the
-/// emitter filters on it the same way.
-///
-/// A directory name is one family where a `family` gate takes a list, so `deb`
-/// names the two families that share an installer and would otherwise hold two
-/// copies of one file set. Ordered widest first: a `debian/` beside a `deb/` is
-/// Debian alone and is taken after it, the way a gate is taken after what sits
-/// outside one.
+/// is taken on. A directory name is one family, so `deb` names the two families
+/// that share an installer. Ordered widest first: a `debian/` beside a `deb/`
+/// is taken after it.
 pub const FAMILY_DIRS: [(&str, &[&str]); 4] = [
     ("deb", &["debian", "ubuntu"]),
     ("fedora", &["fedora"]),
@@ -87,8 +79,8 @@ pub const FAMILY_DIRS: [(&str, &[&str]); 4] = [
 ];
 
 /// Where a file a module ships is read from, most specific first and the module
-/// root last: what a lookup that picks one copy rather than layering them walks.
-/// The reverse of `family_dirs`, whose order is what a layering emitter wants.
+/// root last: what a lookup that picks one copy walks. The reverse of
+/// `family_dirs`, whose order is what a layering emitter wants.
 pub fn family_first(module_dir: &Path, family: &str) -> Vec<String> {
     family_dirs(module_dir, family)
         .into_iter()
@@ -109,13 +101,8 @@ pub fn shipped(module_dir: &Path, family: &str, file: &str) -> Option<String> {
 }
 
 /// The ones this module ships for this family, in the order they are taken.
-///
-/// The convention is additive and nothing is renamed to keep working. An
-/// ungated `module.sh` and `files/` at the module root still run everywhere, so
-/// a module with no such directory has nothing gated -- the overwhelmingly
-/// common case, and the one that has to stay cheapest to write. Empty where the
-/// image declares no family, so a repository that never names one is never
-/// asked to.
+/// Additive: an ungated `module.sh` and `files/` at the module root still run
+/// everywhere. Empty where the image declares no family.
 pub fn family_dirs(module_dir: &Path, family: &str) -> Vec<&'static str> {
     FAMILY_DIRS
         .iter()
@@ -126,7 +113,7 @@ pub fn family_dirs(module_dir: &Path, family: &str) -> Vec<&'static str> {
 }
 
 /// GitHub's path, not this repository's choice, which is why it is written
-/// here rather than declared anywhere.
+/// here.
 pub const WORKFLOW_DIR: &str = ".github/workflows";
 
 /// Repo context, not an image, and the file whose presence marks a root.
@@ -152,8 +139,8 @@ pub const SOURCES_CACHE: &str = "out/sources";
 /// under `modules/` is tool-written state.
 pub const STAMPS: &str = "out/remote-modules";
 
-/// Whether a root file holds images. An allowlist rather than "everything but
-/// repo.kdl", so a root `.kdl` that is neither is reported instead of parsed.
+/// Whether a root file holds images. An allowlist, so a root `.kdl` that is
+/// neither is reported. "Everything but repo.kdl" would parse it as an image.
 pub fn is_image_file(name: &str) -> bool {
     name == IMAGE_FILE || name.ends_with(IMAGE_SUFFIX)
 }
@@ -197,16 +184,11 @@ pub fn generated(root: &Path) -> PathBuf {
 }
 
 /// Everything `generate` writes for one image, under a directory of its own.
-/// The per-image files used to sit flat beside `plan.json` and `lib/`, four
-/// apiece, so what belonged to the repository and what belonged to one image
-/// were the same pile.
 pub fn generated_image(id: &str) -> PathBuf {
     PathBuf::from(GENERATED).join(id)
 }
 
-/// What the generated Containerfile is called. It was named for its image and
-/// nothing else, so the one file a person goes looking for was the one with no
-/// extension to find it by.
+/// What the generated Containerfile is called.
 pub const CONTAINERFILE: &str = "Containerfile";
 
 /// The one directory under `generated/` that belongs to no image: the helper

@@ -16,9 +16,9 @@ impl Json {
         Json::String(value.into())
     }
 
-    /// An absent value as null rather than an absent key, so every object of a
-    /// given kind has the same shape and a reader never has to tell "not
-    /// declared" from "misspelled the key".
+    /// An absent value as null, so every object of a given kind has the same
+    /// shape and a reader never has to tell "not declared" from "misspelled the
+    /// key".
     pub fn optional(value: Option<impl Into<String>>) -> Self {
         match value {
             Some(value) => Json::String(value.into()),
@@ -43,8 +43,8 @@ impl Json {
         )
     }
 
-    /// An object whose keys come out of the data rather than the schema: a
-    /// path to the module that owns it, an option name to its value.
+    /// An object whose keys come out of the data: a path to the module that
+    /// owns it, an option name to its value.
     pub fn map(entries: impl IntoIterator<Item = (String, Json)>) -> Self {
         Json::Object(entries.into_iter().collect())
     }
@@ -138,7 +138,7 @@ fn escape(value: &str, out: &mut String) {
     out.push('"');
 }
 
-/// How far a document may nest before it is refused rather than recursed into.
+/// How far a document may nest before it is refused.
 const MAX_DEPTH: usize = 128;
 
 /// A byte cursor: positions are byte offsets, which is what an error reports.

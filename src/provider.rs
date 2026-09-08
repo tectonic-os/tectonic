@@ -1,10 +1,7 @@
 //! Given a capability, which module provides it: over the repository, over
 //! what it has already imported, and over the collections it declares.
 //!
-//! One index, because three things ask the same question — the
-//! unsatisfied-`requires` help, the offer `import module` makes, and the family
-//! module `create image` seeds — a fourth asks it of a key kind, and a fifth
-//! asks which modules claim the rules a profile selects.
+//! One index: five callers ask the same question.
 
 use crate::model::remote::{Collection, REMOTE_DIR};
 use crate::parse::disk::Disk;
@@ -90,10 +87,8 @@ impl Index {
             });
         }
         // One collection that cannot be reached takes the whole catalog with
-        // it, so a scan that meant to fetch falls back to what is already
-        // here: a reader asking what provides something is answered worse by
-        // nothing at all than by what one unreachable collection is missing
-        // from. `unread` is what still says the search was incomplete.
+        // it, so a scan that meant to fetch falls back to what is already here.
+        // `unread` is what still says the search was incomplete.
         let fetched = crate::import::catalog(root, sources, fetch);
         let unreached = fetched.as_ref().err().cloned();
         let reached = fetched.is_ok();
@@ -184,10 +179,9 @@ impl Index {
     }
 
     /// Every module declaring `capability` that supports `family`, the
-    /// repository's own first. An adapter role is filled per family, so a
-    /// provider for another family is not a candidate for this image at all —
-    /// `of` alone would hand a fedora image the deb adapter whenever the deb
-    /// one sorts first.
+    /// repository's own first. An adapter role is filled per family, so `of`
+    /// alone would hand a fedora image the deb adapter whenever the deb one
+    /// sorts first.
     pub fn fitting(&self, capability: &str, family: &str) -> Vec<&Provider> {
         self.of(capability)
             .into_iter()

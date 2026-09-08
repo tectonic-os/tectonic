@@ -31,11 +31,8 @@ pub(crate) fn of_target<'a>(
 
 /// The shape of this document. A host binary reads it back and is pinned
 /// independently of the one that wrote it, so this moves when a field in the
-/// plan moves. It is deliberately **not** `model::image::SCHEMA_VERSION`,
-/// which is `repo.kdl`'s own grammar and is held against every repository by
-/// `parse::repo::compatible`: writing that number here would mean a field
-/// moving for a reader's sake could only be said by rejecting every
-/// repository that declares the version it still is.
+/// plan moves. `model::image::SCHEMA_VERSION` is a separate number: `repo.kdl`'s
+/// own grammar, held against every repository by `parse::repo::compatible`.
 pub const SCHEMA_VERSION: u32 = 1;
 
 pub fn build(list: &List, resolved: &[Resolved], workflows: &[Declared]) -> Json {
@@ -489,8 +486,8 @@ fn overlay_files(image: &Image, shipped: &overlay::Index, flavour: &str) -> Json
 
 /// Every path a module ships that another module's overlay replaced, to the
 /// module whose copy the image actually carries. A claim about a file its
-/// claimant no longer owns is a composition failure rather than a false claim,
-/// and this is what tells the two apart.
+/// claimant no longer owns is a composition failure, and this is what tells it
+/// from a false claim.
 fn overridden(image: &Image, shipped: &overlay::Index, flavour: &str) -> Json {
     Json::array(
         overrides(image, shipped, flavour)
@@ -677,7 +674,7 @@ mod tests {
 
     /// The ungated target is a flavour name like any other, and a gated entry
     /// is not in it. Nothing golden covers this: the build args are the only
-    /// consumer, and they are handed to a backend rather than written.
+    /// consumer, and they are handed to a backend.
     #[test]
     fn a_gated_entry_is_out_of_the_ungated_target() {
         assert!(in_target(&entry(None), NO_FLAVOUR));

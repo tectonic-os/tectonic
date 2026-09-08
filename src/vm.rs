@@ -1,9 +1,7 @@
 //! The disk the repository's own script builds and boots, run as it stands.
 //!
-//! Nothing here reimplements it: rootful podman, `podman image scp`,
-//! bootc-image-builder under `--privileged` and qemu port selection are
-//! shell-shaped work, and the script is interactive, so this execs it the way
-//! `build` execs the container backend.
+//! The script is interactive, so this execs it the way `build` execs the
+//! container backend.
 
 use crate::command::Spec;
 use crate::copy;
@@ -13,17 +11,14 @@ use std::os::unix::process::CommandExt as _;
 use std::path::Path;
 use std::process::Command;
 
-/// Generated in place by `emit::SCRIPTS`, which is what lets this call it: a
-/// scaffolded copy would be the repository's to edit, and then `tect vm`
-/// would do whatever that edit says.
+/// Generated in place by `emit::SCRIPTS`: a scaffolded copy would be the
+/// repository's to edit, and `tect vm` would do whatever that edit says.
 const SCRIPT: &str = "scripts/vm.sh";
 
-/// Measured 2026-08-31 against both deb bases: an Ubuntu image generates a
-/// manifest and then dies relabelling its buildroot, `setfiles` against an
-/// SELinux policy the image does not carry, and a Debian one is refused before
-/// that for omitting `VERSION_ID` from os-release. The generated
-/// `build-disk.yml` skips the job on the same field, and it is the same
-/// constant, so this is that gate where a person hits it.
+/// Disk images are Fedora's alone: an Ubuntu image dies relabelling its
+/// buildroot in `setfiles`, and a Debian one is refused for omitting
+/// `VERSION_ID` from os-release. The generated `build-disk.yml` gates on this
+/// same constant.
 use crate::resolve::workflow::FEDORA;
 
 /// What the container image is converted into, and what each one is.
@@ -87,9 +82,7 @@ const BOOTISO: &str = "out/bootiso";
 
 /// The build context `vm.sh` hands `podman build`, and the recipe tacklebox
 /// assembles the media from. Neither is a `generate` output: both depend on
-/// `--target`, `--tag` and `$IMAGE_REGISTRY`, which are build-time and not
-/// commit-time, so they are staged here the way the installer and the login
-/// access already are.
+/// `--target`, `--tag` and `$IMAGE_REGISTRY`, which are build-time.
 fn documents(
     list: &crate::model::image::List,
     name: &str,
@@ -114,12 +107,10 @@ fn documents(
              before it fails to boot"
         )
     };
-    // Both references fisherman is given are the published one, and that is
-    // not a lost split — it is where the split already happened. Tacklebox
-    // embeds the local bytes *under* the published name, so on this medium
-    // that name is what the bytes are called; asking fisherman for
+    // Both references fisherman is given are the published one: tacklebox
+    // embeds the local bytes under the published name, so asking fisherman for
     // `localhost/...` would miss the store and reach for a registry. The local
-    // reference is the media recipe's `source` and appears nowhere else.
+    // reference is the media recipe's `source`.
     let build = recipe::build(list, name, imgref, imgref, &[recipe::STORE.to_string()])
         .ok_or_else(refuse)?;
     let media = recipe::media(list, name, image, imgref).ok_or_else(refuse)?;
@@ -154,14 +145,11 @@ fn stage(root: &Path, opts: &Options) -> Result<String, String> {
     Ok(crate::emit::recipe::live(&published))
 }
 
-/// The frontend the media autostarts is *this* binary, copied into the build
-/// context beside the recipes. Not the published release: media assembled from
-/// a tree exists to prove that tree, and fetching a different `tect` would
-/// install with an installer nobody here is looking at.
-///
-/// A binary that cannot run in the live environment — a glibc build carried
-/// onto another distribution's libc — is caught by the `--version` the
-/// Containerfile runs, so the failure is an ISO build and not a boot.
+/// The frontend the media autostarts is this binary, copied into the build
+/// context beside the recipes. One that cannot run in the live environment — a
+/// glibc build carried onto another distribution's libc — is caught by the
+/// `--version` the Containerfile runs, so the failure is an ISO build and not
+/// a boot.
 fn frontend(to: &Path) -> Result<(), String> {
     let from = std::env::current_exe().map_err(|err| format!("this binary: {err}"))?;
     std::fs::copy(&from, to)
@@ -185,8 +173,8 @@ fn converts(root: &Path, spec: &Spec, kind: &str, opts: &Options) -> bool {
 
 /// The family of what would be converted, as the repository declares it, or
 /// nothing where this cannot know: an `--image` names a ref that need not be
-/// one of this repository's at all, and a target it does not declare is the
-/// script's own to refuse.
+/// this repository's, and a target it does not declare is the script's to
+/// refuse.
 fn family(root: &Path, opts: &Options) -> Option<String> {
     if opts.image.is_some() {
         return None;
@@ -209,13 +197,9 @@ fn target(list: &crate::model::image::List, opts: &Options) -> Option<crate::mod
 }
 
 /// Whether the selected target imports non-root password credentials, and the
-/// SSH public key `bootc install` can provision. An arbitrary image ref is
-/// deliberately not assumed to match this source.
-///
-/// Neither half applies to an installer iso: it boots a live environment that
-/// autologins root and creates the installed machine's account itself, so
-/// asking for a VM password there would provision an unprivileged account
-/// nobody needs and block a run with no terminal to ask on.
+/// SSH public key `bootc install` can provision. Neither half applies to an
+/// installer iso: it autologins root and creates the installed machine's
+/// account itself, so asking there blocks a run with no terminal to ask on.
 fn access(root: &Path, kind: &str, opts: &Options) -> Access {
     if kind == "iso" || opts.image.is_some() {
         return Access::default();
@@ -272,14 +256,10 @@ fn imports_passwords(root: &Path, module: &str) -> bool {
     false
 }
 
-/// Which installer converts this image, where one would be converted at all:
-/// the script boots what is already there, and cannot read the family for
-/// itself. `None` is the script's own default, `bib`. An `iso` reaches
-/// neither converter — fisherman installs the target through podman, so one
-/// live environment installs every family — and so names no installer.
-///
-/// Lifted out of `run`, which `exec`s and so cannot be tested past this point:
-/// this is the whole of what the change decides, and it is worth asserting.
+/// Which installer converts this image, where one would be converted at all.
+/// `None` is the script's own default, `bib`. An `iso` reaches neither
+/// converter — fisherman installs the target through podman — and so names no
+/// installer. Lifted out of `run`, which `exec`s and cannot be tested past it.
 fn installer(root: &Path, spec: &Spec, kind: &str, opts: &Options) -> Option<&'static str> {
     if kind == "iso" || !converts(root, spec, kind, opts) {
         return None;
@@ -289,10 +269,9 @@ fn installer(root: &Path, spec: &Spec, kind: &str, opts: &Options) -> Option<&'s
         .map(|_| BOOTC)
 }
 
-/// What `vm.sh` calls `bootc install to-disk`. The script cannot read the base
-/// family — it has no JSON reader and `plan.json` is where the family is — so
-/// the tool, which already reads it for the refusal above, names the installer
-/// instead. `bib` is the script's own default and is never passed.
+/// What `vm.sh` calls `bootc install to-disk`. The script has no JSON reader
+/// and `plan.json` is where the base family is, so the tool names the installer.
+/// `bib` is the script's own default and is never passed.
 const BOOTC: &str = "bootc";
 
 /// The whole command line the script is given.
@@ -363,8 +342,8 @@ fn kind(spec: &Spec, given: Option<&str>, prompt: &Prompt) -> Result<Option<&'st
 }
 
 /// One row per type, in the order `TYPES` holds them, so an answer indexes
-/// straight back into it. `spawn` boots a disk rather than an installer, so
-/// its iso row is drawn and refused rather than left out.
+/// straight back into it. `spawn` boots a disk, so its iso row is drawn and
+/// refused. Leaving the row out would shift every index below it.
 fn rows(spec: &Spec) -> Vec<Choice> {
     TYPES
         .iter()
@@ -435,11 +414,9 @@ mod tests {
         assert!(iso(Verb::VmRun.spec()).available);
     }
 
-    /// A `debian` image is converted by bootc rather than by the builder that
-    /// cannot convert it, decided before anything is pulled and before sudo is
-    /// asked for rather than ten minutes in, inside osbuild. The disk type is
-    /// settled first, since the choice is about converting one and a type is
-    /// free to resolve.
+    /// A `debian` image is converted by bootc, decided before anything is
+    /// pulled and before sudo is asked for. The disk type is settled first,
+    /// since the choice is about converting one.
     #[test]
     fn the_family_names_the_converter_before_anything_is_pulled() {
         let root = std::env::temp_dir().join(format!("tect-vm-family.{}", std::process::id()));
@@ -509,13 +486,13 @@ mod tests {
         };
 
         // The whole of what this decides: a deb target that would convert a
-        // disk is installed with bootc rather than refused, and the script is
-        // told so, because it cannot read the family for itself.
+        // disk is installed with bootc, and the script is told so, because it
+        // cannot read the family for itself.
         let build = Verb::VmBuild.spec();
         for kind in ["qcow2", "raw"] {
             assert_eq!(installer(&root, build, kind, &opts(None)), Some(BOOTC));
         }
-        // So what a deb target hits is the missing script rather than a wall.
+        // So what a deb target hits is the missing script.
         let installed = refuse("qcow2", &opts(None));
         assert!(installed.contains("vm.sh is not there"), "{installed}");
         // An iso reaches neither converter: the media boots a live environment
@@ -523,7 +500,8 @@ mod tests {
         assert_eq!(installer(&root, build, "iso", &opts(None)), None);
 
         // With no type named and nobody to ask, the type is what is missing,
-        // and that is what it says rather than reaching for the family.
+        // and that is what it says. Reaching for the family answers a question
+        // nobody asked.
         let unasked = run(
             &root,
             Verb::VmRun.spec(),
@@ -537,9 +515,9 @@ mod tests {
             "{unasked}"
         );
 
-        // A disk that is already there is booted rather than rebuilt, so the
-        // family has nothing to say about it and the guard stands aside. This
-        // is what lets a deb disk built by hand be booted by the tool.
+        // A disk that is already there is booted as it stands, so the family
+        // has nothing to say about it and the guard stands aside. This is what
+        // lets a deb disk built by hand be booted by the tool.
         crate::init::put(&root.join("out/raw/disk.raw"), "").unwrap();
         assert!(!converts(&root, Verb::VmSpawn.spec(), "raw", &opts(None)));
         assert!(!converts(&root, Verb::VmRun.spec(), "raw", &opts(None)));
@@ -588,12 +566,9 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// What an iso stages, and the two refusals that are the whole point of
-    /// staging it in the tool rather than in the script. Off the real
-    /// `deb-families` fixture, so the recipe is a declaration's and not a
-    /// constructed one, and off `documents` rather than `stage` because the
-    /// references are the caller's — resolving them reads $IMAGE_REGISTRY and
-    /// a git remote, and neither belongs in a unit test.
+    /// What an iso stages, and the two refusals that are the point of staging
+    /// it here. Off `documents`, because `stage` resolves the references, which
+    /// reads $IMAGE_REGISTRY and a git remote.
     #[test]
     fn an_iso_stages_both_recipes_and_refuses_a_local_update_origin() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/repos/deb-families");
@@ -638,7 +613,8 @@ mod tests {
             .contains("\"ref\": \"ghcr.io/someone/forky:latest\""));
 
         // A local namespace is where a disk gets away with recording nothing
-        // and a machine does not: refuse it by name rather than install one.
+        // and a machine does not: refuse it by name. Installing one leaves a
+        // machine with no record.
         let local = documents(
             &list,
             "forky",

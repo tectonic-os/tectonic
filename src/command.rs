@@ -47,8 +47,8 @@ pub enum Verb {
     ValidateImage,
 }
 
-/// Beside the enum, so a variant with no row is a failed test rather than a
-/// word nothing resolves to.
+/// Beside the enum, so a variant with no row is a failed test. Missed here, it
+/// is a word nothing resolves to.
 pub const ALL: &[Verb] = &[
     Verb::Upgrade,
     Verb::Installer,
@@ -115,8 +115,7 @@ pub struct Spec {
     pub about: &'static str,
     pub family: Family,
     /// Whether a booted tectonic image answers it, off the two documents the
-    /// build baked. A place is not a family, so this is a column rather than a
-    /// fifth `Family`: `why` needs a repository *or* a host.
+    /// build baked. A column, since `why` needs a repository *or* a host.
     pub host: bool,
     /// The flags it reads. One it does not is a failure, not a silent no-op.
     pub takes: &'static [&'static str],
@@ -574,9 +573,8 @@ pub fn nouns(word: &str) -> Vec<&'static Spec> {
 }
 
 /// Whether `word` alone is a list to pick from, which it is when every form of
-/// it takes a noun. `scap` and `fetch` also take an argument, so a picker of
-/// their nouns would hide half the surface and their bare form keeps its
-/// refusal.
+/// it takes a noun. `scap` and `fetch` also take an argument, so their bare
+/// form keeps its refusal.
 pub fn all_nouns(word: &str) -> bool {
     let rows = nouns(word);
     !rows.is_empty() && rows.iter().all(|spec| !spec.noun.is_empty())
@@ -615,11 +613,9 @@ fn either(rows: &[&'static Spec]) -> String {
     }
 }
 
-/// Rows the help and the picker leave out, which is a fact about the command
-/// and so lives here rather than in either rendering. `installer` erases the
-/// disk it is pointed at, and `tect` alone is typed by people scaffolding a
-/// repository: right on the media, a loaded gun anywhere else. It still runs
-/// when it is typed, and `docs/commands.md` still documents it.
+/// Rows the help and the picker leave out. `installer` erases the disk it is
+/// pointed at. It still runs when it is typed, and `docs/commands.md` still
+/// documents it.
 const UNLISTED: &[Verb] = &[Verb::Installer];
 
 /// What a person is shown: what runs anywhere, then what needs a repository.
@@ -644,9 +640,9 @@ pub fn listed() -> Vec<&'static Spec> {
 /// needs a repository *or* a host, which no family can say.
 #[derive(Debug, PartialEq)]
 pub enum Context {
-    /// A `repo.kdl` here or above, named the way `--root .` names one, so
-    /// every path a command prints hangs off it and a person reads `modules/x`
-    /// rather than where their home is.
+    /// A `repo.kdl` here or above, named the way `--root .` names one, so every
+    /// path a command prints hangs off it and a person reads `modules/x`. An
+    /// absolute path would print where their home is.
     Repo(PathBuf),
     /// A booted tectonic image: `/usr/share/tectonic/` carries the manifest
     /// the build baked and the record it wrote beside it.
@@ -656,10 +652,9 @@ pub enum Context {
 }
 
 impl Context {
-    /// `--root` names a repository outright. Otherwise a repository wins over
-    /// a host, because a checkout on a booted tectonic machine is the more
-    /// specific answer and it is the one with the source; without it the
-    /// baked manifest is what there is to read.
+    /// `--root` names a repository outright. Otherwise a repository wins over a
+    /// host: it is the one with the source. Without it the baked manifest is
+    /// what there is to read.
     pub fn of(root: Option<&Path>) -> Self {
         if let Some(root) = root {
             return Self::Repo(root.to_path_buf());
@@ -685,18 +680,10 @@ pub fn on_host() -> Vec<&'static Spec> {
     COMMANDS.iter().filter(|spec| spec.host).collect()
 }
 
-/// The rows a picker offers here, and the choices that draw them.
-///
-/// It used to keep every row and put `needs a repository` where the `about`
-/// went, so the list would not be shorter. That reasoning holds for a
-/// reference and not for a menu: `usage` is the surface a person learns from
-/// and it still lists everything, grouped by where it runs, while a picker is
-/// a question about what to do *now*. A row it cannot answer with is neither
-/// runnable nor readable, which is worse than either offering it whole or
-/// leaving it out.
-///
-/// One function returns both, because a filtered list and an index into it
-/// cannot be built apart without eventually disagreeing.
+/// The rows a picker offers here, and the choices that draw them. A row a
+/// picker cannot answer with is left out; `usage` still lists everything. One
+/// function returns both, so a filtered list and an index into it cannot be
+/// built apart and disagree.
 pub fn choices<'a>(rows: &[&'a Spec], here: &Context) -> (Vec<&'a Spec>, Vec<Choice>) {
     let kept: Vec<&Spec> = rows
         .iter()

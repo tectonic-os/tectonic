@@ -1,11 +1,11 @@
 //! Where everything in a repository came from, in one shape.
 //!
-//! Four slots answer it, and every pin in the tree fills the same four: the
-//! **locator** says where it comes from, the **selector** which version of it,
-//! the **verifier** what proves you got that one, and the **tracker** who keeps
-//! the selector current. `asset`, an out-of-tree module and a collection each
-//! hold the one `pin` table; the base carries its locator and selector joined
-//! in the image reference, and `signed` as its verifier.
+//! Every pin in the tree fills the same four slots: the locator says where it
+//! comes from, the selector which version, the verifier what proves you got
+//! that one, and the tracker who keeps the selector current. `asset`, an
+//! out-of-tree module and a collection each hold the one `pin` table; the base
+//! carries locator and selector joined in the image reference, and `signed` as
+//! its verifier.
 
 pub mod build;
 pub mod evidence;
@@ -118,8 +118,8 @@ impl Evidence {
         })
     }
 
-    /// Whether the content is cloned rather than downloaded, which is what
-    /// makes the commit the selector names the verifier instead of a hash.
+    /// Whether the content is a git clone, which is what makes the commit the
+    /// selector names the verifier. A download is verified by a hash.
     pub fn cloned(&self) -> bool {
         self.url.as_deref().is_some_and(|url| url.ends_with(".git"))
     }
@@ -150,7 +150,7 @@ impl Evidence {
 // ---- policy --------------------------------------------------------------
 
 /// The network verbs a build layer reaches the outside world with. Closed, and
-/// data rather than a regex, so what counts as a fetch is one list to read.
+/// held as data, so what counts as a fetch is one list to read.
 const FETCHES: [&str; 8] = [
     "curl ",
     "wget ",
@@ -180,9 +180,8 @@ fn scripts() -> Vec<String> {
 }
 
 /// A module that reaches the network with nothing declaring what it pulls.
-/// Always on, whatever the posture: an undeclared fetch is the one thing no
-/// record can describe after the fact, because nothing says what it should
-/// have been.
+/// Always on, whatever the posture: no record can describe an undeclared fetch
+/// after the fact.
 pub fn check_fetch(
     module: &crate::model::module::Module,
     dir: &std::path::Path,
@@ -226,8 +225,7 @@ pub fn check_fetch(
 
 /// What `audit { enforce }` refuses at build time: a record that would not name
 /// the digest it built on, or would not bind the image to a tree anyone can
-/// read. Kept apart from the build so the posture is checkable without running
-/// one.
+/// read. Apart from the build, so the posture is checkable without running one.
 pub fn enforce_build(
     enforce: bool,
     resolved_base: Option<&str>,

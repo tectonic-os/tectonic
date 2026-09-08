@@ -1,8 +1,7 @@
 ---
 # `base-sig-probe` and not `base-probe`: the file name is the workflow id a
-# repository names in `repo.kdl`, so renaming it would move every consumer's
-# manifest for a label. It grew past signatures on 2026-09-06 and the display
-# name says so.
+# repository names in `repo.kdl`, so renaming it moves every consumer's
+# manifest for a label.
 name: Base image probe
 
 on:
@@ -35,24 +34,15 @@ jobs:
 
       - name: Probe each base and correct the declaration
         id: probe
-        # Every path this workflow manages, and what it manages it for. A row
-        # with a capability is a *witness*: the path decides whether the base
-        # claims that capability, and is never written into `provides-file`
-        # itself, because a second spelling of a claim is a line to keep in
-        # step for nothing. A row with `-` is a file contract — a path some
-        # module requires or provides — and is written into `provides-file`
-        # when it is there.
+        # Every path this workflow manages. A row with a capability is a
+        # witness: the path decides whether the base claims it, and is never
+        # written into `provides-file`. A row with `-` is a file contract and is
+        # written into `provides-file` when it is there. `rechunking` has no
+        # witness path and stays hand-declared.
         #
-        # `rechunking` is deliberately absent: it has no witness path, so it
-        # stays hand-declared. Nothing this table does not name is ever
-        # removed, which is what makes that safe.
-        #
-        # A path already declared is measured whether the table names it or
-        # not, because a claim the image does not carry has to come off however
-        # it got there. That is the direction that matters: an under-claim
-        # refuses a module and says so, while an over-claim is silent —
-        # `resolve::graph::suppress` drops a module the base covers entirely
-        # with no diagnostic at all.
+        # A path already declared is measured whether the table names it or not:
+        # an under-claim refuses a module and says so, an over-claim is silent.
+        # Nothing this table does not name is ever removed.
         env:
           WITNESS: |
             /usr/bin/flatpak     flatpak
@@ -67,14 +57,10 @@ jobs:
           set -euo pipefail
           ./scripts/tect.sh fetch modules
 
-          # To a file, and before the loop, because `plan --json` writes
-          # nothing at all when any module is refused. Read through a process
-          # substitution that would be an empty loop and a run reporting that
-          # every base matches, having measured none of them — and a refused
-          # module is exactly what an under-declared base causes. This probe
-          # keeps a repository that resolves honest as its bases move; it
-          # cannot repair one that has already stopped resolving, and it says
-          # so here rather than passing.
+          # To a file, and before the loop, because `plan --json` writes nothing
+          # at all when any module is refused: read through a process
+          # substitution that would be an empty loop and a run reporting every
+          # base matched, having measured none.
           plan="$(mktemp)"
           ./scripts/tect.sh plan --json > "${plan}"
 
@@ -162,10 +148,9 @@ jobs:
           while IFS='|' read -r image base recorded file provides files; do
             [ -n "${image}" ] || continue
             # `signed` records that a signature is published, which is not the
-            # same as one a consumer can attribute. A keyless signature carries
-            # a Fulcio certificate naming the signer and its issuer; a key-based
-            # one carries none, and verifying it needs a public key obtained
-            # some other way. Both are `#true`, so the run log says which.
+            # same as one a consumer can attribute: a keyless signature carries
+            # a Fulcio certificate naming the signer, a key-based one carries
+            # none. Both are `#true`, so the run log says which.
             if cosign download signature "${base}" > /dev/null 2>&1; then
               actual="true"
               if cosign verify --certificate-identity-regexp='.*' \
@@ -185,12 +170,9 @@ jobs:
               changed="${changed}${changed:+, }\`${image}\` (\`${base}\`): \`signed #${recorded}\` to \`#${actual}\`"
             fi
 
-            # One pull and one container for the whole table, rather than one
-            # per path: the ublue bases are several gigabytes each and the
-            # runner has one disk. The image goes again straight afterwards for
-            # the same reason, and the answer is memoised, because two images
-            # in a repository on the same base is the ordinary case and it is a
-            # property of the base rather than of either of them.
+            # One pull and one container for the whole table: the ublue bases
+            # are several gigabytes each and the runner has one disk. The answer
+            # is memoised, since it is a property of the base.
             probe="$(printf '%s\n%s\n' "${WITNESS}" "${files}" \
               | awk '{ print $1 }' | grep '^/' | sort -u | tr '\n' ' ')"
             memo="${memos}/$(printf '%s' "${base}" | md5sum | cut -d' ' -f1)"

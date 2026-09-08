@@ -13,10 +13,9 @@ const INSTALLED: [&str; 2] = [
 ];
 
 /// The `sources` block a new repo.kdl is scaffolded with, which is one of the
-/// assets rather than a value in here: editing it changes what every
-/// repository created afterwards declares, and deleting it scaffolds none. It
-/// is spliced into repo.kdl, so the copy that lands at the root is taken out
-/// again.
+/// assets: editing it changes what every repository created afterwards
+/// declares, and deleting it scaffolds none. It is spliced into repo.kdl, so
+/// the copy that lands at the root is taken out again.
 pub const SOURCES_FILE: &str = "repo.sources.kdl";
 
 pub fn sources(assets: &Path) -> String {
@@ -56,7 +55,7 @@ pub fn assets() -> Result<PathBuf, String> {
 }
 
 /// `$XDG_DATA_HOME`, else `~/.local/share`. `upgrade` reads it too, so the
-/// per-user assets path has one definition rather than two that drift.
+/// per-user assets path has one definition.
 pub(crate) fn data_home() -> Option<PathBuf> {
     std::env::var_os("XDG_DATA_HOME")
         .filter(|dir| !dir.is_empty())

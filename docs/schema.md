@@ -239,7 +239,7 @@ How strictly the provenance facts are held. Every one of them is recorded either
 
 | Node | Takes | Meaning |
 | --- | --- | --- |
-| `enforce` | `#true` or `#false`, at most one | Whether a provenance fact that is missing or does not match stops the run rather than being reported. |
+| `enforce` | `#true` or `#false`, at most one | Whether a provenance fact that is missing or does not match stops the run. Off, it is reported and the run carries on. |
 
 <!-- /schema: repo -->
 
@@ -319,7 +319,7 @@ One image: what it calls itself, what it builds on, and everything it is made of
 | `description` | a string, at most one | A one-line summary of the image, in its OCI labels and not in os-release. |
 | `keywords` | one or more strings | Keywords for the image's OCI labels, comma-joined into one label. |
 | `logo-url` | a string, at most one | A URL to the image's logo, in its OCI labels. |
-| `conforms` | a string, at most one | The benchmark profile a scan measures the ungated target against, reported rather than enforced. |
+| `conforms` | a string, at most one | The benchmark profile a scan measures the ungated target against. A scan reports it and enforces nothing. |
 
 #### `base`
 
@@ -348,7 +348,7 @@ One flavour, named by the node: a gated module set published as `<image>-<flavou
 | Property | Value | Meaning |
 | --- | --- | --- |
 | `default=` | `#true` or `#false` | Whether a build that names no flavour builds this one. |
-| `pr-build=` | `#true` or `#false` | Whether a pull request builds this flavour rather than the default. |
+| `pr-build=` | `#true` or `#false` | Whether a pull request builds this flavour in place of the default. |
 | `conforms=` | a string | The benchmark profile a scan measures this flavour against; the image's `conforms` measures the ungated target alone. |
 
 #### `modules`
@@ -750,7 +750,7 @@ Where the public half is shipped, which is a contract path this module provides.
 
 ### `allow-verify`
 
-One `tect validate-image` diagnostic accepted on one unit rather than image-wide.
+One `tect validate-image` diagnostic accepted on one unit, leaving the rest of the image checked.
 
 *a string*
 
@@ -812,7 +812,7 @@ The package groups this module installs. Fedora only, so an ungated one is a mod
 
 ### `satisfies`
 
-The benchmarks and rules this module claims to harden, as an audit declaration the tool records rather than certifies.
+The benchmarks and rules this module claims to harden, as an audit declaration. The tool records it and certifies nothing.
 
 *at most one*
 

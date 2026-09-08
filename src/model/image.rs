@@ -114,9 +114,8 @@ pub struct Flavour {
     pub default: bool,
     pub pr_build: bool,
     /// The profile a scan measures this flavour's target against. A flavour is
-    /// a different image from the set it extends and is not guaranteed to
-    /// score the way that set did, so it asks for its own measurement or gets
-    /// none.
+    /// a different image from the set it extends, so it asks for its own
+    /// measurement or gets none.
     pub conforms: String,
     pub span: Span,
 }
@@ -204,7 +203,7 @@ pub struct Seed {
 }
 
 /// The repository's declarations: every image in it, and the handful of
-/// decisions that are about the repository rather than about any image.
+/// decisions that are about the repository.
 pub struct List {
     /// What repo.kdl calls the repository, shown as the name of a tree.
     pub name: String,
@@ -233,13 +232,13 @@ pub struct List {
     pub seed: Option<Seed>,
     /// Whether a build stamps the generated manifest onto the image as an OCI label.
     pub manifest_label: bool,
-    /// Whether a provenance fact that is missing or does not match is an error
-    /// rather than a read-out. Every fact is recorded either way.
+    /// Whether a provenance fact that is missing or does not match is an error.
+    /// Every fact is recorded either way.
     pub audit_enforce: bool,
     /// What repo.kdl declares, which is `SCHEMA_VERSION` or the load failed.
     pub schema_version: Option<u32>,
-    /// Whether the node was there at all, so a malformed one is reported once
-    /// rather than as both wrong and missing.
+    /// Whether the node was there at all, so a malformed one is reported once.
+    /// Without it, the same node is both wrong and missing.
     pub(crate) schema_version_seen: bool,
     /// repo.kdl, for a diagnostic about either of the two above.
     pub repo_src: Source,
@@ -299,7 +298,7 @@ impl List {
     }
 
     /// Why there is no default, for a command that had to pick one. Raised
-    /// there rather than at load: a command given an image never needed one.
+    /// there: a command given an image never needed one.
     pub fn no_default(&self) -> Option<Issue> {
         let first = self.images.first().filter(|_| self.images.len() > 1)?;
         self.default_image_id.is_none().then(|| {

@@ -98,8 +98,8 @@ fn repo_root(here: &Context) -> Result<PathBuf, Error> {
         Context::Repo(root) => root.clone(),
         Context::Host => {
             return Err(Error::Invocation(format!(
-                "this is a tectonic image and not a repository, so there is no source tree to \
-                 read\n\nhelp: {} off the documents the build baked",
+                "this is a tectonic image, so there is no source tree to read\n\nhelp: {} \
+                 off the documents the build baked",
                 answers()
             )))
         }
@@ -163,8 +163,8 @@ fn this_target(named: Option<&str>, scope: &crate::emit::why::Scope) -> Result<(
             "this image was built as `{name}`, so it cannot answer for `{named}`"
         ))),
         _ => Err(Error::Invocation(format!(
-            "the build record does not name a target, so this image cannot answer for `{named}` \
-             rather than for itself"
+            "the build record does not name a target, so this image can answer only for \
+             itself"
         ))),
     }
 }
@@ -182,10 +182,8 @@ fn unscoped(spec: &Spec) -> String {
 
 /// What a booted image answers, off the two documents the build baked: the
 /// manifest is what it declares it is made of, the record what the build
-/// resolved. Neither needs a checkout, and both describe the whole repository,
-/// so everything here is scoped to the target the record names — a host
-/// read-out that answers across targets describes an image that is not this
-/// one.
+/// resolved. Both describe the whole repository, so everything here is scoped
+/// to the target the record names.
 fn on_host(
     spec: &Spec,
     rest: &[&str],
@@ -409,9 +407,8 @@ pub fn dispatch(
             Ok(ExitCode::SUCCESS)
         }
         // The installer this project owns. Discovery says what a root holds;
-        // the three flags are the person's half of the recipe, and with
-        // nobody to ask each one fails naming itself rather than guessing a
-        // disk to erase.
+        // the three flags are the person's half of the recipe, and with nobody
+        // to ask each one fails naming itself. A guess here erases a disk.
         Verb::Installer => {
             if let [word, ..] = rest {
                 return Err(Error::Invocation(format!(
@@ -566,8 +563,7 @@ pub fn dispatch(
                 return Err(Error::Invocation(crate::set::BY_HAND.to_string()));
             }
             // The declaration this edits is readable whatever else is wrong
-            // with the repository, so the issues are `check`'s rather than
-            // this command's.
+            // with the repository, so the issues are `check`'s.
             let list = crate::load(&root).list;
             let on: Vec<&str> = list.workflows.iter().map(|w| w.name.as_str()).collect();
             let Some(set) = crate::set::Workflows::collect(
@@ -749,9 +745,9 @@ pub fn dispatch(
 }
 
 /// `coverage`'s read-out onto the run that produced it. The datastream is a
-/// flag and `run_loaded` reads none, so this is resolved here — and only from
-/// what was passed, never by probing the host, or what the command prints
-/// depends on whether SSG is installed.
+/// flag and `run_loaded` reads none, so it is resolved here, and only from what
+/// was passed: probing the host would make the output depend on whether SSG is
+/// installed.
 fn coverage(
     run: &mut crate::Run,
     json: bool,
@@ -868,10 +864,8 @@ fn reading(
     ) && arg.is_none()
         && prompt.draws();
     // What `generate` writes is read off the fetched trees, so it fetches them
-    // first. A `.remote` older than the collection bakes a deleted file into
-    // `plan.json`, and CI — which fetches into an empty tree — disagrees and is
-    // right. The issues are left for `run` to report; a repository that does
-    // not read has nothing to fetch for.
+    // first: a `.remote` older than the collection bakes a deleted file into
+    // `plan.json`. The issues are left for `run` to report.
     if command == Command::Generate {
         let (list, issues, _) = crate::declarations(&root);
         if issues.is_empty() {
@@ -952,9 +946,8 @@ fn reading(
             eprintln!("tect: {line}");
         }
         // `hidden` concludes from silence the same way `coverage` does: a
-        // collection that is declared and not on this machine is not walked,
-        // and a clean `check` on a fresh clone would otherwise read as one
-        // that looked.
+        // collection that is declared and not on this machine is not walked, so
+        // a clean `check` on a fresh clone would read as one that looked.
         match run.index.unsearched() {
             clause if clause.is_empty() => {}
             clause => eprintln!("tect: {clause}"),

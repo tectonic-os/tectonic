@@ -40,8 +40,8 @@ env:
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"  # do not edit
 
 jobs:
-  # First, so everything below reads the fixed-up tree rather than a second
-  # workflow run over it.
+  # First, so everything below reads the fixed-up tree. A fix committed later
+  # takes a second workflow run before anything acts on it.
   checksums:
     runs-on: ubuntu-24.04
     permissions:
@@ -332,22 +332,17 @@ jobs:
           echo "PUBLISH=${publish}" >> "${GITHUB_ENV}"
           echo "publish=${publish}" >> "${GITHUB_OUTPUT}"
 
-      # The runner hands root podman a fuse-overlayfs mount program, which
-      # turns off the native overlay diff, so every layer commit walks the
-      # whole rootfs: two minutes a layer on the build and twice the time on
-      # the rechunk and the SBOM. Written before anything pulls, so the store
-      # is created under the driver it keeps.
+      # The runner hands root podman a fuse-overlayfs mount program, which turns
+      # off the native overlay diff, so every layer commit walks the whole
+      # rootfs. Written before anything pulls, so the store is created under the
+      # driver it keeps.
       - name: Settle the container storage driver
         run: |
-          # The reset goes first, and the order is the whole point: the runner
-          # ships a root store already created under its own config, and with
-          # the new file in place every podman call that opens it — `system
-          # reset` included — dies on `database graph driver "" does not match
-          # our graph driver "overlay"`. Reset under the config that made the
-          # store, then write ours and let the next call create a fresh one.
-          # Errors are shown rather than swallowed: `|| true` covers a runner
-          # with no store at all, and hiding stderr is what made this take a
-          # red run to find.
+          # The reset goes first: the runner ships a root store already created
+          # under its own config, and with the new file in place every podman
+          # call that opens it — `system reset` included — dies on `database
+          # graph driver "" does not match our graph driver "overlay"`.
+          # `|| true` covers a runner with no store at all.
           sudo podman system reset --force || true
           sudo mkdir -p /etc/containers
           # skopeo reads this file too and, unlike podman, defaults neither
@@ -479,14 +474,14 @@ jobs:
         env:
           TARGET: ${{ matrix.target }}
           # The digest the label was stamped with, so the build record and the
-          # label are one resolution of a moving tag rather than two.
+          # label are one resolution of a moving tag.
           BASE: ${{ steps.base.outputs.name }}@${{ steps.base.outputs.digest }}
           IMAGE_VERSION: ${{ steps.date.outputs.version }}
           LABELS: ${{ steps.metadata.outputs.labels }}
         run: |
           # The one staging tag every step below reads. The published tags are
-          # the push's, so the raw image carries one name and `podman rmi`
-          # after the rechunk frees it rather than untagging it.
+          # the push's, so the raw image carries one name and `podman rmi` after
+          # the rechunk frees it. A second tag would leave it on disk.
           args=(--target "$TARGET" --tag "localhost/${IMAGE_NAME}:raw")
           for secret in "${RUNNER_TEMP}"/build-secrets/*; do
             [ -f "$secret" ] || continue
@@ -602,8 +597,8 @@ jobs:
 
       # Nothing here builds with docker, so its preinstalled images are pure
       # headroom for the rechunk. The build's own intermediate layers are not
-      # reclaimable: they are the raw image's layers, and podman calls an image
-      # dangling only when it is untagged and childless.
+      # reclaimable: podman calls an image dangling only when it is untagged and
+      # childless.
       - name: Reclaim the runner's docker images
         run: |
           docker image prune --all --force > /dev/null
@@ -720,8 +715,8 @@ jobs:
     needs: [checksums, compute-matrix, build_push]
     name: Scan the claims (${{ matrix.target }})
     runs-on: ubuntu-24.04
-    # An empty matrix is an error rather than a skip, so a repository
-    # measuring nothing has to be turned away before the strategy is read.
+    # An empty matrix is an error, so a repository measuring nothing has to be
+    # turned away before the strategy is read.
     # tect:only push-scan
     if: needs.build_push.outputs.publish == 'true' && github.event_name != 'pull_request' && needs.compute-matrix.outputs.scanned != '[]'
     # tect:end
@@ -749,8 +744,8 @@ jobs:
           ref: ${{ needs.checksums.outputs.ref }}
 
       # Nothing when the target declares no `conforms`, which is an image
-      # asking not to be measured. A module's `satisfies` no longer opens
-      # this gate, and every step below is gated on it.
+      # asking not to be measured. A module's `satisfies` does not open this
+      # gate, and every step below is gated on it.
       - name: What this target is measured with
         id: content
         env:
@@ -853,19 +848,16 @@ jobs:
           # The scanner runs inside the image, not over its mounted rootfs: a
           # chroot scan reads the runner's rpm database path, a bootc image
           # keeps an empty /var and its database under /usr, and the content
-          # then decides the target is not Fedora and skips every rule. What
-          # the scanner installs is in the container it measures, never in the
-          # published image.
+          # then decides the target is not Fedora and skips every rule.
           #
-          # Every rule in the datastream, so one run answers both halves: what
-          # the modules claimed, and what the image scores against a profile it
-          # never has to run separately. oscap exits non-zero whenever any rule
-          # fails, which is expected.
+          # Every rule in the datastream, so one run answers what the modules
+          # claimed and what the image scores. oscap exits non-zero whenever any
+          # rule fails, which is expected.
           cp "$DATASTREAM" "${RUNNER_TEMP}/ds.xml"
-          # The scanner is installed inside the image being measured, over
-          # the network, on every scan, so a transient mirror error is the
-          # same red X as a false claim. It retries rather than failing the
-          # run, and gives up rather than evaluating without a scanner.
+          # The scanner is installed inside the image being measured, over the
+          # network, on every scan, so a transient mirror error is the same red
+          # X as a false claim. It retries, and gives up if it still will not
+          # install: a scan without one would measure nothing.
           sudo podman run --rm --entrypoint "" \
             -v "${RUNNER_TEMP}:/scan:z" "$IMAGE_REF" \
             sh -c "n=0
@@ -880,9 +872,8 @@ jobs:
           [ -s "${RUNNER_TEMP}/arf.xml" ] || { echo "::error::the scan wrote no report"; exit 1; }
           sudo chown "$(id -u):$(id -g)" "${RUNNER_TEMP}/arf.xml"
 
-      # The ratchet's floor: what the last scan of this target passed. Every
-      # run rewrites it, so a deliberate regression is one red run rather than
-      # a cache entry somebody has to go and delete.
+      # The ratchet's floor: what the last scan of this target passed. Every run
+      # rewrites it, so a deliberate regression is one red run.
       - name: Restore the last scan's pass set
         if: steps.content.outputs.datastream != ''
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -949,8 +940,7 @@ jobs:
       # signature there makes every key verification on the digest fail.
       #
       # That store is a paid feature on a private repository, so this reports
-      # rather than fails: the two cosign predicates below are the ones a
-      # verifier reads with the image's own key.
+      # without failing.
       - name: Attest the commit that built it
         if: steps.content.outputs.datastream != ''
         continue-on-error: true

@@ -2,9 +2,7 @@
 //!
 //! One renderer, two readings. In a repository it comes off the resolved plan;
 //! on a live host with no `repo.kdl` it comes off the manifest and the build
-//! record baked into the image. What it answers is the same either way: what
-//! lists this module, what it exchanges with the rest of them, what it claims,
-//! and where every byte of it came from.
+//! record baked into the image.
 
 use crate::emit::json::{field, items, strings, text, Json};
 use crate::emit::{Part, Table};
@@ -58,7 +56,7 @@ fn batches(declared: &[(String, Vec<String>, Option<String>)]) -> Json {
 }
 
 /// Everything the read-out says, gathered before anything is rendered so the
-/// two readings meet here rather than in the output.
+/// two readings meet here.
 #[derive(Default)]
 pub struct Why {
     pub path: String,
@@ -93,8 +91,7 @@ pub struct Why {
     /// not carry the module tree, so a host knows only that there is one.
     pub repo_read: bool,
     /// The images that list it and build no layer for it, because their base
-    /// already ships everything it provides. An image can suppress a module
-    /// another image builds, so this is beside `images` rather than instead of
+    /// already ships everything it provides. Beside `images`, never replacing
     /// it. Always empty on a host: a baked manifest holds what was built.
     pub suppressed: Vec<String>,
     /// Which targets a host answer was read across. A repository reading is
@@ -117,7 +114,7 @@ pub enum Scope {
     Built(String),
     /// The record was absent or named no target, so every baked target was
     /// read. This is the old answer, kept so an image built before the record
-    /// carried a target degrades rather than refuses.
+    /// carried a target degrades.
     EveryTarget,
 }
 
@@ -140,14 +137,11 @@ pub fn display(paths: &[String]) -> Vec<String> {
         .collect()
 }
 
-/// What the repository says about one module, by its whole path — `matching`
-/// is what turns a name into one of those, and reading out anything but what
-/// it resolved would answer a different question than the one asked.
+/// What the repository says about one module, by its whole path; `matching`
+/// turns a name into one of those.
 ///
 /// None when nothing declares it, and when what declares it never loaded. The
-/// set searched is the one `known` advertises — suppressed entries included,
-/// since the base making a module redundant is a thing to ask `why` about
-/// rather than a reason to refuse.
+/// set searched is the one `known` advertises, suppressed entries included.
 pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
     let module = list
         .images
@@ -256,7 +250,7 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
 
 /// Every URL a `repo` file names. A pointer, not a parsing contract: the file
 /// is shell calling the family's config manager, so this reads what a person
-/// would look for rather than claiming to understand it.
+/// would look for.
 fn repo_urls(root: &std::path::Path, dir: &str) -> Vec<String> {
     // Every family copy, not the one this build takes: `why` answers about
     // the module as published, and a reader looking for an archive wants the
@@ -846,11 +840,9 @@ pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why
         return None;
     }
 
-    // Where this machine came from. **This is not the seeding refusal**: that
-    // forbids deriving *declarations* back out of *resolved output*, and this
-    // fetches the real declarations rather than reconstructing them. It is
-    // also why there is no verb — the line below is copy-pasteable exactly
-    // where it is wanted.
+    // Where this machine came from. The seeding refusal forbids deriving
+    // declarations back out of resolved output; this fetches the real ones.
+    // No verb, so the line below is copy-pasteable where it is wanted.
     if let ([target], Some(record)) = (targets.as_slice(), record) {
         why.source = image_of(manifest, target)
             .and_then(|image| text(image, "url"))
@@ -884,9 +876,8 @@ pub fn known_on_host(manifest: &Json, record: Option<&Json>) -> Vec<String> {
 
 /// Whether this binary knows the shape of a baked document. The binary in an
 /// image is pinned independently of the one that built it, so the two can be a
-/// schema apart, and a host is the one place with no repository to check an
-/// answer against: a read-out off fields that moved looks exactly like a right
-/// one. So it refuses, and names both numbers.
+/// schema apart, and a host has no repository to check an answer against. It
+/// refuses, naming both numbers.
 fn readable(document: &Json, at: &std::path::Path, reads: u32) -> Result<(), String> {
     let tool = env!("CARGO_PKG_VERSION");
     match crate::emit::json::field(document, "schema_version") {
@@ -946,10 +937,8 @@ mod tests {
     use crate::emit::Part;
     use crate::resolve::name::matching;
 
-    /// A booted image is one target, and the manifest baked into it holds
-    /// every target the repository declares. The record says which one is
-    /// running; without it the whole manifest is the only honest answer, and
-    /// the read-out has to say so rather than sound certain.
+    /// A booted image is one target, and the manifest baked into it holds every
+    /// target the repository declares. The record says which one is running.
     #[test]
     fn a_host_answer_is_scoped_to_the_target_the_record_names() {
         let manifest = crate::emit::json::Json::parse(
@@ -989,8 +978,7 @@ mod tests {
         );
 
         // The module tree is not in a finished image, so the read-out prints
-        // the clone that fetches the real declarations rather than a verb
-        // that would reconstruct them.
+        // the clone that fetches the real declarations.
         let record = crate::emit::json::Json::parse(
             r#"{"target": "desktop", "source_commit": "1f2bb19aa"}"#,
         )
@@ -1089,10 +1077,8 @@ mod tests {
         assert_eq!(table.header, ["Field", "Value"]);
         assert_eq!(table.rows.len(), 4);
     }
-    /// The binary in an image is pinned apart from the one that built it, so a
-    /// host can be a schema away from the documents it is reading. Both numbers
-    /// and the tool version are named, because on a host there is nothing else
-    /// to check the answer against.
+    /// A host can be a schema away from the documents it is reading, so both
+    /// numbers and the tool version are named.
     #[test]
     fn a_baked_document_this_binary_does_not_know_is_refused() {
         let dir = std::env::temp_dir().join(format!("tect-baked.{}", std::process::id()));

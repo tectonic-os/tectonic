@@ -132,11 +132,10 @@ fn missing_runtime_file_falls_back_to_embedded_catalog() {
     assert!(issues.is_empty(), "{}", issues.plain());
     assert!(shadows.is_empty());
     assert_eq!(bases.len(), 7);
-    // The two rows nothing can be built on until a module set says otherwise,
-    // and the only ones outside the Fedora family: every published deb bootc
-    // base carries an empty package database, so an image on one reports its
-    // whole base as clean rather than refusing. One module set covers both,
-    // so both rows require the same capability and each names its own family.
+    // The two rows nothing can be built on until a module set says otherwise:
+    // every published deb bootc base carries an empty package database, so an
+    // image on one reports its whole base as clean. Both rows require the same
+    // capability and each names its own family.
     for (at, image, family) in [
         (5, "docker.io/library/debian:forky", "debian"),
         (6, "docker.io/library/ubuntu:26.04", "ubuntu"),

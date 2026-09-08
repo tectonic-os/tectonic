@@ -14,8 +14,7 @@ const DATASOURCES: [&str; 3] = ["github-releases", "github-tags", "git-refs"];
 /// The archives the fetch can extract.
 const ARCHIVES: [&str; 5] = [".tar.gz", ".tgz", ".tar.xz", ".tar.zst", ".tar.bz2"];
 
-/// The annotation Renovate matches, declared as data rather than as a comment
-/// so this can check it.
+/// The annotation Renovate matches, declared as data so this can check it.
 #[rustfmt::skip]
 const RENOVATE: Node = Node::new("renovate",
     "The custom manager Renovate matches to keep the selector current.")
@@ -62,7 +61,7 @@ const UNPINNED: Node = Node::new("unpinned",
 
 /// One table for the four slots, held by `asset`, an out-of-tree module and a
 /// collection. Which of the trackers and which of the trailing nodes say
-/// anything is meaning, so the reader answers it rather than the shape.
+/// anything is meaning, so the reader answers it.
 #[rustfmt::skip]
 pub const PIN: Node = Node::new("pin",
     "Where this comes from, which version of it, what proves you got that one, and what keeps \
@@ -109,7 +108,7 @@ pub enum Role {
     /// A module collection references and copies resolve against.
     Collection,
     /// The record `copy module` wrote: the collection as it stood then, read
-    /// back rather than authored, so nothing about it is diagnosed twice.
+    /// back, so nothing about it is diagnosed twice.
     Record,
 }
 
@@ -234,7 +233,7 @@ fn check_tracker(
     issues: &mut Issues,
 ) {
     // `unpinned` is a collection's alone, so everything else is told about the
-    // two answers it has rather than the three.
+    // two answers it has.
     let (needs, how) = match role {
         Role::Collection => (
             "needs `renovate`, `manual` or `unpinned`",
@@ -415,7 +414,7 @@ fn check_locator(pin: &Evidence, role: Role, src: &Source, issues: &mut Issues) 
             issues.push(
                 Issue::new(format!("the {what} contains a shell metacharacter"), src)
                     .at(span, "not usable in the fetch")
-                    .help("a pin reaches the fetch as pipe-separated fields and a layer's env, so quotes, spaces, pipes and expansions are rejected rather than escaped"),
+                    .help("a pin reaches the fetch as pipe-separated fields and a layer's env, so quotes, spaces, pipes and expansions are rejected"),
             );
         }
     }

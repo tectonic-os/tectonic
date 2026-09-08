@@ -1,8 +1,7 @@
 //! Replacing this release with the published one. The binary and the assets
 //! move together or not at all: `init::assets` falls through to whatever stale
-//! copy the host already has, so a binary that arrives alone scaffolds from it
-//! with no diagnostic. The shell statement of the same thing is `install.sh`,
-//! and the two agree by reading `init::data_home` rather than by copying it.
+//! copy the host has, so a binary that arrives alone scaffolds from it with no
+//! diagnostic. `install.sh` says the same in shell, via `init::data_home`.
 
 use crate::init;
 use std::cmp::Ordering;
@@ -25,8 +24,8 @@ pub struct Plan {
 }
 
 /// The pair euid chooses, and the download that fills it. There is no fallback
-/// between the pairs: an unwritable destination names the other rather than
-/// guessing, which is the guess this command exists not to make.
+/// between the pairs: an unwritable destination names the other. A guess
+/// between them is the guess this command exists not to make.
 fn plan(
     version: &str,
     euid: u32,
@@ -55,7 +54,7 @@ fn plan(
     })
 }
 
-/// What a refusal names instead of falling back.
+/// The other pair, which a refusal names so a person knows where else it goes.
 fn instead(euid: u32) -> &'static str {
     match euid {
         0 => "the per-user pair is ~/.local/bin with $XDG_DATA_HOME/tectonic/assets",
@@ -64,8 +63,7 @@ fn instead(euid: u32) -> &'static str {
 }
 
 /// The tag out of the URL `releases/latest` lands on. The whole input is the
-/// guard: a split that found nothing answers nothing, rather than handing a
-/// failed redirect on as a version.
+/// guard: a split that found nothing answers nothing.
 fn version_of(url: &str) -> Result<String, String> {
     let url = url.trim();
     let version = match url.rsplit_once("/tag/v") {
@@ -239,8 +237,8 @@ pub fn run() -> Result<(), String> {
     fs::set_permissions(&ready.0, fs::Permissions::from_mode(0o755))
         .map_err(|err| format!("{}: {err}", ready.0.display()))?;
 
-    // Swapped rather than merged: an asset a release dropped must not survive
-    // into every repository created afterwards.
+    // Swapped whole: an asset a release dropped must not survive into every
+    // repository created afterwards.
     let _ = fs::remove_dir_all(&plan.assets);
     fs::rename(&assets, &plan.assets).map_err(|err| format!("{}: {err}", plan.assets.display()))?;
     // rename(2), never fs::copy: a running executable is ETXTBSY.
@@ -273,8 +271,8 @@ mod tests {
         assert_eq!(version_of("  .../tag/v1.0.0-rc1\n").unwrap(), "1.0.0-rc1");
     }
 
-    /// A redirect that did not land on a tag is refused rather than becoming a
-    /// download URL built out of a whole URL.
+    /// A redirect that did not land on a tag is refused. Passed on, it builds a
+    /// download URL out of a whole URL.
     #[test]
     fn a_url_holding_no_tag_is_no_version() {
         for url in [
@@ -332,7 +330,7 @@ mod tests {
         assert_eq!(parts("0.3.7"), parts("0.3.7"));
         assert!(parts("0.4.0") > parts("0.3.99"));
         // A pre-release compares as the version it precedes, which makes
-        // `upgrade` a no-op on a build of it rather than a downgrade.
+        // `upgrade` a no-op on a build of it.
         assert_eq!(parts("0.4.0-rc1"), parts("0.4.0"));
     }
 }

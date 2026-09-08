@@ -7,7 +7,7 @@ on:
   # tect:end
   # tect:only scheduled-publish
   # Hung off the run that published, so a boot regression names the publication
-  # that caused it rather than whatever the last seven days left behind.
+  # that caused it.
   workflow_run:
     workflows: ['Build container image']
     types: [completed]

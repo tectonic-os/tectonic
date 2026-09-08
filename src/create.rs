@@ -1,6 +1,5 @@
 //! `create repo`, `create image` and `create module`. Every step of a chain is
-//! also a command: `create repo` calls `create image` in place rather than
-//! writing an image of its own.
+//! also a command: `create repo` calls `create image` in place.
 //!
 //! Each of them collects every answer first and writes afterwards, which is why
 //! no `apply` takes a `Prompt`.
@@ -22,9 +21,7 @@ pub const HOST: &str = "github.com";
 const GH_INSTALL: &str = "install gh from https://github.com/cli/cli";
 
 /// The family-adapter role: what makes a family's package manager usable from
-/// a build layer. Every family needs the same role filled by a different
-/// module, which is why this is the name of a role and not a row of a
-/// family-to-capability table.
+/// a build layer. Every family needs it filled by a different module.
 const BUILD_ENVIRONMENT: &str = "build-environment";
 
 /// The prefix every URL a repository writes is built from.
@@ -44,11 +41,8 @@ pub fn named_after_root(root: &Path) -> Option<String> {
 
 /// A row of the review screen, and so a point `Repo::collect` can be re-entered
 /// at. The order is the order the questions are asked in: re-entering at a
-/// field asks it and everything after it.
-///
-/// A row re-enters at its gate, not at its first field, which is what makes a
-/// collapsed gate reversible in both directions — `provider` re-asks whether
-/// there is one at all, so it can become `none`, and `none` can become one.
+/// field asks it and everything after it. A row re-enters at its gate, so
+/// `provider` re-asks whether there is one at all and `none` can become one.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Field {
     Name,
@@ -63,8 +57,8 @@ pub enum Field {
 }
 
 /// What the flags gave, which only the first pass reads. A field asked again
-/// opens on the answer it has rather than on the flag that seeded it; the root
-/// is the exception, since nothing else says where the tree goes.
+/// opens on the answer it has; the flag seeded that answer and is spent. The
+/// root is the exception, since nothing else says where the tree goes.
 #[derive(Default)]
 struct Given {
     name: Option<String>,
@@ -134,8 +128,8 @@ impl Repo {
                 None,
                 0,
             )? {
-                // Nothing was written, so leaving is a leaving rather than a
-                // failure, the way every other widget's is.
+                // Nothing was written, so leaving is a leaving, the way every
+                // other widget's is.
                 None => return Ok(None),
                 Some(at) if at == rows.len() => break,
                 Some(at) => repo = Self::ask(rows[at].0, &given, Some(&repo), prompt)?,
@@ -144,9 +138,7 @@ impl Repo {
         Ok(Some(repo))
     }
 
-    /// Ask from `from` onward, keeping every answer before it. The procedure is
-    /// the order and the gating, so re-entering it at a point is the only
-    /// re-collection that cannot disagree with the first pass: what comes after
+    /// Ask from `from` onward, keeping every answer before it. What comes after
     /// an edited answer opens on its previous answer where that still exists,
     /// and is dropped where it no longer does.
     fn ask(
@@ -329,12 +321,9 @@ impl Repo {
         })
     }
 
-    /// One row per piece of configuration, and nothing per question.
-    ///
-    /// A gate answered Yes is not a row — `provider github.com/someone` is the
-    /// decision and the Yes is only how it was reached — and a gate answered No
-    /// is one row saying `none`, which is what the repository will have and
-    /// what re-enters the gate. Nothing collected disappears from the screen.
+    /// One row per piece of configuration, and nothing per question. A gate
+    /// answered Yes is not a row; a gate answered No is one row saying `none`,
+    /// which is what re-enters the gate.
     fn rows(&self) -> Vec<(Field, &'static str, String)> {
         let mut rows = vec![
             (Field::Name, copy::ROW_NAME, self.name.clone()),
@@ -347,8 +336,8 @@ impl Repo {
                 },
             ),
         ];
-        // An action rather than a setting, said as what will happen: nothing
-        // else on the screen says a remote will be made.
+        // An action, said as what will happen: nothing else on the screen says
+        // a remote will be made.
         if self.owner.is_some() && self.host == HOST {
             rows.push((
                 Field::Remote,
@@ -403,7 +392,7 @@ impl Repo {
         let Self { host, id, .. } = self;
         let mut next = Vec::new();
         // A process cannot move its parent, so the step it left you one above
-        // is the first thing offered rather than the last thing implied.
+        // is the first thing offered.
         if std::fs::canonicalize(&self.root).ok() != std::env::current_dir().ok() {
             next.push(format!("cd {}", self.root.display()));
         }
@@ -428,7 +417,7 @@ impl Repo {
 }
 
 /// The tree a create, import or copy wrote, hung off what the repository calls
-/// itself rather than off the directory it happens to sit in.
+/// itself.
 pub fn report(root: &Path, wrote: &[(PathBuf, Change)]) {
     let id = crate::model::image::List::load(root).0.id;
     crate::ui::tree::print(&id, wrote, describe);
@@ -495,7 +484,7 @@ pub struct Image {
     /// What the chosen base belongs to, which decides what CI can run here.
     pub family: String,
     /// Whether the offer of what the base cannot build without was taken, so
-    /// that asking again opens on the answer rather than back on yes.
+    /// that asking again opens on the answer.
     took: bool,
     /// The image a second one takes the fallback away from, named in repo.kdl
     /// so that a bare build still builds what it built before.
@@ -580,15 +569,12 @@ impl Image {
         let mut wanted = wanted(&index, &family, &roles);
         // The one moment this costs network: only where the question it is for
         // can be asked, and only where the collections already here did not
-        // answer it. A fresh repository has fetched nothing, so what the base
-        // says it needs is in a collection nothing has read, and an offer that
-        // named none of it would be no offer at all.
+        // answer it.
         let fetched;
         if wanted.len() < roles.len() && prompt.asks() && !index.unread().is_empty() {
-            // Nothing is written yet, and this run may end at the review screen
-            // without anything ever being: the fetch goes to scratch rather
-            // than laying a cache into a directory nobody asked for. The
-            // repository's own fetch is `tect fetch modules`, later.
+            // Nothing is written yet and this run may end without anything
+            // ever being, so the fetch goes to scratch. The repository's own
+            // fetch is `tect fetch modules`, later.
             let scratch = std::env::temp_dir().join(format!("tect-bases.{}", std::process::id()));
             let _ = std::fs::remove_dir_all(&scratch);
             let _ = std::fs::create_dir_all(&scratch);
@@ -601,10 +587,9 @@ impl Image {
                 false => scratch.as_path(),
             };
             fetched = crate::provider::Index::scan(cache, sources, &disk, true);
-            // One line, in this tool's voice, before the offer it narrows.
-            // The fetcher itself says nothing: a bare `curl: (6) Could not
-            // resolve host` printed underneath the question it just made
-            // incomplete is not a report of anything.
+            // One line, in this tool's voice, before the offer it narrows: the
+            // fetcher's own `curl: (6) Could not resolve host` says nothing
+            // about the question it just made incomplete.
             if let Some(why) = fetched.unreached() {
                 eprintln!(
                     "tect: {why}; what is offered below is only what is already on this machine"
@@ -1100,8 +1085,7 @@ impl Listing {
     /// One answer applied to a set: every member gets its line in every image
     /// the answer named, in the order they are given, under the collection it
     /// came from or none where the repository now owns it. A member an image
-    /// already lists is skipped there alone, since the offer that brought it
-    /// may have been for the other images only.
+    /// already lists is skipped there alone.
     pub(crate) fn apply_declaration(
         &self,
         list: &crate::model::image::List,
@@ -1185,11 +1169,9 @@ fn dir_of(name: &str, source: Option<&str>) -> String {
 /// counts it: an ungated entry is in every flavour, so only an overlap is a
 /// duplicate.
 ///
-/// Matched by the module's name rather than the directory it lands in, so the
-/// two ways one module reaches an image see each other: `import` puts it under
-/// `.remote/<collection>/` and `copy` puts it directly under `modules/`, and
-/// comparing directories made each spelling invisible to the other. A namesake
-/// from a *different* collection is a different module and is not one of these.
+/// Matched by the module's name, so `import` under `.remote/<collection>/` and
+/// `copy` under `modules/` see each other. A namesake from a different
+/// collection is a different module and is not one of these.
 fn holds<'a>(
     list: &'a crate::model::image::List,
     into: &Listed,
@@ -1283,8 +1265,7 @@ fn wrap(blocks: &[(&str, Option<&str>)], leaf: &str) -> String {
 
 /// One declaration before the closing brace of the deepest block on `chain`
 /// that is already there, wrapped in the ones below it that are not. Every
-/// other byte is left where it was: the tool creates whole files and appends
-/// declarations, and never rewrites a value.
+/// other byte is left where it was: this appends, and never rewrites a value.
 fn append(
     file: &Path,
     image: &str,
@@ -1319,9 +1300,8 @@ fn append(
 
 /// The modules a fresh image cannot build without: whatever fills the
 /// family-adapter role, and whatever satisfies what the base row says it
-/// requires. Two kinds of missing module, and they fail together on a fresh
-/// repository — a base that is not a bootc image needs both, and neither is
-/// there — so they are gathered as one list and asked as one question.
+/// requires. Gathered as one list and asked as one question, since a fresh
+/// repository is missing both.
 fn wanted<'a>(
     index: &'a crate::provider::Index,
     family: &str,
@@ -1330,7 +1310,7 @@ fn wanted<'a>(
     let mut out: Vec<&crate::provider::Provider> = Vec::new();
     for capability in roles {
         // The role is filled per family, so the provider that fits this image
-        // is the one wanted rather than the one that sorts first.
+        // is the one wanted.
         let Some(provider) = index.adapter(capability, family) else {
             continue;
         };
@@ -1353,11 +1333,9 @@ fn roles(base: Option<&crate::base::Base>) -> Vec<&str> {
         .collect()
 }
 
-/// The question, which names them: a person meeting a base for the first time
-/// is told what it cannot build without. *Needs* rather than *requires*, since
-/// only one of the two kinds is a `requires` on the base row and the other is
-/// the family adapter, which no row declares. Nobody to ask takes them, which
-/// is what the seed always did.
+/// The question, which names them. *Needs*, since only one of the two kinds is
+/// a `requires` on the base row and the other is the family adapter, which no
+/// row declares. Nobody to ask takes them.
 fn offer(
     base: &str,
     wanted: &[&crate::provider::Provider],
@@ -1375,8 +1353,7 @@ fn offer(
 }
 
 /// Those modules as an image's `modules` block, each collection's grouped under
-/// one `source`. An image with nothing to seed opens with an empty block, which
-/// is what it always did.
+/// one `source`. An image with nothing to seed opens with an empty block.
 fn seeded(wanted: &[&crate::provider::Provider]) -> String {
     let mut owners: Vec<Option<&str>> = Vec::new();
     for provider in wanted {
@@ -1523,9 +1500,8 @@ fn create_remote(owner: &str, id: &str) -> Result<(), String> {
 mod tests {
     use super::*;
 
-    /// Two collections' worth and two of one collection's, so the block a
-    /// fresh image opens with is one `source` per collection rather than one
-    /// per module.
+    /// Two collections' worth and two of one collection's, so the block a fresh
+    /// image opens with is one `source` per collection.
     #[test]
     fn the_seeded_block_groups_each_collections_modules_under_one_source() {
         let provider = |owner: Option<&str>, name: &str| crate::provider::Provider {

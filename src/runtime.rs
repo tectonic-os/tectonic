@@ -148,8 +148,7 @@ pub fn fetch(args: &[&str]) -> Result<(), String> {
         ("deb", []) => {
             let deb = scratch(url);
             verified(url, Some(sha256), &deb)?;
-            // apt over dpkg, so the package's dependencies are resolved rather
-            // than left half-configured.
+            // apt over dpkg, so the package's dependencies are resolved.
             let status = run(
                 "apt-get",
                 &[
@@ -190,9 +189,9 @@ fn verified(url: &str, sha256: Option<&str>, dest: &Path) -> Result<(), String> 
     if let Some(dir) = dest.parent().filter(|d| !d.as_os_str().is_empty()) {
         fs::create_dir_all(dir).map_err(|err| format!("{}: {err}", dir.display()))?;
     }
-    // curl's own stderr is captured rather than inherited: a failed fetch here
-    // is reported by whoever asked for it, and a bare `curl: (6) Could not
-    // resolve host` printed underneath a prompt is not that report.
+    // curl's own stderr is captured: a failed fetch here is reported by whoever
+    // asked for it, and a bare `curl: (6) Could not resolve host` printed
+    // underneath a prompt is not that report.
     let said = Command::new("curl")
         .args(["--retry", "3", "-fsSLo", &dest.to_string_lossy(), url])
         .output()
@@ -348,8 +347,8 @@ fn sha256_file(path: &Path) -> Result<String, String> {
 // ---- validate-image ------------------------------------------------------
 
 /// The kernel the image ships, which is what names the initramfs beside it.
-/// Asking the package manager is per family, so the family is passed down
-/// rather than guessed: nothing in a built filesystem says which one built it.
+/// Asking the package manager is per family, so the family is passed down:
+/// nothing in a built filesystem says which one built it.
 fn kernel_version() -> Option<String> {
     match env("FAMILY").as_deref() {
         Some("debian" | "ubuntu") => modules_dir(),
@@ -498,9 +497,8 @@ pub fn validate_image() -> Result<(), String> {
     for scope in ["system", "user"] {
         // `finalize.sh` applies these as `systemctl enable`/`disable` per line
         // in glob order, so two modules asking opposite things about one unit
-        // are resolved by the alphabet and the loser's own check is what
-        // fails. The check catches it either way round; without this the
-        // failure names the unit and not the module that overruled it.
+        // are resolved by the alphabet. Without this the failure names the unit
+        // and not the module that overruled it.
         let contradicts = |unit: &str, verb: &str| -> Vec<String> {
             let opposite = match verb {
                 "enable" => "disable",
@@ -636,11 +634,8 @@ pub fn validate_image() -> Result<(), String> {
     }
 
     // `systemd-analyze verify` creates /run/systemd, and this runs in the last
-    // layer of the build, so the directory is committed into the image — where
-    // `bootc container lint` reports it as `nonempty-run-tmp`. The in-build
-    // lint only warns; a consumer running `--fatal-warnings` fails on it, which
-    // is how it was found. Removed here rather than in a later step, because
-    // this is what created it and there is no later step.
+    // layer, so the directory is committed into the image — where `bootc
+    // container lint` reports `nonempty-run-tmp` and `--fatal-warnings` fails.
     clear_run_systemd();
 
     println!();

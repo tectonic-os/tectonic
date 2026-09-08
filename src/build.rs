@@ -24,7 +24,7 @@ pub struct Options {
     pub cache_to: bool,
 }
 
-/// Why a build came back rather than becoming the backend.
+/// Why a build came back without becoming the backend.
 pub enum Stopped {
     /// The repository is wrong, and every problem was printed.
     Repository,
@@ -51,11 +51,9 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
     let target = target(&list, opts.target.as_deref())?;
 
     // Nothing is fetched or regenerated here: a build proves the committed
-    // files are current, and proving that by first writing them is proving
-    // nothing. `tect fetch modules` and `tect generate` are what change the
-    // repository, and `vm.sh --rebuild` runs both before it gets here. What
-    // this read is what the rest of this builds from, so the build cannot act
-    // on a second reading of the same files.
+    // files are current. `tect fetch modules` and `tect generate` are what
+    // change the repository, and `vm.sh --rebuild` runs both before this. The
+    // rest of the build works off what this read, never a second reading.
     let gate = crate::run(crate::Command::Verify, None, root);
     if gate.issues.report(&gate.context) {
         return Ok(Stopped::Repository);

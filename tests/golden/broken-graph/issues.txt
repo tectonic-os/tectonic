@@ -123,6 +123,5 @@
     `----
   help: an `after` orders the build without requiring anything; name a
         capability the base or an enabled module provides, or make it a
-        `requires` so the missing edge is a requirement rather than an
-        ordering
+        `requires` so the missing edge is a requirement
 

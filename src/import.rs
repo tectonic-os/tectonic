@@ -1,7 +1,6 @@
 //! `import module` references one collection member from an image; `copy
 //! module` vendors one into the repository. One command with two endings: the
-//! questions, the offers and every refusal in front of them are the same code,
-//! so an improvement to one is an improvement to both.
+//! questions, the offers and every refusal in front of them are the same code.
 
 use crate::copy;
 use crate::create::{report, Change, Listing};
@@ -41,10 +40,8 @@ fn names(sources: &[Collection]) -> String {
 }
 
 /// Every collection that has `name`. Never the first of them: which one an
-/// ambiguous name comes from is the caller's to settle, and `<owner>/<name>` is
-/// what settles it without asking.
-///
-/// `enforce` refuses an unpinned collection before it is used.
+/// ambiguous name comes from is the caller's to settle. `enforce` refuses an
+/// unpinned collection before it is used.
 pub fn find(
     root: &Path,
     sources: &[Collection],
@@ -104,10 +101,9 @@ pub fn find(
 
     if found.is_empty() {
         // No member has the exact path. A typed name is also a suffix of a
-        // member path at a `/` boundary — `why`'s rule, one predicate for both
-        // — so every member of every eligible collection is a candidate. The
-        // owner filter and the unpinned refusal above already ran over every
-        // one of them, so `searched` stands.
+        // member path at a `/` boundary — `why`'s rule — so every member of
+        // every eligible collection is a candidate. The owner filter and the
+        // unpinned refusal above already ran over all of them.
         for collection in sources {
             if owner.is_some_and(|owner| owner != collection.name) {
                 continue;
@@ -166,8 +162,7 @@ fn members(tree: &Path) -> Vec<String> {
 
 /// A `module.kdl` the walk never reaches, because it sits below a directory
 /// that already holds one, paired with the member holding it. Descending would
-/// make a member's own subdirectory ambiguous, so the walk is right to stop;
-/// what is wrong is that nothing says the thing below it is invisible.
+/// make a member's own subdirectory ambiguous, so the walk stops here.
 fn nested(tree: &Path) -> Vec<(String, String)> {
     let mut out: Vec<(String, String)> = Vec::new();
     for member in members(tree) {
@@ -175,10 +170,9 @@ fn nested(tree: &Path) -> Vec<(String, String)> {
         while let Some(dir) = dirs.pop() {
             for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
                 let path = entry.path();
-                // `file_type` rather than `is_dir`, which resolves a link: a
-                // member holding one back to its own parent is a walk that
-                // stops only when the kernel runs out of link resolutions,
-                // after forty lines naming directories that are not members.
+                // `file_type`, since `is_dir` resolves a link: a member holding
+                // one back to its own parent walks until the kernel runs out of
+                // link resolutions.
                 if !entry.file_type().is_ok_and(|kind| kind.is_dir())
                     || entry.file_name().to_string_lossy().starts_with('.')
                 {
@@ -199,12 +193,9 @@ fn nested(tree: &Path) -> Vec<(String, String)> {
 /// Every module every declared collection holds, by name and then by
 /// collection, and a line for every `module.kdl` the walk could not reach.
 /// `fetch` decides whether a collection that is not on this machine is
-/// downloaded to answer or passed over.
-///
-/// The walk goes as deep as `Disk::scan`'s, so a member the collection groups
-/// under a directory is named by its path and is otherwise a member like any
-/// other. A dot directory is passed over: a collection read out of a working
-/// tree carries `.git`.
+/// downloaded to answer or passed over. The walk goes as deep as `Disk::scan`'s,
+/// so a grouped member is named by its path; a dot directory is passed over,
+/// since a collection read out of a working tree carries `.git`.
 pub fn catalog(
     root: &Path,
     sources: &[Collection],
@@ -289,8 +280,7 @@ fn choose_several(
 
 /// The collection's tree where it is already on this machine: the directory it
 /// is, an archive fetched at the hash it is still pinned to, or whatever the
-/// last import of an unpinned one left. Nothing is fetched, so a reader that
-/// only wants what is there costs no network.
+/// last import of an unpinned one left. Nothing is fetched.
 pub fn cached(root: &Path, collection: &Collection) -> Option<PathBuf> {
     let dir = match &collection.at {
         At::Dir(dir) => root.join(dir),
@@ -312,8 +302,8 @@ pub fn cached(root: &Path, collection: &Collection) -> Option<PathBuf> {
 
 /// The collection's tree on this machine: the directory it already is, or the
 /// pinned archive, fetched and verified once and kept for the next lookup. An
-/// unpinned one is fetched again every time, since the ref it follows has
-/// moved by now for all anything here knows.
+/// unpinned one is fetched again every time, since the ref it follows may have
+/// moved.
 pub(crate) fn tree(root: &Path, collection: &Collection) -> Result<PathBuf, String> {
     if !collection.unpinned() {
         if let Some(dir) = cached(root, collection) {
@@ -339,10 +329,9 @@ pub(crate) fn tree(root: &Path, collection: &Collection) -> Result<PathBuf, Stri
     let sha256 = (!remote.unpinned())
         .then(|| remote.sha256.as_deref())
         .flatten();
-    // Extracted beside the cache and swapped in, never written over it. The
-    // remove used to come first, so a fetch that could not reach the network
-    // took the tree it had failed to replace with it, and the next command
-    // read a collection that was there a moment ago.
+    // Extracted beside the cache and swapped in, never written over it: with
+    // the remove first, a fetch that cannot reach the network takes the tree it
+    // failed to replace with it.
     let work = root.join(layout::SOURCES_CACHE).join(format!(
         ".{}.fetching.{}",
         collection.name,
@@ -528,10 +517,8 @@ impl Module {
     /// Asks which ones when no name was given, and which collection when a name
     /// is in more than one. Then the three offers, once for the set: what it
     /// requires and nothing provides, the CI it makes runnable, and the profile
-    /// its claims would have the images measured against.
-    ///
-    /// `place` decides only what `write` does at the end. A `copy` asks every
-    /// question an `import` asks and refuses everything an `import` refuses.
+    /// its claims would have the images measured against. `place` decides only
+    /// what `write` does at the end.
     pub fn collect(
         name: Option<String>,
         root: &Path,
@@ -758,9 +745,8 @@ pub fn bring(
 }
 
 /// One member with its destination settled. A vendored one is refused here if
-/// something is already at that path, which is the one thing `copy` checks
-/// that `import` does not: a reference is replaced by its next fetch, an owned
-/// module is not overwritten.
+/// something is already at that path, the one thing `copy` checks that `import`
+/// does not: a reference is replaced by its next fetch, an owned module is not.
 fn member(root: &Path, from: &Found, name: &str, place: Place) -> Result<Member, String> {
     let dest = match place {
         Place::Reference => place.dest(from),
@@ -774,9 +760,8 @@ fn member(root: &Path, from: &Found, name: &str, place: Place) -> Result<Member,
 }
 
 /// What the set requires that the images it is being listed in do not have, as
-/// the collection members that would satisfy it. The offer is one question for
-/// the set: declining it leaves a file that is still valid and a `check` that
-/// says so.
+/// the collection members that would satisfy it. One question for the set;
+/// declining it leaves a file that is still valid.
 fn short(
     root: &Path,
     sources: &[Collection],
@@ -819,16 +804,14 @@ fn short(
         }
         // Per target, because the adapter filling a role is a different module
         // on every family: two images on two families owe two providers, and
-        // one image owes the one that supports it rather than the one that
-        // sorts first.
+        // one image owes the one that supports it.
         for (image, flavour) in &targets {
             if image_has(image, *flavour, want, &index) {
                 continue;
             }
             let family = image.base.as_ref().map_or("", |base| base.family.as_str());
-            // A provider the repository owns needs a line rather than an
-            // import, which is what the unsatisfied-`requires` help already
-            // says.
+            // A provider the repository owns needs a line, which is what the
+            // unsatisfied-`requires` help already says.
             let Some(provider) = index
                 .fitting(want, family)
                 .into_iter()
@@ -890,14 +873,9 @@ fn collisions(root: &Path, brought: &[String]) {
 }
 
 /// Which profile the set's claims would have the images it is listed in
-/// measured against, as the question whether to declare one. `conforms` means
-/// measure me against this rather than I pass this, so an image that has just
-/// taken a claiming module is exactly the one worth measuring.
-///
-/// The content is probed the way `set conforms` probes it, since this writes
-/// the same declaration and a profile has to be one the scan carries. No
-/// content on this machine is no offer rather than a refusal: an import is not
-/// a conformance command, and `tect set conforms` is the one that says so.
+/// measured against, as the question whether to declare one. The content is
+/// probed the way `set conforms` probes it, since a profile has to be one the
+/// scan carries. No content on this machine is no offer.
 fn measured(
     list: &crate::model::image::List,
     listing: &Listing,

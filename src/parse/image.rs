@@ -64,7 +64,7 @@ pub const IMAGE: Node = Node::new("image",
             .arg(Arg::Strs, Say::NONE),
         Node::new("logo-url", "A URL to the image's logo, in its OCI labels.")
             .arg(Arg::Str, NEEDS_VALUE).once(""),
-        Node::new("conforms", "The benchmark profile a scan measures the ungated target against, reported rather than enforced.")
+        Node::new("conforms", "The benchmark profile a scan measures the ungated target against. A scan reports it and enforces nothing.")
             .arg(Arg::Str, NEEDS_VALUE).once(""),
 
         Node::new("base", "The image every layer builds on, and what building on it may assume.")
@@ -115,7 +115,7 @@ pub const IMAGE: Node = Node::new("image",
                             say: Say::new("`{}` must be #true or #false", "not a boolean", ""),
                             missing: Say::NONE },
                         Prop { name: "pr-build", kind: Kind::Bool,
-                            desc: "Whether a pull request builds this flavour rather than the \
+                            desc: "Whether a pull request builds this flavour in place of the \
                                    default.",
                             say: Say::new("`{}` must be #true or #false", "not a boolean", ""),
                             missing: Say::NONE },
@@ -153,8 +153,7 @@ pub const IMAGE: Node = Node::new("image",
 
 /// Where a declaration goes: the offset of the closing brace of the last block
 /// on `chain`, walking down from the image `image` names. An empty chain is the
-/// image's own brace. Appending is a text splice over this offset, so nothing
-/// outside here has to hold a KDL document to write one line.
+/// image's own brace. Appending is a text splice over this offset.
 pub fn block_close(kdl: &str, image: &str, chain: &[(&str, Option<&str>)]) -> Option<usize> {
     let doc: KdlDocument = kdl.parse().ok()?;
     let mut node = doc
@@ -304,10 +303,9 @@ impl Image {
             );
         }
         // `generated/<id>/` is a sibling of the one directory the repository
-        // shares between images, so an image called `lib` writes its
-        // Containerfile and its scripts into the helper library every module
-        // build mounts at `/ctx/lib`. Nothing overwrites anything today, which
-        // is why this has to be said rather than discovered.
+        // shares between images, so an image called `lib` would write its
+        // Containerfile and scripts over the helper library every module build
+        // mounts at `/ctx/lib`.
         if self.id == crate::layout::LIB {
             issues.push(
                 Issue::new(format!("`{}` is not available as an image name", self.id), src)

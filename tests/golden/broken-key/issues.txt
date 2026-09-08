@@ -17,7 +17,7 @@
  7 |     public "etc/pki/containers/cosign.pub" format="jwk"
    `----
   help: the generators are `cosign`, `openssl` and `ssh-keygen`; a manifest
-        picks one of them rather than naming a command of its own
+        picks one of them by name
 
   x `format` must be "pem" or "der"
    ,-[./modules/core/keys/module.kdl:7:44]
@@ -128,7 +128,7 @@
  15 |     passphrase "hunter2"
     `----
   help: the private half is written under keys/private/ and never committed,
-        so it is a plain name rather than a path
+        so it is a plain name
 
   x `core/keys` has no public half for its secureboot key
     ,-[./modules/core/keys/module.kdl:18:1]

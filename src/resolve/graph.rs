@@ -9,8 +9,7 @@ use std::path::Path;
 
 /// A module the base covers entirely provisions nothing, so it comes off the
 /// entry list before anything orders, checks or emits it. Runs first: the base
-/// wins as provider everywhere, and building what it already ships is the
-/// duplicate layer `base { provides }` exists to prevent.
+/// wins as provider everywhere.
 pub fn suppress(image: &mut Image) {
     let base: BTreeSet<String> = image
         .base
@@ -52,10 +51,8 @@ fn names(decls: &[&Decl]) -> String {
 }
 
 /// The help a requirement nothing anywhere provides gets: what the index
-/// searched, and — the point of it — what it did not. Resolution never
-/// fetches, so in a fresh clone every declared collection is unread, and
-/// concluding that nobody provides the capability would assert a search that
-/// never ran.
+/// searched, and what it did not. Resolution never fetches, so in a fresh clone
+/// every declared collection is unread.
 fn nowhere(index: &Index, capability: &str, src: &str) -> String {
     let (searched, unsearched) = match (index.unread().is_empty(), index.sourced()) {
         (true, true) => ("the repository or its collections", String::new()),
@@ -72,9 +69,8 @@ fn nowhere(index: &Index, capability: &str, src: &str) -> String {
 }
 
 /// What would satisfy a requirement nothing enabled provides. The candidates
-/// are family-filtered, and fall back to every provider when none supports
-/// this family: a diagnostic naming a module that does not fit is worth more
-/// than one naming nothing.
+/// are family-filtered, and fall back to every provider when none supports this
+/// family.
 fn satisfied_by(index: &Index, image: &Image, name: &str) -> String {
     let family = image.base.as_ref().map_or("", |base| base.family.as_str());
     let fits = index.fitting(name, family);
@@ -347,7 +343,7 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
                     &module.src,
                 )
                 .at(decl.span, "nothing to order after")
-                .help("an `after` orders the build without requiring anything; name a capability the base or an enabled module provides, or make it a `requires` so the missing edge is a requirement rather than an ordering"),
+                .help("an `after` orders the build without requiring anything; name a capability the base or an enabled module provides, or make it a `requires` so the missing edge is a requirement"),
             );
         }
     }
