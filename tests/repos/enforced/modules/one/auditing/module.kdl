@@ -1,0 +1,7 @@
+description "Claims a rule the image does not list a module for"
+
+supports "fedora"
+
+satisfies {
+    cis-fedora "4.1.3.1"
+}

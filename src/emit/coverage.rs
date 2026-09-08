@@ -7,8 +7,8 @@ use crate::emit::json::Json;
 use crate::emit::{Part, Table};
 use crate::model::image::{Entry, Image};
 use crate::provider::Index;
-use crate::scap::{ordinal, Content, Profile};
-use std::collections::BTreeSet;
+use crate::scap::{ordinal, reached, Content, Profile};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 
 /// One selected rule, as everything the read-out says about it.
@@ -34,45 +34,53 @@ pub struct Coverage<'a> {
 /// `conforms` names, which is the caller's diagnostic to make.
 pub fn of<'a>(image: &'a Image, content: &'a Content, index: &Index) -> Option<Coverage<'a>> {
     let profile = content.profiles.iter().find(|p| p.is(&image.conforms))?;
-    let listed: BTreeSet<String> = image.entries.iter().map(Entry::dir).collect();
-    let mut rows: Vec<Row> = content
-        .selected(&profile.id)
+    let selected = content.selected(&profile.id);
+
+    // One walk of the image's modules, then one of the index for the whole
+    // open set: both are keyed by rule afterwards, so neither is repeated per
+    // rule.
+    let mut claimed: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for module in image.modules() {
+        let numbers = module
+            .satisfies
+            .iter()
+            .flat_map(|coverage| coverage.rules.iter());
+        for rule in reached(content, numbers) {
+            claimed.entry(rule).or_default().insert(module.path.clone());
+        }
+    }
+    let open: BTreeSet<String> = selected
         .iter()
-        .map(|rule| {
-            let numbers: Vec<String> = content
+        .filter(|rule| !claimed.contains_key(*rule))
+        .cloned()
+        .collect();
+    let listed: BTreeSet<String> = image.entries.iter().map(Entry::dir).collect();
+    let mut would: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for provider in index.claiming(&content.numbering(&open)) {
+        if listed.contains(&provider.dir()) {
+            continue;
+        }
+        for rule in reached(content, provider.declares.satisfies.iter()) {
+            if open.contains(&rule) {
+                would.entry(rule).or_default().push(provider.qualified());
+            }
+        }
+    }
+
+    let mut rows: Vec<Row> = selected
+        .iter()
+        .map(|rule| Row {
+            numbers: content
                 .numbers
                 .get(rule)
                 .into_iter()
                 .flatten()
                 .cloned()
-                .collect();
-            let claimed: BTreeSet<String> = image
-                .modules()
-                .filter(|module| {
-                    module
-                        .satisfies
-                        .iter()
-                        .flat_map(|coverage| coverage.rules.iter())
-                        .any(|number| content.rules.get(number) == Some(rule))
-                })
-                .map(|module| module.path.clone())
-                .collect();
-            let would = match claimed.is_empty() {
-                false => Vec::new(),
-                true => index
-                    .claiming(&numbers.iter().cloned().collect())
-                    .into_iter()
-                    .filter(|provider| !listed.contains(&provider.dir()))
-                    .map(|provider| provider.qualified())
-                    .collect(),
-            };
-            Row {
-                rule: rule.clone(),
-                numbers,
-                title: content.titles.get(rule).unwrap_or(rule).clone(),
-                claimed: claimed.into_iter().collect(),
-                would,
-            }
+                .collect(),
+            title: content.titles.get(rule).unwrap_or(rule).clone(),
+            claimed: claimed.get(rule).into_iter().flatten().cloned().collect(),
+            would: would.remove(rule).unwrap_or_default(),
+            rule: rule.clone(),
         })
         .collect();
     // A benchmark reads in its own order, which is not the rule ids' and not
