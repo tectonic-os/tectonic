@@ -12,6 +12,22 @@ fn stem(question: &str) -> &str {
     question.trim_end_matches(':')
 }
 
+/// The retype loop both secret questions run: two that differ ask again, and
+/// nothing typed is the caller's to answer.
+fn retyped(question: &str, empty: impl Fn() -> Result<String, String>) -> Result<String, String> {
+    loop {
+        let typed = crate::ui::secret(question)?;
+        if typed.is_empty() {
+            return empty();
+        }
+        if typed == crate::ui::secret(crate::copy::PASSWORD_AGAIN)? {
+            println!("{}: {}\n", stem(question), crate::copy::PASSWORD_SET);
+            return Ok(typed);
+        }
+        println!("{}", crate::copy::NO_MATCH);
+    }
+}
+
 /// A file of answers, one per line, which a run answers from without asking.
 /// What the transcript goldens drive the binary with.
 const SCRIPT: &str = "TECT_ANSWERS";
@@ -107,6 +123,20 @@ impl Prompt {
         flag: &str,
         default: Option<&str>,
     ) -> Result<String, String> {
+        self.asked(given, question, flag, None, default)
+    }
+
+    /// Both free-text questions. `prefix` is `None` where the answer is typed
+    /// after the question on one line, and what it is typed after otherwise.
+    /// A default is shown in the question and answered by typing nothing.
+    fn asked(
+        &self,
+        given: Option<String>,
+        question: &str,
+        flag: &str,
+        prefix: Option<&str>,
+        default: Option<&str>,
+    ) -> Result<String, String> {
         if let Some(value) = given.filter(|value| !value.is_empty()) {
             return Ok(value);
         }
@@ -121,18 +151,19 @@ impl Prompt {
             return missing();
         }
         if self.draw {
-            return self.written(question, "", default, missing);
+            return self.written(question, prefix.unwrap_or(""), default, missing);
         }
-        let answer = match default {
-            Some(default) => {
-                let question = format!("{} [{default}]", stem(question));
-                self.read(&question, &format!("{question}: "))?
-            }
-            None => self.read(question, &format!("{}: ", stem(question)))?,
+        let labelled = match default {
+            Some(default) => format!("{} [{default}]", stem(question)),
+            None => question.to_string(),
         };
-        match answer.is_empty() {
-            true => missing(),
-            false => Ok(answer),
+        let shown = match prefix {
+            None => format!("{}: ", stem(&labelled)),
+            Some(prefix) => format!("{labelled}\n{prefix}"),
+        };
+        match self.read(&labelled, &shown)? {
+            answer if answer.is_empty() => missing(),
+            answer => Ok(answer),
         }
     }
 
@@ -170,37 +201,19 @@ impl Prompt {
         if !self.draw {
             return self.text(None, question, flag, None);
         }
-        loop {
-            let typed = crate::ui::secret(question)?;
-            if typed.is_empty() {
-                return Err(format!(
-                    "give {flag}, since nothing was typed: {}",
-                    stem(question)
-                ));
-            }
-            if typed == crate::ui::secret(crate::copy::PASSWORD_AGAIN)? {
-                println!("{}: {}\n", stem(question), crate::copy::PASSWORD_SET);
-                return Ok(typed);
-            }
-            println!("{}", crate::copy::NO_MATCH);
-        }
+        retyped(question, || {
+            Err(format!(
+                "give {flag}, since nothing was typed: {}",
+                stem(question)
+            ))
+        })
     }
 
     /// The same, editing a field on a form: nothing typed keeps what is there.
     /// Only for a screen — a run with nothing to draw on has no form to go back
     /// to, so it uses `secret` and gets the refusal naming the flag.
     pub fn secret_current(&self, question: &str, current: &str) -> Result<String, String> {
-        loop {
-            let typed = crate::ui::secret(question)?;
-            if typed.is_empty() {
-                return Ok(current.to_string());
-            }
-            if typed == crate::ui::secret(crate::copy::PASSWORD_AGAIN)? {
-                println!("{}: {}\n", stem(question), crate::copy::PASSWORD_SET);
-                return Ok(typed);
-            }
-            println!("{}", crate::copy::NO_MATCH);
-        }
+        retyped(question, || Ok(current.to_string()))
     }
 
     /// The same, asked over two lines: the question on its own, the answer
@@ -213,30 +226,7 @@ impl Prompt {
         prefix: &str,
         default: Option<&str>,
     ) -> Result<String, String> {
-        if let Some(value) = given.filter(|value| !value.is_empty()) {
-            return Ok(value);
-        }
-        let missing = || match default {
-            Some(default) => Ok(default.to_string()),
-            None => Err(format!(
-                "give {flag}, since nothing can be asked here: {}",
-                stem(question)
-            )),
-        };
-        if !self.ask {
-            return missing();
-        }
-        if self.draw {
-            return self.written(question, prefix, default, missing);
-        }
-        let question = match default {
-            Some(default) => format!("{} [{default}]", stem(question)),
-            None => question.to_string(),
-        };
-        match self.read(&question, &format!("{question}\n{prefix}"))? {
-            answer if answer.is_empty() => missing(),
-            answer => Ok(answer),
-        }
+        self.asked(given, question, flag, Some(prefix), default)
     }
 
     /// A step with no flag of its own: the flag that answers it is the answer,

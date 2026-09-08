@@ -721,15 +721,14 @@ fn sheet(rows: &[(String, String)], action: &str, blocked: Option<&str>) -> Vec<
     options
 }
 
-/// A line typed and not echoed. Empty is what esc answers, and the caller
-/// turns that into the refusal naming its flag.
-pub fn secret(question: &str) -> Result<String, String> {
+/// The typing loop both free-text widgets run. Enter answers with what is
+/// there and esc answers with nothing; `draw` is the whole difference between
+/// a masked answer and a shown one.
+fn typing(keys: &str, draw: impl Fn(&mut Frame, Rect, &str)) -> Result<String, String> {
     inline(3, |terminal| {
         let mut typed = String::new();
         loop {
-            render(terminal, 3, SECRET_KEYS, |frame, area| {
-                masked(frame, area, question, typed.chars().count())
-            })?;
+            render(terminal, 3, keys, |frame, area| draw(frame, area, &typed))?;
             let Some(key) = read()? else { continue };
             match key {
                 KeyCode::Enter => return Ok(typed),
@@ -744,28 +743,21 @@ pub fn secret(question: &str) -> Result<String, String> {
     })
 }
 
+/// A line typed and not echoed. Empty is what esc answers, and the caller
+/// turns that into the refusal naming its flag.
+pub fn secret(question: &str) -> Result<String, String> {
+    typing(SECRET_KEYS, |frame, area, typed| {
+        masked(frame, area, question, typed.chars().count())
+    })
+}
+
 /// A line typed and shown: `secret` with the characters left visible and a
 /// default standing in until one is typed. Empty is what esc answers, and the
 /// caller turns that into its default or the refusal naming its flag. `prefix`
 /// stands before the answer and is not part of it.
 pub fn line(question: &str, prefix: &str, default: Option<&str>) -> Result<String, String> {
-    inline(3, |terminal| {
-        let mut typed = String::new();
-        loop {
-            render(terminal, 3, LINE_KEYS, |frame, area| {
-                written(frame, area, question, prefix, &typed, default)
-            })?;
-            let Some(key) = read()? else { continue };
-            match key {
-                KeyCode::Enter => return Ok(typed),
-                KeyCode::Esc => return Ok(String::new()),
-                KeyCode::Backspace => {
-                    typed.pop();
-                }
-                KeyCode::Char(letter) => typed.push(letter),
-                _ => {}
-            }
-        }
+    typing(LINE_KEYS, |frame, area, typed| {
+        written(frame, area, question, prefix, typed, default)
     })
 }
 
