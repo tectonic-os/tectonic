@@ -15,6 +15,9 @@ ARG IMAGE_VERSION=dev
 # ---- base family ----
 ARG FAMILY
 
+# ---- declared conformance ----
+ARG CONFORMS=
+
 # ---- image identity ----
 ARG IMAGE_ID="broken-unpinned"
 ARG IMAGE_NAME="Broken Unpinned"
@@ -32,5 +35,6 @@ RUN --mount=type=bind,from=ctx,source=/generated/broken-unpinned/finalize.sh,tar
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
     FLAVOUR=${FLAVOUR} IMAGE_VERSION="${IMAGE_VERSION}" \
+    CONFORMS="${CONFORMS}" FAMILY="${FAMILY}" \
     IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" bash /ctx/finalize.sh
 

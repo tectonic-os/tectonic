@@ -42,6 +42,9 @@ ARG IMAGE_VERSION=dev
 # ---- base family ----
 ARG FAMILY
 
+# ---- declared conformance ----
+ARG CONFORMS=
+
 # ---- image identity ----
 ARG IMAGE_ID="signing"
 ARG IMAGE_NAME="Signing"
@@ -59,5 +62,6 @@ RUN --mount=type=bind,from=ctx,source=/generated/signing/finalize.sh,target=/ctx
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
     FLAVOUR=${FLAVOUR} IMAGE_VERSION="${IMAGE_VERSION}" \
+    CONFORMS="${CONFORMS}" FAMILY="${FAMILY}" \
     IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" bash /ctx/finalize.sh
 

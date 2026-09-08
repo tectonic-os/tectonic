@@ -74,6 +74,13 @@ const LINEAGE: &str = "rootfs";
 /// The binary, so anything running in the image can call the tool.
 const TECT_MOUNT: &str = "--mount=type=bind,from=tect,source=/tect,target=/ctx/tect \\\n    ";
 
+/// The profile the image is measured against, for the finalize layer alone.
+/// `tect build` resolves it, because a flavour may declare its own and the
+/// generated file is one per image rather than one per flavour.
+const CONFORMS_ARG: &str = "\
+# ---- declared conformance ----
+ARG CONFORMS=";
+
 /// CI passes the build date, so this changes every day.
 const IMAGE_VERSION_ARG: &str = "\
 # ---- image version ----
@@ -178,6 +185,7 @@ pub fn section(image: &Image, root: &Path) -> String {
 
     let _ = write!(out, "{IMAGE_VERSION_ARG}\n\n");
     let _ = write!(out, "{FAMILY_ARG}\n\n");
+    let _ = write!(out, "{CONFORMS_ARG}\n\n");
 
     let identity = identity(image);
     let _ = writeln!(out, "# ---- image identity ----");
@@ -237,7 +245,8 @@ fn finalize_layer(image: &Image, identity_env: &str, root: &Path) -> String {
         "--mount=type=cache,target=/var/cache \\\n    \
          --mount=type=cache,target=/var/log \\\n    \
          --mount=type=tmpfs,target=/tmp \\\n    \
-         FLAVOUR=${FLAVOUR} IMAGE_VERSION=\"${IMAGE_VERSION}\" \\\n    ",
+         FLAVOUR=${FLAVOUR} IMAGE_VERSION=\"${IMAGE_VERSION}\" \\\n    \
+         CONFORMS=\"${CONFORMS}\" FAMILY=\"${FAMILY}\" \\\n    ",
     );
     out.push_str(identity_env);
     out.push_str("bash /ctx/finalize.sh");
