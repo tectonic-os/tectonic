@@ -20,6 +20,25 @@ base "quay.io/fedora/fedora-bootc:44" {
     provides "rechunking" "initramfs-generation" "selinux-policy"
     provides-file "/usr/sbin/sshd" "/usr/bin/bootc" "/usr/bin/bootupctl" \
         "/usr/bin/podman" "/usr/bin/crun"
+    scap-content "ssg-fedora-ds.xml"
+}
+
+// CentOS Stream 10, the EL base. `family "fedora"` because every family-gated
+// behaviour matches: dnf, rpm, SELinux, and `bootupctl` for the recipe's
+// bootupd grub2 arm. The one thing that diverges is the benchmark, which is
+// why `scap-content` exists rather than a third family.
+//
+// The content is the reason to build on it. `ssg-cs10-ds.xml` carries 18
+// profiles to Fedora's 8, including `stig` at 509 rules and `cis_server_l1` at
+// 323, and it is authored for the OS being measured. Measured 2026-09-09
+// against the image: every path below is present and bootc is 1.16.6.
+base "quay.io/centos-bootc/centos-bootc:stream10" {
+    about "CentOS Stream 10, the EL base a stated claim can be measured against"
+    family "fedora"
+    provides "rechunking" "initramfs-generation" "selinux-policy"
+    provides-file "/usr/sbin/sshd" "/usr/bin/bootc" "/usr/bin/bootupctl" \
+        "/usr/bin/podman" "/usr/bin/crun"
+    scap-content "ssg-cs10-ds.xml"
 }
 
 // Universal Blue Images
@@ -29,6 +48,7 @@ base "ghcr.io/ublue-os/bazzite:stable" {
     provides "rechunking" "flatpak"
     provides-file "/usr/bin/flatpak"
     signed #true
+    scap-content "ssg-fedora-ds.xml"
 }
 
 base "ghcr.io/ublue-os/aurora:stable" {
@@ -37,6 +57,7 @@ base "ghcr.io/ublue-os/aurora:stable" {
     provides "rechunking" "flatpak"
     provides-file "/usr/bin/flatpak"
     signed #true
+    scap-content "ssg-fedora-ds.xml"
 }
 
 base "ghcr.io/ublue-os/bluefin:stable" {
@@ -45,6 +66,7 @@ base "ghcr.io/ublue-os/bluefin:stable" {
     provides "rechunking" "flatpak"
     provides-file "/usr/bin/flatpak"
     signed #true
+    scap-content "ssg-fedora-ds.xml"
 }
 
 base "ghcr.io/ublue-os/kinoite-main:44" {
@@ -53,6 +75,7 @@ base "ghcr.io/ublue-os/kinoite-main:44" {
     provides "rechunking" "flatpak"
     provides-file "/usr/bin/flatpak"
     signed #true
+    scap-content "ssg-fedora-ds.xml"
 }
 
 // Debian, which is not a bootc image: it carries no kernel, no dracut, no

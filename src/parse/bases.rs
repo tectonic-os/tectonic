@@ -47,10 +47,16 @@ const BASE: Node = Node::new("base",
             .arg(Arg::Bool, Say::new("`signed` needs #true or #false", "not a boolean",
                 "`signed #true` records that this base publishes a cosign signature"))
             .once(""),
+        Node::new("scap-content",
+            "The SSG datastream this base is measured against, named as a bare filename.")
+            .arg(Arg::Str, Say::new("`scap-content` needs a filename", "no datastream given",
+                "`scap-content \"ssg-cs10-ds.xml\"`, the file under \
+                 /usr/share/xml/scap/ssg/content a scan of this base reads"))
+            .once(""),
     ], Say::new("unknown node `{}` in a base", "not part of the schema",
-        "a base entry holds `about`, `family`, `provides`, `provides-file`, `requires` and \
-         `signed`: what an image built on it may assume, what it still needs, and what a person \
-         picks it by"));
+        "a base entry holds `about`, `family`, `provides`, `provides-file`, `requires`, \
+         `signed` and `scap-content`: what an image built on it may assume, what it still \
+         needs, what a person picks it by, and what measures it"));
 
 /// bases.kdl's grammar, and the whole of it.
 #[rustfmt::skip]
@@ -122,6 +128,7 @@ fn entry(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Base> {
         requires: strings(node, "requires"),
         about: text(node, "about"),
         signed: child(node, "signed").and_then(bool_arg).unwrap_or(false),
+        scap_content: text(node, "scap-content"),
         span: node.name().span().into(),
     };
     (!base.family.is_empty()).then_some(base)

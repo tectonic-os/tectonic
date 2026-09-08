@@ -86,6 +86,7 @@ fn public_catalog_lists_every_shipped_base_in_order() {
             .collect::<Vec<_>>(),
         [
             "quay.io/fedora/fedora-bootc:44",
+            "quay.io/centos-bootc/centos-bootc:stream10",
             "ghcr.io/ublue-os/bazzite:stable",
             "ghcr.io/ublue-os/aurora:stable",
             "ghcr.io/ublue-os/bluefin:stable",
@@ -128,26 +129,45 @@ fn missing_runtime_file_falls_back_to_embedded_catalog() {
     let mut issues = Issues::default();
     let (bases, shadows) = tect::base::catalog(Path::new("."), &[], &mut issues);
 
-    // Then: the embedded seven rows are selected.
+    // Then: the embedded eight rows are selected.
     assert!(issues.is_empty(), "{}", issues.plain());
     assert!(shadows.is_empty());
-    assert_eq!(bases.len(), 7);
+    assert_eq!(bases.len(), 8);
     // The two rows nothing can be built on until a module set says otherwise:
     // every published deb bootc base carries an empty package database, so an
     // image on one reports its whole base as clean. Both rows require the same
     // capability and each names its own family.
-    for (at, image, family) in [
-        (5, "docker.io/library/debian:forky", "debian"),
-        (6, "docker.io/library/ubuntu:26.04", "ubuntu"),
+    for (image, family) in [
+        ("docker.io/library/debian:forky", "debian"),
+        ("docker.io/library/ubuntu:26.04", "ubuntu"),
     ] {
-        assert_eq!(bases[at].image, image);
-        assert_eq!(bases[at].family, family);
-        assert!(bases[at].provides.is_empty(), "{image}");
-        assert_eq!(bases[at].requires, ["bootc-base"], "{image}");
+        // Found by reference: a row added above these shifts every index.
+        let base = tect::base::find(&bases, image).expect(image);
+        assert_eq!(base.family, family);
+        assert!(base.provides.is_empty(), "{image}");
+        assert_eq!(base.requires, ["bootc-base"], "{image}");
         // Docker Official Images publish no cosign signature, so the digest a
         // consumer pins is the trust root and this field cannot pretend
         // otherwise.
-        assert!(!bases[at].signed, "{image}");
+        assert!(!base.signed, "{image}");
+        // SSG publishes no content either can be measured against, so neither
+        // names one and `conforms` on them refuses.
+        assert!(base.scap_content.is_empty(), "{image}");
+    }
+    // Every rpm row names the benchmark it is measured against, and the EL row
+    // is why the field exists: it declares `family "fedora"` because every
+    // family-gated behaviour matches, and only the content diverges.
+    for (image, content) in [
+        ("quay.io/fedora/fedora-bootc:44", "ssg-fedora-ds.xml"),
+        (
+            "quay.io/centos-bootc/centos-bootc:stream10",
+            "ssg-cs10-ds.xml",
+        ),
+        ("ghcr.io/ublue-os/bazzite:stable", "ssg-fedora-ds.xml"),
+    ] {
+        let base = tect::base::find(&bases, image).expect(image);
+        assert_eq!(base.family, "fedora", "{image}");
+        assert_eq!(base.scap_content, content, "{image}");
     }
 }
 
@@ -280,7 +300,7 @@ fn collection_still_overrides_and_shadows_selected_catalog() {
 
     // Then: order is retained, the row is replaced, and the shadow is reported.
     assert!(issues.is_empty(), "{}", issues.plain());
-    assert_eq!(bases.len(), 7);
+    assert_eq!(bases.len(), 8);
     assert_eq!(bases[0].about, "collection replacement");
     assert!(bases[0].signed);
     assert_eq!(shadows.len(), 1);

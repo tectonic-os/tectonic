@@ -4,14 +4,15 @@ What will the image be called? [example]
 Beta
 
   1) quay.io/fedora/fedora-bootc:44  Fedora 44, as this collection describes it
-  2) ghcr.io/ublue-os/bazzite:stable  KDE, gaming and hardware support over kinoite-main
-  3) ghcr.io/ublue-os/aurora:stable  KDE developer workstation over kinoite-main
-  4) ghcr.io/ublue-os/bluefin:stable  GNOME developer workstation over silverblue-main
-  5) ghcr.io/ublue-os/kinoite-main:44  Fedora Kinoite with the ublue additions, what bazzite builds on
-  6) docker.io/library/debian:forky  Debian 14, which a module set has to turn into a bootc image
-  7) docker.io/library/ubuntu:26.04  Ubuntu 26.04 LTS, which a module set has to turn into a bootc image
-  8) example.invalid/collected:1  A base only the collection knows about
-What is the base image for this image? [1-8, 0 for none]: 8
+  2) quay.io/centos-bootc/centos-bootc:stream10  CentOS Stream 10, the EL base a stated claim can be measured against
+  3) ghcr.io/ublue-os/bazzite:stable  KDE, gaming and hardware support over kinoite-main
+  4) ghcr.io/ublue-os/aurora:stable  KDE developer workstation over kinoite-main
+  5) ghcr.io/ublue-os/bluefin:stable  GNOME developer workstation over silverblue-main
+  6) ghcr.io/ublue-os/kinoite-main:44  Fedora Kinoite with the ublue additions, what bazzite builds on
+  7) docker.io/library/debian:forky  Debian 14, which a module set has to turn into a bootc image
+  8) docker.io/library/ubuntu:26.04  Ubuntu 26.04 LTS, which a module set has to turn into a bootc image
+  9) example.invalid/collected:1  A base only the collection knows about
+What is the base image for this image? [1-9, 0 for none]: 9
 
 example.invalid/collected:1 needs the following modules:
     one/fedora-family

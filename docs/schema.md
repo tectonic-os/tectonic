@@ -503,6 +503,7 @@ One base a collection describes, named by the reference an image builds on.
 | `provides-file` | one or more strings | Absolute paths this base guarantees, written into every image scaffolded on it. |
 | `requires` | one or more strings | Capabilities this base is unusable without, which an enabled module must provide. |
 | `signed` | `#true` or `#false`, at most one | Whether this base publishes a cosign signature, which a scaffolded image records. |
+| `scap-content` | a string, at most one | The SSG datastream this base is measured against, named as a bare filename. |
 
 <!-- /schema: bases -->
 

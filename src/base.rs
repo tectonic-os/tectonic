@@ -30,6 +30,10 @@ pub struct Base {
     /// What a person needs to see to pick between this and the rest.
     pub about: String,
     pub signed: bool,
+    /// The SSG datastream file an image on this base is measured against, as a
+    /// bare filename under the content directory. Empty where SSG publishes
+    /// nothing for the release, which refuses `conforms` on it.
+    pub scap_content: String,
     /// Where it was declared, for a diagnostic about a second declaration.
     pub span: Span,
 }
@@ -44,6 +48,7 @@ impl Base {
             || self.requires != other.requires
             || self.about != other.about
             || self.signed != other.signed
+            || self.scap_content != other.scap_content
     }
 }
 
