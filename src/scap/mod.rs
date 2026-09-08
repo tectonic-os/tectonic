@@ -83,6 +83,10 @@ pub fn conformance(
     };
     let mut out = Vec::new();
     for image in list.images.iter().filter(|i| !i.conforms.is_empty()) {
+        out.extend(unremediated(image, index));
+        if let Some(content) = &content {
+            out.extend(claimed_and_refused(image, content));
+        }
         match &content {
             Some(content) => out.extend(unclaimed(image, content, index)),
             None if image.modules().any(|m| !m.satisfies.is_empty())
@@ -97,6 +101,70 @@ pub fn conformance(
         }
     }
     Ok(out)
+}
+
+/// The capability the remediation step provides, which is how an image says it
+/// runs one without the tool naming a module.
+const REMEDIATION: &str = "scap-remediation";
+
+/// An image measured against a profile that nothing in it will remediate. Needs
+/// no datastream: it is a question about the module list alone. A notice rather
+/// than an error, because measuring without remediating is a real thing to want
+/// — it is measuring and *silently* not remediating that is the accident.
+///
+/// Silent until something on this machine offers the capability. A notice
+/// telling a reader to add a module that exists nowhere is one they cannot act
+/// on, and every image declaring `conforms` would carry it.
+fn unremediated(image: &Image, index: &Index) -> Option<String> {
+    if index.providing(REMEDIATION).is_empty() {
+        return None;
+    }
+    let has = image
+        .modules()
+        .any(|m| m.provides.iter().any(|p| p.name == REMEDIATION))
+        || image
+            .base
+            .iter()
+            .any(|base| base.provides.iter().any(|p| p.name == REMEDIATION));
+    (!has).then(|| {
+        format!(
+            "`{}` conforms to `{}` and nothing it installs provides `{REMEDIATION}`, so the \
+             profile is measured and nothing acts on it. That is a scan report rather than a \
+             hardened image; add a module providing `{REMEDIATION}`, or drop `conforms`",
+            image.id, image.conforms
+        )
+    })
+}
+
+/// A rule one image both claims and refuses. The two are written in different
+/// vocabularies — a claim in a benchmark number, a refusal in a rule ID — so
+/// only a datastream can tell that they meet, which is what puts this in the
+/// second tier.
+fn claimed_and_refused(image: &Image, content: &Content) -> Vec<String> {
+    let refused: BTreeSet<&str> = image
+        .modules()
+        .flat_map(|m| m.refuses.iter().map(|r| rule_name(&r.rule)))
+        .collect();
+    let mut out = Vec::new();
+    for module in image.modules() {
+        for coverage in &module.satisfies {
+            for number in &coverage.rules {
+                let Some(rule) = content.rules.get(number) else {
+                    continue;
+                };
+                if refused.contains(rule_name(rule)) {
+                    out.push(format!(
+                        "`{}` claims `{number}` and something it installs refuses `{}`, which \
+                         is the same rule. A claim says the image passes it and a refusal says \
+                         nothing may set it, so one of the two is wrong",
+                        module.path,
+                        rule_name(rule)
+                    ));
+                }
+            }
+        }
+    }
+    out
 }
 
 /// What an image still owes the profile it is measured against.
@@ -1181,6 +1249,46 @@ mod tests {
     /// The datastream-backed tier over a repository whose every source was
     /// read: the claims the image lists come off the profile's rules, what is
     /// left is named, and nothing is said about a collection.
+    /// Two checks that need no scan. One is a manifest arguing with itself: a
+    /// claim says the image passes a rule and a refusal says nothing may set
+    /// it. The other is an image measured against a profile nothing will act
+    /// on, which is a report rather than a hardened image.
+    #[test]
+    fn check_catches_a_rule_both_claimed_and_refused_and_an_image_nothing_remediates() {
+        let root = fixture("tests/repos/refused");
+        let loaded = crate::load(&root);
+        let said = conformance(
+            &loaded.list,
+            &loaded.index,
+            Some(&fixture("tests/scap/datastream.xml")),
+        )
+        .expect("the fixture datastream reads");
+
+        assert!(
+            said.iter().any(|m| m.contains("claims `1.1.1.1`")
+                && m.contains("refuses `package_aide_installed`")
+                && m.contains("one of the two is wrong")),
+            "{said:#?}"
+        );
+        assert!(
+            said.iter()
+                .any(|m| m.contains("nothing it installs provides `scap-remediation`")),
+            "{said:#?}"
+        );
+
+        // Silent where nothing on this machine offers the capability: a notice
+        // naming a module that exists nowhere cannot be acted on.
+        let bare = fixture("tests/scap");
+        let nothing = Index::scan(&bare, &[], &Disk::scan(&bare), false);
+        assert!(
+            !conformance(&loaded.list, &nothing, None)
+                .expect("no datastream is the first tier")
+                .iter()
+                .any(|m| m.contains("scap-remediation")),
+            "an unavailable capability is not offered"
+        );
+    }
+
     #[test]
     fn the_notice_names_the_rules_no_listed_module_claims() {
         let root = fixture("tests/repos/enforced");

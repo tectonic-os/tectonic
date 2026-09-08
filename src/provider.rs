@@ -219,6 +219,15 @@ impl Index {
             .collect()
     }
 
+    /// Every module offering one capability, which answers whether a notice
+    /// pointing at one has anything to point at.
+    pub fn providing(&self, capability: &str) -> Vec<&Provider> {
+        self.held
+            .iter()
+            .filter(|held| held.declares.provides.iter().any(|p| p == capability))
+            .collect()
+    }
+
     /// The one an image entry names, which is how what an image already has is
     /// read back off its declaration.
     pub fn at(&self, dir: &str) -> Option<&Provider> {

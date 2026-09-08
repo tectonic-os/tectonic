@@ -1,0 +1,9 @@
+description "Claims a number and refuses the rule that number reaches"
+
+supports "fedora"
+
+satisfies {
+    cis-fedora "1.1.1.1"
+}
+
+refuses "package_aide_installed" because="the fixture needs one module arguing with itself"

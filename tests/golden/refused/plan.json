@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "default_image": "refused",
+  "default_image_name": "Refused",
+  "pr_image": "refused",
+  "default_target": "refused",
+  "default_published": "refused",
+  "pr_target": "refused",
+  "pr_published": "refused",
+  "ungated_target": "refused",
+  "ungated_published": "refused",
+  "cache_image": "refused-cache",
+  "workflows": [],
+  "audit": {
+    "enforce": false
+  },
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "refused",
+      "name": "Refused",
+      "pretty_name": "",
+      "file": "./example.image.kdl",
+      "url": "",
+      "issues_url": "",
+      "description": "",
+      "keywords": [],
+      "logo_url": "",
+      "conforms": "standard",
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "provides_files": [],
+        "requires": [],
+        "satisfies": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "refused",
+          "image": "refused",
+          "flavour": null,
+          "published": "refused",
+          "conforms": "standard",
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "one/contradicts",
+              "dir": "one/contradicts",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Claims a number and refuses the rule that number reaches",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "content": "e0c44249aae73e7701d41218ca51e5a38d2fe349d689f3997ccbdb4046a489c5",
+                "repo": false,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": [
+                {
+                  "benchmark": "cis-fedora",
+                  "rules": [
+                    "1.1.1.1"
+                  ]
+                }
+              ]
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "overlay_overridden": [],
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}
