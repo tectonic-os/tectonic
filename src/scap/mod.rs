@@ -1247,7 +1247,7 @@ mod tests {
         );
     }
 
-    /// `parse_satisfies` drops a claim whose benchmark name is empty and
+    /// `coverages` drops a claim whose benchmark name is empty and
     /// `parse::module::summary` keeps it, so the index offers a module the
     /// image already lists. Offering it back is what the `listed` filter stops.
     #[test]

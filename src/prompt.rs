@@ -14,11 +14,11 @@ fn stem(question: &str) -> &str {
 
 /// The retype loop both secret questions run: two that differ ask again, and
 /// nothing typed is the caller's to answer.
-fn retyped(question: &str, empty: impl Fn() -> Result<String, String>) -> Result<String, String> {
+fn retyped(question: &str, empty: Result<String, String>) -> Result<String, String> {
     loop {
         let typed = crate::ui::secret(question)?;
         if typed.is_empty() {
-            return empty();
+            return empty;
         }
         if typed == crate::ui::secret(crate::copy::PASSWORD_AGAIN)? {
             println!("{}: {}\n", stem(question), crate::copy::PASSWORD_SET);
@@ -201,19 +201,20 @@ impl Prompt {
         if !self.draw {
             return self.text(None, question, flag, None);
         }
-        retyped(question, || {
+        retyped(
+            question,
             Err(format!(
                 "give {flag}, since nothing was typed: {}",
                 stem(question)
-            ))
-        })
+            )),
+        )
     }
 
     /// The same, editing a field on a form: nothing typed keeps what is there.
     /// Only for a screen — a run with nothing to draw on has no form to go back
     /// to, so it uses `secret` and gets the refusal naming the flag.
     pub fn secret_current(&self, question: &str, current: &str) -> Result<String, String> {
-        retyped(question, || Ok(current.to_string()))
+        retyped(question, Ok(current.to_string()))
     }
 
     /// The same, asked over two lines: the question on its own, the answer

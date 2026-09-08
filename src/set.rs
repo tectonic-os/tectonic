@@ -796,7 +796,7 @@ mod tests {
         );
     }
 
-    /// `parse_satisfies` refuses a benchmark with no name and `summary` keeps
+    /// `coverages` refuses a benchmark with no name and `summary` keeps
     /// its numbers, so a number carried over from one comes back under the
     /// profile as a claim the picker never showed. The two halves `collect`
     /// runs between are the read and the write, and this is both of them.
