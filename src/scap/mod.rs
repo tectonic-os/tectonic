@@ -1106,6 +1106,22 @@ mod tests {
               selects; `one/auditing` would claim 1 of them"
             ]
         );
+        // The other arm, over an index holding no module at all: what is left
+        // open is the image's own, so only the offer goes away.
+        let bare = fixture("tests/scap");
+        let nothing = Index::scan(&bare, &[], &Disk::scan(&bare), false);
+        assert_eq!(
+            conformance(
+                &loaded.list,
+                &nothing,
+                Some(&fixture("tests/scap/datastream.xml"))
+            )
+            .expect("the fixture datastream reads"),
+            [
+                "`enforced` conforms to `standard`, and nothing it lists claims 2 of the 4 rules it \
+              selects; nothing in the repository claims them"
+            ]
+        );
         // No datastream, and a listed module does declare `satisfies`: there
         // is nothing the manifests alone can say.
         assert!(conformance(&loaded.list, &loaded.index, None)
