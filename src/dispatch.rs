@@ -705,6 +705,26 @@ pub fn dispatch(
                 crate::scap::Verdict::Wrong => ExitCode::from(REPO_ERROR),
             },
         ),
+        // The finalize layer's resolver. A claim is a number and a tailoring
+        // wants a rule, and the one place that mapping is written is
+        // `Content::read`; a hook re-deriving it in shell would be a second
+        // implementation of the rule this project's claims rest on.
+        Verb::ScapRules => {
+            let Some(path) = datastream.as_deref() else {
+                return Err(Error::Invocation(
+                    "`scap rules` needs the content to resolve against: \
+                     `tect scap rules --datastream <file> <number>...`"
+                        .into(),
+                ));
+            };
+            let content = crate::scap::content_of(path)?;
+            for number in rest {
+                if let Some(rule) = content.rules.get(*number) {
+                    println!("{}", crate::scap::rule_name(rule));
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
         Verb::Scap => {
             let [arf] = rest else {
                 return Err(Error::Invocation(
