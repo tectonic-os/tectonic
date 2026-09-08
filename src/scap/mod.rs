@@ -1163,6 +1163,37 @@ mod tests {
         );
     }
 
+    /// A collection declared and cached is one the search reached, so the
+    /// sentence says what was searched. The collection holds a module and it
+    /// claims nothing, which is the only way to be sure the walk read it.
+    #[test]
+    fn a_search_that_reached_the_collections_says_so() {
+        let root = fixture("tests/scap/sourced-claimant");
+        let loaded = crate::load(&root);
+        assert!(
+            loaded.issues.plain().is_empty(),
+            "{}",
+            loaded.issues.plain()
+        );
+        assert!(loaded.index.sourced() && loaded.index.unread().is_empty());
+        assert!(
+            loaded.index.at(".remote/held/one/plain").is_some(),
+            "the collection was walked"
+        );
+        assert_eq!(
+            conformance(
+                &loaded.list,
+                &loaded.index,
+                Some(&fixture("tests/scap/datastream.xml"))
+            )
+            .expect("the fixture datastream reads"),
+            [
+                "`sourced` conforms to `standard`, and nothing it lists claims 4 of the 4 rules it \
+              selects; nothing in the repository or its collections claims them"
+            ]
+        );
+    }
+
     /// `parse_satisfies` drops a claim whose benchmark name is empty and
     /// `parse::module::summary` keeps it, so the index offers a module the
     /// image already lists. Offering it back is what the `listed` filter stops.

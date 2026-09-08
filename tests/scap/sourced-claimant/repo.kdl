@@ -1,0 +1,6 @@
+schema-version 1
+name "Sourced"
+
+sources {
+    held "collection"
+}
