@@ -126,7 +126,14 @@ pub fn owed<'a>(image: &Image, content: &Content, profile: &Profile, index: &'a 
     );
     let open: BTreeSet<String> = selected.difference(&claimed).cloned().collect();
     // A module the image already lists is not an answer to what it is missing.
-    let listed: BTreeSet<String> = image.entries.iter().map(Entry::dir).collect();
+    // A module the base suppressed is still one the image lists, so it is
+    // still not an answer to what the image is missing.
+    let listed: BTreeSet<String> = image
+        .entries
+        .iter()
+        .chain(&image.suppressed)
+        .map(Entry::dir)
+        .collect();
     let helping: Vec<&crate::provider::Provider> = match open.is_empty() {
         true => Vec::new(),
         false => index
@@ -1127,6 +1134,33 @@ mod tests {
         assert!(conformance(&loaded.list, &loaded.index, None)
             .unwrap()
             .is_empty());
+    }
+
+    /// A module the base already provides leaves `entries` for `suppressed`,
+    /// and the image lists it either way. This repository has no diagnostic to
+    /// its name, so the offer would be the only thing wrong with it.
+    #[test]
+    fn a_module_the_base_suppressed_is_not_offered_back() {
+        let root = fixture("tests/scap/suppressed-claimant");
+        let loaded = crate::load(&root);
+        let image = loaded.list.images.first().expect("one image");
+        assert!(image.entries.is_empty(), "the base covers the only module");
+        assert_eq!(
+            image.suppressed.iter().map(Entry::dir).collect::<Vec<_>>(),
+            ["one/aide"]
+        );
+        assert_eq!(
+            conformance(
+                &loaded.list,
+                &loaded.index,
+                Some(&fixture("tests/scap/datastream.xml"))
+            )
+            .expect("the fixture datastream reads"),
+            [
+                "`suppressed` conforms to `standard`, and nothing it lists claims 4 of the 4 rules \
+              it selects; nothing in the repository claims them"
+            ]
+        );
     }
 
     /// `parse_satisfies` drops a claim whose benchmark name is empty and

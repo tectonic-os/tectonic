@@ -1,0 +1,9 @@
+description "What the base already provides, so the resolve suppresses it"
+
+supports "fedora"
+
+provides "rechunking"
+
+satisfies {
+    cis-fedora "1.1.1.1"
+}
