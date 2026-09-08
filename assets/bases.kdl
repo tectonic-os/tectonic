@@ -41,6 +41,24 @@ base "quay.io/centos-bootc/centos-bootc:stream10" {
     scap-content "ssg-cs10-ds.xml"
 }
 
+// RHEL 10, the supported EL base, and the only row here behind a login:
+// `podman login registry.redhat.io` with a Red Hat account, individual
+// subscriptions included. Measured 2026-09-09 against the image: RHEL 10.2,
+// bootc 1.16.4, and every path below present.
+//
+// `scap-security-guide` is not in the container's repos without entitlement,
+// so a build running the remediation step needs the host's entitlement
+// certificates. CentOS Stream 10 carries the same content unentitled and is
+// the row to develop against.
+base "registry.redhat.io/rhel10/rhel-bootc:latest" {
+    about "RHEL 10, the supported EL base, behind a Red Hat login"
+    family "fedora"
+    provides "rechunking" "initramfs-generation" "selinux-policy"
+    provides-file "/usr/sbin/sshd" "/usr/bin/bootc" "/usr/bin/bootupctl" \
+        "/usr/bin/podman" "/usr/bin/crun"
+    scap-content "ssg-rhel10-ds.xml"
+}
+
 // Universal Blue Images
 base "ghcr.io/ublue-os/bazzite:stable" {
     about "KDE, gaming and hardware support over kinoite-main"

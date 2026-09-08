@@ -87,6 +87,7 @@ fn public_catalog_lists_every_shipped_base_in_order() {
         [
             "quay.io/fedora/fedora-bootc:44",
             "quay.io/centos-bootc/centos-bootc:stream10",
+            "registry.redhat.io/rhel10/rhel-bootc:latest",
             "ghcr.io/ublue-os/bazzite:stable",
             "ghcr.io/ublue-os/aurora:stable",
             "ghcr.io/ublue-os/bluefin:stable",
@@ -129,10 +130,10 @@ fn missing_runtime_file_falls_back_to_embedded_catalog() {
     let mut issues = Issues::default();
     let (bases, shadows) = tect::base::catalog(Path::new("."), &[], &mut issues);
 
-    // Then: the embedded eight rows are selected.
+    // Then: the embedded nine rows are selected.
     assert!(issues.is_empty(), "{}", issues.plain());
     assert!(shadows.is_empty());
-    assert_eq!(bases.len(), 8);
+    assert_eq!(bases.len(), 9);
     // The two rows nothing can be built on until a module set says otherwise:
     // every published deb bootc base carries an empty package database, so an
     // image on one reports its whole base as clean. Both rows require the same
@@ -300,7 +301,7 @@ fn collection_still_overrides_and_shadows_selected_catalog() {
 
     // Then: order is retained, the row is replaced, and the shadow is reported.
     assert!(issues.is_empty(), "{}", issues.plain());
-    assert_eq!(bases.len(), 8);
+    assert_eq!(bases.len(), 9);
     assert_eq!(bases[0].about, "collection replacement");
     assert!(bases[0].signed);
     assert_eq!(shadows.len(), 1);
