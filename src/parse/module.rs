@@ -1653,20 +1653,38 @@ refuses "set_password_hashing_algorithm_logindefs" \
         );
         assert!(with.is_empty(), "{with:?}");
 
-        let without = parsed(
-            "refuses-bare",
-            r#"
+        let bare = r#"
 description "refuses one rule and says nothing"
 supports "fedora"
 refuses "grub2_nousb_argument"
-"#,
-        );
+"#;
+        let without = parsed("refuses-bare", bare);
         assert!(
             without
                 .iter()
                 .any(|m| m.contains("refused without a reason")
                     && m.contains("grub2_nousb_argument")),
             "{without:?}"
+        );
+        // And kept: dropping it would let remediation set a rule the module
+        // decided to leave alone, which is worse than the missing sentence.
+        let mut issues = Issues::default();
+        let module = Module::parse(
+            "refuses-bare",
+            "refuses-bare",
+            Path::new("."),
+            bare.to_string(),
+            None,
+            &mut issues,
+        )
+        .expect("a module missing only a reason still parses");
+        assert_eq!(
+            module
+                .refuses
+                .iter()
+                .map(|r| r.rule.as_str())
+                .collect::<Vec<_>>(),
+            ["grub2_nousb_argument"]
         );
 
         // Two refusals of one rule is a manifest arguing with itself.

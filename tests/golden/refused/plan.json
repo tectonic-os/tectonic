@@ -37,7 +37,14 @@
         ],
         "provides_files": [],
         "requires": [],
-        "satisfies": []
+        "satisfies": [
+          {
+            "benchmark": "stig",
+            "rules": [
+              "RHEL-09-232010"
+            ]
+          }
+        ]
       },
       "flavours": [],
       "default_flavour": null,
@@ -79,6 +86,27 @@
                   ]
                 }
               ]
+            },
+            {
+              "path": "one/typo",
+              "dir": "one/typo",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Refuses a rule the content carries nothing by",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "content": "3dcc563359184ed500d3608bad9291491beb8633fc41ee063e344dd3b009fb49",
+                "repo": false,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": []
             }
           ],
           "suppressed": [],

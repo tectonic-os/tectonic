@@ -32,18 +32,6 @@ pub enum Stopped {
 
 /// Fetches, verifies, then replaces this process with the backend. Returns only
 /// when the repository is wrong, having reported why.
-/// In order and without repeats: two modules claiming one benchmark number, or
-/// refusing one rule, name it once in the argument the build carries.
-fn unique(values: impl IntoIterator<Item = String>) -> Vec<String> {
-    let mut out: Vec<String> = Vec::new();
-    for value in values {
-        if !out.contains(&value) {
-            out.push(value);
-        }
-    }
-    out
-}
-
 pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
     let backend = match opts.backend.clone().or_else(|| env("BUILD_BACKEND")) {
         None => "buildah".to_string(),
@@ -142,6 +130,14 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
     let conforms = image
         .conforms_of(flavour.as_deref().unwrap_or(NO_FLAVOUR))
         .to_string();
+    // Refused rather than guessed: a base measured against the wrong benchmark
+    // returns numbers, and the image is remediated to a profile nobody chose.
+    let scap_content = match conforms.is_empty() {
+        true => String::new(),
+        false => crate::scap::content_for(root, &list, Some(&target))?,
+    };
+    // Both lists include the base, which claims the way a module does.
+    let (scap_claimed, scap_refused) = crate::scap::exclusions(image);
     let mut build_args = vec![
         format!("FLAVOUR={}", flavour.unwrap_or_default()),
         format!("IMAGE_VERSION={version}"),
@@ -172,35 +168,13 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
                 .unwrap_or_default()
         ),
         format!("CONFORMS={conforms}"),
-        format!(
-            "SCAP_CONTENT={}",
-            match conforms.is_empty() {
-                true => String::new(),
-                false => crate::scap::content_for(root, &list, Some(&target)),
-            }
-        ),
+        format!("SCAP_CONTENT={scap_content}"),
         // Two vocabularies on purpose. A claim is written as a benchmark
         // number and the hook resolves it against the content it installs; a
         // refusal is written as a rule ID, because 710 of the 994 rules carry
         // no number that reaches them and a rule worth refusing is often one.
-        format!(
-            "SCAP_CLAIMED={}",
-            unique(
-                modules
-                    .iter()
-                    .flat_map(|m| m.satisfies.iter().flat_map(|c| c.rules.iter().cloned()))
-            )
-            .join(" ")
-        ),
-        format!(
-            "SCAP_REFUSED={}",
-            unique(
-                modules
-                    .iter()
-                    .flat_map(|m| m.refuses.iter().map(|r| r.rule.clone()))
-            )
-            .join(" ")
-        ),
+        format!("SCAP_CLAIMED={}", scap_claimed.join(" ")),
+        format!("SCAP_REFUSED={}", scap_refused.join(" ")),
         format!("TARGET={target}"),
         format!(
             "MODULE_HASHES={}",
@@ -440,32 +414,5 @@ fn today() -> Result<String, String> {
     match out.status.success() && stamp.len() == 8 {
         true => Ok(stamp),
         false => Err(format!("date -u +%Y%m%d said `{stamp}`")),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::unique;
-
-    /// The order is the resolved build order, because a reader comparing a
-    /// build argument against the module list should find them in step.
-    #[test]
-    fn claims_and_refusals_are_named_once_each_in_order() {
-        let of = |v: &[&str]| unique(v.iter().map(|s| s.to_string()));
-
-        assert_eq!(
-            of(&["CCI-000199", "Req-10.2.5"]),
-            ["CCI-000199", "Req-10.2.5"]
-        );
-        // Two modules claiming one number, which is ordinary: a number reaches
-        // one rule and more than one module may address it.
-        assert_eq!(
-            of(&["CCI-000199", "Req-10.2.5", "CCI-000199"]),
-            ["CCI-000199", "Req-10.2.5"]
-        );
-        assert!(of(&[]).is_empty());
-        // Joined into the argument, an empty list has to leave the arg empty
-        // rather than carrying a stray separator.
-        assert_eq!(of(&[]).join(" "), "");
     }
 }

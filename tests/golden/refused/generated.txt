@@ -15,6 +15,13 @@ set -euxo pipefail
 
 MODDIR=/ctx/modules/one/contradicts
 export MODDIR
+==== generated/refused/modules/one/typo.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/one/typo
+export MODDIR
 ==== generated/refused/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
@@ -140,6 +147,7 @@ right.
 graph LR
     base["quay.io/fedora/fedora-bootc:44"]
     m0["one/contradicts"]
+    m1["one/typo"]
 ```
 
 ## Capabilities

@@ -637,27 +637,24 @@ pub(crate) fn in_target(entry: &Entry, target: &str) -> bool {
 }
 
 fn unique(modules: &[&Module], of: impl Fn(&Module) -> Vec<String>) -> Json {
-    let mut out: Vec<String> = Vec::new();
-    for module in modules {
-        for name in of(module) {
-            if !out.contains(&name) {
-                out.push(name);
-            }
-        }
-    }
-    Json::strings(out)
+    Json::strings(distinct(modules.iter().flat_map(|module| of(module))))
 }
 
 pub(crate) fn unique_pairs(
     modules: &[&Module],
     of: impl Fn(&Module) -> Vec<(String, String)>,
 ) -> Vec<(String, String)> {
-    let mut out: Vec<(String, String)> = Vec::new();
-    for module in modules {
-        for pair in of(module) {
-            if !out.contains(&pair) {
-                out.push(pair);
-            }
+    distinct(modules.iter().flat_map(|module| of(module)))
+}
+
+/// In order and without repeats. The order is the resolved build order, so a
+/// reader comparing one of these lists against the module list finds them in
+/// step.
+pub(crate) fn distinct<T: PartialEq>(values: impl IntoIterator<Item = T>) -> Vec<T> {
+    let mut out: Vec<T> = Vec::new();
+    for value in values {
+        if !out.contains(&value) {
+            out.push(value);
         }
     }
     out

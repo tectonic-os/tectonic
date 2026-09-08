@@ -1,0 +1,5 @@
+description "Refuses a rule the content carries nothing by"
+
+supports "fedora"
+
+refuses "not_a_rule_this_content_has" because="a misspelling reads exactly like a rule left alone"
