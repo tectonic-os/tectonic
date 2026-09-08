@@ -258,6 +258,19 @@ pub const MODULE: Node = Node::new("module",
             ], Say::new("unknown `allow-verify` property `{}`", "not part of the schema",
                 "`allow-verify` accepts `unit`")),
 
+        Node::new("refuses",
+            "One benchmark rule this module deliberately leaves unsatisfied, which no remediation may set on its behalf.")
+            .arg(Arg::Str, Say::new("`refuses` needs a rule ID", "nothing named",
+                "`refuses \"grub2_nousb_argument\" because=\"it removes the keyboard\"`"))
+            .unique(Say::new("`{}` is refused twice", "already refused above", ""))
+            .props(&[
+                Prop { name: "because", kind: Kind::Str,
+                    desc: "Why the rule is left unsatisfied, which is the whole point of declaring it.",
+                    say: Say::new("`because` must be a string", "not a string", ""),
+                    missing: Say::NONE },
+            ], Say::new("unknown `refuses` property `{}`", "not part of the schema",
+                "`refuses` accepts `because`")),
+
         Node::new("collects", "A filename this module gathers from every module that ships one.")
             .arg(Arg::Str, Say::NONE)
             .props(&[
@@ -614,6 +627,7 @@ impl Module {
             requires_files: Vec::new(),
             overrides: Vec::new(),
             verify_exceptions: Vec::new(),
+            refuses: Vec::new(),
             flavour: None,
             collects: Vec::new(),
             contributes: Vec::new(),
@@ -741,6 +755,7 @@ impl Module {
                 }
                 "helpers" => module.parse_helpers(node, dir, src, issues),
                 "allow-verify" => module.parse_allow_verify(node, src, issues),
+                "refuses" => module.parse_refuses(node, src, issues),
                 "collects" => module.parse_collects(node, src, issues),
                 "contributes" => module.parse_contributes(node, dir, src, issues),
                 "fragment" => {
@@ -1122,6 +1137,32 @@ impl Module {
 
     /// `allow-verify "man-page-missing" unit="x.service"` One known diagnostic
     /// accepted on one unit, which is why both halves are required.
+    /// A refusal is a judgement, so it is worth nothing without its reason:
+    /// the rule alone reads as an oversight the next reader will try to fix.
+    fn parse_refuses(&mut self, node: &KdlNode, src: &Source, issues: &mut Issues) {
+        let span: Span = node.name().span().into();
+        let Some(rule) = string_arg(node).map(str::to_string) else {
+            return;
+        };
+        let because = prop(node, "because").unwrap_or_default().to_string();
+        if because.is_empty() {
+            issues.push(
+                Issue::new(format!("`{rule}` is refused without a reason"), src)
+                    .at(span, "no `because`")
+                    .help(
+                        "a refusal keeps a rule out of remediation for good, so the reason is \
+                         what stops the next reader undoing it: `because=\"the base is on \
+                         yescrypt, which is stronger\"`",
+                    ),
+            );
+        }
+        self.refuses.push(crate::model::module::Refusal {
+            rule,
+            because,
+            span,
+        });
+    }
+
     fn parse_allow_verify(&mut self, node: &KdlNode, src: &Source, issues: &mut Issues) {
         let span: Span = node.name().span().into();
         let class = string_arg(node).map(str::to_string);
@@ -1594,6 +1635,53 @@ mod tests {
             &mut issues,
         );
         issues.findings()
+    }
+
+    /// A refusal without its reason reads as an oversight, and the next reader
+    /// undoes it. The rule is kept either way: refusing is still the module's
+    /// decision, and dropping it would silently let remediation back in.
+    #[test]
+    fn a_refusal_wants_its_reason_and_is_kept_without_one() {
+        let with = parsed(
+            "refuses-well",
+            r#"
+description "refuses one rule"
+supports "fedora"
+refuses "set_password_hashing_algorithm_logindefs" \
+    because="the base is on yescrypt, which is stronger than the SHA512 this asks for"
+"#,
+        );
+        assert!(with.is_empty(), "{with:?}");
+
+        let without = parsed(
+            "refuses-bare",
+            r#"
+description "refuses one rule and says nothing"
+supports "fedora"
+refuses "grub2_nousb_argument"
+"#,
+        );
+        assert!(
+            without
+                .iter()
+                .any(|m| m.contains("refused without a reason")
+                    && m.contains("grub2_nousb_argument")),
+            "{without:?}"
+        );
+
+        // Two refusals of one rule is a manifest arguing with itself.
+        let twice = messages(
+            r#"
+description "twice"
+supports "fedora"
+refuses "grub2_nousb_argument" because="one"
+refuses "grub2_nousb_argument" because="two"
+"#,
+        );
+        assert!(
+            twice.iter().any(|m| m.contains("is refused twice")),
+            "{twice:?}"
+        );
     }
 
     /// The index answers for a module whatever family it is built on, so a

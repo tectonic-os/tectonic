@@ -120,6 +120,16 @@ pub struct VerifyException {
     pub span: Span,
 }
 
+/// One benchmark rule a module deliberately leaves unsatisfied, which nothing
+/// may remediate on its behalf. Written as a rule ID rather than as the number
+/// a `satisfies` takes: 710 of the 994 rules carry no number that reaches them,
+/// and a rule worth refusing is often one of them.
+pub struct Refusal {
+    pub rule: String,
+    pub because: String,
+    pub span: Span,
+}
+
 /// Where a module's `Containerfile.inc` is inlined.
 #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
 pub enum Position {
@@ -160,6 +170,7 @@ pub struct Module {
     pub overrides: Vec<Decl>,
     /// Verify diagnostics this module's own units are allowed to produce.
     pub verify_exceptions: Vec<VerifyException>,
+    pub refuses: Vec<Refusal>,
     /// The flavour this module is gated to, from the list: a module never names
     /// a flavour.
     pub flavour: Option<String>,

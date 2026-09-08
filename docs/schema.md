@@ -769,6 +769,16 @@ One `tect validate-image` diagnostic accepted on one unit, leaving the rest of t
 | --- | --- | --- |
 | `unit=` | a string | The unit the exception applies to. |
 
+### `refuses`
+
+One benchmark rule this module deliberately leaves unsatisfied, which no remediation may set on its behalf.
+
+*a string, one per name*
+
+| Property | Value | Meaning |
+| --- | --- | --- |
+| `because=` | a string | Why the rule is left unsatisfied, which is the whole point of declaring it. |
+
 ### `collects`
 
 A filename this module gathers from every module that ships one.
