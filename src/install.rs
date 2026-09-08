@@ -1202,15 +1202,26 @@ pub fn run(payload: &Payload, answers: &Answers, prompt: &Prompt) -> Result<(), 
 /// deliberately in no file, and the restart, because the stick is still in the
 /// machine and nothing else says what to do next.
 fn finish(recovery: Option<&str>, log: Option<&Path>, prompt: &Prompt) -> Result<(), String> {
-    if let Some(key) = recovery {
-        println!("\n{}", copy::recovery(key));
-        println!("{}\n", copy::KEY_NOT_LOGGED);
-    }
-    eprintln!("tect: {}", copy::logging(log));
+    // Nothing draws, so the streams are the only channel there is.
     if !prompt.draws() {
+        if let Some(key) = recovery {
+            println!("\n{}", copy::recovery(key));
+            println!("{}\n", copy::KEY_NOT_LOGGED);
+        }
+        eprintln!("tect: {}", copy::logging(log));
         return Ok(());
     }
-    match crate::ui::offer(copy::INSTALL_DONE, copy::RESTART, copy::DONE_KEYS)? {
+    // Inside the box, all of it. A key held in no file and shown on no screen
+    // is a disk nobody can open.
+    let mut rows = Vec::new();
+    if let Some(key) = recovery {
+        rows.push(Choice::new(copy::WRITE_DOWN, "").content());
+        // The one row on the screen a person has to copy by eye.
+        rows.push(Choice::new(key, "").content().tinted());
+        rows.push(Choice::new(copy::KEY_NOT_LOGGED, "").content());
+    }
+    rows.push(Choice::new(copy::logging(log), "").content());
+    match crate::ui::offer_over(copy::INSTALL_DONE, rows, copy::RESTART, copy::DONE_KEYS)? {
         false => Ok(()),
         true => restart(),
     }

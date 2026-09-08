@@ -86,14 +86,21 @@ pub struct Choice {
     /// The row this one is nested under, which comes before it. A parent and
     /// any of its children contradict; two children of one parent do not.
     pub parent: Option<usize>,
-    /// The dotted group this one sits inside, which *contains* it rather than
-    /// contradicting it, and which a question taking several answers draws as
-    /// a collapsed tree. Nothing reads it and `parent` both.
+    /// The dotted group this one sits inside. A group *contains* its rows; a
+    /// `parent` contradicts them. A question taking several answers draws a
+    /// group as a collapsed tree. Nothing reads it and `parent` both.
     pub group: String,
-    /// Whether it can be picked at all. One that cannot is drawn dim and
-    /// refuses the key that would pick it, rather than being left out: what it
-    /// needs is the reason it is worth showing.
+    /// Whether it can be picked at all. One that cannot is shown anyway and
+    /// refuses the key that would pick it: what it needs is the reason it is
+    /// worth showing.
     pub available: bool,
+    /// Whether it is drawn dim, which is what reads as absent from the answer.
+    /// `unavailable` sets it, a refused option being exactly that. `content`
+    /// leaves it clear.
+    pub dim: bool,
+    /// Whether the label is drawn a character at a time, each character tinted
+    /// by what it is. `tinted` is the drawing and the reason for it.
+    pub tint: bool,
 }
 
 impl Choice {
@@ -104,12 +111,30 @@ impl Choice {
             parent: None,
             group: String::new(),
             available: true,
+            dim: false,
+            tint: false,
         }
     }
 
     /// Shown, and not pickable. The detail beside it says why.
     pub fn unavailable(mut self) -> Self {
         self.available = false;
+        self.dim = true;
+        self
+    }
+
+    /// On the screen to be read: not pickable, and at full contrast. Dim here
+    /// would read as absent from the answer, which a recovery key never is.
+    pub fn content(mut self) -> Self {
+        self.available = false;
+        self
+    }
+
+    /// Drawn a character at a time, each character tinted by what it is. For a
+    /// recovery key: sixty-four characters of hex run together, held in no
+    /// file, copied off this screen by eye.
+    pub fn tinted(mut self) -> Self {
+        self.tint = true;
         self
     }
 
@@ -152,16 +177,6 @@ pub fn select_current(
     inline(height(options.len()), |terminal| {
         pick(terminal, question, options, PICK, at)
     })
-}
-
-/// One thing to do, or not. The way out is esc and `keys` is what says so, so
-/// leaving is not drawn as a row competing with the action.
-pub fn offer(question: &str, action: &str, keys: &str) -> Result<bool, String> {
-    let options = [Choice::new(action, "")];
-    let chosen = inline(height(options.len()), |terminal| {
-        pick(terminal, question, &options, keys, 0)
-    })?;
-    Ok(chosen == Some(0))
 }
 
 /// Which of `yes` and `no`, drawn as the two answers they are.
@@ -668,7 +683,30 @@ pub fn confirm_over(
     Ok(chosen == Some(at))
 }
 
-/// The summary and the two answers under it. Every row of the summary is
+/// One thing to do, over the same read-only rows `confirm_over` draws. The way
+/// out is esc and `keys` says so, so leaving is not drawn as a row competing
+/// with the action.
+///
+/// This is what a screen carrying something a person has to read draws, since
+/// a widget that sets `CHROME` opens full screen and paints over anything
+/// printed under it.
+pub fn offer_over(
+    question: &str,
+    rows: Vec<Choice>,
+    action: &str,
+    keys: &str,
+) -> Result<bool, String> {
+    let mut options = rows;
+    options.push(Choice::new("", ""));
+    options.push(Choice::new(action, ""));
+    let at = options.len() - 1;
+    let chosen = inline((options.len() + 2) as u16, |terminal| {
+        pick(terminal, question, &options, keys, at)
+    })?;
+    Ok(chosen == Some(at))
+}
+
+/// The summary and the answers under it. Every row of the summary is
 /// unavailable, so the cursor passes over what it is being asked about and
 /// lands only on an answer.
 fn summary_sheet(rows: &[(String, String)], yes: &str, no: &str) -> Vec<Choice> {
@@ -1022,6 +1060,31 @@ fn blend(at: usize, room: usize) -> Color {
     )
 }
 
+/// The palette's own colour lifted towards white. A tinted row is read one
+/// character at a time, so it wants hue and full contrast.
+fn lifted(base: (u8, u8, u8)) -> Color {
+    let lift = |channel: u8| (u16::from(channel) + (0xff - u16::from(channel)) * 2 / 3) as u8;
+    Color::Rgb(lift(base.0), lift(base.1), lift(base.2))
+}
+
+/// A label drawn one character at a time: digits off the gradient's hot end,
+/// letters off its cold one, everything else white. Three classes, because the
+/// pairs a person confuses — `0` and `O`, `1` and `l`, `5` and `S` — are one
+/// from each, so colour separates what shape does not.
+fn tinted(label: &str) -> Vec<Span<'static>> {
+    label
+        .chars()
+        .map(|letter| {
+            let colour = match letter {
+                _ if letter.is_ascii_digit() => lifted(HOT),
+                _ if letter.is_alphabetic() => lifted(COLD),
+                _ => Color::White,
+            };
+            Span::styled(letter.to_string(), Style::new().fg(colour))
+        })
+        .collect()
+}
+
 /// The lines a question takes: its rows, whatever they are, under the question
 /// and over the hint. Unused where a command has taken the screen, since the
 /// viewport is then the terminal and nothing sizes to its content.
@@ -1372,19 +1435,23 @@ fn draw(
                 Some(on) if on.contains(&at) => "[x] ",
                 Some(_) => "[ ] ",
             };
-            // A row that cannot be picked is dim whole, so it reads as absent
-            // from the answer while still saying what it needs.
-            let row = match choice.available {
-                true => Style::new(),
-                false => Style::new().dim(),
+            // A refused option is dim whole, so it reads as absent from the
+            // answer while still saying what it needs.
+            let row = match choice.dim {
+                false => Style::new(),
+                true => Style::new().dim(),
             };
-            ListItem::new(Line::from(vec![
+            let mut spans = vec![
                 Span::styled(mark, row),
                 Span::styled(branch(options, at), row),
-                Span::styled(&choice.label, row),
-                Span::raw("  "),
-                Span::styled(&choice.detail, Style::new().dim()),
-            ]))
+            ];
+            match choice.tint {
+                true => spans.extend(tinted(&choice.label)),
+                false => spans.push(Span::styled(choice.label.clone(), row)),
+            }
+            spans.push(Span::raw("  "));
+            spans.push(Span::styled(choice.detail.clone(), Style::new().dim()));
+            ListItem::new(Line::from(spans))
         })
         .collect();
     let rows = items.len();
@@ -1639,6 +1706,7 @@ fn nested(
 mod tests {
     use super::*;
     use ratatui::backend::TestBackend;
+    use ratatui::style::Modifier;
     use ratatui::Terminal;
 
     /// The serial console case: it comes up 0x0 and stays there, and a
@@ -1651,11 +1719,105 @@ mod tests {
         assert!(!unsized_tty(Some((80, 24))));
     }
 
-    /// The one screen that carries what installing costs. What it must show is
-    /// the disk, what happens to it, and every answer that is about to be
-    /// The last question before a disk is wiped: the answers shown, none of
-    /// them landable, and the cursor opening on the way back rather than on
-    /// the way through.
+    /// The completion screen draws the recovery key. It is generated at install
+    /// time, kept out of the log on purpose and written to no file, so this
+    /// screen is the only copy there is. It was a `println!` under the widget
+    /// that covers it.
+    #[test]
+    fn the_completion_screen_draws_the_recovery_key() {
+        // 32 random bytes as hex, which is what fisherman's RandomPassphrase
+        // hands back for a `tpm2-luks` install.
+        const KEY: &str = "6f1b4c0d2a9e83f57b6c1d40e2578a93bb0e4f21c7d68a5039e1b74c2f8d605a";
+        let options: Vec<Choice> = vec![
+            Choice::new(crate::copy::WRITE_DOWN, "").content(),
+            Choice::new(KEY, "").content().tinted(),
+            Choice::new(crate::copy::KEY_NOT_LOGGED, "").content(),
+            Choice::new(
+                crate::copy::logging(Some(std::path::Path::new("/var/log/tect-install.log"))),
+                "",
+            )
+            .content(),
+            Choice::new("", ""),
+            Choice::new(crate::copy::RESTART, ""),
+        ];
+        let rows = 4;
+        // The rows are read and not answered, and the action is the one thing
+        // the cursor can land on.
+        for at in 0..rows {
+            assert!(!available(&options, at), "row {at} is landable");
+            assert!(!options[at].dim, "row {at} is dim");
+        }
+        assert!(available(&options, options.len() - 1));
+
+        let at = options.len() - 1;
+        let mut state = ListState::default().with_selected(Some(at));
+        let mut terminal = Terminal::new(TestBackend::new(72, options.len() as u16 + 2)).unwrap();
+        terminal
+            .draw(|frame| {
+                draw(
+                    frame,
+                    frame.area(),
+                    crate::copy::INSTALL_DONE,
+                    &options,
+                    None,
+                    crate::copy::DONE_KEYS,
+                    &mut state,
+                )
+            })
+            .unwrap();
+        let drawn = terminal.backend().to_string();
+        assert!(drawn.contains(KEY), "the key is not on the screen: {drawn}");
+        assert!(drawn.contains(crate::copy::KEY_NOT_LOGGED), "{drawn}");
+        assert!(drawn.contains("/var/log/tect-install.log"), "{drawn}");
+        assert!(drawn.contains(crate::copy::RESTART), "{drawn}");
+
+        // And drawn at full contrast, a character at a time. `unavailable`
+        // dims a refused option. The key is the one string on this screen that
+        // leaves with the person.
+        let buffer = terminal.backend().buffer();
+        let row = KEY_ROW;
+        let lit = (0..buffer.area.width)
+            .map(|column| &buffer[(column, row)])
+            .filter(|cell| !cell.symbol().trim().is_empty())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            lit.len(),
+            KEY.len(),
+            "the key's row is not the key: {drawn}"
+        );
+        for cell in &lit {
+            assert!(
+                !cell.modifier.contains(Modifier::DIM),
+                "the recovery key is drawn dim: {drawn}"
+            );
+        }
+
+        // Letters and digits take a tint each, so `0` and `O` are told apart
+        // by something on a screen where nothing else can check them.
+        let tint = |class: fn(&char) -> bool| {
+            KEY.chars()
+                .zip(&lit)
+                .filter(|(letter, _)| class(letter))
+                .map(|(_, cell)| cell.fg)
+                .collect::<std::collections::HashSet<_>>()
+        };
+        let digits = tint(|letter| letter.is_ascii_digit());
+        let letters = tint(|letter| letter.is_alphabetic());
+        assert_eq!(digits.len(), 1, "digits take one tint: {digits:?}");
+        assert_eq!(letters.len(), 1, "letters take one tint: {letters:?}");
+        assert!(
+            digits.is_disjoint(&letters),
+            "letters and digits share a tint: {digits:?} {letters:?}"
+        );
+    }
+
+    /// The question takes the first row and the key is the second summary row
+    /// under it, `WRITE_DOWN` being the first.
+    const KEY_ROW: u16 = 2;
+
+    /// The last question before a disk is wiped. It carries what installing
+    /// costs — the disk, what happens to it, and every answer about to be acted
+    /// on — all shown, none landable, with the cursor opening on the way back.
     #[test]
     fn the_confirmation_shows_the_answers_and_lands_only_on_a_choice() {
         let rows = [

@@ -280,8 +280,12 @@ pub fn writing(log: Option<&std::path::Path>) -> String {
 /// The only copy of it there will ever be, and the disk does not open
 /// without it if the TPM stops answering.
 pub fn recovery(key: &str) -> String {
-    format!("write this down, it is the recovery key: {key}")
+    format!("{WRITE_DOWN} {key}")
 }
+
+/// Drawn above the key on the completion screen, and with the key appended
+/// where there is no screen to draw one on.
+pub const WRITE_DOWN: &str = "write this down, it is the recovery key:";
 
 pub const LEAVING: &str = "Leave the installer?";
 pub const LEAVE_BACK: &str = "Keep going";
@@ -292,8 +296,8 @@ pub const RESTART: &str = "Restart now";
 /// The other way off the last screen is esc, which the legend already names,
 /// so it is not a row.
 pub const DONE_KEYS: &str = "enter to restart, esc for a shell";
-/// Said on its own line before the restart is offered, because the key is on
-/// screen and the log deliberately has no copy of it.
+/// Said under the key on the completion screen, because the log deliberately
+/// has no copy of it.
 pub const KEY_NOT_LOGGED: &str = "It is not in the install log.";
 
 #[cfg(test)]
