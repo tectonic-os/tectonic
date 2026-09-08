@@ -335,6 +335,16 @@ The image every layer builds on, and what building on it may assume.
 | `requires` | one or more strings | Capabilities the base is unusable without, which an enabled module must provide. |
 | `signed` | `#true` or `#false`, at most one | Whether the base publishes a cosign signature. |
 
+##### `satisfies`
+
+Benchmarks and rules the base image already satisfies, as an audit declaration. The tool records it and certifies nothing.
+
+*at most one*
+
+| Node | Takes | Meaning |
+| --- | --- | --- |
+| `<name>` | one or more strings, one per name | One benchmark, and the rule IDs it covers. |
+
 #### `flavours`
 
 The flavours this image publishes beside its ungated build.

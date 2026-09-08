@@ -146,6 +146,15 @@ fn image(list: &List, image: &Image, resolved: &Resolved) -> Json {
                         "requires",
                         Json::strings(base.requires.iter().map(|d| d.name.clone())),
                     ),
+                    (
+                        "satisfies",
+                        Json::array(base.satisfies.iter().map(|coverage| {
+                            Json::object([
+                                ("benchmark", Json::string(&coverage.benchmark)),
+                                ("rules", Json::strings(&coverage.rules)),
+                            ])
+                        })),
+                    ),
                 ]),
             },
         ),

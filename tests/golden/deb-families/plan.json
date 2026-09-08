@@ -34,7 +34,8 @@
         "signed": false,
         "provides": [],
         "provides_files": [],
-        "requires": []
+        "requires": [],
+        "satisfies": []
       },
       "flavours": [],
       "default_flavour": null,
@@ -174,7 +175,8 @@
         "provides_files": [],
         "requires": [
           "bootc-base"
-        ]
+        ],
+        "satisfies": []
       },
       "flavours": [],
       "default_flavour": null,
@@ -357,7 +359,8 @@
         "signed": false,
         "provides": [],
         "provides_files": [],
-        "requires": []
+        "requires": [],
+        "satisfies": []
       },
       "flavours": [],
       "default_flavour": null,

@@ -1,7 +1,7 @@
 //! The image files: one `.kdl` at the repository root per image.
 
 use crate::diag::{Issue, Source, Span};
-use crate::model::module::Module;
+use crate::model::module::{Coverage, Module};
 use crate::model::options::Value;
 use crate::model::remote::{Collection, REMOTE_DIR};
 use crate::provenance::Evidence;
@@ -97,6 +97,9 @@ pub struct Base {
     /// set turns into a bootc image declares what that module set has to
     /// provide, and `check` refuses the image until something does.
     pub requires: Vec<Decl>,
+    /// Benchmark rules the base image is published as satisfying, which count
+    /// towards `conforms` the way a listed module's claims do.
+    pub satisfies: Vec<Coverage>,
     /// Whether the base image publishes a cosign signature.
     pub signed: bool,
     pub span: Span,

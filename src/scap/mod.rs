@@ -85,12 +85,13 @@ pub fn conformance(
     for image in list.images.iter().filter(|i| !i.conforms.is_empty()) {
         match &content {
             Some(content) => out.extend(unclaimed(image, content, index)),
-            None if image.modules().any(|m| !m.satisfies.is_empty()) => {}
+            None if image.modules().any(|m| !m.satisfies.is_empty())
+                || image.base.iter().any(|base| !base.satisfies.is_empty()) => {}
             None => out.push(format!(
-                "`{}` conforms to `{}` and no module it lists declares `satisfies`, so nothing \
-                 here claims a rule of it. Nothing read a datastream, so that is a count of \
-                 declarations: `tect check --datastream <file>` says which of the profile's \
-                 rules are unclaimed",
+                "`{}` conforms to `{}` and nothing it lists or builds on declares `satisfies`, \
+                 so nothing here claims a rule of it. Nothing read a datastream, so that is a \
+                 count of declarations: `tect check --datastream <file>` says which of the \
+                 profile's rules are unclaimed",
                 image.id, image.conforms
             )),
         }
@@ -117,11 +118,15 @@ pub struct Owed<'a> {
 /// who would help runs backward through `Content::numbering`.
 pub fn owed<'a>(image: &Image, content: &Content, profile: &Profile, index: &'a Index) -> Owed<'a> {
     let selected = content.selected(&profile.id);
+    // The base claims rules the way a listed module does, and a module the base
+    // suppressed left `entries` with its claims, so a base that covers a module
+    // says for itself what that module was claiming.
     let claimed = reached(
         content,
         image
             .modules()
             .flat_map(|module| module.satisfies.iter())
+            .chain(image.base.iter().flat_map(|base| base.satisfies.iter()))
             .flat_map(|coverage| coverage.rules.iter()),
     );
     let open: BTreeSet<String> = selected.difference(&claimed).cloned().collect();
@@ -213,8 +218,8 @@ fn unclaimed(image: &Image, content: &Content, index: &Index) -> Option<String> 
         clause => format!(". {clause}"),
     };
     Some(format!(
-        "`{}` conforms to `{}`, and nothing it lists claims {} of the {} rules it selects; \
-         {found}{unsearched}",
+        "`{}` conforms to `{}`, and nothing it lists or builds on claims {} of the {} rules it \
+         selects; {found}{unsearched}",
         image.id,
         image.conforms,
         owed.open.len(),
@@ -1109,8 +1114,8 @@ mod tests {
         assert_eq!(
             said,
             [
-                "`enforced` conforms to `standard`, and nothing it lists claims 2 of the 4 rules it \
-              selects; `one/auditing` would claim 1 of them"
+                "`enforced` conforms to `standard`, and nothing it lists or builds on claims 2 \
+              of the 4 rules it selects; `one/auditing` would claim 1 of them"
             ]
         );
         // The other arm, over an index holding no module at all: what is left
@@ -1125,8 +1130,8 @@ mod tests {
             )
             .expect("the fixture datastream reads"),
             [
-                "`enforced` conforms to `standard`, and nothing it lists claims 2 of the 4 rules it \
-              selects; nothing in the repository claims them"
+                "`enforced` conforms to `standard`, and nothing it lists or builds on claims 2 \
+              of the 4 rules it selects; nothing in the repository claims them"
             ]
         );
         // No datastream, and a listed module does declare `satisfies`: there
@@ -1157,10 +1162,55 @@ mod tests {
             )
             .expect("the fixture datastream reads"),
             [
-                "`suppressed` conforms to `standard`, and nothing it lists claims 4 of the 4 rules \
-              it selects; nothing in the repository claims them"
+                "`suppressed` conforms to `standard`, and nothing it lists or builds on claims \
+              4 of the 4 rules it selects; nothing in the repository claims them"
             ]
         );
+    }
+
+    /// Making a conformance claim is the job of an image, and a base declaring
+    /// `satisfies` is a fact about that base. The base here covers the only
+    /// module and says for itself the rule that module was claiming, so the
+    /// rule resolves where suppression alone would have left it open.
+    #[test]
+    fn a_base_claims_the_rules_it_says_it_satisfies() {
+        let root = fixture("tests/scap/claiming-base");
+        let loaded = crate::load(&root);
+        assert!(
+            loaded.issues.plain().is_empty(),
+            "{}",
+            loaded.issues.plain()
+        );
+        let image = loaded.list.images.first().expect("one image");
+        assert!(image.entries.is_empty(), "the base covers the only module");
+        assert_eq!(
+            image
+                .base
+                .as_ref()
+                .expect("a base")
+                .satisfies
+                .iter()
+                .map(|coverage| (coverage.benchmark.as_str(), coverage.rules.len()))
+                .collect::<Vec<_>>(),
+            [("cis-fedora", 2)]
+        );
+        assert_eq!(
+            conformance(
+                &loaded.list,
+                &loaded.index,
+                Some(&fixture("tests/scap/datastream.xml"))
+            )
+            .expect("the fixture datastream reads"),
+            [
+                "`claiming` conforms to `standard`, and nothing it lists or builds on claims 2 of \
+              the 4 rules it selects; nothing in the repository claims them"
+            ]
+        );
+        // The declaration tier reads the same way: the suppressed module is not
+        // among the ones the image lists, so the base is what keeps this quiet.
+        assert!(conformance(&loaded.list, &loaded.index, None)
+            .unwrap()
+            .is_empty());
     }
 
     /// A collection declared and cached is one the search reached, so the
@@ -1188,8 +1238,8 @@ mod tests {
             )
             .expect("the fixture datastream reads"),
             [
-                "`sourced` conforms to `standard`, and nothing it lists claims 4 of the 4 rules it \
-              selects; nothing in the repository or its collections claims them"
+                "`sourced` conforms to `standard`, and nothing it lists or builds on claims 4 \
+              of the 4 rules it selects; nothing in the repository or its collections claims them"
             ]
         );
     }
@@ -1219,8 +1269,8 @@ mod tests {
             )
             .expect("the fixture datastream reads"),
             [
-                "`listed` conforms to `standard`, and nothing it lists claims 3 of the 4 rules it \
-              selects; nothing in the repository claims them"
+                "`listed` conforms to `standard`, and nothing it lists or builds on claims 3 \
+              of the 4 rules it selects; nothing in the repository claims them"
             ]
         );
     }

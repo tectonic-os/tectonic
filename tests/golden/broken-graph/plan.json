@@ -40,7 +40,8 @@
         "provides_files": [],
         "requires": [
           "bootc-base"
-        ]
+        ],
+        "satisfies": []
       },
       "flavours": [],
       "default_flavour": null,

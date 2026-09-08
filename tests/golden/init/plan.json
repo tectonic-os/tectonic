@@ -65,7 +65,8 @@
           "/usr/bin/podman",
           "/usr/bin/crun"
         ],
-        "requires": []
+        "requires": [],
+        "satisfies": []
       },
       "flavours": [],
       "default_flavour": null,

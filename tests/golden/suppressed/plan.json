@@ -39,7 +39,16 @@
         "provides_files": [
           "/usr/bin/flatpak"
         ],
-        "requires": []
+        "requires": [],
+        "satisfies": [
+          {
+            "benchmark": "cis-fedora",
+            "rules": [
+              "1.1.1.1",
+              "4.1.3.1"
+            ]
+          }
+        ]
       },
       "flavours": [],
       "default_flavour": null,

@@ -36,7 +36,8 @@
           "rechunking"
         ],
         "provides_files": [],
-        "requires": []
+        "requires": [],
+        "satisfies": []
       },
       "flavours": [],
       "default_flavour": null,
@@ -210,7 +211,8 @@
           "rechunking"
         ],
         "provides_files": [],
-        "requires": []
+        "requires": [],
+        "satisfies": []
       },
       "flavours": [],
       "default_flavour": null,

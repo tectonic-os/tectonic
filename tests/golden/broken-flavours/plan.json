@@ -36,7 +36,8 @@
           "rechunking"
         ],
         "provides_files": [],
-        "requires": []
+        "requires": [],
+        "satisfies": []
       },
       "flavours": [
         {
