@@ -455,12 +455,7 @@ mod tests {
         let src = Source::new("image.kdl", text);
         let mut issues = Issues::default();
         check(&doc.nodes()[0], &PIN, &src, &mut issues);
-        issues
-            .plain()
-            .lines()
-            .filter_map(|line| line.strip_prefix("  x "))
-            .map(str::to_string)
-            .collect()
+        issues.findings()
     }
 
     /// Every shape the golden corpus has no broken fixture for.

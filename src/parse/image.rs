@@ -531,12 +531,7 @@ mod tests {
         let src = Source::new("image.kdl", text);
         let mut issues = Issues::default();
         check(&doc.nodes()[0], &IMAGE, &src, &mut issues);
-        issues
-            .plain()
-            .lines()
-            .filter_map(|line| line.strip_prefix("  x "))
-            .map(str::to_string)
-            .collect()
+        issues.findings()
     }
 
     /// The three places a `conforms` can land: over the one that is there,

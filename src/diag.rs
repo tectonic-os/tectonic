@@ -136,6 +136,17 @@ impl Issues {
         out
     }
 
+    /// The message line of every issue, without the spans, the source or the
+    /// help, which is what a test asserts on.
+    #[cfg(test)]
+    pub fn findings(&self) -> Vec<String> {
+        self.plain()
+            .lines()
+            .filter_map(|line| line.strip_prefix("  x "))
+            .map(str::to_string)
+            .collect()
+    }
+
     /// Prints every issue and returns whether any were found.
     ///
     /// `context` is every file that was read, in read order. The closing line
