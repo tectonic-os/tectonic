@@ -87,6 +87,7 @@ ARG CONFORMS=";
 /// answer and the generated file is one per image.
 const SCAP_ARGS: &str = "\
 # ---- claimed and refused rules ----
+ARG SCAP_CONTENT=
 ARG SCAP_CLAIMED=
 ARG SCAP_REFUSED=";
 
@@ -257,7 +258,8 @@ fn finalize_layer(image: &Image, identity_env: &str, root: &Path) -> String {
          --mount=type=tmpfs,target=/tmp \\\n    \
          FLAVOUR=${FLAVOUR} IMAGE_VERSION=\"${IMAGE_VERSION}\" \\\n    \
          CONFORMS=\"${CONFORMS}\" FAMILY=\"${FAMILY}\" \\\n    \
-         SCAP_CLAIMED=\"${SCAP_CLAIMED}\" SCAP_REFUSED=\"${SCAP_REFUSED}\" \\\n    ",
+         SCAP_CONTENT=\"${SCAP_CONTENT}\" SCAP_CLAIMED=\"${SCAP_CLAIMED}\" \\\n    \
+         SCAP_REFUSED=\"${SCAP_REFUSED}\" \\\n    ",
     );
     out.push_str(identity_env);
     out.push_str("bash /ctx/finalize.sh");

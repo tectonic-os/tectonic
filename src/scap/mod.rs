@@ -320,6 +320,13 @@ fn open(root: &Path, named: Option<&str>) -> Option<(List, Vec<crate::resolve::R
     }
 }
 
+/// The content one target is measured against, as `tect build` hands it to the
+/// finalize layer. Empty where the target declares no `conforms`, which is the
+/// same gate the layer's own `CONFORMS` carries.
+pub fn content_for(root: &Path, list: &List, named: Option<&str>) -> String {
+    datastream(root, list, named).unwrap_or_default()
+}
+
 fn datastream(root: &Path, list: &List, named: Option<&str>) -> Result<String, String> {
     let name = target(list, named)?;
     let (image, flavour, _) = of_target(list, &name).ok_or(unknown(&name))?;

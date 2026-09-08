@@ -19,6 +19,7 @@ ARG FAMILY
 ARG CONFORMS=
 
 # ---- claimed and refused rules ----
+ARG SCAP_CONTENT=
 ARG SCAP_CLAIMED=
 ARG SCAP_REFUSED=
 
@@ -40,6 +41,7 @@ RUN --mount=type=bind,from=ctx,source=/generated/broken-pin/finalize.sh,target=/
     --mount=type=tmpfs,target=/tmp \
     FLAVOUR=${FLAVOUR} IMAGE_VERSION="${IMAGE_VERSION}" \
     CONFORMS="${CONFORMS}" FAMILY="${FAMILY}" \
-    SCAP_CLAIMED="${SCAP_CLAIMED}" SCAP_REFUSED="${SCAP_REFUSED}" \
+    SCAP_CONTENT="${SCAP_CONTENT}" SCAP_CLAIMED="${SCAP_CLAIMED}" \
+    SCAP_REFUSED="${SCAP_REFUSED}" \
     IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" bash /ctx/finalize.sh
 

@@ -172,6 +172,13 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
                 .unwrap_or_default()
         ),
         format!("CONFORMS={conforms}"),
+        format!(
+            "SCAP_CONTENT={}",
+            match conforms.is_empty() {
+                true => String::new(),
+                false => crate::scap::content_for(root, &list, Some(&target)),
+            }
+        ),
         // Two vocabularies on purpose. A claim is written as a benchmark
         // number and the hook resolves it against the content it installs; a
         // refusal is written as a rule ID, because 710 of the 994 rules carry
