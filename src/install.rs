@@ -451,10 +451,9 @@ impl Answers {
     }
 }
 
-/// The form's rows, by position. `Answers::of` reads them back by the same
-/// names, so a row added in one place and not the other does not compile.
+/// The form's rows, by position, for the code that reads one back. Row 1 is the
+/// layout, which is derived from the payload and read back by nothing.
 const ROW_DISK: usize = 0;
-const ROW_LAYOUT: usize = 1;
 const ROW_HOSTNAME: usize = 2;
 const ROW_ACCOUNT: usize = 3;
 const ROW_PASSWORD: usize = 4;
@@ -904,6 +903,10 @@ const TARGET: &str = "/run/tect-target";
 /// finished and unmounted: `bootc` installs the bootloader before it writes the
 /// entries, so nothing during the install can render them. An image with no
 /// renderer is skipped; anything else is an error.
+///
+/// `render_menu` in `assets/scripts/vm.sh` is this algorithm over a raw disk
+/// file: it runs as a user and has to `losetup -P` first, which is why the two
+/// are separate.
 fn render_menu(image: &str, disk: &str) -> Result<(), String> {
     let at = PathBuf::from(TARGET);
     let boot = at.join("boot");
@@ -966,6 +969,10 @@ fn run_renderer(image: &str, root: &str) -> Result<bool, String> {
             "--net=none",
             "--security-opt",
             "label=disable",
+            // A built image inheriting an entrypoint would take the shell line
+            // as arguments to it. vm.sh and the scan workflow clear it too.
+            "--entrypoint",
+            "",
             "-v",
             &format!("{TARGET}:/target"),
             image,

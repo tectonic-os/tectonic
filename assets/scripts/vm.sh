@@ -183,6 +183,9 @@ build_disk() {
 # needs none, which is exit 3 and not a failure. Two layouts and one mount
 # point: the entries sit at the top of a /boot partition and a level down when
 # /boot is a directory on the root filesystem.
+#
+# `render_menu` in src/install.rs is this algorithm over a real block device: it
+# is already root and needs no loop device, which is why the two are separate.
 render_menu() {
     local raw="$1" lo target device root=""
     target="$(mktemp -d)"
