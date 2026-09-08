@@ -1,0 +1,7 @@
+description "Claims one of the profile's rules"
+
+supports "fedora"
+
+satisfies {
+    cis-fedora "1.1.1.1"
+}

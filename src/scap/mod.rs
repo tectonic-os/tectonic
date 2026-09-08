@@ -1128,4 +1128,35 @@ mod tests {
             .unwrap()
             .is_empty());
     }
+
+    /// `parse_satisfies` drops a claim whose benchmark name is empty and
+    /// `parse::module::summary` keeps it, so the index offers a module the
+    /// image already lists. Offering it back is what the `listed` filter stops.
+    #[test]
+    fn a_module_the_image_lists_is_not_offered_as_one_that_would_help() {
+        let root = fixture("tests/scap/listed-claimant");
+        let loaded = crate::load(&root);
+        assert_eq!(
+            loaded
+                .index
+                .at("one/broken")
+                .expect("the index reads the manifest leniently")
+                .declares
+                .satisfies,
+            ["4.1.3.1"],
+            "the index has the claim the resolved module dropped"
+        );
+        assert_eq!(
+            conformance(
+                &loaded.list,
+                &loaded.index,
+                Some(&fixture("tests/scap/datastream.xml"))
+            )
+            .expect("the fixture datastream reads"),
+            [
+                "`listed` conforms to `standard`, and nothing it lists claims 3 of the 4 rules it \
+              selects; nothing in the repository claims them"
+            ]
+        );
+    }
 }

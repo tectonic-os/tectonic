@@ -200,3 +200,31 @@ fn code(names: &[String]) -> String {
         .collect::<Vec<String>>()
         .join(", ")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    fn fixture(name: &str) -> std::path::PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join(name)
+    }
+
+    /// The index reads a claim the resolved module dropped, so a module the
+    /// image lists reaches the open rule it names. The row offers nothing.
+    #[test]
+    fn a_module_the_image_lists_is_not_offered_as_one_that_would_claim() {
+        let root = fixture("tests/scap/listed-claimant");
+        let loaded = crate::load(&root);
+        let content = crate::scap::content_of(&fixture("tests/scap/datastream.xml"))
+            .expect("the fixture datastream reads");
+        let image = loaded.list.images.first().expect("one image");
+        let out = of(image, &content, &loaded.index)
+            .expect("the datastream carries `standard`")
+            .markdown();
+        assert!(
+            out.contains("| `4.1.3.1` | Record Attempts to Alter Logon and Logout Events |  |  |"),
+            "{out}"
+        );
+    }
+}
