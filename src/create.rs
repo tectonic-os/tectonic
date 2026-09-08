@@ -517,7 +517,7 @@ impl Image {
                     .or_else(|| crate::init::id(repo).is_ok().then_some(repo)),
             )?,
         };
-        let took = prev.map_or(true, |prev| prev.took);
+        let took = prev.is_none_or(|prev| prev.took);
         let id = crate::init::id(&name)?;
         let file = root.join(format!("{id}{}", layout::IMAGE_SUFFIX));
         if file.exists() {

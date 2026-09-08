@@ -61,19 +61,6 @@ pub(crate) const SCRIPTS: &[(&str, &str)] = &[
     ("scripts/vm.sh", include_str!("../../assets/scripts/vm.sh")),
 ];
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn repository_lint_reads_generated_libraries() {
-        let lint = super::SCRIPTS
-            .iter()
-            .find(|(path, _)| *path == "scripts/lint.sh")
-            .unwrap()
-            .1;
-        assert!(lint.contains("find scripts generated/lib modules"));
-    }
-}
-
 pub enum Part {
     Heading(String),
     Text(String),
@@ -88,4 +75,17 @@ pub struct Table {
     pub header: &'static [&'static str],
     /// Each row's cells, and whether what the row says is a defect.
     pub rows: Vec<(Vec<String>, bool)>,
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn repository_lint_reads_generated_libraries() {
+        let lint = super::SCRIPTS
+            .iter()
+            .find(|(path, _)| *path == "scripts/lint.sh")
+            .unwrap()
+            .1;
+        assert!(lint.contains("find scripts generated/lib modules"));
+    }
 }

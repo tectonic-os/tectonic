@@ -181,7 +181,7 @@ mod tests {
     #[test]
     fn the_record_names_the_digest_and_says_whether_anything_was_enforced() {
         let given = |name: &str| {
-            Some(match name {
+            Some(str::to_string(match name {
                 "BASE" => "quay.io/fedora/fedora-bootc:44@sha256:abc",
                 "BASE_DECLARED" => "quay.io/fedora/fedora-bootc:44",
                 "TARGET" => "example-desktop",
@@ -191,8 +191,7 @@ mod tests {
                 "MODULE_HASHES" => "core/hello|aaa apps/browser|bbb",
                 "ASSET_RESOLUTIONS" => "mods/xone|xone|B7|3484f60",
                 _ => return None,
-            })
-            .map(str::to_string)
+            }))
         };
         let out = record(&given).render();
 

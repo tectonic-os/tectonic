@@ -162,10 +162,11 @@ fn this_target(named: Option<&str>, scope: &crate::emit::why::Scope) -> Result<(
         Scope::Built(name) => Err(Error::Invocation(format!(
             "this image was built as `{name}`, so it cannot answer for `{named}`"
         ))),
-        _ => Err(Error::Invocation(format!(
+        _ => Err(Error::Invocation(
             "the build record does not name a target, so this image can answer only for \
              itself"
-        ))),
+                .to_string(),
+        )),
     }
 }
 

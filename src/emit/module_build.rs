@@ -226,7 +226,7 @@ fn script(
     if !profiles.is_empty() {
         let _ = write!(out, "\nsource /ctx/lib/apparmor-helpers.sh\n");
         for file in profiles {
-            let _ = write!(out, "install_apparmor_profile {dir}/apparmor/{file}\n");
+            let _ = writeln!(out, "install_apparmor_profile {dir}/apparmor/{file}");
         }
     }
 

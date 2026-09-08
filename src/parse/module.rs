@@ -688,7 +688,7 @@ impl Module {
         );
 
         // The public half is a contract path, derived.
-        return Self::rest(module, path, root, &dir, &gated, src, issues);
+        Self::rest(module, path, root, &dir, &gated, src, issues)
     }
 
     /// One node of a manifest, from the top level or from inside a `family`

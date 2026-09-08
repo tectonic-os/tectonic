@@ -90,7 +90,7 @@ fn satisfied_by(index: &Index, image: &Image, name: &str) -> String {
                 named.join(" or "),
                 first.qualified()
             ),
-            None => nowhere(index, name, &image.src.name()),
+            None => nowhere(index, name, image.src.name()),
         },
     }
 }
