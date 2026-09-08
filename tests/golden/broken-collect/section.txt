@@ -48,6 +48,10 @@ ARG FAMILY
 # ---- declared conformance ----
 ARG CONFORMS=
 
+# ---- claimed and refused rules ----
+ARG SCAP_CLAIMED=
+ARG SCAP_REFUSED=
+
 # ---- image identity ----
 ARG IMAGE_ID="broken-collect"
 ARG IMAGE_NAME="Broken Collect"
@@ -66,5 +70,6 @@ RUN --mount=type=bind,from=ctx,source=/generated/broken-collect/finalize.sh,targ
     --mount=type=tmpfs,target=/tmp \
     FLAVOUR=${FLAVOUR} IMAGE_VERSION="${IMAGE_VERSION}" \
     CONFORMS="${CONFORMS}" FAMILY="${FAMILY}" \
+    SCAP_CLAIMED="${SCAP_CLAIMED}" SCAP_REFUSED="${SCAP_REFUSED}" \
     IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" bash /ctx/finalize.sh
 

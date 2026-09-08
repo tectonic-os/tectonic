@@ -32,6 +32,18 @@ pub enum Stopped {
 
 /// Fetches, verifies, then replaces this process with the backend. Returns only
 /// when the repository is wrong, having reported why.
+/// In order and without repeats: two modules claiming one benchmark number, or
+/// refusing one rule, name it once in the argument the build carries.
+fn unique(values: impl IntoIterator<Item = String>) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for value in values {
+        if !out.contains(&value) {
+            out.push(value);
+        }
+    }
+    out
+}
+
 pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
     let backend = match opts.backend.clone().or_else(|| env("BUILD_BACKEND")) {
         None => "buildah".to_string(),
@@ -124,6 +136,7 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
         .collect();
 
     let namespace = crate::registry::namespace(root);
+
     // Resolved here rather than emitted as an image identity ARG: a flavour may
     // declare its own, and the generated file is one per image.
     let conforms = image
@@ -159,6 +172,28 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
                 .unwrap_or_default()
         ),
         format!("CONFORMS={conforms}"),
+        // Two vocabularies on purpose. A claim is written as a benchmark
+        // number and the hook resolves it against the content it installs; a
+        // refusal is written as a rule ID, because 710 of the 994 rules carry
+        // no number that reaches them and a rule worth refusing is often one.
+        format!(
+            "SCAP_CLAIMED={}",
+            unique(
+                modules
+                    .iter()
+                    .flat_map(|m| m.satisfies.iter().flat_map(|c| c.rules.iter().cloned()))
+            )
+            .join(" ")
+        ),
+        format!(
+            "SCAP_REFUSED={}",
+            unique(
+                modules
+                    .iter()
+                    .flat_map(|m| m.refuses.iter().map(|r| r.rule.clone()))
+            )
+            .join(" ")
+        ),
         format!("TARGET={target}"),
         format!(
             "MODULE_HASHES={}",
@@ -398,5 +433,32 @@ fn today() -> Result<String, String> {
     match out.status.success() && stamp.len() == 8 {
         true => Ok(stamp),
         false => Err(format!("date -u +%Y%m%d said `{stamp}`")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::unique;
+
+    /// The order is the resolved build order, because a reader comparing a
+    /// build argument against the module list should find them in step.
+    #[test]
+    fn claims_and_refusals_are_named_once_each_in_order() {
+        let of = |v: &[&str]| unique(v.iter().map(|s| s.to_string()));
+
+        assert_eq!(
+            of(&["CCI-000199", "Req-10.2.5"]),
+            ["CCI-000199", "Req-10.2.5"]
+        );
+        // Two modules claiming one number, which is ordinary: a number reaches
+        // one rule and more than one module may address it.
+        assert_eq!(
+            of(&["CCI-000199", "Req-10.2.5", "CCI-000199"]),
+            ["CCI-000199", "Req-10.2.5"]
+        );
+        assert!(of(&[]).is_empty());
+        // Joined into the argument, an empty list has to leave the arg empty
+        // rather than carrying a stray separator.
+        assert_eq!(of(&[]).join(" "), "");
     }
 }
