@@ -2,7 +2,7 @@
 
 use crate::diag::{Issue, Issues};
 use crate::model::image::{Entry, Image};
-use crate::model::module::{Decl, Module};
+use crate::model::module::{Decl, Module, Position};
 use crate::provider::Index;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -364,7 +364,9 @@ pub fn check_fragments(image: &Image, issues: &mut Issues) {
         };
         let path = &entry.path;
 
-        if !gated && (body.contains("${FLAVOUR}") || body.contains("$FLAVOUR")) {
+        // A tail fragment is below the flavour gate wherever the gate lands.
+        let above_gate = !gated && module.fragment_position != Position::Tail;
+        if above_gate && (body.contains("${FLAVOUR}") || body.contains("$FLAVOUR")) {
             issues.push(
                 Issue::new(
                     format!("`{path}` expands FLAVOUR above the flavour gate"),

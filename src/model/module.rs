@@ -120,6 +120,18 @@ pub struct VerifyException {
     pub span: Span,
 }
 
+/// Where a module's `Containerfile.inc` is inlined.
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
+pub enum Position {
+    #[default]
+    Before,
+    After,
+    /// Below the finalize layer, with the lineage stage closed first. A module
+    /// whose work runs over the finished rootfs needs a stage to bind it from,
+    /// and the lineage stage is only nameable once it has ended.
+    Tail,
+}
+
 pub struct Module {
     /// The list path, which is the module's identity everywhere.
     pub path: String,
@@ -182,9 +194,8 @@ pub struct Module {
     /// A Containerfile.inc, inlined verbatim, for a module whose needs the
     /// field sets cannot express.
     pub fragment: Option<String>,
-    /// Where the fragment goes relative to the generated block, and whether
-    /// that block is emitted at all.
-    pub fragment_after: bool,
+    /// Where the fragment goes relative to the generated block.
+    pub fragment_position: Position,
     pub standard_layer: bool,
     /// What the module directory hashes to, every file in it except the import
     /// record. `plan.json` carries it, so `verify` fails on an edit that was

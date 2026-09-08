@@ -4,7 +4,7 @@
 use crate::emit::{finalize, module_build};
 use crate::layout;
 use crate::model::image::{Entry, Image};
-use crate::model::module::Module;
+use crate::model::module::{Module, Position};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
@@ -67,6 +67,10 @@ ARG FAMILY";
 /// read as a build arg.
 const MODULE_DIR: &str = "@MODULE@";
 
+/// The lineage stage: the base with every module layer and the finalize layer
+/// on it. A `tail` fragment binds it from a stage of its own.
+const LINEAGE: &str = "rootfs";
+
 /// The binary, so anything running in the image can call the tool.
 const TECT_MOUNT: &str = "--mount=type=bind,from=tect,source=/tect,target=/ctx/tect \\\n    ";
 
@@ -96,6 +100,7 @@ fn identity(image: &Image) -> Vec<(&'static str, String)> {
 
 pub fn section(image: &Image, root: &Path) -> String {
     let mut out = String::new();
+    let mut tails: Vec<String> = Vec::new();
     let mut flavour_arg_emitted = false;
 
     if image
@@ -113,7 +118,7 @@ pub fn section(image: &Image, root: &Path) -> String {
     // The declared tag is in plan.json; what the build actually resolved it to
     // is what `tect build` passes down, and what the build record keeps.
     if image.base.is_some() {
-        let _ = write!(out, "### Base Image\nFROM ${{BASE}}\n\n");
+        let _ = write!(out, "### Base Image\nFROM ${{BASE}} AS {LINEAGE}\n\n");
     }
 
     let _ = write!(out, "## Module layers\n\n");
@@ -134,8 +139,15 @@ pub fn section(image: &Image, root: &Path) -> String {
             flavour_arg_emitted = true;
         }
 
+        let at = |want| {
+            module
+                .fragment
+                .as_ref()
+                .filter(|_| module.fragment_position == want)
+        };
+
         let mut blocks: Vec<String> = Vec::new();
-        if let Some(body) = module.fragment.as_ref().filter(|_| !module.fragment_after) {
+        if let Some(body) = at(Position::Before) {
             blocks.push(fragment(entry, body));
         }
         if module.standard_layer {
@@ -146,8 +158,11 @@ pub fn section(image: &Image, root: &Path) -> String {
                 &module_build::path(image, entry),
             ));
         }
-        if let Some(body) = module.fragment.as_ref().filter(|_| module.fragment_after) {
+        if let Some(body) = at(Position::After) {
             blocks.push(fragment(entry, body));
+        }
+        if let Some(body) = at(Position::Tail) {
+            tails.push(fragment(entry, body));
         }
 
         if let Some(flavour) = &entry.flavour {
@@ -183,6 +198,12 @@ pub fn section(image: &Image, root: &Path) -> String {
     );
 
     let _ = write!(out, "{}\n\n", finalize_layer(image, &identity_env, root));
+
+    // A tail fragment ends the lineage stage and is answerable for leaving one
+    // open that is the final image; the skeleton's own layers run in it.
+    for tail in &tails {
+        let _ = write!(out, "{tail}\n\n");
+    }
 
     out
 }

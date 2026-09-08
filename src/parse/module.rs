@@ -4,7 +4,7 @@ use crate::diag::{Issue, Issues, Source, Span};
 use crate::layout;
 use crate::model::image::{Entry, Image, List};
 use crate::model::module::{
-    Collect, Contribution, Copr, Coverage, Decl, FileMode, Key, Module, PackageGroup,
+    Collect, Contribution, Copr, Coverage, Decl, FileMode, Key, Module, PackageGroup, Position,
     VerifyException,
 };
 use crate::model::remote::REMOTE_DIR;
@@ -287,11 +287,12 @@ pub const MODULE: Node = Node::new("module",
                 "`fragment position=\"after\"`"))
             .once("")
             .props(&[
-                Prop { name: "position", kind: Kind::One(&["before", "after"]),
-                    desc: "Whether the fragment goes above or below the generated block.",
-                    say: Say::new("`position` must be \"before\" or \"after\"", "not a position",
+                Prop { name: "position", kind: Kind::One(&["before", "after", "tail"]),
+                    desc: "Whether the fragment goes above the generated block, below it, or below the finalize layer.",
+                    say: Say::new("`position` must be \"before\", \"after\" or \"tail\"", "not a position",
                         "before, the default, puts the fragment above the generated block; after \
-                         puts it below"),
+                         puts it below; tail puts it below the finalize layer, where the lineage \
+                         stage has ended and can be named"),
                     missing: Say::NONE },
                 Prop { name: "standard-layer", kind: Kind::Bool,
                     desc: "Whether the generated block is emitted at all.",
@@ -630,7 +631,7 @@ impl Module {
             satisfies: Vec::new(),
             resolved: Vec::new(),
             fragment: std::fs::read_to_string(dir.join("Containerfile.inc")).ok(),
-            fragment_after: false,
+            fragment_position: Position::default(),
             standard_layer: true,
             content: crate::provenance::record::hash(&dir),
             imported: crate::provenance::record::read(&dir, issues),
@@ -1264,8 +1265,12 @@ impl Module {
     /// additive case: the fragment goes above the generated block and the
     /// block is still emitted.
     fn parse_fragment(&mut self, node: &KdlNode, src: &Source, issues: &mut Issues) {
-        let position = prop(node, "position").filter(|p| matches!(*p, "before" | "after"));
-        self.fragment_after = position == Some("after");
+        let position = prop(node, "position").filter(|p| matches!(*p, "before" | "after" | "tail"));
+        self.fragment_position = match position {
+            Some("after") => Position::After,
+            Some("tail") => Position::Tail,
+            _ => Position::Before,
+        };
         self.standard_layer = boolean(node, "standard-layer").unwrap_or(true);
 
         if !self.standard_layer {
@@ -1667,7 +1672,7 @@ family "fedora" { supports "debian"; packages }
                 "unknown `collects` property `mode`",
                 "unknown `contributes` property `mode`",
                 "`fragment` takes no arguments",
-                "`position` must be \"before\" or \"after\"",
+                "`position` must be \"before\", \"after\" or \"tail\"",
                 "`standard-layer` must be #true or #false",
                 "unknown fragment property `placement`",
                 "`fragment` is declared twice",

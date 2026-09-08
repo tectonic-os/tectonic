@@ -1,5 +1,5 @@
 ### Base Image
-FROM ${BASE}
+FROM ${BASE} AS rootfs
 
 ## Module layers
 
@@ -55,4 +55,14 @@ RUN --mount=type=bind,from=ctx,source=/generated/alpha/finalize.sh,target=/ctx/f
     --mount=type=tmpfs,target=/tmp \
     FLAVOUR=${FLAVOUR} IMAGE_VERSION="${IMAGE_VERSION}" \
     IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" bash /ctx/finalize.sh
+
+# verbatim from modules/core/hello/Containerfile.inc:
+# The lineage stage has ended by here, so it can be bound from a stage of its
+# own. Whatever a tail fragment opens last is the final image.
+FROM rootfs AS greeting
+RUN --mount=type=bind,from=rootfs,source=/,target=/rootfs,rw \
+    cp /rootfs/etc/os-release /os-release
+
+FROM rootfs
+COPY --from=greeting /os-release /usr/share/hello-os-release
 

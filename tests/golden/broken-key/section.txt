@@ -3,7 +3,7 @@ FROM ctx AS public-keys
 COPY keys/public/ /public/
 
 ### Base Image
-FROM ${BASE}
+FROM ${BASE} AS rootfs
 
 ## Module layers
 

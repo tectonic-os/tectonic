@@ -1,5 +1,5 @@
 ### Base Image
-FROM ${BASE}
+FROM ${BASE} AS rootfs
 
 ## Module layers
 

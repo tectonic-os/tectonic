@@ -797,7 +797,7 @@ Where the module's Containerfile.inc goes relative to the generated layer.
 
 | Property | Value | Meaning |
 | --- | --- | --- |
-| `position=` | `before`, `after` | Whether the fragment goes above or below the generated block. |
+| `position=` | `before`, `after`, `tail` | Whether the fragment goes above the generated block, below it, or below the finalize layer. |
 | `standard-layer=` | `#true` or `#false` | Whether the generated block is emitted at all. |
 
 ### `packages`

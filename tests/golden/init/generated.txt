@@ -23,7 +23,7 @@ COPY out/tect /tect
 # ---- BEGIN GENERATED (module layers) ----
 
 ### Base Image
-FROM ${BASE}
+FROM ${BASE} AS rootfs
 
 ## Module layers
 
