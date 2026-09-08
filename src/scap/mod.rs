@@ -88,7 +88,7 @@ pub fn conformance(
             None if image.modules().any(|m| !m.satisfies.is_empty())
                 || image.base.iter().any(|base| !base.satisfies.is_empty()) => {}
             None => out.push(format!(
-                "`{}` conforms to `{}` and nothing it lists or builds on declares `satisfies`, \
+                "`{}` conforms to `{}` and nothing it installs or builds on declares `satisfies`, \
                  so nothing here claims a rule of it. Nothing read a datastream, so that is a \
                  count of declarations: `tect check --datastream <file>` says which of the \
                  profile's rules are unclaimed",
@@ -103,7 +103,9 @@ pub fn conformance(
 pub struct Owed<'a> {
     /// How many rules the profile selects, which is what `open` is out of.
     pub selects: usize,
-    /// The selected rules nothing the image lists claims.
+    /// The selected rules nothing the image installs and no base it builds on
+    /// claims. A module the base suppressed is installed by nothing, so its
+    /// claims are not here.
     pub open: BTreeSet<String>,
     /// Modules elsewhere claiming one of them, already minus what the image
     /// lists: an offer is only worth making about what it does not have.
@@ -181,7 +183,8 @@ pub(crate) fn profile_names(content: &Content) -> String {
 }
 
 /// The datastream-backed tier: of the rules the declared profile selects, the
-/// ones nothing the image lists claims, and what elsewhere would claim them.
+/// ones nothing it installs and no base it builds on claims, and what
+/// elsewhere would claim them.
 fn unclaimed(image: &Image, content: &Content, index: &Index) -> Option<String> {
     let Some(profile) = content.profiles.iter().find(|p| p.is(&image.conforms)) else {
         return Some(format!(
@@ -206,7 +209,7 @@ fn unclaimed(image: &Image, content: &Content, index: &Index) -> Option<String> 
         false => "the repository",
     };
     let found = match named.is_empty() {
-        true => format!("nothing in {searched} claims them"),
+        true => format!("nothing else in {searched} claims them"),
         false => format!(
             "{} would claim {} of them",
             named.join(", "),
@@ -218,7 +221,7 @@ fn unclaimed(image: &Image, content: &Content, index: &Index) -> Option<String> 
         clause => format!(". {clause}"),
     };
     Some(format!(
-        "`{}` conforms to `{}`, and nothing it lists or builds on claims {} of the {} rules it \
+        "`{}` conforms to `{}`, and nothing it installs or builds on claims {} of the {} rules it \
          selects; {found}{unsearched}",
         image.id,
         image.conforms,
@@ -1114,7 +1117,7 @@ mod tests {
         assert_eq!(
             said,
             [
-                "`enforced` conforms to `standard`, and nothing it lists or builds on claims 2 \
+                "`enforced` conforms to `standard`, and nothing it installs or builds on claims 2 \
               of the 4 rules it selects; `one/auditing` would claim 1 of them"
             ]
         );
@@ -1130,8 +1133,8 @@ mod tests {
             )
             .expect("the fixture datastream reads"),
             [
-                "`enforced` conforms to `standard`, and nothing it lists or builds on claims 2 \
-              of the 4 rules it selects; nothing in the repository claims them"
+                "`enforced` conforms to `standard`, and nothing it installs or builds on claims 2 \
+              of the 4 rules it selects; nothing else in the repository claims them"
             ]
         );
         // No datastream, and a listed module does declare `satisfies`: there
@@ -1162,8 +1165,8 @@ mod tests {
             )
             .expect("the fixture datastream reads"),
             [
-                "`suppressed` conforms to `standard`, and nothing it lists or builds on claims \
-              4 of the 4 rules it selects; nothing in the repository claims them"
+                "`suppressed` conforms to `standard`, and nothing it installs or builds on claims \
+              4 of the 4 rules it selects; nothing else in the repository claims them"
             ]
         );
     }
@@ -1202,8 +1205,8 @@ mod tests {
             )
             .expect("the fixture datastream reads"),
             [
-                "`claiming` conforms to `standard`, and nothing it lists or builds on claims 2 of \
-              the 4 rules it selects; nothing in the repository claims them"
+                "`claiming` conforms to `standard`, and nothing it installs or builds on claims 2 of \
+              the 4 rules it selects; nothing else in the repository claims them"
             ]
         );
         // The declaration tier reads the same way: the suppressed module is not
@@ -1238,8 +1241,8 @@ mod tests {
             )
             .expect("the fixture datastream reads"),
             [
-                "`sourced` conforms to `standard`, and nothing it lists or builds on claims 4 \
-              of the 4 rules it selects; nothing in the repository or its collections claims them"
+                "`sourced` conforms to `standard`, and nothing it installs or builds on claims 4 \
+              of the 4 rules it selects; nothing else in the repository or its collections claims them"
             ]
         );
     }
@@ -1269,8 +1272,8 @@ mod tests {
             )
             .expect("the fixture datastream reads"),
             [
-                "`listed` conforms to `standard`, and nothing it lists or builds on claims 3 \
-              of the 4 rules it selects; nothing in the repository claims them"
+                "`listed` conforms to `standard`, and nothing it installs or builds on claims 3 \
+              of the 4 rules it selects; nothing else in the repository claims them"
             ]
         );
     }

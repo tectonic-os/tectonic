@@ -505,7 +505,7 @@ Asks you for:
 - Which profile, out of the ones the datastream carries, with what each is
   called beside it
 - Whether to import the collection modules claiming rules that profile selects
-  and nothing the image lists claims
+  and nothing the image installs or builds on claims
 
 #### Notes:
 - `--datastream <file>` names the content to choose out of. Without it this
@@ -574,7 +574,7 @@ modules the base already provides.
 #### Notes:
 - Above the counts it names every base a collection describes differently from
   the tool's own entry, every collection declared `unpinned`, every image
-  declaring a `conforms` nothing it lists or builds on claims a rule of, and
+  declaring a `conforms` nothing it installs or builds on claims a rule of, and
   every `module.kdl` sitting below another member's directory in a collection.
 - A member inside a member is invisible everywhere else: the walk stops at the
   first `module.kdl`, and everything below one is that module's own content. It

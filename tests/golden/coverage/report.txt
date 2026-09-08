@@ -1,7 +1,7 @@
 ==== the read-out, with no scan behind it
 # Enforced coverage of `standard`
 
-`standard` (Standard System Security Profile for Fedora) selects 4 rules, and what `enforced` lists claims 2 of them. One of them carries no number, so no `satisfies` can name it.
+`standard` (Standard System Security Profile for Fedora) selects 4 rules, and what `enforced` installs or builds on claims 2 of them. One of them carries no number, so no `satisfies` can name it.
 
 | Number | Rule | Claimed by | Would claim |
 |---|---|---|---|
