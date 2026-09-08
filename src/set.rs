@@ -648,8 +648,8 @@ impl Claims {
         let file = root.join(&self.file);
         let text =
             std::fs::read_to_string(&file).map_err(|err| format!("{}: {err}", file.display()))?;
-        let spliced = splice(&text, parse::module::satisfies_span(&text), &self.block());
-        std::fs::write(&file, spliced).map_err(|err| format!("{}: {err}", file.display()))?;
+        std::fs::write(&file, self.spliced(&text))
+            .map_err(|err| format!("{}: {err}", file.display()))?;
         Ok(vec![(
             self.file.clone(),
             Change::Updated(match self.claimed {
@@ -658,6 +658,10 @@ impl Claims {
                 many => format!("claiming {many} rules of `{}`", self.profile),
             }),
         )])
+    }
+
+    fn spliced(&self, text: &str) -> String {
+        splice(text, parse::module::satisfies_span(text), &self.block())
     }
 
     /// One benchmark node, since declaring one twice is a diagnostic, and one
@@ -749,6 +753,59 @@ mod tests {
         assert_eq!(group("1.1.1.1"), "1.1.1");
         assert_eq!(group("5.2"), "5");
         assert_eq!(group("RHEL-09-232010"), "other");
+    }
+
+    fn claims(profile: &str, numbers: &[&str]) -> Claims {
+        Claims {
+            file: PathBuf::from("modules/one/module.kdl"),
+            profile: profile.to_string(),
+            numbers: numbers.iter().map(|n| n.to_string()).collect(),
+            claimed: numbers.len(),
+        }
+    }
+
+    /// The block replaces the one that was there, and every number goes on its
+    /// own continued line under the one benchmark node.
+    #[test]
+    fn the_claims_replace_the_block_that_was_there() {
+        assert_eq!(
+            claims("ospp", &["1.1.1.1", "1.1.1.2"]).spliced(
+                "description \"one\"\n\nsatisfies {\n    ospp \"9.9\"\n}\n\npackages \"curl\"\n"
+            ),
+            "description \"one\"\n\nsatisfies {\n    ospp \"1.1.1.1\" \\\n        \"1.1.1.2\"\n}\n\npackages \"curl\"\n"
+        );
+    }
+
+    /// A module that declared none gets the block at the end.
+    #[test]
+    fn a_module_with_no_block_gets_one_at_the_end() {
+        assert_eq!(
+            claims("ospp", &["1.1.1.1"]).spliced("description \"one\"\n"),
+            "description \"one\"\n\nsatisfies {\n    ospp \"1.1.1.1\"\n}\n"
+        );
+    }
+
+    /// Claiming nothing takes the block away, and the blank line above it with
+    /// it.
+    #[test]
+    fn claiming_nothing_takes_the_block_and_its_blank_line() {
+        assert_eq!(
+            claims("ospp", &[])
+                .spliced("description \"one\"\n\nsatisfies {\n    ospp \"9.9\"\n}\n"),
+            "description \"one\"\n"
+        );
+    }
+
+    /// `parse_satisfies` refuses a benchmark with no name and `summary` keeps
+    /// its numbers, so a number carried over from one comes back under the
+    /// profile as a claim the picker never showed.
+    #[test]
+    fn an_unnamed_benchmark_comes_back_named_after_the_profile() {
+        assert_eq!(
+            claims("ospp", &["1.1.1.1"])
+                .spliced("description \"one\"\n\nsatisfies {\n    \"\" \"1.1.1.1\"\n}\n"),
+            "description \"one\"\n\nsatisfies {\n    ospp \"1.1.1.1\"\n}\n"
+        );
     }
 
     fn set(chosen: &[&'static str], at: (u32, u32)) -> Workflows {
