@@ -93,6 +93,7 @@ pub fn conformance(
         out.extend(unremediated(image, index));
         if let Some(content) = &content {
             out.extend(claimed_and_refused(image, content));
+            out.extend(claims_nothing(image, content));
             out.extend(refuses_nothing(image, content));
         }
         match &content {
@@ -195,6 +196,46 @@ fn refuses_nothing(image: &Image, content: &Content) -> Vec<String> {
                  exactly like one that does",
                 refusal.rule
             )
+        })
+        .collect()
+}
+
+/// A claim whose number reaches no rule in the content this image is measured
+/// against. The finalize layer resolves those numbers itself — a claim is
+/// written as a benchmark number and a tailoring wants a rule — so a number
+/// that reaches nothing fails the build inside the remediation hook, where the
+/// diagnostic is a `RUN` that stopped. Named here instead.
+///
+/// This is not always a typo. A whole vocabulary can be missing: measured
+/// 2026-09-09, `ssg-cs10-ds.xml` carries no `CCI-` number and no `BP28(` at
+/// all, so `hardening/login-defaults`, gated to `family "fedora"` and correct
+/// on `fedora-bootc`, names nothing on the EL base that declares the same
+/// family. The gate a claim needs is the content, and `family` is not it.
+fn claims_nothing(image: &Image, content: &Content) -> Vec<String> {
+    let claimants = image
+        .base
+        .iter()
+        .map(|base| ("its base", &base.satisfies))
+        .chain(image.modules().map(|m| (m.path.as_str(), &m.satisfies)));
+    claimants
+        .flat_map(|(who, satisfies)| satisfies.iter().map(move |coverage| (who, coverage)))
+        .filter_map(|(who, coverage)| {
+            let lost: Vec<&str> = coverage
+                .rules
+                .iter()
+                .filter(|number| !content.rules.contains_key(*number))
+                .map(String::as_str)
+                .collect();
+            (!lost.is_empty()).then(|| {
+                format!(
+                    "`{who}` claims {} under `{}`, which the content `{}` is measured against \
+                     carries no rule by. The remediation hook resolves a claim to the rule it \
+                     protects, so this stops the build in the finalize layer",
+                    lost.join(", "),
+                    coverage.benchmark,
+                    image.id
+                )
+            })
         })
         .collect()
 }
@@ -1394,6 +1435,17 @@ mod tests {
                 .any(|m| m.contains("nothing it installs provides `scap-remediation`")),
             "{said:#?}"
         );
+        // A claim the content carries no rule by fails inside the finalize
+        // layer, where the diagnostic is a `RUN` that stopped, so it is named
+        // here. This is the EL case: a number correct on one benchmark and
+        // absent from another.
+        assert!(
+            said.iter().any(|m| m.contains("one/typo")
+                && m.contains("claims CCI-000198 under `stig`")
+                && m.contains("stops the build in the finalize layer")),
+            "{said:#?}"
+        );
+
         // A refusal that reaches no rule protects nothing and looks identical
         // to one that does, so it is named too.
         assert!(
@@ -1426,15 +1478,22 @@ mod tests {
             Some(&fixture("tests/scap/datastream.xml")),
         )
         .expect("the fixture datastream reads");
+        // `9.9.9.9` is the fixture's number that reaches nothing, and it is
+        // named twice over: the count leaves it out, and the claim itself is
+        // one the remediation hook would fail the build resolving.
         assert_eq!(
             said,
             [
+                "`one/hello` claims 9.9.9.9 under `cis-fedora`, which the content `enforced` is \
+              measured against carries no rule by. The remediation hook resolves a claim to the \
+              rule it protects, so this stops the build in the finalize layer",
                 "`enforced` conforms to `standard`, and nothing it installs or builds on claims 2 \
               of the 4 rules it selects; `one/auditing` would claim 1 of them"
             ]
         );
         // The other arm, over an index holding no module at all: what is left
-        // open is the image's own, so only the offer goes away.
+        // open is the image's own, so only the offer goes away. The claim that
+        // reaches nothing is the image's own too, and stays.
         let bare = fixture("tests/scap");
         let nothing = Index::scan(&bare, &[], &Disk::scan(&bare), false);
         assert_eq!(
@@ -1445,6 +1504,9 @@ mod tests {
             )
             .expect("the fixture datastream reads"),
             [
+                "`one/hello` claims 9.9.9.9 under `cis-fedora`, which the content `enforced` is \
+              measured against carries no rule by. The remediation hook resolves a claim to the \
+              rule it protects, so this stops the build in the finalize layer",
                 "`enforced` conforms to `standard`, and nothing it installs or builds on claims 2 \
               of the 4 rules it selects; nothing else in the repository claims them"
             ]

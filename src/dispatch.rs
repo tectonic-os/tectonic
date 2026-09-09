@@ -730,12 +730,12 @@ pub fn dispatch(
             // remediated out from under the module that claims it.
             if !lost.is_empty() {
                 return Err(Error::Invocation(format!(
-                    "{} reaches no rule in {}: {}\n\nhelp: a number resolves against the content \
+                    "{} no rule in {}: {}\n\nhelp: a number resolves against the content \
                      the base is measured with, so a claim written for one family does not \
                      resolve against another's",
                     match lost.len() {
-                        1 => "one number".to_string(),
-                        n => format!("{n} numbers"),
+                        1 => "one number reaches".to_string(),
+                        n => format!("{n} numbers reach"),
                     },
                     path.display(),
                     lost.join(", ")

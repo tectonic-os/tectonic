@@ -1135,8 +1135,6 @@ impl Module {
         });
     }
 
-    /// `allow-verify "man-page-missing" unit="x.service"` One known diagnostic
-    /// accepted on one unit, which is why both halves are required.
     /// A refusal is a judgement, so it is worth nothing without its reason:
     /// the rule alone reads as an oversight the next reader will try to fix.
     fn parse_refuses(&mut self, node: &KdlNode, src: &Source, issues: &mut Issues) {
@@ -1163,6 +1161,8 @@ impl Module {
         });
     }
 
+    /// `allow-verify "man-page-missing" unit="x.service"` One known diagnostic
+    /// accepted on one unit, which is why both halves are required.
     fn parse_allow_verify(&mut self, node: &KdlNode, src: &Source, issues: &mut Issues) {
         let span: Span = node.name().span().into();
         let class = string_arg(node).map(str::to_string);

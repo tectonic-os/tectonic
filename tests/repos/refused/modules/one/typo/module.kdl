@@ -3,3 +3,9 @@ description "Refuses a rule the content carries nothing by"
 supports "fedora"
 
 refuses "not_a_rule_this_content_has" because="a misspelling reads exactly like a rule left alone"
+
+// And a claim in a vocabulary the content does not speak, which is the case
+// the EL base found: a number correct on one benchmark and absent from another.
+satisfies {
+    stig "CCI-000198"
+}

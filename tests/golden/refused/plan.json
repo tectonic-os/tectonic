@@ -101,12 +101,19 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "3dcc563359184ed500d3608bad9291491beb8633fc41ee063e344dd3b009fb49",
+                "content": "b0f40d526381d73088b2519a9043e794ce6c9f4da16fb7742b252e750f16b802",
                 "repo": false,
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [
+                {
+                  "benchmark": "stig",
+                  "rules": [
+                    "CCI-000198"
+                  ]
+                }
+              ]
             }
           ],
           "suppressed": [],
