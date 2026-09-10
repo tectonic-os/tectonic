@@ -17,8 +17,6 @@
         <title>Protection Profile for General Purpose Operating Systems</title>
         <select idref="xccdf_org.ssgproject.content_rule_no_empty_passwords" selected="true"/>
         <select idref="xccdf_org.ssgproject.content_rule_package_aide_installed" selected="false"/>
-        <select idref="xccdf_org.ssgproject.content_rule_partition_for_var" selected="true"/>
-        <select idref="xccdf_org.ssgproject.content_rule_partition_for_home" selected="true"/>
       </Profile>
       <Rule id="xccdf_org.ssgproject.content_rule_package_aide_installed" severity="medium">
         <title>Install AIDE</title>
@@ -39,13 +37,6 @@
       <Rule id="xccdf_org.ssgproject.content_rule_gpgcheck_enabled">
         <title>Ensure gpgcheck Enabled In Main dnf Configuration</title>
         <description>A rule the profile selects and no number reaches.</description>
-      </Rule>
-      <!-- The two a layout answers: one the recipe asks for, one it cannot. -->
-      <Rule id="xccdf_org.ssgproject.content_rule_partition_for_var">
-        <title>Ensure /var Located On Separate Partition</title>
-      </Rule>
-      <Rule id="xccdf_org.ssgproject.content_rule_partition_for_home">
-        <title>Ensure /home Located On Separate Partition</title>
       </Rule>
       <!-- A profile may deselect a group, and every rule under it with it. -->
       <Group id="xccdf_org.ssgproject.content_group_auditing">

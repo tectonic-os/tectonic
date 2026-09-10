@@ -97,9 +97,6 @@ pub fn conformance(
             out.extend(claims_nothing(image, content));
             out.extend(refuses_nothing(image, content));
         }
-        if let Some(content) = &content {
-            out.extend(layout_owes(image, content));
-        }
         match &content {
             Some(content) => out.extend(unclaimed(image, content, index)),
             None if image.modules().any(|m| !m.satisfies.is_empty())
@@ -430,44 +427,6 @@ fn allows_nothing(image: &Image) -> Vec<String> {
             )
         })
         .collect()
-}
-
-/// The prefix every rule wanting a mount of its own is named by.
-const PARTITION: &str = "partition_for_";
-
-/// What the declared layout leaves open, by name and with no scan. A separate
-/// `/var` is the only mount fisherman's recipe asks for, so it is the one rule
-/// here an image closes; the rest want partitions the installer does not
-/// create. A notice: the layout claims nothing, and the scan measures these
-/// whether or not anything declares them.
-fn layout_owes(image: &Image, content: &Content) -> Option<String> {
-    let profile = content.profiles.iter().find(|p| p.is(&image.conforms))?;
-    let var = image
-        .layout
-        .as_ref()
-        .and_then(|layout| layout.var_disk.as_ref())
-        .is_some();
-    let open: Vec<String> = content
-        .selected(&profile.id)
-        .iter()
-        .map(|id| rule_name(id).to_string())
-        .filter(|rule| rule.starts_with(PARTITION))
-        .filter(|rule| !(var && rule == "partition_for_var"))
-        .collect();
-    (!open.is_empty()).then(|| {
-        let has = match var {
-            true => "a separate `/var` and nothing else",
-            false => "no separate mount at all",
-        };
-        format!(
-            "`{}` conforms to `{}`, and its layout declares {has}, so these rules it selects are \
-             open at install time: {}. The recipe asks for one separate mount, `/var`; the rest \
-             want partitions the installer does not create",
-            image.id,
-            image.conforms,
-            open.join(", ")
-        )
-    })
 }
 
 /// Every manifest read and every image resolved, or nothing where the
@@ -1651,54 +1610,6 @@ mod tests {
                 .any(|m| m.contains("scap-remediation")),
             "an unavailable capability is not offered"
         );
-    }
-
-    /// The layout half of the same notice: what the installer cannot lay down
-    /// is named at `check`, and a declared `/var` disk takes its own rule off
-    /// the list. Nothing here claims anything — a scan measures these rules
-    /// whether or not a layout is declared.
-    #[test]
-    fn the_notice_names_the_partitions_the_declared_layout_leaves_open() {
-        let root = fixture("tests/repos/enforced");
-        let mut loaded = crate::load(&root);
-        let content = content_of(&fixture("tests/scap/datastream.xml")).expect("the fixture reads");
-        let image = &mut loaded.list.images[0];
-        image.conforms = "ospp".to_string();
-
-        let said = layout_owes(image, &content).expect("ospp selects two of them");
-        assert!(
-            said.contains("no separate mount at all")
-                && said.contains("partition_for_home, partition_for_var"),
-            "{said}"
-        );
-
-        image.layout = Some(crate::model::image::Layout {
-            filesystem: String::new(),
-            subvolumes: false,
-            pool: String::new(),
-            bootloader: String::new(),
-            composefs: None,
-            generic: None,
-            admin_group: String::new(),
-            var_disk: Some(crate::model::image::VarDisk {
-                disk: "/dev/sdb".to_string(),
-                keep_existing: false,
-                span: Span::default(),
-            }),
-            span: Span::default(),
-        });
-        let said = layout_owes(image, &content).expect("`/home` is still open");
-        assert!(
-            said.contains("a separate `/var` and nothing else")
-                && said.contains("partition_for_home")
-                && !said.contains("partition_for_var"),
-            "{said}"
-        );
-
-        // A profile selecting none of them says nothing: the notice is about
-        // what this image is measured against, not about layouts in general.
-        image.conforms = "standard".to_string();
-        assert_eq!(layout_owes(image, &content), None);
     }
 
     #[test]

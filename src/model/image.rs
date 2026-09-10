@@ -136,8 +136,7 @@ pub struct Layout {
     /// answer stands. `useradd` refuses the whole call when a listed group is
     /// missing, so this names one.
     pub admin_group: String,
-    /// The one separate mount fisherman's recipe can ask for. Every other
-    /// `partition_for_*` rule wants partitions the installer does not create.
+    /// The one separate mount fisherman's recipe can ask for.
     pub var_disk: Option<VarDisk>,
     pub span: Span,
 }

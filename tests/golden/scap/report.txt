@@ -15,7 +15,7 @@ The scan measured 4 rules: 2 pass, 1 fail.
 | Profile | Selected | Pass | Fail | Other |
 | --- | --- | --- | --- | --- |
 | `standard` (declared) | 4 | 1 | 1 | 2 |
-| `ospp` | 6 | 1 | 1 | 4 |
+| `ospp` | 4 | 1 | 1 | 2 |
 
 Every row is scored at the values the scan ran with, which are the named profile's under `tect scap tailoring` and every default under `(all)`.
 
@@ -45,7 +45,7 @@ The scan measured 4 rules: 1 pass, 2 fail.
 | Profile | Selected | Pass | Fail | Other |
 | --- | --- | --- | --- | --- |
 | `standard` (declared) | 4 | 1 | 1 | 2 |
-| `ospp` | 6 | 0 | 2 | 4 |
+| `ospp` | 4 | 0 | 2 | 2 |
 
 Every row is scored at the values the scan ran with, which are the named profile's under `tect scap tailoring` and every default under `(all)`.
 
@@ -72,8 +72,6 @@ tect: 4 findings, and the repository does not enforce
     <xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_gpgcheck_enabled" selected="true"/>
     <xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_no_empty_passwords" selected="true"/>
     <xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_package_aide_installed" selected="true"/>
-    <xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_partition_for_home" selected="true"/>
-    <xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_partition_for_var" selected="true"/>
     <xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_sshd_disable_root_login" selected="true"/>
   </xccdf-1.2:Profile>
 </xccdf-1.2:Tailoring>
@@ -99,7 +97,7 @@ Not load-bearing: one/hello cis-fedora 1.1.1.1. The base alone already passes it
 | Profile | Selected | Pass | Fail | Other |
 | --- | --- | --- | --- | --- |
 | `standard` (declared) | 4 | 1 | 1 | 2 |
-| `ospp` | 6 | 1 | 1 | 4 |
+| `ospp` | 4 | 1 | 1 | 2 |
 
 Every row is scored at the values the scan ran with, which are the named profile's under `tect scap tailoring` and every default under `(all)`.
 
@@ -114,7 +112,7 @@ tect: 3 findings, and the repository does not enforce
 | Profile | Selected | Pass | Fail | Other |
 | --- | --- | --- | --- | --- |
 | `standard` | 4 | 1 | 1 | 2 |
-| `ospp` | 6 | 1 | 1 | 4 |
+| `ospp` | 4 | 1 | 1 | 2 |
 
 Every row is scored at the values the scan ran with, which are the named profile's under `tect scap tailoring` and every default under `(all)`.
 
@@ -141,7 +139,7 @@ The scan measured 4 rules: 2 pass, 1 fail.
 | Profile | Selected | Pass | Fail | Other |
 | --- | --- | --- | --- | --- |
 | `standard` (declared) | 4 | 1 | 1 | 2 |
-| `ospp` | 6 | 1 | 1 | 4 |
+| `ospp` | 4 | 1 | 1 | 2 |
 
 Every row is scored at the values the scan ran with, which are the named profile's under `tect scap tailoring` and every default under `(all)`.
 
