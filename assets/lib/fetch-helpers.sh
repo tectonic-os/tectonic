@@ -48,6 +48,6 @@ fetch_install_rpm() {
     local url="$1" sha256="$2" rpm
     rpm="/tmp/fetch.$$.${url##*/}"
     fetch_verified "$url" "$sha256" "$rpm"
-    dnf5 install -y "$rpm"
+    dnf install -y "$rpm"
     rm -f "$rpm"
 }

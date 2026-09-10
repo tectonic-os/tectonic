@@ -854,25 +854,29 @@ jobs:
           # Every rule in the datastream at the declared profile's values, so
           # one run answers what the modules claimed and what the image scores.
           # oscap exits non-zero whenever any rule fails, which is expected.
-          cp "$DATASTREAM" "${RUNNER_TEMP}/ds.xml"
           ./scripts/tect.sh scap tailoring --target "$TARGET" \
             --datastream "$DATASTREAM" > "${RUNNER_TEMP}/tailoring.xml"
+          # Files go in and out with `podman cp`: a bind mount of runner-owned
+          # files fails the unowned-file rules.
+          sudo podman run -d --name scan --entrypoint "" "$IMAGE_REF" sleep infinity
           # The scanner is installed inside the image being measured, over the
           # network, on every scan, so a transient mirror error is the same red
           # X as a false claim. It retries, and gives up if it still will not
           # install: a scan without one would measure nothing.
-          sudo podman run --rm --entrypoint "" \
-            -v "${RUNNER_TEMP}:/scan:z" "$IMAGE_REF" \
-            sh -c "n=0
-              until $INSTALLER > /dev/null; do
-                n=\$((n+1))
-                [ \"\$n\" -ge 3 ] && exit 1
-                $CLEANER > /dev/null 2>&1 || true
-                sleep 15
-              done
-              oscap xccdf eval --tailoring-file /scan/tailoring.xml \
-                --profile xccdf_tect_profile_measured \
-                --results-arf /scan/arf.xml /scan/ds.xml" || true
+          sudo podman exec scan sh -c "n=0
+            until $INSTALLER > /dev/null; do
+              n=\$((n+1))
+              [ \"\$n\" -ge 3 ] && exit 1
+              $CLEANER > /dev/null 2>&1 || true
+              sleep 15
+            done"
+          sudo podman cp "$DATASTREAM" scan:/tmp/ds.xml
+          sudo podman cp "${RUNNER_TEMP}/tailoring.xml" scan:/tmp/tailoring.xml
+          sudo podman exec scan oscap xccdf eval \
+            --tailoring-file /tmp/tailoring.xml --profile xccdf_tect_profile_measured \
+            --results-arf /tmp/arf.xml /tmp/ds.xml || true
+          sudo podman cp scan:/tmp/arf.xml "${RUNNER_TEMP}/arf.xml" || true
+          sudo podman rm -f scan
           [ -s "${RUNNER_TEMP}/arf.xml" ] || { echo "::error::the scan wrote no report"; exit 1; }
           sudo chown "$(id -u):$(id -g)" "${RUNNER_TEMP}/arf.xml"
 

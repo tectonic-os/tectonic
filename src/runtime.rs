@@ -141,7 +141,7 @@ pub fn fetch(args: &[&str]) -> Result<(), String> {
         ("rpm", []) => {
             let rpm = scratch(url);
             verified(url, Some(sha256), &rpm)?;
-            let status = run("dnf5", &["install", "-y", &rpm.to_string_lossy()])?;
+            let status = run("dnf", &["install", "-y", &rpm.to_string_lossy()])?;
             let _ = fs::remove_file(&rpm);
             status
         }
