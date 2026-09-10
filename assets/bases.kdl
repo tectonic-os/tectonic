@@ -1,3 +1,7 @@
+// Every row carries `signed`, measured 2026-09-11 unless it says otherwise:
+// `#true` is a published cosign signature, keyless or keyed, and
+// `base-sig-probe` can only correct a line that is there.
+//
 // No row here carries a digest: pinning in this file would make every digest
 // roll a tool release, and a stale pin stops resolving once a registry retires
 // the digest. The catalog offers the tag, the digest belongs in the image file
@@ -21,6 +25,7 @@ base "quay.io/fedora/fedora-bootc:44" {
     provides-file "/usr/sbin/sshd" "/usr/bin/bootc" "/usr/bin/bootupctl" \
         "/usr/bin/podman" "/usr/bin/crun"
     scap-content "ssg-fedora-ds.xml"
+    signed #false
 }
 
 // CentOS Stream 10, the EL base. `family "rhel"` is EL's archive: it installs
@@ -38,6 +43,7 @@ base "quay.io/centos-bootc/centos-bootc:stream10" {
     provides-file "/usr/sbin/sshd" "/usr/bin/bootc" "/usr/bin/bootupctl" \
         "/usr/bin/podman" "/usr/bin/crun"
     scap-content "ssg-cs10-ds.xml"
+    signed #true
 }
 
 // RHEL 10, the supported EL base, and the only row here behind a login:
@@ -56,6 +62,10 @@ base "registry.redhat.io/rhel10/rhel-bootc:latest" {
     provides-file "/usr/sbin/sshd" "/usr/bin/bootc" "/usr/bin/bootupctl" \
         "/usr/bin/podman" "/usr/bin/crun"
     scap-content "ssg-rhel10-ds.xml"
+    // Unmeasured: `registry.redhat.io` answers no signature read without a
+    // login. `#false` is the under-claim, and a line `base-sig-probe` can
+    // correct where a missing one is not.
+    signed #false
 }
 
 // AlmaLinux 10, the RHEL rebuild, with the content RHEL keeps behind
@@ -73,10 +83,6 @@ base "quay.io/almalinuxorg/almalinux-bootc:10" {
     provides-file "/usr/sbin/sshd" "/usr/bin/bootc" "/usr/bin/bootupctl" \
         "/usr/bin/podman" "/usr/bin/crun"
     scap-content "ssg-almalinux10-ds.xml"
-    // Measured 2026-09-11: a signature is published and it names no signer, so
-    // verifying it needs the key from AlmaLinux. cs10 publishes one too and
-    // this catalog still records `#false` for it — a row carrying no `signed`
-    // line is what `base-sig-probe`'s `sed` cannot correct.
     signed #true
 }
 
