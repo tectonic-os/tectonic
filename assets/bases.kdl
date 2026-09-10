@@ -73,6 +73,11 @@ base "quay.io/almalinuxorg/almalinux-bootc:10" {
     provides-file "/usr/sbin/sshd" "/usr/bin/bootc" "/usr/bin/bootupctl" \
         "/usr/bin/podman" "/usr/bin/crun"
     scap-content "ssg-almalinux10-ds.xml"
+    // Measured 2026-09-11: a signature is published and it names no signer, so
+    // verifying it needs the key from AlmaLinux. cs10 publishes one too and
+    // this catalog still records `#false` for it — a row carrying no `signed`
+    // line is what `base-sig-probe`'s `sed` cannot correct.
+    signed #true
 }
 
 // Universal Blue Images
