@@ -2557,6 +2557,23 @@ fn scap() {
         out.push_str(&format!("==== {heading}\n{report}{said}==== exit {code}\n"));
     }
 
+    // What CI scans with: the declared profile, and every group and rule it
+    // leaves out selected besides.
+    let (tailoring, said, code) = scap_run(
+        &root,
+        &[
+            "--root",
+            ".",
+            "scap",
+            "tailoring",
+            "--datastream",
+            &datastream.display().to_string(),
+        ],
+    );
+    out.push_str(&format!(
+        "==== the tailoring\n{tailoring}{said}==== exit {code}\n"
+    ));
+
     // The bare base's own pass set beside the image's. A claim the base already
     // passes is a notice and never a finding, and one the base passed that the
     // image now fails names the base.

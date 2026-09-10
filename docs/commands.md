@@ -849,6 +849,21 @@ is what the scan job gates on, and `tect set conforms` is what opens it.
 #### Flags:
     --target <t>          the target, else the ungated one
 
+### `scap tailoring`
+
+Prints the XCCDF tailoring a scan of the target runs, as profile
+`xccdf_tect_profile_measured`: the declared profile, with every group and rule
+selected. Nothing at all when the image declares no `conforms`.
+
+#### Flags:
+    --target <t>          the target, else the ungated one
+    --datastream <f>      the SSG content, else the one `scap content` names
+
+#### Notes:
+- `--profile '(all)'` scores every variable at its default, so a rule
+  remediated to the profile's value reads as failing. The tailoring keeps the
+  profile's values and still evaluates every claim outside it.
+
 ### `registry namespace`
 
 Prints where images publish: `$IMAGE_REGISTRY`, else `ghcr.io/<owner>` read off

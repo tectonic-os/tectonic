@@ -499,6 +499,72 @@ pub fn content_for(root: &Path, list: &List, named: Option<&str>) -> Result<Stri
     datastream(root, list, named)
 }
 
+/// The profile a scan names to run the tailoring below.
+const MEASURED: &str = "xccdf_tect_profile_measured";
+
+/// Prints the tailoring one target is scanned with, and nothing where it
+/// declares no `conforms`. `(all)` scores every variable at its default, so a
+/// rule remediated to the declared profile's value reads there as failing.
+pub fn tailoring_for(
+    root: &Path,
+    named: Option<&str>,
+    given: Option<&Path>,
+) -> Result<Verdict, String> {
+    let Some((list, _)) = open(root, named) else {
+        return Ok(Verdict::Wrong);
+    };
+    let name = target(&list, named)?;
+    let (image, flavour, _) = of_target(&list, &name).ok_or(unknown(&name))?;
+    let conforms = image.conforms_of(flavour.as_deref().unwrap_or(NO_FLAVOUR));
+    if conforms.is_empty() {
+        return Ok(Verdict::Clean);
+    }
+    let path = match given {
+        Some(path) => path.to_path_buf(),
+        None => PathBuf::from(datastream(root, &list, Some(&name))?),
+    };
+    let content = content_of(&path)?;
+    let profile = content
+        .profiles
+        .iter()
+        .find(|p| p.is(conforms))
+        .ok_or_else(|| {
+            format!(
+                "`{name}` conforms to `{conforms}`, which is none of the profiles {} carries: {}",
+                path.display(),
+                profile_names(&content)
+            )
+        })?;
+    print!("{}", tailoring(&content, profile));
+    Ok(Verdict::Clean)
+}
+
+/// The declared profile with every rule selected, so one scan measures the
+/// profile at its own values and every claim outside it besides.
+/// XCCDF requires the version's `time`; a fixed one keeps the output a golden.
+fn tailoring(content: &Content, profile: &Profile) -> String {
+    let mut out = format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+         <xccdf-1.2:Tailoring xmlns:xccdf-1.2=\"http://checklists.nist.gov/xccdf/1.2\" \
+         id=\"xccdf_tect_tailoring_measured\">\n  \
+         <xccdf-1.2:version time=\"1970-01-01T00:00:00\">1</xccdf-1.2:version>\n  \
+         <xccdf-1.2:Profile id=\"{MEASURED}\" extends=\"{}\">\n    \
+         <xccdf-1.2:title>{}, and every other rule</xccdf-1.2:title>\n",
+        profile.id,
+        profile.name()
+    );
+    // A rule under a group the profile deselects stays unselected however it
+    // is selected itself.
+    for id in content.groups.iter().chain(&content.ids) {
+        let _ = writeln!(
+            out,
+            "    <xccdf-1.2:select idref=\"{id}\" selected=\"true\"/>"
+        );
+    }
+    out.push_str("  </xccdf-1.2:Profile>\n</xccdf-1.2:Tailoring>\n");
+    out
+}
+
 fn datastream(root: &Path, list: &List, named: Option<&str>) -> Result<String, String> {
     let name = target(list, named)?;
     let (image, flavour, _) = of_target(list, &name).ok_or(unknown(&name))?;
@@ -929,7 +995,11 @@ fn profiles(
             selected.len() - pass - fail
         );
     }
-    out.push('\n');
+    let _ = writeln!(
+        out,
+        "\nEvery row is scored at the values the scan ran with, which are the named profile's \
+         under `tect scap tailoring` and every default under `(all)`.\n"
+    );
 }
 
 /// What passed last time and does not now. The baseline is read before it is
@@ -1082,6 +1152,8 @@ pub struct Content {
     /// the way a title's does.
     pub descriptions: BTreeMap<String, String>,
     ids: BTreeSet<String>,
+    /// Every group, which a profile may deselect with the rules under it.
+    groups: BTreeSet<String>,
     pub profiles: Vec<Profile>,
 }
 
@@ -1148,6 +1220,14 @@ impl Content {
                     content.ids.insert(rule.clone());
                 }
                 xml::Event::Close { name: "Rule" } => rule.clear(),
+                xml::Event::Open {
+                    name: "Group",
+                    attrs,
+                } => {
+                    content
+                        .groups
+                        .insert(xml::attr(attrs, "id").unwrap_or_default().to_string());
+                }
                 xml::Event::Open {
                     name: name @ ("reference" | "ident" | "version" | "title" | "description"),
                     ..

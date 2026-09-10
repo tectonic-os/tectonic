@@ -842,6 +842,7 @@ jobs:
       - name: Evaluate the rules
         if: steps.content.outputs.datastream != ''
         env:
+          TARGET: ${{ matrix.target }}
           DATASTREAM: ${{ steps.content.outputs.datastream }}
         run: |
           set -euo pipefail
@@ -850,10 +851,12 @@ jobs:
           # keeps an empty /var and its database under /usr, and the content
           # then decides the target is not Fedora and skips every rule.
           #
-          # Every rule in the datastream, so one run answers what the modules
-          # claimed and what the image scores. oscap exits non-zero whenever any
-          # rule fails, which is expected.
+          # Every rule in the datastream at the declared profile's values, so
+          # one run answers what the modules claimed and what the image scores.
+          # oscap exits non-zero whenever any rule fails, which is expected.
           cp "$DATASTREAM" "${RUNNER_TEMP}/ds.xml"
+          ./scripts/tect.sh scap tailoring --target "$TARGET" \
+            --datastream "$DATASTREAM" > "${RUNNER_TEMP}/tailoring.xml"
           # The scanner is installed inside the image being measured, over the
           # network, on every scan, so a transient mirror error is the same red
           # X as a false claim. It retries, and gives up if it still will not
@@ -867,8 +870,9 @@ jobs:
                 $CLEANER > /dev/null 2>&1 || true
                 sleep 15
               done
-              oscap xccdf eval \
-                --profile '(all)' --results-arf /scan/arf.xml /scan/ds.xml" || true
+              oscap xccdf eval --tailoring-file /scan/tailoring.xml \
+                --profile xccdf_tect_profile_measured \
+                --results-arf /scan/arf.xml /scan/ds.xml" || true
           [ -s "${RUNNER_TEMP}/arf.xml" ] || { echo "::error::the scan wrote no report"; exit 1; }
           sudo chown "$(id -u):$(id -g)" "${RUNNER_TEMP}/arf.xml"
 
@@ -879,8 +883,8 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/baseline.json
-          key: scap-${{ matrix.target }}-${{ github.run_id }}
-          restore-keys: scap-${{ matrix.target }}-
+          key: scap-tailored-${{ matrix.target }}-${{ github.run_id }}
+          restore-keys: scap-tailored-${{ matrix.target }}-
 
       - name: Compare what was declared to what was measured
         if: steps.content.outputs.datastream != ''
@@ -900,7 +904,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/baseline.json
-          key: scap-${{ matrix.target }}-${{ github.run_id }}
+          key: scap-tailored-${{ matrix.target }}-${{ github.run_id }}
 
       - name: Install Cosign
         if: steps.content.outputs.datastream != ''

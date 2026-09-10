@@ -17,6 +17,8 @@ The scan measured 4 rules: 2 pass, 1 fail.
 | `standard` (declared) | 4 | 1 | 1 | 2 |
 | `ospp` | 6 | 1 | 1 | 4 |
 
+Every row is scored at the values the scan ran with, which are the named profile's under `tect scap tailoring` and every default under `(all)`.
+
 ## Since the last scan
 
 Nothing to compare against; this run is the baseline.
@@ -45,6 +47,8 @@ The scan measured 4 rules: 1 pass, 2 fail.
 | `standard` (declared) | 4 | 1 | 1 | 2 |
 | `ospp` | 6 | 0 | 2 | 4 |
 
+Every row is scored at the values the scan ran with, which are the named profile's under `tect scap tailoring` and every default under `(all)`.
+
 ## Since the last scan
 
 | Rule | Now |
@@ -56,6 +60,23 @@ tect: one/hello claims cis-fedora 9.9.9.9, which names no rule in the datastream
 tect: one/hello claims stig RHEL-09-232010 and the image fails it
 tect: one rule passed the last scan and does not now: xccdf_org.ssgproject.content_rule_no_empty_passwords
 tect: 4 findings, and the repository does not enforce
+==== exit 0
+==== the tailoring
+<?xml version="1.0" encoding="UTF-8"?>
+<xccdf-1.2:Tailoring xmlns:xccdf-1.2="http://checklists.nist.gov/xccdf/1.2" id="xccdf_tect_tailoring_measured">
+  <xccdf-1.2:version time="1970-01-01T00:00:00">1</xccdf-1.2:version>
+  <xccdf-1.2:Profile id="xccdf_tect_profile_measured" extends="xccdf_org.ssgproject.content_profile_standard">
+    <xccdf-1.2:title>standard, and every other rule</xccdf-1.2:title>
+    <xccdf-1.2:select idref="xccdf_org.ssgproject.content_group_auditing" selected="true"/>
+    <xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_audit_rules_login_events" selected="true"/>
+    <xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_gpgcheck_enabled" selected="true"/>
+    <xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_no_empty_passwords" selected="true"/>
+    <xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_package_aide_installed" selected="true"/>
+    <xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_partition_for_home" selected="true"/>
+    <xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_partition_for_var" selected="true"/>
+    <xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_sshd_disable_root_login" selected="true"/>
+  </xccdf-1.2:Profile>
+</xccdf-1.2:Tailoring>
 ==== exit 0
 ==== and against what the bare base passes alone
 The scan measured 4 rules: 2 pass, 1 fail.
@@ -80,6 +101,8 @@ Not load-bearing: one/hello cis-fedora 1.1.1.1. The base alone already passes it
 | `standard` (declared) | 4 | 1 | 1 | 2 |
 | `ospp` | 6 | 1 | 1 | 4 |
 
+Every row is scored at the values the scan ran with, which are the named profile's under `tect scap tailoring` and every default under `(all)`.
+
 tect: one/hello claims cis-fedora 5.2.20 and the image fails it
 tect: one/hello claims cis-fedora 9.9.9.9, which names no rule in the datastream
 tect: one/hello claims stig RHEL-09-232010 and the image fails it
@@ -92,6 +115,8 @@ tect: 3 findings, and the repository does not enforce
 | --- | --- | --- | --- | --- |
 | `standard` | 4 | 1 | 1 | 2 |
 | `ospp` | 6 | 1 | 1 | 4 |
+
+Every row is scored at the values the scan ran with, which are the named profile's under `tect scap tailoring` and every default under `(all)`.
 
 tect: one/hello claims cis-fedora 5.2.20 and the image fails it
 tect: one/hello claims cis-fedora 9.9.9.9, which names no rule in the datastream
@@ -117,6 +142,8 @@ The scan measured 4 rules: 2 pass, 1 fail.
 | --- | --- | --- | --- | --- |
 | `standard` (declared) | 4 | 1 | 1 | 2 |
 | `ospp` | 6 | 1 | 1 | 4 |
+
+Every row is scored at the values the scan ran with, which are the named profile's under `tect scap tailoring` and every default under `(all)`.
 
 ==== the content it is measured with
 /usr/share/xml/scap/ssg/content/ssg-fedora-ds.xml

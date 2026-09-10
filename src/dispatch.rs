@@ -705,6 +705,16 @@ pub fn dispatch(
                 crate::scap::Verdict::Wrong => ExitCode::from(REPO_ERROR),
             },
         ),
+        Verb::ScapTailoring => Ok(
+            match crate::scap::tailoring_for(
+                &repo_root(here)?,
+                target.as_deref(),
+                datastream.as_deref(),
+            )? {
+                crate::scap::Verdict::Clean => ExitCode::SUCCESS,
+                crate::scap::Verdict::Wrong => ExitCode::from(REPO_ERROR),
+            },
+        ),
         // The finalize layer's resolver. A claim is a number and a tailoring
         // wants a rule, and the one place that mapping is written is
         // `Content::read`; a hook re-deriving it in shell would be a second
