@@ -45,7 +45,13 @@ if grep -rn 'crate::ui' src/resolve src/emit; then
     exit 1
 fi
 
-shellcheck -s bash "${scripts[@]}"
+# `install.sh` is what a stranger pipes into `sh`, so it is checked as the
+# shell it declares. Every other script here is bash.
+mapfile -t posix < <(grep -lx '#!/bin/sh' "${scripts[@]}")
+mapfile -t in_bash < <(printf '%s\n' "${scripts[@]}" \
+    | grep -vxF -f <(printf '%s\n' "${posix[@]}"))
+shellcheck -s bash "${in_bash[@]}"
+[ "${#posix[@]}" -eq 0 ] || shellcheck -s sh "${posix[@]}"
 "${shfmt[@]}" -d "${scripts[@]}" || unformatted
 cargo fmt --check || unformatted
 echo "lint: ${#scripts[@]} scripts and the source are clean"
