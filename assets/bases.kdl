@@ -58,6 +58,23 @@ base "registry.redhat.io/rhel10/rhel-bootc:latest" {
     scap-content "ssg-rhel10-ds.xml"
 }
 
+// AlmaLinux 10, the RHEL rebuild, with the content RHEL keeps behind
+// entitlement: `ssg-almalinux10-ds.xml` comes out of AlmaLinux's own
+// ComplianceAsCode fork and its repos carry SSG 0.1.81 unentitled. Measured
+// 2026-09-11 against the image: 10.2, bootc 1.16.4, rpm-ostree 2026.1 with
+// `compose build-chunked-oci`, and every path below present.
+//
+// Two things it does that the other two EL rows do not: `crb` is enabled out
+// of the box, and its kernel ships btrfs with `btrfs-progs` in the repos.
+base "quay.io/almalinuxorg/almalinux-bootc:10" {
+    about "AlmaLinux 10, the RHEL rebuild, whose benchmark needs no entitlement"
+    family "rhel"
+    provides "rechunking" "initramfs-generation" "selinux-policy"
+    provides-file "/usr/sbin/sshd" "/usr/bin/bootc" "/usr/bin/bootupctl" \
+        "/usr/bin/podman" "/usr/bin/crun"
+    scap-content "ssg-almalinux10-ds.xml"
+}
+
 // Universal Blue Images
 base "ghcr.io/ublue-os/bazzite:stable" {
     about "KDE, gaming and hardware support over kinoite-main"

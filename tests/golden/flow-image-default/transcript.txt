@@ -17,13 +17,14 @@ What will the image be called? [Example]
   1) quay.io/fedora/fedora-bootc:44  Fedora 44, nothing above the base system
   2) quay.io/centos-bootc/centos-bootc:stream10  CentOS Stream 10, the EL base a stated claim can be measured against
   3) registry.redhat.io/rhel10/rhel-bootc:latest  RHEL 10, the supported EL base, behind a Red Hat login
-  4) ghcr.io/ublue-os/bazzite:stable  KDE, gaming and hardware support over kinoite-main
-  5) ghcr.io/ublue-os/aurora:stable  KDE developer workstation over kinoite-main
-  6) ghcr.io/ublue-os/bluefin:stable  GNOME developer workstation over silverblue-main
-  7) ghcr.io/ublue-os/kinoite-main:44  Fedora Kinoite with the ublue additions, what bazzite builds on
-  8) docker.io/library/debian:forky  Debian 14, which a module set has to turn into a bootc image
-  9) docker.io/library/ubuntu:26.04  Ubuntu 26.04 LTS, which a module set has to turn into a bootc image
-What is the base image for this image? [1-9, 0 for none]: 1
+  4) quay.io/almalinuxorg/almalinux-bootc:10  AlmaLinux 10, the RHEL rebuild, whose benchmark needs no entitlement
+  5) ghcr.io/ublue-os/bazzite:stable  KDE, gaming and hardware support over kinoite-main
+  6) ghcr.io/ublue-os/aurora:stable  KDE developer workstation over kinoite-main
+  7) ghcr.io/ublue-os/bluefin:stable  GNOME developer workstation over silverblue-main
+  8) ghcr.io/ublue-os/kinoite-main:44  Fedora Kinoite with the ublue additions, what bazzite builds on
+  9) docker.io/library/debian:forky  Debian 14, which a module set has to turn into a bootc image
+  10) docker.io/library/ubuntu:26.04  Ubuntu 26.04 LTS, which a module set has to turn into a bootc image
+What is the base image for this image? [1-10, 0 for none]: 1
 
 tect: `tectonic-os`: curl: No such file or directory (os error 2); what is offered below is only what is already on this machine
 initialised a git repository in example
