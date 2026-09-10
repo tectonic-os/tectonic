@@ -1,0 +1,150 @@
+==== markdown
+# tectonic-os/flatpak
+
+A module imported from the collection this repository publishes
+
+## Where it is built
+
+example
+
+## What it exchanges
+
+| Direction | What | With |
+| --- | --- | --- |
+| provides | `flatpak` | nothing |
+| provides file | `/usr/bin/flatpak` | nothing |
+
+## What it declares to install
+
+| Family | Packages | Enabled repository |
+| --- | --- | --- |
+| `fedora` | `flatpak` | default |
+
+## What it claims
+
+Nothing. It declares no `satisfies`.
+
+## Where it came from
+
+| Content | Hash |
+| --- | --- |
+| declared | `0179980f392ae7c6c8b7bb593c99c97d140a879abf2620a2a4ff21f49fb092fa` |
+
+| Collection | Locator | Selector | Verifier | Tracker |
+| --- | --- | --- | --- | --- |
+| `tectonic-os` | https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3 | renovate |
+
+It is referenced rather than copied, so what a build reads is the collection's own tree at that pin.
+
+## What it pulls in
+
+Nothing. It declares no `asset`.
+
+## Third-party repositories
+
+None. It declares no `copr` and ships no `repo` file.
+
+==== json
+{
+  "module": "tectonic-os/flatpak",
+  "description": "A module imported from the collection this repository publishes",
+  "images": [
+    "example"
+  ],
+  "suppressed": [],
+  "provides": [
+    {
+      "capability": "flatpak",
+      "required_by": []
+    }
+  ],
+  "requires": [],
+  "packages": [
+    {
+      "family": "fedora",
+      "names": [
+        "flatpak"
+      ],
+      "enablerepo": null
+    }
+  ],
+  "groups": [],
+  "coprs": [],
+  "satisfies": [],
+  "content": "0179980f392ae7c6c8b7bb593c99c97d140a879abf2620a2a4ff21f49fb092fa",
+  "built": null,
+  "imported": {
+    "collection": "tectonic-os",
+    "pin": {
+      "name": "collection",
+      "locator": "https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz",
+      "selector": "v1.0.0",
+      "verifier": "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3",
+      "tracker": "renovate"
+    }
+  },
+  "modified": false,
+  "fetches": [],
+  "repo": null
+}
+==== unknown
+  x `nosuch` is not a module this repository lists
+  help: modules: drivers, fedora-family, hello, flatpak
+
+==== from the baked manifest, with no repository
+# tectonic-os/flatpak
+
+A module imported from the collection this repository publishes
+
+## Where it is built
+
+example, example-nvidia
+
+The build record names no target, so this is read across every target the baked manifest holds and may describe an image other than the one running.
+
+## What it exchanges
+
+| Direction | What | With |
+| --- | --- | --- |
+| provides | `flatpak` | nothing |
+
+## What it declares to install
+
+| Family | Packages | Enabled repository |
+| --- | --- | --- |
+| `fedora` | `flatpak` | default |
+
+## What it claims
+
+Nothing. It declares no `satisfies`.
+
+## Where it came from
+
+| Content | Hash |
+| --- | --- |
+| declared | `0179980f392ae7c6c8b7bb593c99c97d140a879abf2620a2a4ff21f49fb092fa` |
+
+It was written in this repository rather than imported, so nothing upstream to compare it against.
+
+## What it pulls in
+
+Nothing. It declares no `asset`.
+
+## Third-party repositories
+
+None. It declares no `copr` and ships no `repo` file.
+
+==== the names it knows
+drivers, fedora-family, hello, flatpak
+==== against a build record that disagrees
+
+
+| Content | Hash |
+| --- | --- |
+| declared | `0179980f392ae7c6c8b7bb593c99c97d140a879abf2620a2a4ff21f49fb092fa` |
+| observed by the build | `not what was declared` |
+
+**The two documents disagree**, which they cannot if both came from this build.
+
+It was written in this repository rather than imported, so nothing upstream to compare it against.
+

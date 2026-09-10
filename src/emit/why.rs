@@ -83,6 +83,9 @@ pub struct Why {
     pub content: Option<String>,
     /// The collection it was imported from, and the pin that collection had.
     pub imported: Option<(String, Fetch)>,
+    /// Whether a copy of it sits in this repository, which is what a content
+    /// hash can be compared against.
+    pub copied: bool,
     pub modified: bool,
     /// What the build observed the directory hashing to, where that was
     /// recorded. `content` is what the repository declared.
@@ -147,12 +150,12 @@ pub fn display(paths: &[String]) -> Vec<String> {
 /// None when nothing declares it, and when what declares it never loaded. The
 /// set searched is the one `known` advertises, suppressed entries included.
 pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
-    let module = list
+    let entry = list
         .images
         .iter()
         .flat_map(|image| image.entries.iter().chain(&image.suppressed))
-        .filter_map(|entry| entry.module.as_ref())
-        .find(|m| m.path == path)?;
+        .find(|entry| entry.module.as_ref().is_some_and(|m| m.path == path))?;
+    let module = entry.module.as_ref()?;
 
     let mut why = Why {
         path: module.path.clone(),
@@ -160,6 +163,7 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
         content: module.content.clone(),
         modified: matches!((&module.imported, &module.content),
             (Some(record), Some(content)) if record.content != *content),
+        copied: module.imported.is_some(),
         repo: module.repo.then(|| repo_urls(root, &module.dir)),
         repo_read: true,
         ..Why::default()
@@ -170,6 +174,11 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
             record.collection.clone(),
             Fetch::of("collection", &record.pin),
         ));
+    } else if let (Some(collection), Some(pin)) = (&entry.source, entry.pin(&list.sources)) {
+        // A referenced module has no record beside it: `copy module` writes
+        // one and `import module` does not. The pin is the repository's, and
+        // saying nothing describes an imported module as locally written.
+        why.imported = Some((collection.clone(), Fetch::of("collection", pin)));
     }
     for asset in &module.assets {
         why.fetches.push(Fetch::of(&asset.name, &asset.pin));
@@ -508,9 +517,10 @@ impl Why {
             )),
             Some((collection, pin)) => {
                 out.extend(evidence(COLLECTION, &[(collection.as_str(), pin)], terminal));
-                out.push(Part::Text(match self.modified {
-                    true => "**It has been edited since it was imported.** Forking a module is legitimate; what the record buys is that the fork is visible.".into(),
-                    false => "Its content still matches what was imported.".into(),
+                out.push(Part::Text(match (self.copied, self.modified) {
+                    (false, _) => "It is referenced rather than copied, so what a build reads is the collection's own tree at that pin.".into(),
+                    (true, true) => "**It has been edited since it was imported.** Forking a module is legitimate; what the record buys is that the fork is visible.".into(),
+                    (true, false) => "Its content still matches what was imported.".into(),
                 }));
             }
         }
@@ -856,7 +866,11 @@ pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why
                 if let (Some(collection), Some(pin)) =
                     (text(imported, "collection"), field(imported, "pin"))
                 {
-                    why.modified = text(imported, "content") != why.content;
+                    // Only a copy records what it hashed to, so the hash is
+                    // also what says which of the two this is.
+                    let recorded = text(imported, "content");
+                    why.copied = recorded.is_some();
+                    why.modified = why.copied && recorded != why.content;
                     why.imported = Some((collection, pin_of(pin, "collection")));
                 }
             }

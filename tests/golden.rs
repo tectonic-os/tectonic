@@ -2355,6 +2355,9 @@ fn golden() {
     unpinned_import(&dir.join("unpinned-source"));
     why("enforced", &dir.join("enforced"), "one/hello");
     why("minimal", &dir.join("minimal"), "core/hello");
+    // Referenced rather than copied, so its pin is the repository's and no
+    // record sits beside it.
+    why("seeding", &dir.join("seeding"), "tectonic-os/flatpak");
     why_unbuilt(&dir.join("suppressed"));
     for name in [
         "minimal",
