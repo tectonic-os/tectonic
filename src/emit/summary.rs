@@ -2,7 +2,7 @@
 
 use crate::emit::json::{field, items, strings, text, Json};
 use crate::emit::plan::of_target;
-use crate::model::image::List;
+use crate::model::image::{List, NO_FLAVOUR};
 use std::fmt::Write as _;
 
 /// One module's line, filled by either reading. `options` holds each value as
@@ -63,7 +63,11 @@ pub fn render(list: &List, target: &str) -> Option<String> {
             }
         })
         .collect();
-    Some(table(flavour.as_deref(), &rows))
+    Some(table(
+        flavour.as_deref(),
+        image.conforms_of(flavour.as_deref().unwrap_or(NO_FLAVOUR)),
+        &rows,
+    ))
 }
 
 /// The same table with no repository at all, off one target of the manifest a
@@ -126,10 +130,14 @@ pub fn on_host(target: &Json) -> String {
                 .collect(),
         })
         .collect();
-    table(text(target, "flavour").as_deref(), &rows)
+    table(
+        text(target, "flavour").as_deref(),
+        text(target, "conforms").as_deref().unwrap_or_default(),
+        &rows,
+    )
 }
 
-fn table(flavour: Option<&str>, rows: &[Row]) -> String {
+fn table(flavour: Option<&str>, conforms: &str, rows: &[Row]) -> String {
     let mut out = match flavour {
         None => format!("{} modules, the ungated set.\n", rows.len()),
         Some(flavour) => format!(
@@ -138,6 +146,11 @@ fn table(flavour: Option<&str>, rows: &[Row]) -> String {
             rows.iter().filter(|row| row.flavour.is_some()).count()
         ),
     };
+    // The benchmark the image declares, which the claims below are read
+    // against. A machine with no repository has this document and no other.
+    if !conforms.is_empty() {
+        let _ = write!(out, "\nIt declares `conforms \"{}\"`.\n", cell(conforms));
+    }
     out.push_str(
         "\n| Module | Description | Options | Satisfies | Refuses |\n| --- | --- | --- | --- | \
          --- |\n",

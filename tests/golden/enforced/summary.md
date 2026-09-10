@@ -1,5 +1,7 @@
 2 modules, the ungated set.
 
+It declares `conforms "standard"`.
+
 | Module | Description | Options | Satisfies | Refuses |
 | --- | --- | --- | --- | --- |
 | `one/hello` | An imported module edited since it was imported |  | `cis-fedora: 1.1.1.1, 5.2.20, 9.9.9.9` `stig: RHEL-09-232010` |  |
