@@ -117,6 +117,24 @@ base "ghcr.io/ublue-os/kinoite-main:44" {
     scap-content "ssg-fedora-ds.xml"
 }
 
+// Rocky, which is not a bootc image and is the only EL row that is not: Rocky
+// publishes none. What its plain container does have is a working rpm database
+// and every part in its own repos — `bootc`, `bootupd`, `ostree`, `composefs`,
+// the kernel and the signed shim — so `rhel-family/bootc-base` installs rather
+// than compiles, where the deb set builds bootc and bootupd from pinned
+// source. Measured 2026-09-11: no cosign signature, and 137 of the container's
+// 138 packages carry a Rocky header signature.
+//
+// `ssg-rl10-ds.xml` is Rocky's own datastream, beside the `ssg-rhel10-ds.xml`
+// its `scap-security-guide` also ships. Neither is measured here yet.
+base "quay.io/rockylinux/rockylinux:10" {
+    about "Rocky Linux 10, which a module set has to turn into a bootc image"
+    family "rhel"
+    requires "bootc-base"
+    signed #false
+    scap-content "ssg-rl10-ds.xml"
+}
+
 // Debian, which is not a bootc image: it carries no kernel, no dracut, no
 // bootc and no AppArmor userspace, so a module set has to make it bootable
 // before anything else in an image on it means anything.

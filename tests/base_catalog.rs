@@ -93,6 +93,7 @@ fn public_catalog_lists_every_shipped_base_in_order() {
             "ghcr.io/ublue-os/aurora:stable",
             "ghcr.io/ublue-os/bluefin:stable",
             "ghcr.io/ublue-os/kinoite-main:44",
+            "quay.io/rockylinux/rockylinux:10",
             "docker.io/library/debian:forky",
             "docker.io/library/ubuntu:26.04",
         ]
@@ -131,17 +132,18 @@ fn missing_runtime_file_falls_back_to_embedded_catalog() {
     let mut issues = Issues::default();
     let (bases, shadows) = tect::base::catalog(Path::new("."), &[], &mut issues);
 
-    // Then: the embedded ten rows are selected.
+    // Then: the embedded eleven rows are selected.
     assert!(issues.is_empty(), "{}", issues.plain());
     assert!(shadows.is_empty());
-    assert_eq!(bases.len(), 10);
-    // The two rows nothing can be built on until a module set says otherwise:
-    // every published deb bootc base carries an empty package database, so an
-    // image on one reports its whole base as clean. Both rows require the same
-    // capability and each names its own family.
+    assert_eq!(bases.len(), 11);
+    // The rows nothing can be built on until a module set says otherwise. The
+    // two deb ones are here because every published deb bootc base carries an
+    // empty package database; Rocky is here because it publishes no bootc image
+    // at all. Each requires the same capability and names its own family.
     for (image, family) in [
         ("docker.io/library/debian:forky", "debian"),
         ("docker.io/library/ubuntu:26.04", "ubuntu"),
+        ("quay.io/rockylinux/rockylinux:10", "rhel"),
     ] {
         // Found by reference: a row added above these shifts every index.
         let base = tect::base::find(&bases, image).expect(image);
@@ -152,9 +154,14 @@ fn missing_runtime_file_falls_back_to_embedded_catalog() {
         // consumer pins is the trust root and this field cannot pretend
         // otherwise.
         assert!(!base.signed, "{image}");
-        // SSG publishes no content either can be measured against, so neither
-        // names one and `conforms` on them refuses.
-        assert!(base.scap_content.is_empty(), "{image}");
+        // No SSG content measures a deb release, so neither deb row names one
+        // and `conforms` on them refuses. Rocky ships its own datastream.
+        match image {
+            "quay.io/rockylinux/rockylinux:10" => {
+                assert_eq!(base.scap_content, "ssg-rl10-ds.xml")
+            }
+            _ => assert!(base.scap_content.is_empty(), "{image}"),
+        }
     }
     // Every rpm row names the benchmark it is measured against, and the EL
     // rows are why the field exists: SSG writes one datastream per release, so
@@ -316,7 +323,7 @@ fn collection_still_overrides_and_shadows_selected_catalog() {
 
     // Then: order is retained, the row is replaced, and the shadow is reported.
     assert!(issues.is_empty(), "{}", issues.plain());
-    assert_eq!(bases.len(), 10);
+    assert_eq!(bases.len(), 11);
     assert_eq!(bases[0].about, "collection replacement");
     assert!(bases[0].signed);
     assert_eq!(shadows.len(), 1);
