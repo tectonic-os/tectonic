@@ -812,7 +812,7 @@ impl Module {
                 }
                 "packages" => module.parse_packages(node, gate, src, issues),
                 "package-groups" => module.parse_package_groups(node, gate, src, issues),
-                "copr" => module.parse_copr(node, src, issues),
+                "copr" => module.parse_copr(node, gate, src, issues),
                 "satisfies" => module.satisfies.extend(coverages(node, src, issues)),
                 _ => {}
             }
@@ -879,10 +879,44 @@ impl Module {
             .iter()
             .map(|copr| (copr.name(), copr.selector()))
             .collect();
+        // COPR is Fedora's: the adapter enables one on a Fedora base alone, so
+        // anywhere else it would be skipped and its installs would fail.
+        let supports = module.supports.clone();
+        for copr in &module.coprs {
+            let reach = match copr.family.is_empty() {
+                true => &supports,
+                false => &copr.family,
+            };
+            if let Some(stray) = reach.iter().find(|family| *family != "fedora") {
+                issues.push(
+                    Issue::new(
+                        format!("`copr` is Fedora's, and this one covers `{stray}`"),
+                        src,
+                    )
+                    .at(copr.span, "no COPR is enabled on this family")
+                    .help("declare it inside `family \"fedora\"`"),
+                );
+            }
+        }
         for batch in module.packages.iter_mut().chain(&mut module.groups) {
             let Some(named) = batch.enablerepo.as_deref().filter(|v| v.contains('/')) else {
                 continue;
             };
+            if batch.family != "fedora" {
+                issues.push(
+                    Issue::new(
+                        format!(
+                            "`enablerepo` names COPR `{named}`, and this batch covers `{}`",
+                            batch.family
+                        ),
+                        src,
+                    )
+                    .at(batch.span, "no COPR is enabled on this family")
+                    .help("declare the batch inside `family \"fedora\"`"),
+                );
+                batch.enablerepo = None;
+                continue;
+            }
             match coprs.iter().find(|(name, _)| name == named) {
                 Some((_, selector)) => batch.enablerepo = Some(selector.clone()),
                 None => issues.push(
@@ -1395,7 +1429,7 @@ impl Module {
     /// `copr "owner/project"` The two path segments, which is all a COPR is;
     /// the repository id, its URL and the selector an install enables are
     /// derived from them and never declared.
-    fn parse_copr(&mut self, node: &KdlNode, src: &Source, issues: &mut Issues) {
+    fn parse_copr(&mut self, node: &KdlNode, gate: &[String], src: &Source, issues: &mut Issues) {
         let Some(value) = string_arg(node) else {
             return;
         };
@@ -1410,6 +1444,7 @@ impl Module {
         self.coprs.push(Copr {
             owner: owner.to_string(),
             project: project.to_string(),
+            family: gate.to_vec(),
             span: node.name().span().into(),
         });
     }
@@ -1895,6 +1930,39 @@ package-groups "kde-desktop"
             ),
             ["`package-groups` is dnf's, and this one covers `debian`"]
         );
+    }
+
+    /// COPR is enabled on a Fedora base alone, so a COPR or an `enablerepo`
+    /// naming one that reaches `rhel` would emit an install nothing enabled.
+    #[test]
+    fn a_copr_reaches_fedora_alone() {
+        assert_eq!(
+            parsed(
+                "copr-rhel",
+                r#"
+description "copr"
+supports "rhel"
+copr "owner/project"
+family "rhel" { packages "thing" enablerepo="owner/project"; }
+"#
+            ),
+            [
+                "`copr` is Fedora's, and this one covers `rhel`",
+                "`enablerepo` names COPR `owner/project`, and this batch covers `rhel`",
+            ]
+        );
+        assert!(parsed(
+            "copr-fedora",
+            r#"
+description "copr"
+supports "fedora" "rhel"
+family "fedora" {
+    copr "owner/project"
+    packages "thing" enablerepo="owner/project"
+}
+"#
+        )
+        .is_empty());
     }
 
     /// Both dnf families take a group and an `enablerepo` ungated.

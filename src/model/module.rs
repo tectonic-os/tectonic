@@ -21,6 +21,9 @@ pub struct PackageGroup {
 pub struct Copr {
     pub owner: String,
     pub project: String,
+    /// The families a `family` gate names, or empty for every family the
+    /// module supports.
+    pub family: Vec<String>,
     pub span: Span,
 }
 
