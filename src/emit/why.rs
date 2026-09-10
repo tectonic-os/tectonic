@@ -8,7 +8,7 @@ use crate::emit::json::{field, items, strings, text, Json};
 use crate::emit::{Part, Table};
 use crate::layout;
 use crate::model::image::{Image, List};
-use crate::model::module::Module;
+use crate::model::module::{Decl, Module};
 use crate::provenance::Evidence;
 use std::fmt::Write as _;
 
@@ -68,6 +68,10 @@ pub struct Why {
     pub provides: Vec<(String, Vec<String>)>,
     /// A capability it requires, and what provides it.
     pub requires: Vec<(String, Option<String>)>,
+    /// The same two keyed on a path: one graph, two key types, and a reader
+    /// asking `why` is owed both edges.
+    pub provides_files: Vec<(String, Vec<String>)>,
+    pub requires_files: Vec<(String, Option<String>)>,
     /// Family, package names, and the repository enabled for that install.
     pub packages: Vec<(String, Vec<String>, Option<String>)>,
     /// The same, for the package groups the family adapter installs.
@@ -221,31 +225,60 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
 
     // Who trades with it, which is the half a manifest cannot answer alone.
     let peers: Vec<&Module> = list.images.iter().flat_map(Image::modules).collect();
-    for decl in &module.provides {
-        let wanted: Vec<String> = peers
-            .iter()
-            .filter(|other| other.path != path)
-            .filter(|other| other.requires.iter().any(|r| r.name == decl.name))
-            .map(|other| other.path.clone())
-            .collect();
-        why.provides.push((decl.name.clone(), wanted));
+    for (declared, files, into) in [
+        (&module.provides, false, &mut why.provides),
+        (&module.provides_files, true, &mut why.provides_files),
+    ] {
+        for decl in declared {
+            let wanted: Vec<String> = peers
+                .iter()
+                .filter(|other| other.path != path)
+                .filter(|other| asked(other, files).any(|r| r.name == decl.name))
+                .map(|other| other.path.clone())
+                .collect();
+            into.push((decl.name.clone(), wanted));
+        }
     }
-    for decl in &module.requires {
-        let from = peers
-            .iter()
-            .find(|other| other.provides.iter().any(|p| p.name == decl.name))
-            .map(|other| other.path.clone())
-            .or_else(|| {
-                list.images
-                    .iter()
-                    .filter_map(|i| i.base.as_ref())
-                    .any(|b| b.provides.iter().any(|p| p.name == decl.name))
-                    .then(|| "base".to_string())
-            });
-        why.requires.push((decl.name.clone(), from));
+    for (declared, files, into) in [
+        (&module.requires, false, &mut why.requires),
+        (&module.requires_files, true, &mut why.requires_files),
+    ] {
+        for decl in declared {
+            let from = peers
+                .iter()
+                .find(|other| offered(other, files).any(|p| p.name == decl.name))
+                .map(|other| other.path.clone())
+                .or_else(|| {
+                    list.images
+                        .iter()
+                        .filter_map(|i| i.base.as_ref())
+                        .any(|base| match files {
+                            true => base.provides_files.iter().any(|p| p.name == decl.name),
+                            false => base.provides.iter().any(|p| p.name == decl.name),
+                        })
+                        .then(|| "base".to_string())
+                });
+            into.push((decl.name.clone(), from));
+        }
     }
 
     Some(why)
+}
+
+/// What a peer asks of this module, keyed on a path or on a capability.
+fn asked(module: &Module, files: bool) -> std::slice::Iter<'_, Decl> {
+    match files {
+        true => module.requires_files.iter(),
+        false => module.requires.iter(),
+    }
+}
+
+/// What a peer offers, the same two ways.
+fn offered(module: &Module, files: bool) -> std::slice::Iter<'_, Decl> {
+    match files {
+        true => module.provides_files.iter(),
+        false => module.provides.iter(),
+    }
 }
 
 /// Every URL a `repo` file names. A pointer, not a parsing contract: the file
@@ -339,34 +372,47 @@ impl Why {
         }
 
         out.push(Part::Heading("What it exchanges".into()));
-        if self.provides.is_empty() && self.requires.is_empty() {
+        let offers = [
+            ("provides", &self.provides),
+            ("provides file", &self.provides_files),
+        ];
+        let wants = [
+            ("requires", &self.requires),
+            ("requires file", &self.requires_files),
+        ];
+        let empty = offers.iter().all(|(_, declared)| declared.is_empty())
+            && wants.iter().all(|(_, declared)| declared.is_empty());
+        if empty {
             out.push(Part::Text(
                 "Nothing: it neither provides nor requires.".into(),
             ));
         } else {
-            let rows = self
-                .provides
-                .iter()
-                .map(|(name, wanted)| {
-                    (
-                        vec!["provides".into(), format!("`{name}`"), listed(wanted)],
-                        false,
-                    )
+            let rows = offers
+                .into_iter()
+                .flat_map(|(direction, declared)| {
+                    declared.iter().map(move |(name, wanted)| {
+                        (
+                            vec![direction.into(), format!("`{name}`"), listed(wanted)],
+                            false,
+                        )
+                    })
                 })
-                .chain(self.requires.iter().map(|(name, from)| {
-                    (
-                        vec![
-                            "requires".into(),
-                            format!("`{name}`"),
-                            from.clone().unwrap_or_else(|| "nothing".into()),
-                        ],
-                        false,
-                    )
+                .chain(wants.into_iter().flat_map(|(direction, declared)| {
+                    declared.iter().map(move |(name, from)| {
+                        (
+                            vec![
+                                direction.into(),
+                                format!("`{name}`"),
+                                from.clone().unwrap_or_else(|| "nothing".into()),
+                            ],
+                            false,
+                        )
+                    })
                 }))
                 .collect();
             out.push(Part::Table(Table {
                 title: String::new(),
-                header: &["Direction", "Capability", "With"],
+                header: &["Direction", "What", "With"],
                 rows,
             }));
         }

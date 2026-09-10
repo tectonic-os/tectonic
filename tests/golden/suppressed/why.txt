@@ -9,9 +9,10 @@ Nowhere. suppressed lists it and builds no layer for it: everything it provides,
 
 ## What it exchanges
 
-| Direction | Capability | With |
+| Direction | What | With |
 | --- | --- | --- |
 | provides | `flatpak` | apps/browser |
+| provides file | `/usr/bin/flatpak` | apps/browser |
 
 ## What it declares to install
 

@@ -9,7 +9,7 @@ enforced
 
 ## What it exchanges
 
-| Direction | Capability | With |
+| Direction | What | With |
 | --- | --- | --- |
 | provides | `hello` | core/consumer |
 
@@ -125,7 +125,7 @@ enforced
 
 ## What it exchanges
 
-| Direction | Capability | With |
+| Direction | What | With |
 | --- | --- | --- |
 | provides | `hello` | core/consumer |
 
