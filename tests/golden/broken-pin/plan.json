@@ -44,6 +44,8 @@
       "keywords": [],
       "logo_url": "",
       "conforms": "",
+      "allows": [],
+      "layout": null,
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
@@ -64,6 +66,7 @@
           "flavour": null,
           "published": "broken-pin",
           "conforms": "",
+          "allows": [],
           "default": true,
           "pr": true,
           "siblings": [],
@@ -96,7 +99,8 @@
                 },
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             }
           ],
           "suppressed": [],

@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "default_image": "sealed",
+  "default_image_name": "Sealed",
+  "pr_image": "sealed",
+  "default_target": "sealed",
+  "default_published": "sealed",
+  "pr_target": "sealed",
+  "pr_published": "sealed",
+  "ungated_target": "sealed",
+  "ungated_published": "sealed",
+  "cache_image": "sealed-cache",
+  "workflows": [],
+  "audit": {
+    "enforce": false
+  },
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "sealed",
+      "name": "Sealed",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "description": "",
+      "keywords": [],
+      "logo_url": "",
+      "conforms": "",
+      "allows": [],
+      "layout": {
+        "filesystem": "xfs",
+        "subvolumes": false,
+        "pool": "",
+        "bootloader": "",
+        "var_disk": {
+          "disk": "sdb",
+          "keep_existing": false
+        }
+      },
+      "base": {
+        "image": "docker.io/library/debian:forky",
+        "family": "debian",
+        "signed": false,
+        "provides": [],
+        "provides_files": [],
+        "requires": [],
+        "satisfies": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "sealed",
+          "image": "sealed",
+          "flavour": null,
+          "published": "sealed",
+          "conforms": "",
+          "allows": [],
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "modules": [],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "overlay_overridden": [],
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    },
+    {
+      "id": "halfway",
+      "name": "Halfway",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "description": "",
+      "keywords": [],
+      "logo_url": "",
+      "conforms": "",
+      "allows": [],
+      "layout": {
+        "filesystem": "btrfs",
+        "subvolumes": false,
+        "pool": "",
+        "bootloader": "",
+        "var_disk": null
+      },
+      "base": {
+        "image": "ghcr.io/someone/arch-bootc:latest",
+        "family": "arch",
+        "signed": false,
+        "provides": [],
+        "provides_files": [],
+        "requires": [],
+        "satisfies": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "halfway",
+          "image": "halfway",
+          "flavour": null,
+          "published": "halfway",
+          "conforms": "",
+          "allows": [],
+          "default": false,
+          "pr": false,
+          "siblings": [],
+          "modules": [],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "overlay_overridden": [],
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

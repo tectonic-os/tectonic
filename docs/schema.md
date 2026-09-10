@@ -345,6 +345,50 @@ Benchmarks and rules the base image already satisfies, as an audit declaration. 
 | --- | --- | --- |
 | `<name>` | one or more strings, one per name | One benchmark, and the rule IDs it covers. |
 
+#### `layout`
+
+What the installer lays down, where the family's answer is not the one the image wants.
+
+*at most one, never empty*
+
+| Node | Takes | Meaning |
+| --- | --- | --- |
+| `composefs` | `#true` or `#false`, at most one | Whether the install seals the deployment, in place of the family's answer. |
+| `generic-image` | `#true` or `#false`, at most one | Whether the install skips the bootupd check, in place of the family's answer. |
+| `admin-group` | a string, at most one | The group an administrator is created in, in place of the family's. |
+| `bootloader` | `grub2`, `systemd`, at most one | The bootloader, in place of the one the base family settles. |
+
+##### `filesystem`
+
+The root filesystem, in place of the one the base family settles.
+
+*`xfs`, `ext4`, `btrfs`, `zfs`, at most one*
+
+| Property | Value | Meaning |
+| --- | --- | --- |
+| `subvolumes=` | `#true` or `#false` | btrfs only: create `@`, `@home` and `@snapshots`. |
+| `pool=` | a string | zfs only: the pool to create. Fisherman's own default is `rpool`. |
+
+##### `var-disk`
+
+A whole disk the installer mounts at `/var`, named by its device.
+
+*a string, at most one*
+
+| Property | Value | Meaning |
+| --- | --- | --- |
+| `keep-existing=` | `#true` or `#false` | Whether the disk is mounted as it is; off formats it. |
+
+#### `allow-remediation`
+
+One rule an installed module refuses that this image lets remediation set anyway.
+
+*a string, one per name*
+
+| Property | Value | Meaning |
+| --- | --- | --- |
+| `because=` | a string | Why this image overrides the module's judgement. |
+
 #### `flavours`
 
 The flavours this image publishes beside its ungated build.

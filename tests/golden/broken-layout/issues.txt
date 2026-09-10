@@ -1,0 +1,36 @@
+  x `sdb` is not a block device
+    ,-[./image.kdl:12:9]
+ 11 |         filesystem "xfs"
+ 12 |         var-disk "sdb"
+    :         ^^^^|^^^
+    :             `-- `var-disk` names a device under /dev
+ 13 |     }
+    `----
+  help: the installer formats what this names before bootc runs, and a path
+        that is not a device is a path it would erase something else to reach
+
+  x `sealed` installs a sealed deployment onto xfs
+    ,-[./image.kdl:10:5]
+  9 |     // var-disk that is not a device is a path the installer would format.
+ 10 |     layout {
+    :     ^^^|^^
+    :        `-- xfs has no fs-verity
+ 11 |         filesystem "xfs"
+    `----
+  help: the `debian` family installs with the composefs backend, which needs
+        fs-verity: declare `ext4` or `btrfs`, or drop `filesystem` and take
+        the family's own
+
+  x `halfway` declares half an install layout
+    ,-[./image.kdl:27:5]
+ 26 | 
+ 27 |     layout {
+    :     ^^^|^^
+    :        `-- no generic-image, admin-group, bootloader
+ 28 |         filesystem "btrfs"
+    `----
+  help: nothing here has measured how `arch` installs, so this image answers
+        for itself: a layout naming all of `filesystem`, `composefs`,
+        `generic-image`, `admin-group` and `bootloader` builds install media,
+        and no layout at all builds none
+

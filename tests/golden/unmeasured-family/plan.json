@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "default_image": "arch",
+  "default_image_name": "Arch",
+  "pr_image": "arch",
+  "default_target": "arch",
+  "default_published": "arch",
+  "pr_target": "arch",
+  "pr_published": "arch",
+  "ungated_target": "arch",
+  "ungated_published": "arch",
+  "cache_image": "arch-cache",
+  "workflows": [],
+  "audit": {
+    "enforce": false
+  },
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "arch",
+      "name": "Arch",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "description": "",
+      "keywords": [],
+      "logo_url": "",
+      "conforms": "",
+      "allows": [],
+      "layout": {
+        "filesystem": "btrfs",
+        "subvolumes": true,
+        "pool": "",
+        "bootloader": "systemd",
+        "var_disk": null
+      },
+      "base": {
+        "image": "ghcr.io/someone/arch-bootc:latest",
+        "family": "arch",
+        "signed": false,
+        "provides": [],
+        "provides_files": [],
+        "requires": [],
+        "satisfies": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "arch",
+          "image": "arch",
+          "flavour": null,
+          "published": "arch",
+          "conforms": "",
+          "allows": [],
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "modules": [],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "provides_files": {},
+          "overlay_files": {},
+          "overlay_overridden": [],
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

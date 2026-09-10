@@ -15,7 +15,7 @@ The scan measured 4 rules: 2 pass, 1 fail.
 | Profile | Selected | Pass | Fail | Other |
 | --- | --- | --- | --- | --- |
 | `standard` (declared) | 4 | 1 | 1 | 2 |
-| `ospp` | 4 | 1 | 1 | 2 |
+| `ospp` | 6 | 1 | 1 | 4 |
 
 ## Since the last scan
 
@@ -43,7 +43,7 @@ The scan measured 4 rules: 1 pass, 2 fail.
 | Profile | Selected | Pass | Fail | Other |
 | --- | --- | --- | --- | --- |
 | `standard` (declared) | 4 | 1 | 1 | 2 |
-| `ospp` | 4 | 0 | 2 | 2 |
+| `ospp` | 6 | 0 | 2 | 4 |
 
 ## Since the last scan
 
@@ -78,7 +78,7 @@ Not load-bearing: one/hello cis-fedora 1.1.1.1. The base alone already passes it
 | Profile | Selected | Pass | Fail | Other |
 | --- | --- | --- | --- | --- |
 | `standard` (declared) | 4 | 1 | 1 | 2 |
-| `ospp` | 4 | 1 | 1 | 2 |
+| `ospp` | 6 | 1 | 1 | 4 |
 
 tect: one/hello claims cis-fedora 5.2.20 and the image fails it
 tect: one/hello claims cis-fedora 9.9.9.9, which names no rule in the datastream
@@ -91,7 +91,7 @@ tect: 3 findings, and the repository does not enforce
 | Profile | Selected | Pass | Fail | Other |
 | --- | --- | --- | --- | --- |
 | `standard` | 4 | 1 | 1 | 2 |
-| `ospp` | 4 | 1 | 1 | 2 |
+| `ospp` | 6 | 1 | 1 | 4 |
 
 tect: one/hello claims cis-fedora 5.2.20 and the image fails it
 tect: one/hello claims cis-fedora 9.9.9.9, which names no rule in the datastream
@@ -116,7 +116,7 @@ The scan measured 4 rules: 2 pass, 1 fail.
 | Profile | Selected | Pass | Fail | Other |
 | --- | --- | --- | --- | --- |
 | `standard` (declared) | 4 | 1 | 1 | 2 |
-| `ospp` | 4 | 1 | 1 | 2 |
+| `ospp` | 6 | 1 | 1 | 4 |
 
 ==== the content it is measured with
 /usr/share/xml/scap/ssg/content/ssg-fedora-ds.xml

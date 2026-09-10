@@ -1,0 +1,19 @@
+image {
+    name "Arch"
+
+    // A family nothing here has measured. The image answers for itself, so it
+    // installs; an image on this base declaring no layout builds no media.
+    base "ghcr.io/someone/arch-bootc:latest" {
+        family "arch"
+    }
+
+    layout {
+        filesystem "btrfs" subvolumes=#true
+        composefs #true
+        generic-image #true
+        admin-group "wheel"
+        bootloader "systemd"
+    }
+
+    modules {}
+}

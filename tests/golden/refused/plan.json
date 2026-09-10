@@ -28,6 +28,17 @@
       "keywords": [],
       "logo_url": "",
       "conforms": "standard",
+      "allows": [
+        {
+          "rule": "sshd_disable_root_login",
+          "because": "this image is reached over ssh as root"
+        },
+        {
+          "rule": "no_module_here_refuses_this",
+          "because": "and so it lifts nothing"
+        }
+      ],
+      "layout": null,
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
@@ -55,6 +66,16 @@
           "flavour": null,
           "published": "refused",
           "conforms": "standard",
+          "allows": [
+            {
+              "rule": "sshd_disable_root_login",
+              "because": "this image is reached over ssh as root"
+            },
+            {
+              "rule": "no_module_here_refuses_this",
+              "because": "and so it lifts nothing"
+            }
+          ],
           "default": true,
           "pr": true,
           "siblings": [],
@@ -85,6 +106,12 @@
                     "1.1.1.1"
                   ]
                 }
+              ],
+              "refuses": [
+                {
+                  "rule": "package_aide_installed",
+                  "because": "the fixture needs one module arguing with itself"
+                }
               ]
             },
             {
@@ -101,7 +128,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "b0f40d526381d73088b2519a9043e794ce6c9f4da16fb7742b252e750f16b802",
+                "content": "ec516cf64c848369888b53dea96dd201e8665ac9f31475dde38ac1c38747ab3d",
                 "repo": false,
                 "pin": null,
                 "imported": null
@@ -112,6 +139,16 @@
                   "rules": [
                     "CCI-000198"
                   ]
+                }
+              ],
+              "refuses": [
+                {
+                  "rule": "not_a_rule_this_content_has",
+                  "because": "a misspelling reads exactly like a rule left alone"
+                },
+                {
+                  "rule": "sshd_disable_root_login",
+                  "because": "the fixture needs one refusal an image lifts"
                 }
               ]
             }

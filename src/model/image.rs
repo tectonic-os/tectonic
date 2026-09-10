@@ -1,7 +1,7 @@
 //! The image files: one `.kdl` at the repository root per image.
 
 use crate::diag::{Issue, Source, Span};
-use crate::model::module::{Coverage, Module};
+use crate::model::module::{Coverage, Module, Refusal};
 use crate::model::options::Value;
 use crate::model::remote::{Collection, REMOTE_DIR};
 use crate::provenance::Evidence;
@@ -75,6 +75,15 @@ pub struct Image {
     /// None only when the `base` node is missing or malformed, which is
     /// already an issue: nothing downstream invents a default for it.
     pub base: Option<Base>,
+    /// What the image says about the disk it is installed onto. None where it
+    /// says nothing, which leaves the family's answers standing.
+    pub layout: Option<Layout>,
+    /// Rules an installed module refuses that this image lets remediation set
+    /// anyway. A module's refusal is a judgement about a deployment, and the
+    /// deployment is the image's: `grub2_nousb_argument` removes a keyboard a
+    /// kiosk has not got. The scan measures the result either way, which is
+    /// what keeps a lift honest.
+    pub allows: Vec<Refusal>,
     pub flavours: Vec<Flavour>,
     pub entries: Vec<Entry>,
     /// Entries the base makes redundant: everything the module provides, the
@@ -102,6 +111,42 @@ pub struct Base {
     pub satisfies: Vec<Coverage>,
     /// Whether the base image publishes a cosign signature.
     pub signed: bool,
+    pub span: Span,
+}
+
+/// What the installer lays down, in place of what the family settles. An
+/// installer still asks a person for the disk, the account and the encryption;
+/// this is the half that is a property of the image.
+pub struct Layout {
+    /// The root filesystem, empty where the family's answer stands.
+    pub filesystem: String,
+    /// btrfs only: `@`, `@home` and `@snapshots`.
+    pub subvolumes: bool,
+    /// zfs only: the pool to create. Empty leaves fisherman's `rpool`.
+    pub pool: String,
+    /// `grub2` or `systemd`, empty where the family's answer stands. A family
+    /// whose answer is itself empty reads as grub2 in the recipe.
+    pub bootloader: String,
+    /// `--composefs-backend`, None where the family's answer stands. False is
+    /// an answer, so this is not a bare bool.
+    pub composefs: Option<bool>,
+    /// `--generic-image`, None where the family's answer stands.
+    pub generic: Option<bool>,
+    /// The group an administrator is created in, empty where the family's
+    /// answer stands. `useradd` refuses the whole call when a listed group is
+    /// missing, so this names one.
+    pub admin_group: String,
+    /// The one separate mount fisherman's recipe can ask for. Every other
+    /// `partition_for_*` rule wants partitions the installer does not create.
+    pub var_disk: Option<VarDisk>,
+    pub span: Span,
+}
+
+/// A whole disk mounted at `/var`.
+pub struct VarDisk {
+    pub disk: String,
+    /// Mount it as it is. Off formats it, which erases a second disk.
+    pub keep_existing: bool,
     pub span: Span,
 }
 

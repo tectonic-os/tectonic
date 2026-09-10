@@ -1,4 +1,4 @@
 0 modules, the ungated set.
 
-| Module | Description | Options | Satisfies |
-| --- | --- | --- | --- |
+| Module | Description | Options | Satisfies | Refuses |
+| --- | --- | --- | --- | --- |

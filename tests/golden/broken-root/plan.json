@@ -28,6 +28,8 @@
       "keywords": [],
       "logo_url": "",
       "conforms": "",
+      "allows": [],
+      "layout": null,
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
@@ -48,6 +50,7 @@
           "flavour": null,
           "published": "same",
           "conforms": "",
+          "allows": [],
           "default": false,
           "pr": false,
           "siblings": [],
@@ -73,7 +76,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             },
             {
               "path": "core/hello",
@@ -102,7 +106,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             }
           ],
           "suppressed": [],
@@ -122,6 +127,7 @@
           "flavour": null,
           "published": "same",
           "conforms": "",
+          "allows": [],
           "default": false,
           "pr": false,
           "siblings": [],
@@ -147,7 +153,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             },
             {
               "path": "core/hello",
@@ -176,7 +183,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             }
           ],
           "suppressed": [],
@@ -203,6 +211,8 @@
       "keywords": [],
       "logo_url": "",
       "conforms": "",
+      "allows": [],
+      "layout": null,
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
@@ -223,6 +233,7 @@
           "flavour": null,
           "published": "same",
           "conforms": "",
+          "allows": [],
           "default": false,
           "pr": false,
           "siblings": [],
@@ -248,7 +259,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             },
             {
               "path": "core/hello",
@@ -277,7 +289,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             }
           ],
           "suppressed": [],
@@ -297,6 +310,7 @@
           "flavour": null,
           "published": "same",
           "conforms": "",
+          "allows": [],
           "default": false,
           "pr": false,
           "siblings": [],
@@ -322,7 +336,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             },
             {
               "path": "core/hello",
@@ -351,7 +366,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             }
           ],
           "suppressed": [],

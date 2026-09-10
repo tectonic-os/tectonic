@@ -28,6 +28,8 @@
       "keywords": [],
       "logo_url": "",
       "conforms": "",
+      "allows": [],
+      "layout": null,
       "base": {
         "image": "ghcr.io/ublue-os/bazzite:stable",
         "family": "fedora",
@@ -59,6 +61,7 @@
           "flavour": null,
           "published": "suppressed",
           "conforms": "",
+          "allows": [],
           "default": true,
           "pr": true,
           "siblings": [],
@@ -84,7 +87,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             }
           ],
           "suppressed": [
@@ -127,7 +131,8 @@
                     "9.9.9.9"
                   ]
                 }
-              ]
+              ],
+              "refuses": []
             }
           ],
           "secrets": [],

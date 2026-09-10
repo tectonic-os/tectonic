@@ -28,6 +28,8 @@
       "keywords": [],
       "logo_url": "",
       "conforms": "",
+      "allows": [],
+      "layout": null,
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
@@ -54,6 +56,7 @@
           "flavour": null,
           "published": "broken-fragment",
           "conforms": "",
+          "allows": [],
           "default": true,
           "pr": true,
           "siblings": [
@@ -82,7 +85,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             }
           ],
           "suppressed": [],
@@ -102,6 +106,7 @@
           "flavour": "dev",
           "published": "broken-fragment-dev",
           "conforms": "",
+          "allows": [],
           "default": false,
           "pr": false,
           "siblings": [
@@ -130,7 +135,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             },
             {
               "path": "core/silent",
@@ -151,7 +157,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             },
             {
               "path": "core/mismatched",
@@ -172,7 +179,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             }
           ],
           "suppressed": [],

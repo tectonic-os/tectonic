@@ -44,6 +44,8 @@
       "keywords": [],
       "logo_url": "",
       "conforms": "standard",
+      "allows": [],
+      "layout": null,
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
@@ -64,6 +66,7 @@
           "flavour": null,
           "published": "enforced",
           "conforms": "standard",
+          "allows": [],
           "default": true,
           "pr": true,
           "siblings": [],
@@ -117,7 +120,8 @@
                     "RHEL-09-232010"
                   ]
                 }
-              ]
+              ],
+              "refuses": []
             },
             {
               "path": "core/consumer",
@@ -140,7 +144,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             }
           ],
           "suppressed": [],

@@ -1,0 +1,33 @@
+image {
+    name "Sealed"
+
+    base "docker.io/library/debian:forky" {
+        family "debian"
+    }
+
+    // xfs has no fs-verity and the debian install seals the deployment, and a
+    // var-disk that is not a device is a path the installer would format.
+    layout {
+        filesystem "xfs"
+        var-disk "sdb"
+    }
+
+    modules {}
+}
+
+image {
+    name "Halfway"
+
+    // Half an answer on a family nothing here has measured, which is the one
+    // state that would reach `bootc install` on a default nobody chose.
+    base "ghcr.io/someone/arch-bootc:latest" {
+        family "arch"
+    }
+
+    layout {
+        filesystem "btrfs"
+        composefs #true
+    }
+
+    modules {}
+}

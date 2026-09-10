@@ -28,6 +28,17 @@
       "keywords": [],
       "logo_url": "",
       "conforms": "",
+      "allows": [],
+      "layout": {
+        "filesystem": "btrfs",
+        "subvolumes": true,
+        "pool": "",
+        "bootloader": "systemd",
+        "var_disk": {
+          "disk": "/dev/sdb",
+          "keep_existing": false
+        }
+      },
       "base": {
         "image": "docker.io/library/debian:forky",
         "family": "debian",
@@ -46,6 +57,7 @@
           "flavour": null,
           "published": "debian",
           "conforms": "",
+          "allows": [],
           "default": true,
           "pr": true,
           "siblings": [],
@@ -71,7 +83,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             },
             {
               "path": "core/menu",
@@ -92,7 +105,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             },
             {
               "path": "core/shared",
@@ -128,7 +142,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             }
           ],
           "suppressed": [],
@@ -167,6 +182,8 @@
       "keywords": [],
       "logo_url": "",
       "conforms": "",
+      "allows": [],
+      "layout": null,
       "base": {
         "image": "docker.io/library/debian:forky",
         "family": "debian",
@@ -187,6 +204,7 @@
           "flavour": null,
           "published": "forky",
           "conforms": "",
+          "allows": [],
           "default": false,
           "pr": false,
           "siblings": [],
@@ -212,7 +230,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             },
             {
               "path": "core/bootc-base",
@@ -236,7 +255,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             },
             {
               "path": "core/confined",
@@ -257,7 +277,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             },
             {
               "path": "core/menu",
@@ -278,7 +299,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             },
             {
               "path": "core/shared",
@@ -314,7 +336,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             }
           ],
           "suppressed": [],
@@ -353,6 +376,8 @@
       "keywords": [],
       "logo_url": "",
       "conforms": "",
+      "allows": [],
+      "layout": null,
       "base": {
         "image": "docker.io/library/ubuntu:26.04",
         "family": "ubuntu",
@@ -371,6 +396,7 @@
           "flavour": null,
           "published": "ubuntu",
           "conforms": "",
+          "allows": [],
           "default": false,
           "pr": false,
           "siblings": [],
@@ -396,7 +422,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             },
             {
               "path": "core/menu",
@@ -417,7 +444,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             },
             {
               "path": "core/shared",
@@ -453,7 +481,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             }
           ],
           "suppressed": [],

@@ -13,6 +13,11 @@ image {
         }
     }
 
+    // A module's refusal is its judgement about a deployment, and this image
+    // overrides one of them and names a rule nothing refuses.
+    allow-remediation "sshd_disable_root_login" because="this image is reached over ssh as root"
+    allow-remediation "no_module_here_refuses_this" because="and so it lifts nothing"
+
     modules {
         module "one/contradicts"
         module "one/typo"

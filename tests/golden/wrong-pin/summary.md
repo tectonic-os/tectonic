@@ -1,5 +1,5 @@
 1 modules, the ungated set.
 
-| Module | Description | Options | Satisfies |
-| --- | --- | --- | --- |
-| `core/hello` |  |  |  |
+| Module | Description | Options | Satisfies | Refuses |
+| --- | --- | --- | --- | --- |
+| `core/hello` |  |  |  |  |

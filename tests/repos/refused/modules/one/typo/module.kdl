@@ -4,6 +4,10 @@ supports "fedora"
 
 refuses "not_a_rule_this_content_has" because="a misspelling reads exactly like a rule left alone"
 
+// And one the image overrides, because a refusal is a judgement about a
+// deployment and the deployment is the image's.
+refuses "sshd_disable_root_login" because="the fixture needs one refusal an image lifts"
+
 // And a claim in a vocabulary the content does not speak, which is the case
 // the EL base found: a number correct on one benchmark and absent from another.
 satisfies {

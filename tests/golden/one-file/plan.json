@@ -28,6 +28,8 @@
       "keywords": [],
       "logo_url": "",
       "conforms": "",
+      "allows": [],
+      "layout": null,
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
@@ -48,6 +50,7 @@
           "flavour": null,
           "published": "alpha",
           "conforms": "",
+          "allows": [],
           "default": true,
           "pr": true,
           "siblings": [],
@@ -73,7 +76,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             },
             {
               "path": "core/hello",
@@ -102,7 +106,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             }
           ],
           "suppressed": [],
@@ -129,6 +134,8 @@
       "keywords": [],
       "logo_url": "",
       "conforms": "",
+      "allows": [],
+      "layout": null,
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
@@ -149,6 +156,7 @@
           "flavour": null,
           "published": "beta",
           "conforms": "",
+          "allows": [],
           "default": false,
           "pr": false,
           "siblings": [],
@@ -174,7 +182,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             },
             {
               "path": "core/hello",
@@ -203,7 +212,8 @@
                 "pin": null,
                 "imported": null
               },
-              "satisfies": []
+              "satisfies": [],
+              "refuses": []
             }
           ],
           "suppressed": [],

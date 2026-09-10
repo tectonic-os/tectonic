@@ -5,6 +5,12 @@ image {
         family "debian"
     }
 
+    layout {
+        filesystem "btrfs" subvolumes=#true
+        bootloader "systemd"
+        var-disk "/dev/sdb"
+    }
+
     modules {
         module "debian-family"
         module "core/menu"
