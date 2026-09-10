@@ -1114,7 +1114,15 @@ impl Module {
             }
         };
 
-        if !regular_overlay_file(&dir.join(layout::OVERLAY), path) {
+        // The emitter applies a mode after every overlay the family takes.
+        let shipped = std::iter::once(dir.join(layout::OVERLAY))
+            .chain(
+                layout::FAMILY_DIRS
+                    .iter()
+                    .map(|(name, _)| dir.join(name).join(layout::OVERLAY)),
+            )
+            .any(|overlay| regular_overlay_file(&overlay, path));
+        if !shipped {
             issues.push(
                 Issue::new(
                     format!(
@@ -1123,7 +1131,10 @@ impl Module {
                     ),
                     src,
                 )
-                .at(args[0].span(), format!("{path} is missing from `files/`"))
+                .at(
+                    args[0].span(),
+                    format!("{path} is missing from every `files/`"),
+                )
                 .help("shipping the overlay file is what makes its mode meaningful"),
             );
             return;
@@ -1795,6 +1806,30 @@ family "fedora" { supports "debian"; packages }
                 "`packages` needs at least one name",
             ]
         );
+    }
+
+    #[test]
+    fn a_mode_may_name_a_file_only_a_family_ships() {
+        let root = std::env::temp_dir().join(format!("tect-mode-family-{}", std::process::id()));
+        let module = layout::module(&root, "one");
+        let files = module.join("deb").join(layout::OVERLAY).join("etc");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&files).unwrap();
+        std::fs::write(files.join("family.conf"), "deb\n").unwrap();
+
+        let mut issues = Issues::default();
+        Module::parse(
+            "one",
+            "one",
+            &root,
+            "description \"family mode\"\nsupports \"debian\"\nmode \"/etc/family.conf\" \"0600\"\n"
+                .to_string(),
+            None,
+            &mut issues,
+        );
+        let found = issues.plain();
+        assert!(!found.contains("does not ship"), "{found}");
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[cfg(unix)]

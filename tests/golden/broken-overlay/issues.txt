@@ -52,7 +52,7 @@
  10 | mode "/etc/duplicate.conf" "0600"
  11 | mode "/etc/missing.conf" "0440"
     :      ^^^^^^^^^|^^^^^^^^^
-    :               `-- /etc/missing.conf is missing from `files/`
+    :               `-- /etc/missing.conf is missing from every `files/`
     `----
   help: shipping the overlay file is what makes its mode meaningful
 
