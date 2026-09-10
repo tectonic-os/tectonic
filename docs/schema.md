@@ -566,7 +566,7 @@ in the directory is convention.
 | `files/` | copied over `/` |
 | `finalize.sh` | sourced by the finalize phase, in resolved order |
 | `Containerfile.inc` | placed verbatim by `fragment`, with `@MODULE@` replaced by the module's directory in the build context |
-| `<family>/` | `repo`, `module.sh`, `files/`, `finalize.sh` and a collected file under `fedora/`, `debian/`, `ubuntu/` or `deb/`, each taken on the families that name is for |
+| `<family>/` | `repo`, `module.sh`, `files/`, `finalize.sh` and a collected file under `fedora/`, `rhel/`, `debian/`, `ubuntu/`, `rpm/` or `deb/`, each taken on the families that name is for |
 | a file another module collects | staged for it |
 
 A fragment is inlined verbatim and so cannot name its own directory. `@MODULE@`

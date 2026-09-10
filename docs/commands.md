@@ -327,12 +327,12 @@ Asks you for:
     --image <name>        list the module in this image or flavour; repeatable
 
 #### Notes:
-- Packages are scaffolded under the repository's own family, as
-  `packages { fedora "..." }`, `debian` or `ubuntu`. The generated build layer
-  runs `dnf5 install -y` on Fedora and `apt-get update` / `install -y` /
-  `clean` on Debian and Ubuntu, per matching group.
-- `enablerepo=` is Fedora-only, and naming it on a Debian or Ubuntu group is a
-  `check` diagnostic.
+- Packages are scaffolded as one flat `packages` line on every family the
+  module supports; a `family` gate is where names that differ go. The generated
+  build layer installs through the family's adapter: `dnf install -y` on Fedora
+  and RHEL, `apt-get update` / `install -y` / `clean` on Debian and Ubuntu.
+- `enablerepo=` is dnf's, and naming it on a Debian or Ubuntu batch is a
+  `check` diagnostic. One naming a COPR is Fedora's alone.
 - Anything `--with` writes is held to the schema like the rest of the manifest.
 - You are asked which of the declared images list the module, with each image's
   flavours under it, and several are an answer: enter or space toggles one on a
@@ -487,8 +487,8 @@ Asks you for:
   that would be a second way to write the same line.
 - Leaving the picker changes nothing. Choosing nothing takes the block away,
   and a repository declaring no block generates no CI.
-- `build-disk` and `smoke-test` need a fedora image, because the image builder
-  relabels its buildroot with SELinux and builds no disk otherwise.
+- `build-disk` and `smoke-test` need a fedora or rhel image, because the image
+  builder relabels its buildroot with SELinux and builds no disk otherwise.
   `kernel-freshness` needs a module taking a `KERNEL` build arg. One whose
   basis is absent is drawn with the reason and refused.
 - Every schedule is an offset from the daily build, so moving one value moves

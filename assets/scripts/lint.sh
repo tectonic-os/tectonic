@@ -3,13 +3,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 mapfile -t scripts < <(
+    # A `repo` file is shell and carries no extension.
     find scripts generated/lib modules -path modules/.remote -prune -o \
-        -name '*.sh' -type f -print
+        \( -name '*.sh' -o -name repo \) -type f -print
     find modules -path modules/.remote -prune -o -path '*/files/*' -type f \
         \( -path '*/libexec/*' -o -path '*/system-generators/*' \) -print
-    # A `repo` file is shell and carries no extension, so it is named here or
-    # it is linted nowhere.
-    find modules -path modules/.remote -prune -o -name repo -type f -print
 )
 shfmt=(shfmt -i 4 -ci -bn -sr)
 

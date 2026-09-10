@@ -2,7 +2,10 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-mapfile -t scripts < <(find . -path ./target -prune -o -name '*.sh' -type f -print)
+# `modules/` here is a fetched collection cache, which is linted where it is
+# authored.
+mapfile -t scripts < <(find . \( -path ./target -o -path ./modules \) -prune -o \
+    -name '*.sh' -type f -print)
 shfmt=(shfmt -i 4 -ci -bn -sr)
 
 if [ "${1:-}" = "--fix" ]; then
@@ -48,8 +51,7 @@ fi
 # `install.sh` is what a stranger pipes into `sh`, so it is checked as the
 # shell it declares. Every other script here is bash.
 mapfile -t posix < <(grep -lx '#!/bin/sh' "${scripts[@]}")
-mapfile -t in_bash < <(printf '%s\n' "${scripts[@]}" \
-    | grep -vxF -f <(printf '%s\n' "${posix[@]}"))
+mapfile -t in_bash < <(grep -Lx '#!/bin/sh' "${scripts[@]}")
 shellcheck -s bash "${in_bash[@]}"
 [ "${#posix[@]}" -eq 0 ] || shellcheck -s sh "${posix[@]}"
 "${shfmt[@]}" -d "${scripts[@]}" || unformatted

@@ -7,7 +7,7 @@
 use crate::emit::json::{field, items, strings, text, Json};
 use crate::emit::{Part, Table};
 use crate::layout;
-use crate::model::image::{Image, List};
+use crate::model::image::{Base, Image, List};
 use crate::model::module::{Decl, Module};
 use crate::provenance::Evidence;
 use std::fmt::Write as _;
@@ -234,37 +234,57 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
 
     // Who trades with it, which is the half a manifest cannot answer alone.
     let peers: Vec<&Module> = list.images.iter().flat_map(Image::modules).collect();
-    for (declared, files, into) in [
-        (&module.provides, false, &mut why.provides),
-        (&module.provides_files, true, &mut why.provides_files),
-    ] {
+    // One graph, two key types: each row names the field it is keyed on.
+    type Edges<T, D> = fn(&T) -> &Vec<D>;
+    let wants: [(_, Edges<Module, Decl>, _); 2] = [
+        (&module.provides, |m| &m.requires, &mut why.provides),
+        (
+            &module.provides_files,
+            |m| &m.requires_files,
+            &mut why.provides_files,
+        ),
+    ];
+    for (declared, asks, into) in wants {
         for decl in declared {
             let wanted: Vec<String> = peers
                 .iter()
                 .filter(|other| other.path != path)
-                .filter(|other| asked(other, files).any(|r| r.name == decl.name))
+                .filter(|other| asks(other).iter().any(|r| r.name == decl.name))
                 .map(|other| other.path.clone())
                 .collect();
             into.push((decl.name.clone(), wanted));
         }
     }
-    for (declared, files, into) in [
-        (&module.requires, false, &mut why.requires),
-        (&module.requires_files, true, &mut why.requires_files),
-    ] {
+    let offers: [(
+        _,
+        Edges<Module, Decl>,
+        Edges<Base, crate::model::image::Decl>,
+        _,
+    ); 2] = [
+        (
+            &module.requires,
+            |m| &m.provides,
+            |b| &b.provides,
+            &mut why.requires,
+        ),
+        (
+            &module.requires_files,
+            |m| &m.provides_files,
+            |b| &b.provides_files,
+            &mut why.requires_files,
+        ),
+    ];
+    for (declared, from_module, from_base, into) in offers {
         for decl in declared {
             let from = peers
                 .iter()
-                .find(|other| offered(other, files).any(|p| p.name == decl.name))
+                .find(|other| from_module(other).iter().any(|p| p.name == decl.name))
                 .map(|other| other.path.clone())
                 .or_else(|| {
                     list.images
                         .iter()
                         .filter_map(|i| i.base.as_ref())
-                        .any(|base| match files {
-                            true => base.provides_files.iter().any(|p| p.name == decl.name),
-                            false => base.provides.iter().any(|p| p.name == decl.name),
-                        })
+                        .any(|base| from_base(base).iter().any(|p| p.name == decl.name))
                         .then(|| "base".to_string())
                 });
             into.push((decl.name.clone(), from));
@@ -272,22 +292,6 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
     }
 
     Some(why)
-}
-
-/// What a peer asks of this module, keyed on a path or on a capability.
-fn asked(module: &Module, files: bool) -> std::slice::Iter<'_, Decl> {
-    match files {
-        true => module.requires_files.iter(),
-        false => module.requires.iter(),
-    }
-}
-
-/// What a peer offers, the same two ways.
-fn offered(module: &Module, files: bool) -> std::slice::Iter<'_, Decl> {
-    match files {
-        true => module.provides_files.iter(),
-        false => module.provides.iter(),
-    }
 }
 
 /// Every URL a `repo` file names. A pointer, not a parsing contract: the file
@@ -389,41 +393,38 @@ impl Why {
             ("requires", &self.requires),
             ("requires file", &self.requires_files),
         ];
-        let empty = offers.iter().all(|(_, declared)| declared.is_empty())
-            && wants.iter().all(|(_, declared)| declared.is_empty());
-        if empty {
-            out.push(Part::Text(
-                "Nothing: it neither provides nor requires.".into(),
-            ));
-        } else {
-            let rows = offers
-                .into_iter()
-                .flat_map(|(direction, declared)| {
-                    declared.iter().map(move |(name, wanted)| {
-                        (
-                            vec![direction.into(), format!("`{name}`"), listed(wanted)],
-                            false,
-                        )
-                    })
+        let rows: Vec<_> = offers
+            .into_iter()
+            .flat_map(|(direction, declared)| {
+                declared.iter().map(move |(name, wanted)| {
+                    (
+                        vec![direction.into(), format!("`{name}`"), listed(wanted)],
+                        false,
+                    )
                 })
-                .chain(wants.into_iter().flat_map(|(direction, declared)| {
-                    declared.iter().map(move |(name, from)| {
-                        (
-                            vec![
-                                direction.into(),
-                                format!("`{name}`"),
-                                from.clone().unwrap_or_else(|| "nothing".into()),
-                            ],
-                            false,
-                        )
-                    })
-                }))
-                .collect();
-            out.push(Part::Table(Table {
+            })
+            .chain(wants.into_iter().flat_map(|(direction, declared)| {
+                declared.iter().map(move |(name, from)| {
+                    (
+                        vec![
+                            direction.into(),
+                            format!("`{name}`"),
+                            from.clone().unwrap_or_else(|| "nothing".into()),
+                        ],
+                        false,
+                    )
+                })
+            }))
+            .collect();
+        match rows.is_empty() {
+            true => out.push(Part::Text(
+                "Nothing: it neither provides nor requires.".into(),
+            )),
+            false => out.push(Part::Table(Table {
                 title: String::new(),
                 header: &["Direction", "What", "With"],
                 rows,
-            }));
+            })),
         }
 
         if !self.packages.is_empty() || !self.groups.is_empty() {
