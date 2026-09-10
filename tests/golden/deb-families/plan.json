@@ -74,6 +74,8 @@
                 "build-environment"
               ],
               "requires": [],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -96,6 +98,8 @@
               "options": {},
               "provides": [],
               "requires": [],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -118,6 +122,8 @@
               "options": {},
               "provides": [],
               "requires": [],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [
                 {
                   "family": "debian",
@@ -221,6 +227,8 @@
                 "build-environment"
               ],
               "requires": [],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -246,6 +254,8 @@
                 "apparmor-policy"
               ],
               "requires": [],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -268,6 +278,8 @@
               "options": {},
               "provides": [],
               "requires": [],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -290,6 +302,8 @@
               "options": {},
               "provides": [],
               "requires": [],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -312,6 +326,8 @@
               "options": {},
               "provides": [],
               "requires": [],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [
                 {
                   "family": "debian",
@@ -413,6 +429,8 @@
                 "build-environment"
               ],
               "requires": [],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -435,6 +453,8 @@
               "options": {},
               "provides": [],
               "requires": [],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -457,6 +477,8 @@
               "options": {},
               "provides": [],
               "requires": [],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [
                 {
                   "family": "ubuntu",

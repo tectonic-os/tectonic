@@ -67,6 +67,10 @@
                 "shell-tools"
               ],
               "requires": [],
+              "provides_files": [
+                "/usr/bin/eza"
+              ],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -167,6 +171,10 @@
                 "shell-tools"
               ],
               "requires": [],
+              "provides_files": [
+                "/usr/bin/eza"
+              ],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -227,6 +235,10 @@
                 "shell-tools"
               ],
               "requires": [],
+              "provides_files": [
+                "/usr/bin/eza"
+              ],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -287,6 +299,10 @@
                 "shell-tools"
               ],
               "requires": [],
+              "provides_files": [
+                "/usr/bin/eza"
+              ],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -311,6 +327,8 @@
               "requires": [
                 "shell-tools"
               ],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],

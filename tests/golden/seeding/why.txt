@@ -107,6 +107,7 @@ The build record names no target, so this is read across every target the baked 
 | Direction | What | With |
 | --- | --- | --- |
 | provides | `flatpak` | nothing |
+| provides file | `/usr/bin/flatpak` | nothing |
 
 ## What it declares to install
 

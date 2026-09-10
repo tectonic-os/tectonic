@@ -68,6 +68,8 @@
               },
               "provides": [],
               "requires": [],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],

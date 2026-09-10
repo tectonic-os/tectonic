@@ -83,6 +83,8 @@
                 "hello"
               ],
               "requires": [],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -135,6 +137,8 @@
               "requires": [
                 "hello"
               ],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],

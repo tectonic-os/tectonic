@@ -78,6 +78,10 @@
               "requires": [
                 "flatpak"
               ],
+              "provides_files": [],
+              "requires_files": [
+                "/usr/bin/flatpak"
+              ],
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -107,6 +111,10 @@
                 "flatpak"
               ],
               "requires": [],
+              "provides_files": [
+                "/usr/bin/flatpak"
+              ],
+              "requires_files": [],
               "packages": [
                 {
                   "family": "fedora",

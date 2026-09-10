@@ -72,6 +72,10 @@
                 "package-manager",
                 "apparmor-policy"
               ],
+              "provides_files": [],
+              "requires_files": [
+                "/usr/bin/nothing"
+              ],
               "packages": [
                 {
                   "family": "fedora",
@@ -105,6 +109,8 @@
                 "shell-tools"
               ],
               "requires": [],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -129,6 +135,8 @@
                 "shell-tools"
               ],
               "requires": [],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],

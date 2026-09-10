@@ -69,6 +69,8 @@
               "requires": [
                 "b"
               ],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -95,6 +97,8 @@
               "requires": [
                 "a"
               ],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],

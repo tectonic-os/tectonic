@@ -67,6 +67,8 @@
                 "build-environment"
               ],
               "requires": [],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -89,6 +91,8 @@
               "options": {},
               "provides": [],
               "requires": [],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [
                 {
                   "family": "fedora",
@@ -173,6 +177,8 @@
                 "build-environment"
               ],
               "requires": [],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -195,6 +201,8 @@
               "options": {},
               "provides": [],
               "requires": [],
+              "provides_files": [],
+              "requires_files": [],
               "packages": [
                 {
                   "family": "fedora",

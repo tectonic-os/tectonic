@@ -812,24 +812,36 @@ pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why
             }
         }
         why.description = text(module, "description").unwrap_or_default();
-        for name in strings(module, "provides") {
-            if !why.provides.iter().any(|(have, _)| *have == name) {
+        for (offers, asks, into) in [
+            ("provides", "requires", &mut why.provides),
+            ("provides_files", "requires_files", &mut why.provides_files),
+        ] {
+            for name in strings(module, offers) {
+                if into.iter().any(|(have, _)| *have == name) {
+                    continue;
+                }
                 let wanted = items(target, "modules")
                     .iter()
                     .filter(|other| text(other, "path").as_deref() != Some(path))
-                    .filter(|other| strings(other, "requires").contains(&name))
+                    .filter(|other| strings(other, asks).contains(&name))
                     .filter_map(|other| text(other, "path"))
                     .collect();
-                why.provides.push((name, wanted));
+                into.push((name, wanted));
             }
         }
-        for name in strings(module, "requires") {
-            if !why.requires.iter().any(|(have, _)| *have == name) {
+        for (asks, offers, into) in [
+            ("requires", "provides", &mut why.requires),
+            ("requires_files", "provides_files", &mut why.requires_files),
+        ] {
+            for name in strings(module, asks) {
+                if into.iter().any(|(have, _)| *have == name) {
+                    continue;
+                }
                 let from = items(target, "modules")
                     .iter()
-                    .find(|other| strings(other, "provides").contains(&name))
+                    .find(|other| strings(other, offers).contains(&name))
                     .and_then(|other| text(other, "path"));
-                why.requires.push((name, from));
+                into.push((name, from));
             }
         }
         for (into, field) in [(&mut why.packages, "packages"), (&mut why.groups, "groups")] {

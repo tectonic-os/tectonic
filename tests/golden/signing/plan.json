@@ -70,6 +70,11 @@
               "requires": [
                 "initramfs-generation"
               ],
+              "provides_files": [
+                "/usr/libexec/kernel-devel-helpers.sh",
+                "/usr/share/secureboot/sb_cert.der"
+              ],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -107,6 +112,10 @@
               "provides": [],
               "requires": [
                 "kernel-devel"
+              ],
+              "provides_files": [],
+              "requires_files": [
+                "/usr/libexec/kernel-devel-helpers.sh"
               ],
               "packages": [],
               "groups": [],

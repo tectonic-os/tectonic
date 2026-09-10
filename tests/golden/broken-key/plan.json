@@ -65,6 +65,10 @@
               "options": {},
               "provides": [],
               "requires": [],
+              "provides_files": [
+                "/usr/share/secureboot/sb_cert.der"
+              ],
+              "requires_files": [],
               "packages": [],
               "groups": [],
               "coprs": [],
