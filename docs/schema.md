@@ -665,8 +665,9 @@ modules/login-access/
     └── module.sh     # Debian alone, sourced after module.sh
 ```
 
-`fedora/`, `debian/`, `ubuntu/` and `deb/` are the four names; anything else in
-a module directory is the author's own and is read by nothing.
+`fedora/`, `rhel/`, `debian/`, `ubuntu/`, `rpm/` and `deb/` are the six names;
+anything else in a module directory is the author's own and is read by
+nothing.
 
 A file another module collects gates too, and is one of the two cases that
 **picks** rather than layers: a collector claims one filename across the image,
@@ -696,11 +697,12 @@ and the family `module.sh` is sourced below the shared one. A `<family>/`
 directory or a `family` gate naming a family the module does not `supports` is
 refused, since no image could reach it.
 
-A directory name is one family where a `family` gate takes a list, so `deb/` is
-the name for the two families that share an installer and would otherwise hold
-two copies of one file set. It is taken on Debian and Ubuntu both, and a
-`debian/` beside it is Debian alone and is taken after it — widest first, the
-same order as the ungated half and a gate:
+A directory name is one family where a `family` gate takes a list, so `deb/`
+and `rpm/` are the names for the two families each shares a package manager and
+an installer with, which would otherwise hold two copies of one file set. `deb/`
+is taken on Debian and Ubuntu both, `rpm/` on Fedora and RHEL, and a `debian/`
+beside it is Debian alone and is taken after it — widest first, the same order
+as the ungated half and a gate:
 
 ```
 modules/login-access/
@@ -863,11 +865,11 @@ The packages this module installs, on every family it supports or, inside a `fam
 
 | Property | Value | Meaning |
 | --- | --- | --- |
-| `enablerepo=` | a string | A repository enabled for this install and disabled otherwise. Fedora only, so the batch has to resolve to Fedora alone. |
+| `enablerepo=` | a string | A repository enabled for this install and disabled otherwise. dnf only, so the batch has to resolve to `fedora` or `rhel` alone. |
 
 ### `package-groups`
 
-The package groups this module installs. Fedora only, so an ungated one is a module supporting Fedora alone.
+The package groups this module installs. dnf only, so an ungated one is a module supporting `fedora` or `rhel` alone.
 
 *one or more strings*
 

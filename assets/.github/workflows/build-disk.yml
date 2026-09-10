@@ -44,17 +44,17 @@ jobs:
             '.images[] | select([.targets[].name] | index($t)) | .base.family' \
             <<< "$plan")"
           echo "family=${family}" >> "$GITHUB_OUTPUT"
-          # Disk images are Fedora's alone: the qcow2 dies in `setfiles`,
+          # Disk images are the rpm families': the qcow2 dies in `setfiles`,
           # relabelling its buildroot against an SELinux policy a deb image does
           # not carry, and a base built from `debian:forky` is refused earlier
           # for omitting VERSION_ID from os-release. The installer iso is not
           # this workflow's: `tect vm build iso` calls no builder at all.
-          [ "$family" = fedora ] || echo "::warning::the builder relabels its buildroot with SELinux, and the ${family} family carries no policy, so it builds no disk here"
+          [ "$family" = fedora ] || [ "$family" = rhel ] || echo "::warning::the builder relabels its buildroot with SELinux, and the ${family} family carries no policy, so it builds no disk here"
 
   build:
     name: Build disk images
     needs: family
-    if: needs.family.outputs.family == 'fedora'
+    if: needs.family.outputs.family == 'fedora' || needs.family.outputs.family == 'rhel'
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false

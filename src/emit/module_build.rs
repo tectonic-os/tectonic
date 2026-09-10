@@ -115,14 +115,14 @@ fn script(
 
     // The repo a module declares is sourced before its packages, so an
     // `enablerepo` names a repository that exists by the time it is enabled.
-    // The guard is `/etc/yum.repos.d` and so is Fedora's alone; a deb family's
+    // The guard is `/etc/yum.repos.d` and so is dnf's alone; a deb family's
     // own `repo` file runs unguarded and has to be idempotent.
     //
     // It picks one family copy: an archive is configured once, and the two
     // families name it at different URLs.
     let on_disk = layout::module(root, entry.dir());
     if let Some(at) = layout::shipped(&on_disk, base_family, "repo") {
-        match repo_id(&on_disk.join(&at)).filter(|_| base_family == "fedora") {
+        match repo_id(&on_disk.join(&at)).filter(|_| crate::parse::module::rpm(base_family)) {
             Some(id) => {
                 let _ = write!(
                     out,

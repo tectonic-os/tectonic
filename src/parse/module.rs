@@ -19,9 +19,15 @@ use kdl::{KdlDocument, KdlNode};
 use std::collections::BTreeSet;
 use std::path::Path;
 
-/// The base families this repository knows how to build on, which is also the
-/// set of directory names a module may gate files behind.
-pub const FAMILIES: [&str; 3] = ["fedora", "debian", "ubuntu"];
+/// The base families this repository knows how to build on. A family is a
+/// package archive: `rhel` and `fedora` share dnf and differ in what it finds.
+pub const FAMILIES: [&str; 4] = ["fedora", "rhel", "debian", "ubuntu"];
+
+/// The families dnf installs on, which share the adapter, the repo guard and
+/// an SELinux policy.
+pub fn rpm(family: &str) -> bool {
+    matches!(family, "fedora" | "rhel")
+}
 
 const TOKEN_HELP: &str = "package names and repo IDs are emitted straight into the RUN line, so they are limited to letters, digits and . _ + : -; anything else belongs in module.sh, where it can be quoted deliberately";
 
@@ -130,8 +136,8 @@ const PACKAGES: Node = Node::new("packages",
          the names differ by family"))
     .props(&[
         Prop { name: "enablerepo", kind: Kind::Str,
-            desc: "A repository enabled for this install and disabled otherwise. Fedora only, so \
-                   the batch has to resolve to Fedora alone.",
+            desc: "A repository enabled for this install and disabled otherwise. dnf only, so the \
+                   batch has to resolve to `fedora` or `rhel` alone.",
             say: Say::NONE,
             missing: Say::NONE },
     ], Say::new("unknown `packages` property `{}`", "not part of the schema",
@@ -139,8 +145,8 @@ const PACKAGES: Node = Node::new("packages",
 
 #[rustfmt::skip]
 const PACKAGE_GROUPS: Node = Node::new("package-groups",
-    "The package groups this module installs. Fedora only, so an ungated one is a module \
-     supporting Fedora alone.")
+    "The package groups this module installs. dnf only, so an ungated one is a module \
+     supporting `fedora` or `rhel` alone.")
     .arg(Arg::Strs, Say::new("`package-groups` needs at least one name", "nothing to install",
         "`package-groups \"kde-desktop\"`"))
     .props(&[
@@ -412,13 +418,13 @@ fn batch(
 
 /// A batch declared outside a gate installs on every family the module
 /// supports. It waits for the whole manifest because `supports` may be written
-/// below the `packages` leaning on it, and because a Fedora-only diagnostic is
+/// below the `packages` leaning on it, and because a dnf-only diagnostic is
 /// about the families a batch resolved to.
 fn spread(
     batches: &mut Vec<PackageGroup>,
     supports: &[String],
     block: &str,
-    fedora_only: bool,
+    dnf_only: bool,
     src: &Source,
     issues: &mut Issues,
 ) {
@@ -431,13 +437,13 @@ fn spread(
             true => supports.to_vec(),
         };
         let first = said.replace(batch.span) != Some(batch.span);
-        if let Some(stray) = families.iter().find(|family| *family != "fedora") {
-            if fedora_only {
+        if let Some(stray) = families.iter().find(|family| !rpm(family)) {
+            if dnf_only {
                 if first {
                     issues.push(
-                        Issue::new(format!("`{block}` is Fedora-only, and this one covers `{stray}`"), src)
+                        Issue::new(format!("`{block}` is dnf's, and this one covers `{stray}`"), src)
                         .at(batch.span, "no group installer on this family")
-                            .help("only the Fedora adapter installs package groups; a module supporting more than Fedora declares it inside `family \"fedora\"`"),
+                            .help("only the dnf adapter installs package groups; a module that also supports a deb family declares it inside `family \"fedora\" \"rhel\"`"),
                     );
                 }
                 continue;
@@ -445,9 +451,9 @@ fn spread(
             if batch.enablerepo.is_some() {
                 if first {
                     issues.push(
-                        Issue::new(format!("`enablerepo` is Fedora-only, and this batch covers `{stray}`"), src)
+                        Issue::new(format!("`enablerepo` is dnf's, and this batch covers `{stray}`"), src)
                             .at(batch.span, "no repo to enable on this family")
-                            .help("declare the batch inside `family \"fedora\"`; a Debian or Ubuntu install takes the base image's configured sources"),
+                            .help("declare the batch inside `family \"fedora\" \"rhel\"`; a Debian or Ubuntu install takes the base image's configured sources"),
                     );
                 }
                 batch.enablerepo = None;
@@ -688,7 +694,7 @@ impl Module {
         }
 
         // Every batch outside a gate resolved against `supports`, which is only
-        // whole now, and the Fedora-only nodes held to what they resolved to.
+        // whole now, and the dnf-only nodes held to what they resolved to.
         let supports = module.supports.clone();
         spread(
             &mut module.packages,
@@ -1874,10 +1880,10 @@ fragment standard-layer=#false
         std::fs::remove_dir_all(root).unwrap();
     }
 
-    /// A package group is the Fedora adapter's verb, so no other family may
+    /// A package group is the dnf adapter's verb, so no other family may
     /// declare one at all.
     #[test]
-    fn package_groups_are_fedora_only() {
+    fn package_groups_are_dnf_only() {
         assert_eq!(
             parsed(
                 "groups",
@@ -1887,8 +1893,23 @@ supports "fedora" "debian"
 package-groups "kde-desktop"
 "#
             ),
-            ["`package-groups` is Fedora-only, and this one covers `debian`"]
+            ["`package-groups` is dnf's, and this one covers `debian`"]
         );
+    }
+
+    /// Both dnf families take a group and an `enablerepo` ungated.
+    #[test]
+    fn package_groups_and_enablerepo_reach_both_dnf_families() {
+        assert!(parsed(
+            "dnf",
+            r#"
+description "package groups"
+supports "fedora" "rhel"
+package-groups "kde-desktop"
+packages "tailscale" enablerepo="tailscale-stable"
+"#
+        )
+        .is_empty());
     }
 
     /// A COPR is two path segments and nothing else, so anything the RUN line
@@ -2045,10 +2066,10 @@ family "redhat" { packages "vim" }
     }
 
     /// `supports` and `packages` walk every family the tool recognises, and
-    /// `enablerepo` stays Fedora-only across all three -- both for a batch that
+    /// `enablerepo` stays dnf-only across every family -- both for a batch that
     /// spread over `supports` and for one a gate placed.
     #[test]
-    fn debian_and_ubuntu_are_known_families_and_enablerepo_stays_fedora_only() {
+    fn debian_and_ubuntu_are_known_families_and_enablerepo_stays_dnf_only() {
         assert_eq!(
             parsed(
                 "known",
@@ -2060,8 +2081,8 @@ family "debian" "ubuntu" { packages "curl" enablerepo="backports" }
 "#
             ),
             [
-                "`enablerepo` is Fedora-only, and this batch covers `debian`",
-                "`enablerepo` is Fedora-only, and this batch covers `debian`",
+                "`enablerepo` is dnf's, and this batch covers `debian`",
+                "`enablerepo` is dnf's, and this batch covers `debian`",
             ]
         );
     }

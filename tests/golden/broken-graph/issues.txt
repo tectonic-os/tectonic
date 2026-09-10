@@ -17,7 +17,7 @@
    :     `-- not a family this repository builds on
  4 | 
    `----
-  help: known families: fedora, debian, ubuntu
+  help: known families: fedora, rhel, debian, ubuntu
 
   x two enabled modules declare helper `shared.sh`
    ,-[./modules/core/two/module.kdl:5:1]

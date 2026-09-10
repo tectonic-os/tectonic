@@ -220,9 +220,8 @@ fn refuses_nothing(image: &Image, content: &Content) -> Vec<String> {
 ///
 /// This is not always a typo. A whole vocabulary can be missing: measured
 /// 2026-09-09, `ssg-cs10-ds.xml` carries no `CCI-` number and no `BP28(` at
-/// all, so `hardening/login-defaults`, gated to `family "fedora"` and correct
-/// on `fedora-bootc`, names nothing on the EL base that declares the same
-/// family. The gate a claim needs is the content, and `family` is not it.
+/// all, so a claim correct against Fedora 0.1.71 names nothing on the EL base.
+/// The gate a claim needs is the content, and `family` is not it.
 fn claims_nothing(image: &Image, content: &Content) -> Vec<String> {
     let claimants = image
         .base
@@ -558,14 +557,10 @@ fn measured_by(
 ) -> Result<PathBuf, String> {
     match crate::base::find(bases, image) {
         Some(base) if !base.scap_content.is_empty() => Ok(Path::new(dir).join(&base.scap_content)),
-        // The catalog describes this base and names no content for it. Falling
-        // back to the family is how an EL base — which declares `family
-        // "fedora"` because every other family-gated behaviour matches — gets
-        // measured against Fedora's benchmark and comes back with numbers
-        // rather than an error.
+        // The catalog describes this base and names no content for it, which
+        // is a stale catalog when the family has content of its own.
         Some(base) => match installed(dir, family) {
-            // The family has no content either, which is the deb case and
-            // carries its own written reason.
+            // The family has no content either, and carries its own reason.
             Err(refusal) => Err(refusal),
             Ok(_) => Err(format!(
                 "`{}` names no `scap-content`, so nothing says which benchmark it is measured \
@@ -585,18 +580,25 @@ fn measured_by(
 /// bases of `debian:forky` and `ubuntu:26.04` the nearest content marks every
 /// rule `notapplicable` — a scan that measures nothing, silently.
 fn installed(dir: &str, family: &str) -> Result<PathBuf, String> {
-    let file = match family {
-        "fedora" => "ssg-fedora-ds.xml",
-        "debian" | "ubuntu" => {
-            return Err(format!(
-                "SSG publishes no content a `{family}` image can be measured against\n\nhelp: \
+    let file =
+        match family {
+            "fedora" => "ssg-fedora-ds.xml",
+            "debian" | "ubuntu" => {
+                return Err(format!(
+                    "SSG publishes no content a `{family}` image can be measured against\n\nhelp: \
                  every SSG benchmark names the one release it applies to, and there is no Debian \
                  14 benchmark and no usable Ubuntu 26.04 one; drop `conforms` from this image, or \
                  name content of your own with `--datastream <file>`"
-            ))
-        }
-        _ => return Err(format!("no SSG content is known for the `{family}` family")),
-    };
+                ))
+            }
+            "rhel" => return Err(
+                "SSG writes one datastream per EL release, so the `rhel` family has no default\n\n\
+                 help: give the base's row a `scap-content` line, or name content of your own \
+                 with `--datastream <file>`"
+                    .to_string(),
+            ),
+            _ => return Err(format!("no SSG content is known for the `{family}` family")),
+        };
     Ok(Path::new(dir).join(file))
 }
 
@@ -1418,15 +1420,13 @@ mod tests {
         );
     }
 
-    /// The bug the `scap-content` row exists to close. Every family-gated
-    /// behaviour an EL base has matches Fedora's — dnf, rpm, SELinux, bootupd —
-    /// so it declares `family "fedora"`, and the family default would measure it
-    /// against the wrong benchmark and return numbers rather than an error.
+    /// Every EL release has its own datastream, so the row names it and the
+    /// `rhel` family names none.
     #[test]
-    fn a_base_row_names_content_the_family_default_would_get_wrong() {
-        let row = |image: &str, content: &str| crate::base::Base {
+    fn a_base_row_names_content_the_family_cannot() {
+        let row = |image: &str, family: &str, content: &str| crate::base::Base {
             image: image.to_string(),
-            family: "fedora".to_string(),
+            family: family.to_string(),
             provides: Vec::new(),
             provides_files: Vec::new(),
             requires: Vec::new(),
@@ -1438,14 +1438,19 @@ mod tests {
         let bases = [
             row(
                 "quay.io/centos-bootc/centos-bootc:stream10",
+                "rhel",
                 "ssg-cs10-ds.xml",
             ),
-            row("quay.io/fedora/fedora-bootc:44", "ssg-fedora-ds.xml"),
-            row("example.invalid/silent:1", ""),
+            row(
+                "quay.io/fedora/fedora-bootc:44",
+                "fedora",
+                "ssg-fedora-ds.xml",
+            ),
+            row("example.invalid/silent:1", "fedora", ""),
         ];
         let of = |image, family| measured_by("/nowhere", &bases, image, family);
 
-        let el = of("quay.io/centos-bootc/centos-bootc:stream10", "fedora").unwrap();
+        let el = of("quay.io/centos-bootc/centos-bootc:stream10", "rhel").unwrap();
         assert!(el.ends_with("ssg-cs10-ds.xml"), "{}", el.display());
 
         let fedora = of("quay.io/fedora/fedora-bootc:44", "fedora").unwrap();
@@ -1458,18 +1463,21 @@ mod tests {
         // A digest pins a catalogued tag rather than naming a second base.
         let pinned = of(
             "quay.io/centos-bootc/centos-bootc:stream10@sha256:0000",
-            "fedora",
+            "rhel",
         )
         .unwrap();
         assert!(pinned.ends_with("ssg-cs10-ds.xml"), "{}", pinned.display());
 
-        // A base the catalog does not describe has only the family to go on.
+        // A base the catalog does not describe has only the family to go on,
+        // and an EL one has nothing.
         let fell = of("example.invalid/unknown:1", "fedora").unwrap();
         assert!(fell.ends_with("ssg-fedora-ds.xml"), "{}", fell.display());
+        let err = of("example.invalid/alma:10", "rhel").unwrap_err();
+        assert!(err.contains("one datastream per EL release"), "{err}");
 
         // A row that names none is refused rather than guessed at. This is the
         // stale-catalog case: the installed `bases.kdl` predates the field, and
-        // guessing hands an EL image Fedora's benchmark without a word.
+        // guessing hands the image its family's benchmark without a word.
         let err = of("example.invalid/silent:1", "fedora").unwrap_err();
         assert!(err.contains("names no `scap-content`"), "{err}");
         assert!(err.contains("stale installed catalog"), "{err}");

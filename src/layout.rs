@@ -68,12 +68,14 @@ impl Policy {
 }
 
 /// Every directory name a module may gate files behind, and the families each
-/// is taken on. A directory name is one family, so `deb` names the two families
-/// that share an installer. Ordered widest first: a `debian/` beside a `deb/`
-/// is taken after it.
-pub const FAMILY_DIRS: [(&str, &[&str]); 4] = [
+/// is taken on. `deb` and `rpm` each name the two families that share a
+/// package manager and an installer. Ordered widest first: a `debian/` beside
+/// a `deb/` is taken after it.
+pub const FAMILY_DIRS: [(&str, &[&str]); 6] = [
     ("deb", &["debian", "ubuntu"]),
+    ("rpm", &["fedora", "rhel"]),
     ("fedora", &["fedora"]),
+    ("rhel", &["rhel"]),
     ("debian", &["debian"]),
     ("ubuntu", &["ubuntu"]),
 ];
@@ -198,4 +200,25 @@ pub const LIB: &str = "lib";
 
 pub fn out(root: &Path) -> PathBuf {
     root.join(OUT)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The shared directory is taken before the family's own, so a `rhel/`
+    /// file lands over the `rpm/` one it replaces.
+    #[test]
+    fn a_family_reads_the_shared_directory_first() {
+        let root = std::env::temp_dir().join(format!("tect-family-dirs-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        for name in ["rpm", "rhel", "fedora", "deb"] {
+            std::fs::create_dir_all(root.join(name)).unwrap();
+        }
+
+        assert_eq!(family_dirs(&root, "rhel"), ["rpm", "rhel"]);
+        assert_eq!(family_dirs(&root, "fedora"), ["rpm", "fedora"]);
+        assert_eq!(family_first(&root, "rhel"), ["rhel/", "rpm/", ""]);
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }

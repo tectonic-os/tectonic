@@ -818,14 +818,14 @@ jobs:
             .images[] | select([.targets[].name] | index($t)) | .base.family
           ' generated/plan.json)"
           case "$family" in
-            fedora) installer="dnf -y install openscap-scanner" ;;
+            fedora | rhel) installer="dnf -y install openscap-scanner" ;;
             *) installer="apt-get update && apt-get install -y openscap-scanner" ;;
           esac
           # The observed failure is corrupt cached repodata, so a retry that
           # does not drop the cache re-reads the same corruption and fails
           # identically. The cleaner runs only between attempts.
           case "$family" in
-            fedora) cleaner="dnf clean all" ;;
+            fedora | rhel) cleaner="dnf clean all" ;;
             *) cleaner="apt-get clean" ;;
           esac
           {

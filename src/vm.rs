@@ -19,7 +19,7 @@ const SCRIPT: &str = "scripts/vm.sh";
 /// buildroot in `setfiles`, and a Debian one is refused for omitting
 /// `VERSION_ID` from os-release. The generated `build-disk.yml` gates on this
 /// same constant.
-use crate::resolve::workflow::FEDORA;
+use crate::parse::module::rpm;
 
 /// What the container image is converted into, and what each one is.
 const TYPES: [(&str, &str); 3] = [
@@ -265,7 +265,7 @@ fn installer(root: &Path, spec: &Spec, kind: &str, opts: &Options) -> Option<&'s
         return None;
     }
     family(root, opts)
-        .filter(|family| family != FEDORA)
+        .filter(|family| !rpm(family))
         .map(|_| BOOTC)
 }
 

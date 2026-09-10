@@ -23,10 +23,9 @@ base "quay.io/fedora/fedora-bootc:44" {
     scap-content "ssg-fedora-ds.xml"
 }
 
-// CentOS Stream 10, the EL base. `family "fedora"` because every family-gated
-// behaviour matches: dnf, rpm, SELinux, and `bootupctl` for the recipe's
-// bootupd grub2 arm. The one thing that diverges is the benchmark, which is
-// why `scap-content` exists rather than a third family.
+// CentOS Stream 10, the EL base. `family "rhel"` is EL's archive: it installs
+// like Fedora and its package names differ, as Debian's and Ubuntu's do. Its
+// kernel carries no btrfs.
 //
 // The content is the reason to build on it. `ssg-cs10-ds.xml` carries 18
 // profiles to Fedora's 8, including `stig` at 509 rules and `cis_server_l1` at
@@ -34,7 +33,7 @@ base "quay.io/fedora/fedora-bootc:44" {
 // against the image: every path below is present and bootc is 1.16.6.
 base "quay.io/centos-bootc/centos-bootc:stream10" {
     about "CentOS Stream 10, the EL base a stated claim can be measured against"
-    family "fedora"
+    family "rhel"
     provides "rechunking" "initramfs-generation" "selinux-policy"
     provides-file "/usr/sbin/sshd" "/usr/bin/bootc" "/usr/bin/bootupctl" \
         "/usr/bin/podman" "/usr/bin/crun"
@@ -52,7 +51,7 @@ base "quay.io/centos-bootc/centos-bootc:stream10" {
 // the row to develop against.
 base "registry.redhat.io/rhel10/rhel-bootc:latest" {
     about "RHEL 10, the supported EL base, behind a Red Hat login"
-    family "fedora"
+    family "rhel"
     provides "rechunking" "initramfs-generation" "selinux-policy"
     provides-file "/usr/sbin/sshd" "/usr/bin/bootc" "/usr/bin/bootupctl" \
         "/usr/bin/podman" "/usr/bin/crun"
