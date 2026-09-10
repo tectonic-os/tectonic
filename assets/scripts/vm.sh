@@ -142,7 +142,8 @@ load_rootful() {
         return 0
     fi
     if ! podman image exists "$ref"; then
-        sudoif podman pull "$ref"
+        # A rootful build leaves the image in root's store alone.
+        sudoif podman image exists "$ref" || sudoif podman pull "$ref"
         return 0
     fi
     local mine theirs tmp
