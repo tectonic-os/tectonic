@@ -133,7 +133,19 @@
                   "path": null,
                   "resolved": "https://github.com/tectonic-os/modules/archive/refs/heads/main.tar.gz"
                 },
-                "imported": null
+                "imported": {
+                  "collection": "tectonic-os",
+                  "pin": {
+                    "locator": "https://github.com/tectonic-os/modules/archive/refs/heads/{version}.tar.gz",
+                    "selector": "main",
+                    "verifier": null,
+                    "tracker": "unpinned",
+                    "reason": "the collection this tool is published alongside, followed at its branch head",
+                    "from": "asset",
+                    "path": null,
+                    "resolved": "https://github.com/tectonic-os/modules/archive/refs/heads/main.tar.gz"
+                  }
+                }
               },
               "satisfies": [],
               "refuses": []

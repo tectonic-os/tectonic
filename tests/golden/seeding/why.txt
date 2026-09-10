@@ -125,7 +125,11 @@ Nothing. It declares no `satisfies`.
 | --- | --- |
 | declared | `0179980f392ae7c6c8b7bb593c99c97d140a879abf2620a2a4ff21f49fb092fa` |
 
-It was written in this repository rather than imported, so nothing upstream to compare it against.
+| Collection | Locator | Selector | Verifier | Tracker |
+| --- | --- | --- | --- | --- |
+| `tectonic-os` | https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3 | renovate |
+
+It is referenced rather than copied, so what a build reads is the collection's own tree at that pin.
 
 ## What it pulls in
 
@@ -147,5 +151,9 @@ drivers, fedora-family, hello, flatpak
 
 **The two documents disagree**, which they cannot if both came from this build.
 
-It was written in this repository rather than imported, so nothing upstream to compare it against.
+| Collection | Locator | Selector | Verifier | Tracker |
+| --- | --- | --- | --- | --- |
+| `tectonic-os` | https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3 | renovate |
+
+It is referenced rather than copied, so what a build reads is the collection's own tree at that pin.
 

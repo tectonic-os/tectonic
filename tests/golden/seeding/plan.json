@@ -183,7 +183,19 @@
                   "path": null,
                   "resolved": "https://github.com/tectonic-os/modules/archive/refs/tags/v1.0.0.tar.gz"
                 },
-                "imported": null
+                "imported": {
+                  "collection": "tectonic-os",
+                  "pin": {
+                    "locator": "https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz",
+                    "selector": "v1.0.0",
+                    "verifier": "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3",
+                    "tracker": "renovate",
+                    "reason": null,
+                    "from": "asset",
+                    "path": null,
+                    "resolved": "https://github.com/tectonic-os/modules/archive/refs/tags/v1.0.0.tar.gz"
+                  }
+                }
               },
               "satisfies": [],
               "refuses": []
@@ -321,7 +333,19 @@
                   "path": null,
                   "resolved": "https://github.com/tectonic-os/modules/archive/refs/tags/v1.0.0.tar.gz"
                 },
-                "imported": null
+                "imported": {
+                  "collection": "tectonic-os",
+                  "pin": {
+                    "locator": "https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz",
+                    "selector": "v1.0.0",
+                    "verifier": "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3",
+                    "tracker": "renovate",
+                    "reason": null,
+                    "from": "asset",
+                    "path": null,
+                    "resolved": "https://github.com/tectonic-os/modules/archive/refs/tags/v1.0.0.tar.gz"
+                  }
+                }
               },
               "satisfies": [],
               "refuses": []
