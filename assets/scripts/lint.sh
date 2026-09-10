@@ -24,7 +24,12 @@ for tool in shellcheck shfmt; do
     }
 done
 
-shellcheck -s bash "${scripts[@]}"
+mapfile -t repos < <(printf '%s\n' "${scripts[@]}" | grep '/repo$' || true)
+mapfile -t rest < <(printf '%s\n' "${scripts[@]}" | grep -v '/repo$')
+shellcheck -s bash "${rest[@]}"
+# `REPO_ID` is a `repo` file's interface: the helper and the emitter read it,
+# and shellcheck sees neither.
+[ "${#repos[@]}" -eq 0 ] || shellcheck -s bash -e SC2034 "${repos[@]}"
 "${shfmt[@]}" -d "${scripts[@]}" || {
     echo "lint: unformatted, run ./scripts/lint.sh --fix" >&2
     exit 1
