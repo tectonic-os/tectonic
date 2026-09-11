@@ -15,7 +15,8 @@ die() {
     exit 1
 }
 
-[ "$#" -eq 2 ] || die "usage: scripts/smoke.sh <image-ref in root's store> <work dir>"
+[ "$#" -eq 2 ] || [ "$#" -eq 3 ] \
+    || die "usage: scripts/smoke.sh <image-ref in root's store> <work dir> [target]"
 ref="$1"
 dir="$(realpath -m "$2")"
 mkdir -p "$dir"
@@ -23,7 +24,8 @@ for tool in jq qemu-system-x86_64 ssh ssh-keygen; do
     command -v "$tool" > /dev/null 2>&1 || die "$tool is not installed"
 done
 
-recipe="$(./scripts/tect.sh recipe)"
+# The target's own recipe: images in one repository can install differently.
+recipe="$(./scripts/tect.sh recipe ${3:+--target "$3"})"
 filesystem="$(jq -r .filesystem <<< "$recipe")"
 composefs="$(jq -r .composeFsBackend <<< "$recipe")"
 bootloader="$(jq -r .bootloader <<< "$recipe")"
