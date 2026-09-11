@@ -24,17 +24,13 @@ ARG FISHERMAN_ORG=tuna-os
 ARG FISHERMAN_COMMIT=027fa25c1d8bc01e2ac97d119cda9e8bb9c99ac7
 ARG FISHERMAN_SHA256=ffab2a2c1094fa02a9b4862958c280045c9390425c93195855a9f0f93956c72e
 # Tacklebox is the one fork left: the media needs a change upstream has not got.
-# The pin is `secure-boot-media`, which stages the payload's signed shim so the
-# stick boots a machine with Secure Boot on. Upstream has most of this in
-# `purefs.DetectBootChain`, wired only into `cmd/purebuild` and `cmd/tbwasm`.
-#
-# The pin also carries a fourth layout for the signed pair: the deb families
-# keep theirs under `/usr/lib/shim` and `/usr/lib/grub/x86_64-efi-signed`, which
-# none of the three upstream layouts covers, so a deb `LIVE_BASE` fell through
-# to unsigned media without saying so. Inert while `LIVE_BASE` is Fedora.
+# The pin is `feat/grub-bootloader-support`, which stages the live image's own
+# bootloader, a signed shim and GRUB pair in any of four layouts, the deb
+# families' `/usr/lib/shim` included. It keeps upstream's systemd-boot first,
+# and `vm.sh` asks for the pair with `--media-bootloader grub2`.
 ARG TACKLEBOX_ORG=tectonic-os
-ARG TACKLEBOX_COMMIT=b3f3b9a744d65c93dc2536cc55e4bb3030e0535c
-ARG TACKLEBOX_SHA256=3c9d9904d6ae0ef9fbd949435c63d1c20ab0cab940543b17668fd94e0330e278
+ARG TACKLEBOX_COMMIT=da820e5e9ac34c7a851382a9a1c7a4c6bd0c886f
+ARG TACKLEBOX_SHA256=c873e6a102640b2688de126238e2faae3abfd1c40370bf46df2906965d9c0439
 # `ExtractEFIBinary` takes an image argument, never reads it, and looks only at
 # two host paths, so a host with no systemd-boot-unsigned is a hard stop and on
 # a cross-distro builder the host is the wrong source. The patch makes

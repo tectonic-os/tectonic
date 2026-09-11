@@ -367,7 +367,10 @@ podman rm "$cid" > /dev/null
 podman build -t "$LIVE" "$STAGED"
 
 unmount_offline_store
-env HOME=/root "$TBX" build "${STAGED}/media.json" --iso "$ISO" -b "$BUILD"
+# The signed pair boots under Secure Boot, so it wins where the live image
+# carries systemd-boot too.
+env HOME=/root "$TBX" build "${STAGED}/media.json" --iso "$ISO" -b "$BUILD" \
+    --media-bootloader grub2
 ROOT
 
     mv -f "${image_file}.part" "$image_file"
