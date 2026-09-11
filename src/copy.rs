@@ -36,6 +36,9 @@ pub const IMAGE_NAME: &str = "What will the image be called?";
 pub const IMAGE_BASE: &str = "What is the base image for this image?";
 pub const BASE_IMAGE: &str = "base image";
 pub const BASE_FAMILY: &str = "base family";
+pub const IMAGE_BOOTLOADER: &str = "Which bootloader does it install?";
+pub const BOOTLOADER_GRUB2: &str = "GRUB";
+pub const BOOTLOADER_SYSTEMD: &str = "systemd-boot";
 pub const FLAVOUR_NAME: &str = "flavour name";
 pub const FLAVOUR_IMAGE: &str = "Which image publishes it?";
 

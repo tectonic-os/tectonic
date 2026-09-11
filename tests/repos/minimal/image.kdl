@@ -6,6 +6,10 @@ image {
         provides "rechunking"
     }
 
+    layout {
+        bootloader "grub2"
+    }
+
     modules {
         module "fedora-family"
         module "core/hello"

@@ -9,6 +9,17 @@
   help: the installer formats what this names before bootc runs, and a path
         that is not a device is a path it would erase something else to reach
 
+  x `sealed` names no bootloader
+    ,-[./image.kdl:10:5]
+  9 |     // var-disk that is not a device is a path the installer would format.
+ 10 |     layout {
+    :     ^^^|^^
+    :        `-- no bootloader
+ 11 |         filesystem "xfs"
+    `----
+  help: no family answers the bootloader: `bootloader "grub2"` here, from what
+        the base's row in bases.kdl lists
+
   x `sealed` installs a sealed deployment onto xfs
     ,-[./image.kdl:10:5]
   9 |     // var-disk that is not a device is a path the installer would format.

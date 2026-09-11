@@ -1433,6 +1433,7 @@ mod tests {
             about: String::new(),
             signed: false,
             scap_content: content.to_string(),
+            bootloaders: Vec::new(),
             span: crate::diag::Span::default(),
         };
         let bases = [

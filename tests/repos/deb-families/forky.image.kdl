@@ -6,6 +6,10 @@ image {
         requires "bootc-base"
     }
 
+    layout {
+        bootloader "grub2"
+    }
+
     modules {
         module "debian-family"
         module "core/bootc-base"

@@ -356,7 +356,7 @@ What the installer lays down, where the family's answer is not the one the image
 | `composefs` | `#true` or `#false`, at most one | Whether the install seals the deployment, in place of the family's answer. |
 | `generic-image` | `#true` or `#false`, at most one | Whether the install skips the bootupd check, in place of the family's answer. |
 | `admin-group` | a string, at most one | The group an administrator is created in, in place of the family's. |
-| `bootloader` | `grub2`, `systemd`, at most one | The bootloader, in place of the one the base family settles. |
+| `bootloader` | `grub2`, `systemd`, at most one | The bootloader the installer installs, one the base's row lists. |
 
 ##### `filesystem`
 
@@ -548,6 +548,7 @@ One base a collection describes, named by the reference an image builds on.
 | `requires` | one or more strings | Capabilities this base is unusable without, which an enabled module must provide. |
 | `signed` | `#true` or `#false`, at most one | Whether this base publishes a cosign signature, which a scaffolded image records. |
 | `scap-content` | a string, at most one | The SSG datastream this base is measured against, named as a bare filename. |
+| `bootloader` | one or more strings, exactly one | The bootloaders an image on this base can install, the one it boots by default first. |
 
 <!-- /schema: bases -->
 

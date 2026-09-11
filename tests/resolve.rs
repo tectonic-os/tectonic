@@ -72,6 +72,11 @@ fn after_rejects_a_provider_on_another_target() {
 /// MAC and cannot name one.
 #[test]
 fn shipped_policy_orders_a_module_after_the_mac_that_installs_it() {
+    // `check` reads the catalog, and the one installed on this host may be older.
+    std::env::set_var(
+        "TECT_ASSETS",
+        concat!(env!("CARGO_MANIFEST_DIR"), "/assets"),
+    );
     let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("policy-ordering");
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(root.join("modules/apparmor")).unwrap();

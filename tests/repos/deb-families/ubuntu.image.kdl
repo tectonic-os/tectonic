@@ -5,6 +5,10 @@ image {
         family "ubuntu"
     }
 
+    layout {
+        bootloader "grub2"
+    }
+
     modules {
         module "debian-family"
         module "core/menu"

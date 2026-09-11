@@ -3,6 +3,7 @@ base "quay.io/fedora/fedora-bootc:44" {
     family "fedora"
     provides "rechunking" "initramfs-generation" "selinux-policy"
     signed #true
+    bootloader "grub2"
 }
 
 base "example.invalid/collected:1" {
@@ -10,4 +11,5 @@ base "example.invalid/collected:1" {
     family "fedora"
     provides "rechunking"
     provides-file "/usr/bin/collected"
+    bootloader "grub2"
 }

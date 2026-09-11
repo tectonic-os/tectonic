@@ -7,16 +7,13 @@
 use crate::emit::json::Json;
 use crate::model::image::{Layout, List};
 
-/// What the base family settles: three `bootc install` flags, the root
+/// What the base family settles: two `bootc install` flags, the root
 /// filesystem the first of them forces, and the group an administrator is
 /// created in.
 #[cfg_attr(test, derive(Debug, PartialEq))]
 struct Family {
     composefs: bool,
     generic: bool,
-    /// Fisherman reads an empty bootloader as grub2, which is what bootupd
-    /// installs.
-    bootloader: String,
     filesystem: String,
     /// Naming the other family's group as well is not a hedge that covers
     /// both: `useradd` refuses the whole call when any listed group is
@@ -29,26 +26,21 @@ struct Family {
 fn family(name: &str) -> Option<Family> {
     Some(match name {
         // Both ship bootupd, so `--generic-image` — which skips the bootupd
-        // check `bootc install` aborts on — stays off, the boot chain is the
-        // grub2 bootupd installs, and nothing seals the deployment.
+        // check `bootc install` aborts on — stays off, and nothing seals the
+        // deployment.
         "fedora" | "rhel" => Family {
             composefs: false,
             generic: false,
-            bootloader: String::new(),
             filesystem: "xfs".into(),
             admin: "wheel".into(),
         },
         // Debian packages no bootupd, so the install aborts without
         // `--generic-image`. The sealed composefs deployment needs fs-verity:
         // xfs has none and drops into a dracut emergency shell, and sealed
-        // btrfs fails to mount. `grub2` because the base stages Debian's signed
-        // shim and GRUB, so the disk boots with Secure Boot on; that GRUB reads
-        // no BLS entries, so the image ships `/usr/libexec/grub-menu-from-bls`
-        // and the installer runs it, and without it the menu comes up empty.
+        // btrfs fails to mount.
         "debian" | "ubuntu" => Family {
             composefs: true,
             generic: true,
-            bootloader: "grub2".into(),
             filesystem: "ext4".into(),
             admin: "sudo".into(),
         },
@@ -56,16 +48,18 @@ fn family(name: &str) -> Option<Family> {
     })
 }
 
-/// The five settled, from the family that knows them or from the image that
-/// declared them. `None` when neither answers, which is what stops a guess
-/// reaching a partition table.
+/// The five settled, and the bootloader beside them: four from the family
+/// that knows them or from the image that declared them, and the bootloader
+/// from the image alone, which `tect create image` writes off the base's row.
+/// `None` when nothing answers, which is what stops a guess reaching a
+/// partition table.
 ///
 /// **Declaring is not guessing.** A family this project has measured answers
-/// for an image that declares nothing. An image on any other base answers for
-/// itself, in full or not at all: half an answer is the one state that would
-/// reach `bootc install` on a default nobody chose, and `unanswered` names it
-/// at `check`.
-fn settle(family: Option<&str>, layout: Option<&Layout>) -> Option<Family> {
+/// the four for an image that declares none of them. An image on any other
+/// base answers for itself, in full or not at all: half an answer is the one
+/// state that would reach `bootc install` on a default nobody chose, and
+/// `unanswered` names it at `check`.
+fn settle(family: Option<&str>, layout: Option<&Layout>) -> Option<(Family, String)> {
     let known = family.and_then(self::family);
     let told = |pick: fn(&Layout) -> &str| {
         layout
@@ -73,23 +67,24 @@ fn settle(family: Option<&str>, layout: Option<&Layout>) -> Option<Family> {
             .filter(|declared| !declared.is_empty())
             .map(str::to_string)
     };
-    Some(Family {
+    let bootloader = told(|l| &l.bootloader)?;
+    let family = Family {
         composefs: layout
             .and_then(|l| l.composefs)
             .or(known.as_ref().map(|f| f.composefs))?,
         generic: layout
             .and_then(|l| l.generic)
             .or(known.as_ref().map(|f| f.generic))?,
-        bootloader: told(|l| &l.bootloader)
-            .or_else(|| known.as_ref().map(|f| f.bootloader.clone()))?,
         filesystem: told(|l| &l.filesystem)
             .or_else(|| known.as_ref().map(|f| f.filesystem.clone()))?,
         admin: told(|l| &l.admin_group).or_else(|| known.as_ref().map(|f| f.admin.clone()))?,
-    })
+    };
+    Some((family, bootloader))
 }
 
 /// Which of the five neither the family nor the layout answers, in the order
-/// the schema lists them. Empty where the image is installable.
+/// the schema lists them. Empty where the image is installable. No family
+/// answers the bootloader.
 pub fn unanswered(family: &str, layout: Option<&Layout>) -> Vec<&'static str> {
     if settle(Some(family), layout).is_some() {
         return Vec::new();
@@ -104,10 +99,31 @@ pub fn unanswered(family: &str, layout: Option<&Layout>) -> Vec<&'static str> {
         ("bootloader", told(|l| &l.bootloader)),
     ]
     .into_iter()
-    .filter(|_| known.is_none())
+    .filter(|(name, _)| known.is_none() || *name == "bootloader")
     .filter(|(_, declared)| !declared)
     .map(|(name, _)| name)
     .collect()
+}
+
+/// Why `build` has no recipe for a target, for the command that asked for one.
+pub fn refusal(list: &List, name: &str) -> String {
+    let declared = list
+        .targets()
+        .into_iter()
+        .find(|t| t.to_string() == name)
+        .and_then(|t| list.images.iter().find(|i| i.id == t.image));
+    let Some(image) = declared else {
+        return format!("`{name}` is not a target here");
+    };
+    let Some(base) = image.base.as_ref() else {
+        return format!("`{name}` declares no base, so there is nothing to install");
+    };
+    format!(
+        "`{name}` answers no {}, and guessing one erases a disk before it fails to \
+         boot\n\nhelp: declare it in the image's `layout {{ }}`; the bootloader is one \
+         its base's row in bases.kdl lists",
+        unanswered(&base.family, image.layout.as_ref()).join(", ")
+    )
 }
 
 /// Whether this image's install seals the deployment, which is what makes
@@ -122,8 +138,8 @@ pub fn seals(family: &str, layout: Option<&Layout>) -> bool {
 /// The recipe for one target: `image` is the bytes installed and `imgref` the
 /// reference the installed machine updates from. `stores` are host paths
 /// carrying that image offline, empty where it is pulled. `None` when nothing
-/// publishes under that name, when the image declares no base, or when the
-/// family has no answer above.
+/// publishes under that name, when the image declares no base, or when
+/// `settle` has no answer; `refusal` says which.
 pub fn build(
     list: &List,
     name: &str,
@@ -134,14 +150,14 @@ pub fn build(
     let target = list.targets().into_iter().find(|t| t.to_string() == name)?;
     let declared = list.images.iter().find(|i| i.id == target.image)?;
     let layout = declared.layout.as_ref();
-    let settled = settle(Some(&declared.base.as_ref()?.family), layout)?;
+    let (settled, bootloader) = settle(Some(&declared.base.as_ref()?.family), layout)?;
 
     let mut fields = vec![
         ("image", Json::string(image)),
         ("targetImgref", Json::string(imgref)),
         ("composeFsBackend", Json::Bool(settled.composefs)),
         ("genericImage", Json::Bool(settled.generic)),
-        ("bootloader", Json::string(&settled.bootloader)),
+        ("bootloader", Json::string(&bootloader)),
         ("filesystem", Json::string(&settled.filesystem)),
         // The published name, which is a hostname the person installing is
         // free to replace. Every other field here is one they are not.
@@ -345,8 +361,7 @@ mod tests {
         };
         assert_eq!(field("filesystem").as_deref(), Some("\"btrfs\""));
         assert_eq!(field("btrfsSubvolumes").as_deref(), Some("true"));
-        // The family's own answer here is grub2, so this is the override
-        // landing rather than the default agreeing with it.
+        // The base's row lists grub2 first, so this is the image's own pick.
         assert_eq!(field("bootloader").as_deref(), Some("\"systemd\""));
         assert_eq!(
             field("varDisk").as_deref(),
@@ -405,16 +420,36 @@ mod tests {
     /// btrfs.
     #[test]
     fn rhel_installs_the_way_fedora_does() {
-        assert_eq!(settle(Some("rhel"), None), settle(Some("fedora"), None));
-        assert_eq!(unanswered("rhel", None), Vec::<&str>::new());
+        let mut grub = layout(None);
+        grub.bootloader = "grub2".into();
+        assert!(settle(Some("rhel"), Some(&grub)).is_some());
+        assert_eq!(
+            settle(Some("rhel"), Some(&grub)),
+            settle(Some("fedora"), Some(&grub))
+        );
+        assert_eq!(unanswered("rhel", Some(&grub)), Vec::<&str>::new());
         assert!(!seals("rhel", None));
+    }
+
+    /// No family answers the bootloader: an image that names none has no
+    /// recipe, and the refusal says which answer is missing.
+    #[test]
+    fn the_bootloader_is_the_image_s_own_answer() {
+        assert_eq!(unanswered("fedora", None), ["bootloader"]);
+        assert_eq!(settle(Some("debian"), None), None);
+        let deb = fixture("deb-families");
+        assert!(build(&deb, "ubuntu", "image", "imgref", &[]).is_some());
+
+        let silent = fixture("multi-image");
+        let name = silent.ungated_target().expect("a target").to_string();
+        assert!(build(&silent, &name, "image", "imgref", &[]).is_none());
+        assert!(refusal(&silent, &name).contains("answers no bootloader"));
     }
 
     /// A family with no measured answer is installable once the image gives
     /// all five, and the diagnostic names what half an answer is missing.
     #[test]
     fn an_unmeasured_family_answers_for_itself_in_full_or_not_at_all() {
-        assert_eq!(unanswered("fedora", None), Vec::<&str>::new());
         assert_eq!(
             unanswered("plan9", None),
             [
@@ -432,16 +467,18 @@ mod tests {
             unanswered("plan9", Some(&half)),
             ["generic-image", "admin-group", "bootloader"]
         );
-        // A family the tool knows fills every gap, so a partial layout there is
-        // an override rather than a hole.
-        assert_eq!(unanswered("fedora", Some(&half)), Vec::<&str>::new());
+        // A family the tool knows fills every gap but the bootloader, so a
+        // partial layout there is an override rather than a hole.
+        assert_eq!(unanswered("fedora", Some(&half)), ["bootloader"]);
 
         let mut whole = half;
         whole.generic = Some(true);
         whole.admin_group = "wheel".into();
         whole.bootloader = "systemd".into();
         assert_eq!(unanswered("plan9", Some(&whole)), Vec::<&str>::new());
-        let settled = settle(Some("plan9"), Some(&whole)).expect("all five are declared");
+        let (settled, bootloader) =
+            settle(Some("plan9"), Some(&whole)).expect("all five are declared");
+        assert_eq!(bootloader, "systemd");
         assert_eq!(settled.filesystem, "btrfs");
         assert_eq!(settled.admin, "wheel");
         assert!(settled.composefs && settled.generic);

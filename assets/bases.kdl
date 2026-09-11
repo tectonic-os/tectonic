@@ -7,6 +7,9 @@
 // the digest. The catalog offers the tag, the digest belongs in the image file
 // built on it, and `tect build` records what it resolved either way.
 
+// `bootloader` is what an image on the row can install, its default first. The
+// deb rows' pair is `deb-family/bootc-base`'s signed GRUB and its systemd-boot.
+
 // Under-claiming refuses a module and says why; over-claiming is silent —
 // `resolve::graph::suppress` drops a module the base covers entirely with no
 // diagnostic — so nothing goes in this node that has not been run against the
@@ -26,6 +29,7 @@ base "quay.io/fedora/fedora-bootc:44" {
         "/usr/bin/podman" "/usr/bin/crun"
     scap-content "ssg-fedora-ds.xml"
     signed #false
+    bootloader "grub2"
 }
 
 // CentOS Stream 10, the EL base. `family "rhel"` is EL's archive: it installs
@@ -44,6 +48,7 @@ base "quay.io/centos-bootc/centos-bootc:stream10" {
         "/usr/bin/podman" "/usr/bin/crun"
     scap-content "ssg-cs10-ds.xml"
     signed #true
+    bootloader "grub2"
 }
 
 // RHEL 10, the supported EL base, and the only row here behind a login:
@@ -66,6 +71,7 @@ base "registry.redhat.io/rhel10/rhel-bootc:latest" {
     // login. `#false` is the under-claim, and a line `base-sig-probe` can
     // correct where a missing one is not.
     signed #false
+    bootloader "grub2"
 }
 
 // AlmaLinux 10, the RHEL rebuild, with the content RHEL keeps behind
@@ -84,6 +90,7 @@ base "quay.io/almalinuxorg/almalinux-bootc:10" {
         "/usr/bin/podman" "/usr/bin/crun"
     scap-content "ssg-almalinux10-ds.xml"
     signed #true
+    bootloader "grub2"
 }
 
 // Universal Blue Images
@@ -94,6 +101,7 @@ base "ghcr.io/ublue-os/bazzite:stable" {
     provides-file "/usr/bin/flatpak"
     signed #true
     scap-content "ssg-fedora-ds.xml"
+    bootloader "grub2"
 }
 
 base "ghcr.io/ublue-os/aurora:stable" {
@@ -103,6 +111,7 @@ base "ghcr.io/ublue-os/aurora:stable" {
     provides-file "/usr/bin/flatpak"
     signed #true
     scap-content "ssg-fedora-ds.xml"
+    bootloader "grub2"
 }
 
 base "ghcr.io/ublue-os/bluefin:stable" {
@@ -112,6 +121,7 @@ base "ghcr.io/ublue-os/bluefin:stable" {
     provides-file "/usr/bin/flatpak"
     signed #true
     scap-content "ssg-fedora-ds.xml"
+    bootloader "grub2"
 }
 
 base "ghcr.io/ublue-os/kinoite-main:44" {
@@ -121,6 +131,7 @@ base "ghcr.io/ublue-os/kinoite-main:44" {
     provides-file "/usr/bin/flatpak"
     signed #true
     scap-content "ssg-fedora-ds.xml"
+    bootloader "grub2"
 }
 
 // Rocky, which is not a bootc image and is the only EL row that is not: Rocky
@@ -139,6 +150,7 @@ base "quay.io/rockylinux/rockylinux:10" {
     requires "bootc-base"
     signed #false
     scap-content "ssg-rl10-ds.xml"
+    bootloader "grub2"
 }
 
 // Debian, which is not a bootc image: it carries no kernel, no dracut, no
@@ -153,6 +165,7 @@ base "docker.io/library/debian:forky" {
     family "debian"
     requires "bootc-base"
     signed #false
+    bootloader "grub2" "systemd"
 }
 
 // Ubuntu. It clears the gates that chose forky over trixie and one forky
@@ -168,4 +181,5 @@ base "docker.io/library/ubuntu:26.04" {
     family "ubuntu"
     requires "bootc-base"
     signed #false
+    bootloader "grub2" "systemd"
 }

@@ -192,7 +192,13 @@
       "logo_url": "",
       "conforms": "",
       "allows": [],
-      "layout": null,
+      "layout": {
+        "filesystem": "",
+        "subvolumes": false,
+        "pool": "",
+        "bootloader": "grub2",
+        "var_disk": null
+      },
       "base": {
         "image": "docker.io/library/debian:forky",
         "family": "debian",
@@ -401,7 +407,13 @@
       "logo_url": "",
       "conforms": "",
       "allows": [],
-      "layout": null,
+      "layout": {
+        "filesystem": "",
+        "subvolumes": false,
+        "pool": "",
+        "bootloader": "grub2",
+        "var_disk": null
+      },
       "base": {
         "image": "docker.io/library/ubuntu:26.04",
         "family": "ubuntu",

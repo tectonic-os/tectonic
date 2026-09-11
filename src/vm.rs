@@ -100,13 +100,7 @@ fn documents(
              publishes"
         ));
     }
-    let refuse = || {
-        format!(
-            "there is no measured install recipe for `{name}`: its base family is \
-             none of `fedora`, `debian` or `ubuntu`, and guessing one erases a disk \
-             before it fails to boot"
-        )
-    };
+    let refuse = || recipe::refusal(list, name);
     // Both references fisherman is given are the published one: tacklebox
     // embeds the local bytes under the published name, so asking fisherman for
     // `localhost/...` would miss the store and reach for a registry. The local
@@ -646,11 +640,11 @@ mod tests {
         )
         .unwrap_err();
         assert!(local.contains("IMAGE_REGISTRY"), "{local}");
-        // And a family with no measured answer is refused before a disk is
-        // erased, not after.
+        // And a target with no recipe is refused before a disk is erased, not
+        // after.
         let unknown =
             documents(&list, "not-a-target", "image", "ghcr.io/someone/x:latest").unwrap_err();
-        assert!(unknown.contains("no measured install recipe"), "{unknown}");
+        assert!(unknown.contains("not a target"), "{unknown}");
     }
 
     /// A dnf payload is its own live environment; a deb one, whose images

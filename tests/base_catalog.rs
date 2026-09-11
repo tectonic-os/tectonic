@@ -108,6 +108,7 @@ fn runtime_file_replaces_embedded_catalog() {
         r#"base "example.invalid/runtime:1" {
     about "runtime only"
     family "runtime"
+    bootloader "grub2"
 }
 "#,
     );
@@ -307,6 +308,7 @@ fn collection_still_overrides_and_shadows_selected_catalog() {
     about "collection replacement"
     family "fedora"
     signed #true
+    bootloader "grub2"
 }
 "#,
     )

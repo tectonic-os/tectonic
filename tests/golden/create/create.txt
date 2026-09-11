@@ -22,6 +22,10 @@ image {
         signed #false
     }
 
+    layout {
+        bootloader "grub2"
+    }
+
     modules {
         module "my-editor"
         source "one" {
@@ -40,6 +44,10 @@ image {
         provides "rechunking" "initramfs-generation" "selinux-policy"
         provides-file "/usr/sbin/sshd" "/usr/bin/bootc" "/usr/bin/bootupctl" "/usr/bin/podman" "/usr/bin/crun"
         signed #false
+    }
+
+    layout {
+        bootloader "grub2"
     }
 
     modules {

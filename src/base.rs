@@ -34,6 +34,8 @@ pub struct Base {
     /// bare filename under the content directory. Empty where SSG publishes
     /// nothing for the release, which refuses `conforms` on it.
     pub scap_content: String,
+    /// The bootloaders an image on this base can install, its default first.
+    pub bootloaders: Vec<String>,
     /// Where it was declared, for a diagnostic about a second declaration.
     pub span: Span,
 }
@@ -49,6 +51,7 @@ impl Base {
             || self.about != other.about
             || self.signed != other.signed
             || self.scap_content != other.scap_content
+            || self.bootloaders != other.bootloaders
     }
 }
 
