@@ -1963,6 +1963,19 @@ family "fedora" {
 "#
         )
         .is_empty());
+        // Ungated beside a deb family: dropped there without a word until the
+        // COPR was held to Fedora.
+        assert_eq!(
+            parsed(
+                "copr-deb",
+                r#"
+description "copr"
+supports "fedora" "debian"
+copr "owner/project"
+"#
+            ),
+            ["`copr` is Fedora's, and this one covers `debian`"]
+        );
     }
 
     /// Both dnf families take a group and an `enablerepo` ungated.

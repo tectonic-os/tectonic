@@ -3,16 +3,17 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 mapfile -t scripts < <(
-    # A `repo` file is shell and carries no extension.
     find scripts generated/lib modules -path modules/.remote -prune -o \
-        \( -name '*.sh' -o -name repo \) -type f -print
+        -name '*.sh' -type f -print
     find modules -path modules/.remote -prune -o -path '*/files/*' -type f \
         \( -path '*/libexec/*' -o -path '*/system-generators/*' \) -print
 )
+# A `repo` file is shell and carries no extension.
+mapfile -t repos < <(find modules -path modules/.remote -prune -o -name repo -type f -print)
 shfmt=(shfmt -i 4 -ci -bn -sr)
 
 if [ "${1:-}" = "--fix" ]; then
-    "${shfmt[@]}" -w "${scripts[@]}"
+    "${shfmt[@]}" -w "${scripts[@]}" "${repos[@]}"
     echo "lint: formatted ${#scripts[@]} scripts"
     exit
 fi
@@ -24,13 +25,11 @@ for tool in shellcheck shfmt; do
     }
 done
 
-mapfile -t repos < <(printf '%s\n' "${scripts[@]}" | grep '/repo$' || true)
-mapfile -t rest < <(printf '%s\n' "${scripts[@]}" | grep -v '/repo$')
-shellcheck -s bash "${rest[@]}"
+shellcheck -s bash "${scripts[@]}"
 # `REPO_ID` is a `repo` file's interface: the helper and the emitter read it,
 # and shellcheck sees neither.
 [ "${#repos[@]}" -eq 0 ] || shellcheck -s bash -e SC2034 "${repos[@]}"
-"${shfmt[@]}" -d "${scripts[@]}" || {
+"${shfmt[@]}" -d "${scripts[@]}" "${repos[@]}" || {
     echo "lint: unformatted, run ./scripts/lint.sh --fix" >&2
     exit 1
 }
