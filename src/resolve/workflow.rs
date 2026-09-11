@@ -250,20 +250,44 @@ fn cron((hour, minute): (u32, u32), offset: i64, day: &str) -> String {
     format!("{minute} {hour} * * {day}")
 }
 
-/// Workflow files the tool owns that nothing generates any more. One it does
-/// not ship is the repository's own and is left where it is.
+/// Workflow files the tool owns that nothing generates any more, and the files
+/// an earlier release wrote. One it never shipped is the repository's own and
+/// is left where it is.
 pub fn orphans(root: &Path, generated: &[(PathBuf, String)]) -> Vec<PathBuf> {
     SHIPPED
         .iter()
         .map(|shipped| PathBuf::from(layout::WORKFLOW_DIR).join(shipped.file()))
+        .chain(RETIRED.iter().map(PathBuf::from))
         .filter(|path| root.join(path).is_file())
         .filter(|path| !generated.iter().any(|(written, _)| written == path))
         .collect()
 }
 
+/// What an earlier release wrote into a repository and this one neither writes
+/// nor reads.
+const RETIRED: [&str; 3] = [
+    ".github/workflows/reconcile-workflows.yml",
+    "scripts/render-iso-config.sh",
+    "disk_config/iso.template.toml",
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_file_an_earlier_release_wrote_is_swept() {
+        let root = std::env::temp_dir().join(format!("tect-retired-{}", std::process::id()));
+        let retired = root.join("scripts/render-iso-config.sh");
+        std::fs::create_dir_all(retired.parent().unwrap()).unwrap();
+        std::fs::write(&retired, "").unwrap();
+        std::fs::write(root.join("scripts/own.sh"), "").unwrap();
+        assert_eq!(
+            orphans(&root, &[]),
+            [PathBuf::from("scripts/render-iso-config.sh")]
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn every_shipped_body_carries_the_markers_its_row_claims() {

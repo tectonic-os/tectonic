@@ -987,6 +987,9 @@ fn reading(
         for name in &run.modified {
             eprintln!("tect: `{name}` has been edited since it was imported");
         }
+        for line in crate::init::drifted(&root) {
+            eprintln!("tect: {line}");
+        }
         for line in run.index.hidden() {
             eprintln!("tect: {line}");
         }
