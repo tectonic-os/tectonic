@@ -371,12 +371,14 @@ fn utf8_width(byte: u8) -> usize {
 /// carries are the only cases of: everything else here writes one.
 /// An explicit `null` reads as absent, the way `Json::optional` writes one.
 pub fn field<'a>(value: &'a Json, key: &str) -> Option<&'a Json> {
+    declared(value, key).filter(|v| !matches!(v, Json::Null))
+}
+
+/// The value a key holds, `null` included, for the reader that has to tell a
+/// key written as `null` from one never written.
+pub fn declared<'a>(value: &'a Json, key: &str) -> Option<&'a Json> {
     match value {
-        Json::Object(fields) => fields
-            .iter()
-            .find(|(name, _)| name == key)
-            .map(|(_, v)| v)
-            .filter(|v| !matches!(v, Json::Null)),
+        Json::Object(fields) => fields.iter().find(|(name, _)| name == key).map(|(_, v)| v),
         _ => None,
     }
 }

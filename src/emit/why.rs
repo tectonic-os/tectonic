@@ -951,7 +951,7 @@ pub fn known_on_host(manifest: &Json, record: Option<&Json>) -> Vec<String> {
 /// refuses, naming both numbers.
 fn readable(document: &Json, at: &std::path::Path, reads: u32) -> Result<(), String> {
     let tool = env!("CARGO_PKG_VERSION");
-    match crate::emit::json::field(document, "schema_version") {
+    match crate::emit::json::declared(document, "schema_version") {
         Some(Json::Number(found)) if *found == reads => Ok(()),
         Some(Json::Number(found)) => Err(format!(
             "{}: this image was built against schema version {found}, and Tectonic v{tool} reads \
@@ -1178,6 +1178,12 @@ mod tests {
         assert!(refused.contains("names no schema version"), "{refused}");
         assert!(refused.contains("reads 1"), "{refused}");
         assert!(refused.contains(tool), "{refused}");
+
+        // Written as `null` is malformed, not old: rebuilding with an older
+        // release is the wrong advice for it.
+        write(&manifest, r#"{"schema_version": null, "images": []}"#);
+        let refused = super::baked(&manifest, &record).err().expect("refused");
+        assert!(refused.contains("not a number"), "{refused}");
 
         // The record is read back too, and refused on its own terms.
         write(&manifest, r#"{"schema_version": 1, "images": []}"#);
