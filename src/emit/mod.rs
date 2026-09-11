@@ -58,6 +58,10 @@ pub(crate) const SCRIPTS: &[(&str, &str)] = &[
         "scripts/tect.sh",
         include_str!("../../assets/scripts/tect.sh"),
     ),
+    (
+        "scripts/smoke.sh",
+        include_str!("../../assets/scripts/smoke.sh"),
+    ),
     ("scripts/vm.sh", include_str!("../../assets/scripts/vm.sh")),
 ];
 

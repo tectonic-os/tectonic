@@ -7,5 +7,6 @@
 ==== generated/lib/wrap-helpers.sh
 ==== scripts/lint.sh
 ==== scripts/tect.sh
+==== scripts/smoke.sh
 ==== scripts/vm.sh
 ==== generated/plan.json

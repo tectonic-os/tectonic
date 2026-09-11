@@ -69,72 +69,17 @@ jobs:
         run: |
           sudo podman pull "${IMAGE_REGISTRY}/${IMAGE_NAME}:latest"
 
-      - name: Generate SSH key for VM access
+      - name: Install and boot the image
+        timeout-minutes: 30
         run: |
-          ssh-keygen -t ed25519 -f "${RUNNER_TEMP}/smoke-key" -N '' -C 'smoke-test'
-          chmod 600 "${RUNNER_TEMP}/smoke-key"
-
-      - name: Install the image to a disk
-        run: |
-          truncate -s 20G "${RUNNER_TEMP}/disk.raw"
-          # the assertions arrive over ssh, and an image may ship sshd disabled
-          sudo podman run --rm --privileged --pid=host \
-            --security-opt label=type:unconfined_t \
-            -v /dev:/dev \
-            -v /var/lib/containers/storage:/var/lib/containers/storage \
-            -v "${RUNNER_TEMP}":/output \
-            "${IMAGE_REGISTRY}/${IMAGE_NAME}:latest" \
-            bootc install to-disk \
-            --via-loopback \
-            --generic-image \
-            --filesystem btrfs \
-            --karg console=ttyS0,115200n8 \
-            --karg systemd.wants=sshd.service \
-            --root-ssh-authorized-keys /output/smoke-key.pub \
-            /output/disk.raw
-          ls -lh "${RUNNER_TEMP}/disk.raw"
-
-      - name: Boot VM under qemu
-        run: |
-          cp /usr/share/OVMF/OVMF_VARS_4M.fd "${RUNNER_TEMP}/vars.fd"
-
-          qemu-system-x86_64 \
-            -machine q35 \
-            -m 4096 \
-            -smp 2 \
-            -cpu host \
-            -enable-kvm \
-            -display none \
-            -drive if=pflash,unit=0,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
-            -drive if=pflash,unit=1,format=raw,file="${RUNNER_TEMP}/vars.fd" \
-            -serial "file:${RUNNER_TEMP}/console.log" \
-            -drive file="${RUNNER_TEMP}/disk.raw",if=virtio,format=raw \
-            -nic user,hostfwd=tcp::2222-:22 \
-            > "${RUNNER_TEMP}/qemu.log" 2>&1 &
-          QEMU_PID=$!
-          echo "qemu_pid=${QEMU_PID}" >> "$GITHUB_ENV"
-
-      - name: Wait for SSH
-        timeout-minutes: 10
-        run: |
-          for i in $(seq 30); do
-            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
-                -i "${RUNNER_TEMP}/smoke-key" \
-                -p 2222 root@localhost 'echo ok' 2>/dev/null; then
-              echo "SSH ready after ${i} attempts"
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "SSH did not come up" >&2
-          exit 1
+          ./scripts/smoke.sh "${IMAGE_REGISTRY}/${IMAGE_NAME}:latest" "${RUNNER_TEMP}/vm"
 
       - name: Assertions
         timeout-minutes: 10
         run: |
           s() {
-            ssh -o StrictHostKeyChecking=no \
-              -i "${RUNNER_TEMP}/smoke-key" \
+            ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o LogLevel=ERROR -i "${RUNNER_TEMP}/vm/key" \
               -p 2222 root@localhost "$@"
           }
 
@@ -155,6 +100,14 @@ jobs:
             echo "No failed units"
           fi
 
+          # A skipped renderer is no failed unit, and it leaves a deb menu stale.
+          echo "==> grub-menu-from-bls"
+          rendered=yes
+          if s systemctl cat grub-menu-from-bls.service > /dev/null 2>&1; then
+            rendered="$(s systemctl show -P ConditionResult grub-menu-from-bls.service)"
+            echo "condition: ${rendered}"
+          fi
+
           echo "==> selinux denials"
           denials="$(s journalctl -b --no-pager | grep -Ei 'avc:[[:space:]]+denied')" || true
           if [ -n "$denials" ]; then
@@ -172,6 +125,10 @@ jobs:
             echo "FAIL: the units above are failed" >&2
             exit 1
           fi
+          if [ "$rendered" != yes ]; then
+            echo "FAIL: grub-menu-from-bls did not run this boot" >&2
+            exit 1
+          fi
           # A denial is not a failed unit: the smoke test reports `running`
           # while the policy is refusing work, which is a pass that means
           # nothing. Judged last so the readings above are all printed first.
@@ -184,10 +141,10 @@ jobs:
         if: failure()
         run: |
           echo "==> qemu"
-          cat "${RUNNER_TEMP}/qemu.log" 2>/dev/null || true
+          cat "${RUNNER_TEMP}/vm/qemu.log" 2>/dev/null || true
           echo "==> serial"
-          if [ -s "${RUNNER_TEMP}/console.log" ]; then
-            cat "${RUNNER_TEMP}/console.log"
+          if [ -s "${RUNNER_TEMP}/vm/console.log" ]; then
+            cat "${RUNNER_TEMP}/vm/console.log"
           else
             echo "the VM wrote nothing to the serial console"
           fi
@@ -195,5 +152,4 @@ jobs:
       - name: Stop qemu
         if: always()
         run: |
-          kill "${qemu_pid}" 2>/dev/null || true
-          wait "${qemu_pid}" 2>/dev/null || true
+          kill "$(cat "${RUNNER_TEMP}/vm/qemu.pid" 2>/dev/null)" 2>/dev/null || true
