@@ -1,15 +1,6 @@
-# The installer live environment: a fixed Fedora base, which is a decision about
-# Secure Boot. Fedora ships a shim signed by the Microsoft UEFI CA that firmware
-# already trusts; Debian ships an unsigned systemd-boot and no shim, which
-# firmware with Secure Boot on refuses with `Access Denied` before the installer
-# draws anything. fisherman runs the target image through podman, so the family
-# installing is independent of the family installed.
-#
-# Two costs: the media no longer carries the payload's own kernel, so media that
-# boots does not prove the installed system will, and a stick for a non-Fedora
-# target grows, since the live rootfs and the offline store share nothing.
-#
-# Staged into out/bootiso/ by `tect vm build iso` and never committed.
+# The installer live environment. `tect vm build iso` stages this into
+# out/bootiso/ and sets `LIVE_BASE` to the payload itself for a dnf family; the
+# Fedora default serves the rest, whose images tacklebox stages unsigned.
 
 # renovate: datasource=docker depName=docker.io/library/golang
 ARG GO_IMAGE=docker.io/library/golang:1.26
@@ -76,9 +67,9 @@ FROM ${LIVE_BASE}
 # password to chpasswd, and only a `$`-prefixed crypt string takes the `-e`
 # branch. crypt(3) is not an option — glibc keeps it in libcrypt.
 #
-# The dnf arm is the one that runs; the apt arm is kept because `LIVE_BASE` is
-# overridable, and it produces unsigned media. The assertion below makes a wrong
-# package name a failed ISO build and not a wiped disk.
+# The apt arm produces unsigned media. EL packages no kmscon, so it is asked
+# for alone. The assertion below makes a wrong package name a failed ISO build
+# and not a wiped disk.
 RUN set -eux; \
     if command -v apt-get > /dev/null 2>&1; then \
         apt-get update -y; \
@@ -90,7 +81,8 @@ RUN set -eux; \
     else \
         dnf install -y --setopt=install_weak_deps=False \
             podman fuse-overlayfs cryptsetup skopeo openssl \
-            util-linux dosfstools e2fsprogs xfsprogs kmscon; \
+            util-linux dosfstools e2fsprogs xfsprogs; \
+        dnf install -y --setopt=install_weak_deps=False kmscon || true; \
         dnf clean all; \
     fi; \
     for tool in podman fuse-overlayfs skopeo cryptsetup systemd-cryptenroll \
@@ -100,6 +92,24 @@ RUN set -eux; \
     done; \
     command -v kmscon > /dev/null 2>&1 \
         || echo "no kmscon here; the console falls back to the kernel VT" >&2
+
+# The media is not the machine it installs, so a hardened payload's rules that
+# stop a stick booting or its console being driven are lifted here: modules the
+# media boots through, services that block USB, binaries or a full audit log,
+# and the shell timeout. The initramfs tacklebox builds reads this modprobe.d.
+ARG MEDIA_MODULES="usb_storage uas squashfs loop overlay isofs vfat"
+RUN set -eux; \
+    pattern="$(echo "$MEDIA_MODULES" | sed 's/_/[-_]/g; s/ /|/g')"; \
+    find /etc/modprobe.d /usr/lib/modprobe.d -name '*.conf' -type f -exec sed -i -E \
+        "/^[[:space:]]*(install|blacklist)[[:space:]]+(${pattern})([[:space:]]|\$)/d" {} +; \
+    kver="$(find /usr/lib/modules -mindepth 1 -maxdepth 1 -printf '%f\n' | head -n1)"; \
+    blocked="$(modprobe -S "$kver" -c 2> /dev/null \
+        | grep -E "^(install|blacklist) ($(echo "$MEDIA_MODULES" | tr ' ' '|'))( |\$)" || true)"; \
+    [ -z "$blocked" ] || { echo "the media cannot load: ${blocked}" >&2; exit 1; }; \
+    systemctl mask usbguard.service fapolicyd.service auditd.service; \
+    grep -rlZ TMOUT /etc/profile /etc/profile.d /etc/bashrc /etc/bash.bashrc 2> /dev/null \
+        | xargs -0r sed -i '/TMOUT/d'; \
+    systemctl set-default multi-user.target
 
 # Fisherman is the backend and nothing here reimplements partitioning, LUKS or
 # TPM2 enrolment. Its recipe is baked in at a fixed path rather than written
