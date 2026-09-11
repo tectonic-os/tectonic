@@ -26,6 +26,7 @@ done
 recipe="$(./scripts/tect.sh recipe)"
 filesystem="$(jq -r .filesystem <<< "$recipe")"
 composefs="$(jq -r .composeFsBackend <<< "$recipe")"
+bootloader="$(jq -r .bootloader <<< "$recipe")"
 
 rm -f "${dir}/key" "${dir}/key.pub" "${dir}/disk.raw"
 ssh-keygen -q -t ed25519 -f "${dir}/key" -N '' -C smoke
@@ -40,6 +41,11 @@ args=(
     --karg console=tty0 --karg 'console=ttyS0,115200n8'
     --karg systemd.wants=sshd.service
 )
+# fisherman's reading of the recipe: empty and `grub2` are bootc's default.
+case "$bootloader" in
+    "" | grub2) ;;
+    *) args+=(--bootloader "$bootloader") ;;
+esac
 mounts=()
 # `--composefs-backend` refuses a containers-storage source with `Invalid
 # splitstream content type`, and takes an OCI layout.

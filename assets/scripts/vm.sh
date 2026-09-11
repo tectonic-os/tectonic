@@ -230,6 +230,7 @@ render_menu() {
 install_disk() {
     command -v skopeo > /dev/null 2>&1 \
         || die "skopeo is not installed, and it writes the layout bootc installs from"
+    command -v jq > /dev/null 2>&1 || die "jq is not installed, and it reads the install recipe"
     if [ "$type" = qcow2 ]; then
         command -v qemu-img > /dev/null 2>&1 \
             || die "qemu-img is not installed, and a qcow2 is converted from the raw disk"
@@ -237,7 +238,16 @@ install_disk() {
 
     # Everything is written beside the disk and moved onto it at the end, so a
     # run that fails or is interrupted leaves the disk that was already there.
-    local raw="out/${type}/disk.raw.part" layout="out/oci-cache" key_args=()
+    local raw="out/${type}/disk.raw.part" layout="out/oci-cache" key_args=() recipe bootloader
+    recipe="$(./scripts/tect.sh recipe ${target:+--target "$target"})"
+    bootloader="$(jq -r .bootloader <<< "$recipe")"
+    local install_args=(--filesystem "$(jq -r .filesystem <<< "$recipe")")
+    [ "$(jq -r .composeFsBackend <<< "$recipe")" != true ] || install_args+=(--composefs-backend)
+    # fisherman's reading of the recipe: empty and `grub2` are bootc's default.
+    case "$bootloader" in
+        "" | grub2) ;;
+        *) install_args+=(--bootloader "$bootloader") ;;
+    esac
     mkdir -p "out/${type}"
     rm -f "$raw"
     truncate -s "${DISK_SIZE:-20G}" "$raw"
@@ -272,9 +282,8 @@ install_disk() {
         -v "${PWD}/${layout}":/oci:ro \
         --security-opt label=type:unconfined_t \
         "$ref" \
-        bootc install to-disk --via-loopback --composefs-backend \
-        --source-imgref oci:/oci \
-        --filesystem ext4 --wipe --generic-image \
+        bootc install to-disk --via-loopback --source-imgref oci:/oci \
+        --wipe --generic-image "${install_args[@]}" \
         "${key_args[@]}" /out/disk.raw.part
 
     sudoif chown -R "$(id -u):$(id -g)" out/
