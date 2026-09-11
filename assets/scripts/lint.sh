@@ -2,18 +2,17 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-mapfile -t scripts < <(
-    find scripts generated/lib modules -path modules/.remote -prune -o \
-        -name '*.sh' -type f -print
-    find modules -path modules/.remote -prune -o -path '*/files/*' -type f \
-        \( -path '*/libexec/*' -o -path '*/system-generators/*' \) -print
-)
+mapfile -t scripts < <(find scripts generated/lib modules -path modules/.remote -prune -o \
+    -name '*.sh' -type f -print)
 # A `repo` file is shell and carries no extension.
 mapfile -t repos < <(find modules -path modules/.remote -prune -o -name repo -type f -print)
+# What a module ships to run on the machine, and each names its shell.
+mapfile -t helpers < <(find modules -path modules/.remote -prune -o -path '*/files/*' -type f \
+    \( -path '*/libexec/*' -o -path '*/system-generators/*' \) -print)
 shfmt=(shfmt -i 4 -ci -bn -sr)
 
 if [ "${1:-}" = "--fix" ]; then
-    "${shfmt[@]}" -w "${scripts[@]}" "${repos[@]}"
+    "${shfmt[@]}" -w "${scripts[@]}" "${repos[@]}" "${helpers[@]}"
     echo "lint: formatted ${#scripts[@]} scripts"
     exit
 fi
@@ -29,7 +28,8 @@ shellcheck -s bash "${scripts[@]}"
 # `REPO_ID` is a `repo` file's interface: the helper and the emitter read it,
 # and shellcheck sees neither.
 [ "${#repos[@]}" -eq 0 ] || shellcheck -s bash -e SC2034 "${repos[@]}"
-"${shfmt[@]}" -d "${scripts[@]}" "${repos[@]}" || {
+[ "${#helpers[@]}" -eq 0 ] || shellcheck "${helpers[@]}"
+"${shfmt[@]}" -d "${scripts[@]}" "${repos[@]}" "${helpers[@]}" || {
     echo "lint: unformatted, run ./scripts/lint.sh --fix" >&2
     exit 1
 }
