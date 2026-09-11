@@ -237,7 +237,7 @@ install_disk() {
 
     # Everything is written beside the disk and moved onto it at the end, so a
     # run that fails or is interrupted leaves the disk that was already there.
-    local raw="out/${type}/disk.raw.part" layout="out/oci-cache" key_args=() key_mount=()
+    local raw="out/${type}/disk.raw.part" layout="out/oci-cache" key_args=()
     mkdir -p "out/${type}"
     rm -f "$raw"
     truncate -s "${DISK_SIZE:-20G}" "$raw"
@@ -249,10 +249,11 @@ install_disk() {
     rm -rf "$layout"
     skopeo copy "containers-storage:${ref}" "oci:${layout}"
 
+    # A composefs install drops `--root-ssh-authorized-keys`, so the key is a
+    # credential on the kernel command line, which systemd's provision.conf reads.
     if [ -n "$ssh_key" ]; then
         [ -s "$ssh_key" ] || die "$ssh_key does not hold an SSH public key"
-        key_mount=(-v "$(realpath "$ssh_key"):/root-ssh-authorized-keys:ro")
-        key_args=(--root-ssh-authorized-keys /root-ssh-authorized-keys)
+        key_args=(--karg "systemd.set_credential_binary=ssh.authorized_keys.root:$(base64 -w0 "$ssh_key")")
     fi
 
     # `load_rootful` keeps root's store from holding a stale image of the same
@@ -269,7 +270,6 @@ install_disk() {
         -v /dev:/dev \
         -v "${PWD}/out/${type}":/out \
         -v "${PWD}/${layout}":/oci:ro \
-        "${key_mount[@]}" \
         --security-opt label=type:unconfined_t \
         "$ref" \
         bootc install to-disk --via-loopback --composefs-backend \

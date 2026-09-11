@@ -34,11 +34,11 @@ truncate -s "${DISK_SIZE:-20G}" "${dir}/disk.raw"
 # `--generic-image` whatever the recipe says: this disk boots under another
 # firmware than the one that installed it, so it wants the removable path and
 # no NVRAM entry. The assertions arrive over ssh, and an image may ship sshd
-# disabled.
+# disabled. The last `console=` is /dev/console, so ttyS0 goes after tty0.
 args=(
     --via-loopback --generic-image --filesystem "$filesystem"
-    --karg 'console=ttyS0,115200n8' --karg systemd.wants=sshd.service
-    --root-ssh-authorized-keys /output/key.pub
+    --karg console=tty0 --karg 'console=ttyS0,115200n8'
+    --karg systemd.wants=sshd.service
 )
 mounts=()
 # `--composefs-backend` refuses a containers-storage source with `Invalid
@@ -103,11 +103,14 @@ done
 cp "${code/CODE/VARS}" "${dir}/vars.fd"
 # A hardened image refuses root over ssh. The drop-in reaches the machine as a
 # credential and lives in /run, so the /etc a scan measures is the image's.
+# The key is a credential too: a composefs install drops
+# `--root-ssh-authorized-keys`.
 # shellcheck disable=SC2016 # expanded by systemd, from each family's EnvironmentFile
 dropin="$(printf '%s\n' '[Service]' 'ExecStart=' \
     'ExecStart=/usr/sbin/sshd -D -oPermitRootLogin=prohibit-password $OPTIONS $SSHD_OPTS' \
     | base64 -w0)"
 qemu-system-x86_64 \
+    -smbios "type=11,value=io.systemd.credential.binary:ssh.authorized_keys.root=$(base64 -w0 "${dir}/key.pub")" \
     -smbios "type=11,value=io.systemd.credential.binary:systemd.unit-dropin.sshd.service=${dropin}" \
     -smbios "type=11,value=io.systemd.credential.binary:systemd.unit-dropin.ssh.service=${dropin}" \
     -machine q35 -m "${RAM:-4096}" -smp 2 -cpu host -enable-kvm -display none \
