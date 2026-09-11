@@ -144,7 +144,7 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
         format!("IMAGE_REGISTRY={}", namespace.clone().unwrap_or_default()),
         format!(
             "CONTRACT_FILES={}",
-            contract_files(image, &modules).join(" ")
+            contract_files(image, &modules, &list.capabilities).join(" ")
         ),
         format!(
             "VERIFY_EXCEPTIONS={}",

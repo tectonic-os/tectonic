@@ -14,7 +14,7 @@ pub fn suppress(image: &mut Image) {
     let base: BTreeSet<String> = image
         .base
         .iter()
-        .flat_map(|b| b.provides.iter().chain(b.provides_files.iter()))
+        .flat_map(|b| b.provides.iter())
         .map(|decl| decl.name.clone())
         .collect();
     if base.is_empty() {
@@ -33,13 +33,7 @@ fn covered(entry: &Entry, base: &BTreeSet<String>) -> bool {
     let Some(module) = &entry.module else {
         return false;
     };
-    let mut decls = provided(module).peekable();
-    decls.peek().is_some() && decls.all(|decl| base.contains(&decl.name))
-}
-
-/// Capabilities and contract paths together: a base covers both the same way.
-fn provided(module: &Module) -> impl Iterator<Item = &Decl> {
-    module.provides.iter().chain(module.provides_files.iter())
+    !module.provides.is_empty() && module.provides.iter().all(|decl| base.contains(&decl.name))
 }
 
 fn names(decls: &[&Decl]) -> String {
@@ -99,7 +93,7 @@ fn satisfied_by(index: &Index, image: &Image, name: &str) -> String {
 pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
     let mut offered: BTreeMap<&str, Vec<&Module>> = BTreeMap::new();
     for module in image.modules() {
-        for decl in module.provides.iter().chain(module.provides_files.iter()) {
+        for decl in &module.provides {
             offered.entry(decl.name.as_str()).or_default().push(module);
         }
     }
@@ -107,7 +101,7 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
     let base_caps: BTreeMap<&str, &crate::model::module::Decl> = image
         .base
         .iter()
-        .flat_map(|b| b.provides.iter().chain(b.provides_files.iter()))
+        .flat_map(|b| b.provides.iter())
         .map(|decl| (decl.name.as_str(), decl))
         .collect();
 
@@ -138,8 +132,10 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
     // here is a module the base covers in part: its layer still builds, and
     // would provision what the base ships a second time.
     for module in image.modules() {
-        let (covered, rest): (Vec<&Decl>, Vec<&Decl>) =
-            provided(module).partition(|decl| base_caps.contains_key(decl.name.as_str()));
+        let (covered, rest): (Vec<&Decl>, Vec<&Decl>) = module
+            .provides
+            .iter()
+            .partition(|decl| base_caps.contains_key(decl.name.as_str()));
         let (Some(first), Some(_)) = (covered.first(), rest.first()) else {
             continue;
         };
@@ -226,7 +222,7 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
                     &first.src,
                 )
                 .at(
-                    first.provides.iter().chain(first.provides_files.iter())
+                    first.provides.iter()
                         .find(|d| d.name == **capability)
                         .map(|d| d.span)
                         .unwrap_or_default(),
@@ -262,13 +258,7 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
     }
 
     for module in image.modules() {
-        let hard = module
-            .requires
-            .iter()
-            .map(|d| (d, "requires"))
-            .chain(module.requires_files.iter().map(|d| (d, "requires-file")));
-
-        for (decl, kind) in hard {
+        for decl in &module.requires {
             if base_caps.contains_key(decl.name.as_str()) {
                 continue;
             }
@@ -277,7 +267,7 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
                 issues.push(
                     Issue::new(
                         format!(
-                            "`{}` {kind} `{}`, which nothing enabled provides",
+                            "`{}` requires `{}`, which nothing enabled provides",
                             module.path, decl.name
                         ),
                         &module.src,
@@ -294,7 +284,7 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
                         issues.push(
                             Issue::new(
                                 format!(
-                                    "`{}` {kind} `{}`, which only `{}` provides and only on the `{provider_flavour}` flavour",
+                                    "`{}` requires `{}`, which only `{}` provides and only on the `{provider_flavour}` flavour",
                                     module.path, decl.name, provider.path
                                 ),
                                 &module.src,

@@ -40,12 +40,12 @@ fn provided(image: &Image) -> BTreeSet<&str> {
     image
         .base
         .iter()
-        .flat_map(|base| base.provides.iter().chain(base.provides_files.iter()))
+        .flat_map(|base| base.provides.iter())
         .map(|decl| decl.name.as_str())
         .chain(
             image
                 .modules()
-                .flat_map(|m| m.provides.iter().chain(m.provides_files.iter()))
+                .flat_map(|m| m.provides.iter())
                 .map(|decl| decl.name.as_str()),
         )
         .collect()

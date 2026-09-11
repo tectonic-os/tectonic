@@ -12,7 +12,6 @@ example
 | Direction | What | With |
 | --- | --- | --- |
 | provides | `flatpak` | nothing |
-| provides file | `/usr/bin/flatpak` | nothing |
 
 ## What it declares to install
 
@@ -28,7 +27,7 @@ Nothing. It declares no `satisfies`.
 
 | Content | Hash |
 | --- | --- |
-| declared | `0179980f392ae7c6c8b7bb593c99c97d140a879abf2620a2a4ff21f49fb092fa` |
+| declared | `44de8f207845d70ba2eea51b605cdb86366917a27225143feedc49a6c8befcab` |
 
 | Collection | Locator | Selector | Verifier | Tracker |
 | --- | --- | --- | --- | --- |
@@ -71,7 +70,7 @@ None. It declares no `copr` and ships no `repo` file.
   "groups": [],
   "coprs": [],
   "satisfies": [],
-  "content": "0179980f392ae7c6c8b7bb593c99c97d140a879abf2620a2a4ff21f49fb092fa",
+  "content": "44de8f207845d70ba2eea51b605cdb86366917a27225143feedc49a6c8befcab",
   "built": null,
   "imported": {
     "collection": "tectonic-os",
@@ -107,7 +106,6 @@ The build record names no target, so this is read across every target the baked 
 | Direction | What | With |
 | --- | --- | --- |
 | provides | `flatpak` | nothing |
-| provides file | `/usr/bin/flatpak` | nothing |
 
 ## What it declares to install
 
@@ -123,7 +121,7 @@ Nothing. It declares no `satisfies`.
 
 | Content | Hash |
 | --- | --- |
-| declared | `0179980f392ae7c6c8b7bb593c99c97d140a879abf2620a2a4ff21f49fb092fa` |
+| declared | `44de8f207845d70ba2eea51b605cdb86366917a27225143feedc49a6c8befcab` |
 
 | Collection | Locator | Selector | Verifier | Tracker |
 | --- | --- | --- | --- | --- |
@@ -146,7 +144,7 @@ drivers, fedora-family, hello, flatpak
 
 | Content | Hash |
 | --- | --- |
-| declared | `0179980f392ae7c6c8b7bb593c99c97d140a879abf2620a2a4ff21f49fb092fa` |
+| declared | `44de8f207845d70ba2eea51b605cdb86366917a27225143feedc49a6c8befcab` |
 | observed by the build | `not what was declared` |
 
 **The two documents disagree**, which they cannot if both came from this build.

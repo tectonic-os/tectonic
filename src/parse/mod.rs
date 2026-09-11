@@ -21,6 +21,21 @@ pub(crate) fn check_capability(name: &str, span: Span, src: &Source, issues: &mu
     if is_name(name) {
         return;
     }
+    if name.starts_with('/') {
+        issues.push(
+            Issue::new(
+                format!("`{name}` is a path where a capability is named"),
+                src,
+            )
+            .at(span, "a name, such as `ssh` or `bootc`")
+            .help(
+                "a capability is found at `/usr/bin/<name>` or `/usr/sbin/<name>`; anywhere \
+                     else, a module writes `provides \"<name>\" file=\"<path>\"`, or bases.kdl a \
+                     `capability \"<name>\" \"<path>\"` row",
+            ),
+        );
+        return;
+    }
     issues.push(
         Issue::new(format!("invalid capability name `{name}`"), src)
             .at(span, "lowercase, digits and dashes, starting with a letter")
@@ -31,15 +46,15 @@ pub(crate) fn check_capability(name: &str, span: Span, src: &Source, issues: &mu
     );
 }
 
-/// A path a base guarantees is checked on the finished image, where nothing has
-/// a working directory for a relative one to be read against.
+/// A witness path is checked on the finished image, where nothing has a
+/// working directory for a relative one to be read against.
 pub(crate) fn check_path(path: &str, span: Span, src: &Source, issues: &mut Issues) {
     if path.starts_with('/') {
         return;
     }
     issues.push(
         Issue::new(format!("`{path}` is not an absolute path"), src)
-            .at(span, "`provides-file` takes absolute paths")
+            .at(span, "an absolute path")
             .help(
                 "the path is checked on the finished image, where nothing has a working directory",
             ),

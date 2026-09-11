@@ -38,7 +38,40 @@
           "rechunking",
           "initramfs-generation"
         ],
-        "provides_files": [],
+        "witnesses": {
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "kernel-devel": [
+            "/usr/bin/kernel-devel",
+            "/usr/sbin/kernel-devel"
+          ],
+          "kernel-devel-helpers": [
+            "/usr/bin/kernel-devel-helpers",
+            "/usr/sbin/kernel-devel-helpers"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
+          ]
+        },
         "requires": [],
         "satisfies": []
       },
@@ -65,21 +98,22 @@
               "description": "A kernel that signs its own modules against a Secure Boot key",
               "options": {},
               "provides": [
-                "kernel-devel"
+                "kernel-devel",
+                "kernel-devel-helpers",
+                "secureboot-key"
               ],
               "requires": [
                 "initramfs-generation"
               ],
-              "provides_files": [
-                "/usr/libexec/kernel-devel-helpers.sh",
-                "/usr/share/secureboot/sb_cert.der"
-              ],
-              "requires_files": [],
+              "files": {
+                "kernel-devel-helpers": "/usr/libexec/kernel-devel-helpers.sh",
+                "secureboot-key": "/usr/share/secureboot/sb_cert.der"
+              },
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "4b33131019d71fdded2b8e45c186cd290fc20e9b2e208bfd39f8034f35be6a7f",
+                "content": "355111a1aa1c18b1eb28b565b5467ac90318da40b51a060ba22f0a36ebc52927",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -112,17 +146,15 @@
               "options": {},
               "provides": [],
               "requires": [
-                "kernel-devel"
+                "kernel-devel",
+                "kernel-devel-helpers"
               ],
-              "provides_files": [],
-              "requires_files": [
-                "/usr/libexec/kernel-devel-helpers.sh"
-              ],
+              "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "9180d9d668bc79d3f81dab617c5f63c0bd44690b8af34243c1f4b452b86fde89",
+                "content": "1f0dd864c0c77568eb600489b2054f5becf06ea1b609b19ff1acaf5313183412",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -137,14 +169,11 @@
             "mok_privkey"
           ],
           "contract_files": [
+            "/usr/bin/dracut",
             "/usr/share/secureboot/sb_cert.der"
           ],
           "verify_exceptions": [],
           "assets": [],
-          "provides_files": {
-            "/usr/libexec/kernel-devel-helpers.sh": "kernel/signed-kernel",
-            "/usr/share/secureboot/sb_cert.der": "kernel/signed-kernel"
-          },
           "overlay_files": {
             "/usr/share/secureboot/sb_cert.der": "kernel/signed-kernel"
           },

@@ -43,7 +43,32 @@
         "provides": [
           "rechunking"
         ],
-        "provides_files": [],
+        "witnesses": {
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
+          ]
+        },
         "requires": [],
         "satisfies": []
       },
@@ -73,8 +98,7 @@
                 "build-environment"
               ],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -98,8 +122,7 @@
               "options": {},
               "provides": [],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [
                 {
                   "family": "fedora",
@@ -147,7 +170,6 @@
           "contract_files": [],
           "verify_exceptions": [],
           "assets": [],
-          "provides_files": {},
           "overlay_files": {},
           "overlay_overridden": [],
           "collected_files": {},

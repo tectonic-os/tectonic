@@ -849,7 +849,7 @@ fn image_has(
     image
         .base
         .iter()
-        .flat_map(|base| base.provides.iter().chain(base.provides_files.iter()))
+        .flat_map(|base| base.provides.iter())
         .any(|decl| decl.name == want)
         || image.entries.iter().any(|entry| {
             (entry.flavour.is_none() || entry.flavour.as_deref() == flavour)

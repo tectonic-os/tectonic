@@ -172,10 +172,10 @@ graph LR
 
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
-| `/usr/bin/nothing` | file |  | `core/one` |  |
 | `apparmor-policy` | capability |  | `core/one` | `core/one`, `core/two` |
 | `boot policy` | capability | `base` |  |  |
 | `logging` | capability |  |  | `core/one` |
+| `nothing` | capability |  | `core/one` |  |
 | `package-manager` | capability |  | `core/one` |  |
 | `rechunking` | capability | `base` |  |  |
 | `selinux-policy` | capability | `base` |  | `core/two` |
@@ -184,16 +184,6 @@ graph LR
 {
   "image": "broken-graph",
   "capabilities": [
-    {
-      "name": "/usr/bin/nothing",
-      "kind": "file",
-      "build_only": false,
-      "provider": null,
-      "required_by": [
-        "core/one"
-      ],
-      "after": []
-    },
     {
       "name": "apparmor-policy",
       "kind": "capability",
@@ -224,6 +214,16 @@ graph LR
       "after": [
         "core/one"
       ]
+    },
+    {
+      "name": "nothing",
+      "kind": "capability",
+      "build_only": false,
+      "provider": null,
+      "required_by": [
+        "core/one"
+      ],
+      "after": []
     },
     {
       "name": "package-manager",

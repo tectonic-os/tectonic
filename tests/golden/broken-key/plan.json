@@ -37,7 +37,32 @@
         "provides": [
           "rechunking"
         ],
-        "provides_files": [],
+        "witnesses": {
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
+          ]
+        },
         "requires": [],
         "satisfies": []
       },
@@ -63,12 +88,13 @@
               "remote": null,
               "description": "Every way a key declaration can be wrong",
               "options": {},
-              "provides": [],
-              "requires": [],
-              "provides_files": [
-                "/usr/share/secureboot/sb_cert.der"
+              "provides": [
+                "secureboot-key"
               ],
-              "requires_files": [],
+              "requires": [],
+              "files": {
+                "secureboot-key": "/usr/share/secureboot/sb_cert.der"
+              },
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -90,9 +116,6 @@
           ],
           "verify_exceptions": [],
           "assets": [],
-          "provides_files": {
-            "/usr/share/secureboot/sb_cert.der": "core/keys"
-          },
           "overlay_files": {
             "/usr/share/secureboot/sb_cert.der": "core/keys"
           },

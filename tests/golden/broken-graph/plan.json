@@ -39,7 +39,48 @@
           "boot policy",
           "selinux-policy"
         ],
-        "provides_files": [],
+        "witnesses": {
+          "apparmor-policy": [
+            "/usr/bin/apparmor-policy",
+            "/usr/sbin/apparmor-policy"
+          ],
+          "boot policy": [
+            "/usr/bin/boot policy",
+            "/usr/sbin/boot policy"
+          ],
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "nothing": [
+            "/usr/bin/nothing",
+            "/usr/sbin/nothing"
+          ],
+          "package-manager": [
+            "/usr/bin/package-manager",
+            "/usr/sbin/package-manager"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
+          ]
+        },
         "requires": [
           "bootc-base"
         ],
@@ -70,12 +111,10 @@
               "provides": [],
               "requires": [
                 "package-manager",
-                "apparmor-policy"
+                "apparmor-policy",
+                "nothing"
               ],
-              "provides_files": [],
-              "requires_files": [
-                "/usr/bin/nothing"
-              ],
+              "files": {},
               "packages": [
                 {
                   "family": "fedora",
@@ -88,7 +127,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "e3cbcaa9f4207c9bfe361dda9b602d025b8bb0b908417d7d4163e2353d371fd7",
+                "content": "2f32f4607af03a59b660c9331f9c76ddb72e71ecd686178bf27795f60a51c87f",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -110,8 +149,7 @@
                 "shell-tools"
               ],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -137,8 +175,7 @@
                 "shell-tools"
               ],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -155,10 +192,12 @@
           ],
           "suppressed": [],
           "secrets": [],
-          "contract_files": [],
+          "contract_files": [
+            "/usr/bin/boot policy|/usr/sbin/boot policy",
+            "/usr/sbin/semodule"
+          ],
           "verify_exceptions": [],
           "assets": [],
-          "provides_files": {},
           "overlay_files": {},
           "overlay_overridden": [],
           "collected_files": {},

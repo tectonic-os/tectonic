@@ -4,7 +4,6 @@ image {
     base "ghcr.io/ublue-os/bazzite:stable" {
         family "fedora"
         provides "rechunking" "flatpak"
-        provides-file "/usr/bin/flatpak"
         satisfies {
             cis-fedora "1.1.1.1" "4.1.3.1"
         }

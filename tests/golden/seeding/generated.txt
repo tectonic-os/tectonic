@@ -191,7 +191,6 @@ graph LR
 
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
-| `/usr/bin/flatpak` | file | `tectonic-os/flatpak` |  |  |
 | `build-environment` | capability | `fedora-family` |  |  |
 | `flatpak` | capability | `tectonic-os/flatpak` |  |  |
 | `rechunking` | capability | `base` |  |  |
@@ -199,14 +198,6 @@ graph LR
 {
   "image": "example",
   "capabilities": [
-    {
-      "name": "/usr/bin/flatpak",
-      "kind": "file",
-      "build_only": false,
-      "provider": "tectonic-os/flatpak",
-      "required_by": [],
-      "after": []
-    },
     {
       "name": "build-environment",
       "kind": "capability",

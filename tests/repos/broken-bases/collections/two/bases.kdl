@@ -18,8 +18,7 @@ base "example.invalid/no-about:1" {
 base "example.invalid/wrong-names:1" {
     about "A capability and a path an image cannot use"
     family "fedora"
-    provides "Rechunking"
-    provides-file "usr/bin/flatpak"
+    provides "Rechunking" "/usr/bin/flatpak"
     signed "yes"
     bootloader "grub2"
 }
@@ -29,6 +28,8 @@ base "example.invalid/wrong-names:1" {
     family "fedora"
     bootloader "grub2"
 }
+
+capability "flatpak" "usr/bin/flatpak"
 
 base "example.invalid/no-family:1" {
     about "Nothing to build against"

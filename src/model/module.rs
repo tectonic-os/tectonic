@@ -74,6 +74,15 @@ pub struct Decl {
     pub span: Span,
 }
 
+/// A provided name and the absolute path that witnesses it.
+pub struct Located {
+    pub name: String,
+    pub file: String,
+    /// Real while the image builds, and gone from the shipped one because the
+    /// providing module removes it again.
+    pub build_only: bool,
+}
+
 /// A filename this module collects from every other module that ships one,
 /// where the build puts them, and where a contribution lands in the result
 /// when the contributor says nothing.
@@ -162,13 +171,9 @@ pub struct Module {
     /// directory: a profile is emitted against whatever the image turned out to
     /// carry, so the module never names one. An ordering edge and nothing else.
     pub policies: Vec<&'static str>,
-    /// Exact paths one module writes and another reads.
-    pub provides_files: Vec<Decl>,
-    /// The subset of `provides_files` declared `build-only=#true`: a real
-    /// contract while the image builds, and gone from the shipped one because
-    /// the providing module removes it again.
-    pub provides_files_build_only: Vec<String>,
-    pub requires_files: Vec<Decl>,
+    /// The file a provided name is witnessed by, where the module states one:
+    /// its `file=`, and every key's public half.
+    pub files: Vec<Located>,
     /// Paths this module's files/ overlay knowingly replaces.
     pub overrides: Vec<Decl>,
     /// Verify diagnostics this module's own units are allowed to produce.

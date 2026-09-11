@@ -149,25 +149,25 @@ graph LR
 
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
-| `/usr/share/secureboot/sb_cert.der` | file | `core/keys` |  |  |
 | `rechunking` | capability | `base` |  |  |
+| `secureboot-key` | file | `core/keys` |  |  |
 ==== generated/broken-key/graph.json
 {
   "image": "broken-key",
   "capabilities": [
     {
-      "name": "/usr/share/secureboot/sb_cert.der",
-      "kind": "file",
-      "build_only": false,
-      "provider": "core/keys",
-      "required_by": [],
-      "after": []
-    },
-    {
       "name": "rechunking",
       "kind": "capability",
       "build_only": false,
       "provider": "base",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "secureboot-key",
+      "kind": "file",
+      "build_only": false,
+      "provider": "core/keys",
       "required_by": [],
       "after": []
     }

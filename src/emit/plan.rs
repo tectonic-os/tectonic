@@ -1,5 +1,6 @@
 //! One resolved plan, as JSON: every fact anything downstream derives.
 
+use crate::base::Capability;
 use crate::emit::json::Json;
 use crate::model::asset::Asset;
 use crate::model::image::{Entry, Image, List, Target, NO_FLAVOUR};
@@ -161,10 +162,7 @@ fn image(list: &List, image: &Image, resolved: &Resolved) -> Json {
                         "provides",
                         Json::strings(base.provides.iter().map(|d| d.name.clone())),
                     ),
-                    (
-                        "provides_files",
-                        Json::strings(base.provides_files.iter().map(|d| d.name.clone())),
-                    ),
+                    ("witnesses", witnesses(image, &list.capabilities)),
                     (
                         "requires",
                         Json::strings(base.requires.iter().map(|d| d.name.clone())),
@@ -286,7 +284,7 @@ fn target(list: &List, image: &Image, resolved: &Resolved, target: &Target) -> J
         ),
         (
             "contract_files",
-            Json::strings(contract_files(image, &modules)),
+            Json::strings(contract_files(image, &modules, &list.capabilities)),
         ),
         (
             "verify_exceptions",
@@ -304,7 +302,6 @@ fn target(list: &List, image: &Image, resolved: &Resolved, target: &Target) -> J
             ),
         ),
         ("assets", assets(&modules)),
-        ("provides_files", provides_files(&modules)),
         (
             "overlay_files",
             overlay_files(image, &resolved.shipped, flavour),
@@ -363,16 +360,15 @@ fn module(list: &List, entry: &Entry, family: &str) -> Json {
         ),
         ("provides", Json::strings(decls(module, |m| &m.provides))),
         ("requires", Json::strings(decls(module, |m| &m.requires))),
-        // The file half of the same graph. The target carries `provides_files`
-        // as one map for the whole image, which cannot say what one module
-        // asked for.
         (
-            "provides_files",
-            Json::strings(decls(module, |m| &m.provides_files)),
-        ),
-        (
-            "requires_files",
-            Json::strings(decls(module, |m| &m.requires_files)),
+            "files",
+            Json::map(
+                module
+                    .map(|m| m.files.as_slice())
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|f| (f.name.clone(), Json::string(&f.file))),
+            ),
         ),
         (
             "packages",
@@ -496,41 +492,72 @@ fn provenance(list: &List, entry: &Entry) -> Json {
     ])
 }
 
-/// Contract file paths the finished image still carries: what the base
-/// guarantees, then what the enabled modules declare.
-pub(crate) fn contract_files(image: &Image, modules: &[&Module]) -> Vec<String> {
+/// The paths the finished image still carries, alternatives joined by `|`:
+/// every name the base claims, and every module name its module or a catalog
+/// row locates.
+pub(crate) fn contract_files(
+    image: &Image,
+    modules: &[&Module],
+    rows: &[Capability],
+) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
-    for decl in image.base.iter().flat_map(|b| b.provides_files.iter()) {
-        if !out.contains(&decl.name) {
-            out.push(decl.name.clone());
+    let mut add = |paths: Vec<String>| {
+        let token = paths.join("|");
+        if !out.contains(&token) {
+            out.push(token);
+        }
+    };
+    for decl in image.base.iter().flat_map(|b| b.provides.iter()) {
+        if let Some(paths) = crate::base::witness(&decl.name, rows) {
+            add(paths);
         }
     }
     for module in modules {
-        for decl in &module.provides_files {
-            if module.provides_files_build_only.contains(&decl.name) {
-                continue;
-            }
-            if !out.contains(&decl.name) {
-                out.push(decl.name.clone());
+        for decl in &module.provides {
+            match module.files.iter().find(|f| f.name == decl.name) {
+                Some(file) if file.build_only => {}
+                Some(file) => add(vec![file.file.clone()]),
+                None => {
+                    let row = rows.iter().find(|row| row.name == decl.name);
+                    if let Some(path) = row.and_then(|row| row.path.clone()) {
+                        add(vec![path]);
+                    }
+                }
             }
         }
     }
     out
 }
 
-/// Every contract path an enabled module declares, to the module that declares
-/// it.
-fn provides_files(modules: &[&Module]) -> Json {
-    let mut out: Vec<(String, Json)> = Vec::new();
-    for module in modules {
-        for decl in &module.provides_files {
-            if out.iter().any(|(path, _)| path == &decl.name) {
-                continue;
-            }
-            out.push((decl.name.clone(), Json::string(&module.path)));
-        }
-    }
-    Json::map(out)
+/// Every name a probe of the base can decide, to the paths that witness it:
+/// each located row, what the base claims, and what the image's modules
+/// require. An abstract row is left out, so a probe leaves it as it was.
+fn witnesses(image: &Image, rows: &[Capability]) -> Json {
+    let mut names: Vec<&str> = rows
+        .iter()
+        .filter(|row| row.path.is_some())
+        .map(|row| row.name.as_str())
+        .chain(
+            image
+                .base
+                .iter()
+                .flat_map(|b| b.provides.iter().map(|d| d.name.as_str())),
+        )
+        .chain(
+            image
+                .entries
+                .iter()
+                .chain(&image.suppressed)
+                .filter_map(|entry| entry.module.as_ref())
+                .flat_map(|m| m.requires.iter().map(|d| d.name.as_str())),
+        )
+        .collect();
+    names.sort_unstable();
+    names.dedup();
+    Json::map(names.into_iter().filter_map(|name| {
+        let paths = crate::base::witness(name, rows)?;
+        Some((name.to_string(), Json::strings(paths)))
+    }))
 }
 
 /// Every path a files/ overlay puts in this target's image, to the module it

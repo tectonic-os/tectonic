@@ -95,28 +95,27 @@
   9 | requires "apparmor-policy"
     : ^^^^|^^^
     :     `-- unsatisfied
- 10 | requires-file "/usr/bin/nothing"
+ 10 | requires "nothing"
     `----
   help: no module in the repository declares `provides "apparmor-policy"`, and
         neither does the `base` node in ./image.kdl. repo.kdl declares no
         `sources`, so there is no collection to import one from
 
-  x `core/one` requires-file `/usr/bin/nothing`, which nothing enabled
-  | provides
+  x `core/one` requires `nothing`, which nothing enabled provides
     ,-[./modules/core/one/module.kdl:10:1]
   9 | requires "apparmor-policy"
- 10 | requires-file "/usr/bin/nothing"
-    : ^^^^^^|^^^^^^
-    :       `-- unsatisfied
+ 10 | requires "nothing"
+    : ^^^^|^^^
+    :     `-- unsatisfied
  11 | after "logging"
     `----
-  help: no module in the repository declares `provides "/usr/bin/nothing"`,
-        and neither does the `base` node in ./image.kdl. repo.kdl declares no
-        `sources`, so there is no collection to import one from
+  help: no module in the repository declares `provides "nothing"`, and neither
+        does the `base` node in ./image.kdl. repo.kdl declares no `sources`,
+        so there is no collection to import one from
 
   x `core/one` builds after `logging`, which nothing enabled provides
     ,-[./modules/core/one/module.kdl:11:1]
- 10 | requires-file "/usr/bin/nothing"
+ 10 | requires "nothing"
  11 | after "logging"
     : ^^|^^
     :   `-- nothing to order after

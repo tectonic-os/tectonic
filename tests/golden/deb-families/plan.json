@@ -44,7 +44,32 @@
         "family": "debian",
         "signed": false,
         "provides": [],
-        "provides_files": [],
+        "witnesses": {
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
+          ]
+        },
         "requires": [],
         "satisfies": []
       },
@@ -74,8 +99,7 @@
                 "build-environment"
               ],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -99,8 +123,7 @@
               "options": {},
               "provides": [],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -124,8 +147,7 @@
               "options": {},
               "provides": [],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [
                 {
                   "family": "debian",
@@ -160,7 +182,6 @@
           "contract_files": [],
           "verify_exceptions": [],
           "assets": [],
-          "provides_files": {},
           "overlay_files": {
             "/etc/shared-deb.conf": "core/shared",
             "/etc/shared.conf": "core/shared"
@@ -204,7 +225,32 @@
         "family": "debian",
         "signed": false,
         "provides": [],
-        "provides_files": [],
+        "witnesses": {
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
+          ]
+        },
         "requires": [
           "bootc-base"
         ],
@@ -236,8 +282,7 @@
                 "build-environment"
               ],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -264,8 +309,7 @@
                 "apparmor-policy"
               ],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -289,8 +333,7 @@
               "options": {},
               "provides": [],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -314,8 +357,7 @@
               "options": {},
               "provides": [],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -339,8 +381,7 @@
               "options": {},
               "provides": [],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [
                 {
                   "family": "debian",
@@ -375,7 +416,6 @@
           "contract_files": [],
           "verify_exceptions": [],
           "assets": [],
-          "provides_files": {},
           "overlay_files": {
             "/etc/shared-deb.conf": "core/shared",
             "/etc/shared.conf": "core/shared"
@@ -419,7 +459,32 @@
         "family": "ubuntu",
         "signed": false,
         "provides": [],
-        "provides_files": [],
+        "witnesses": {
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
+          ]
+        },
         "requires": [],
         "satisfies": []
       },
@@ -449,8 +514,7 @@
                 "build-environment"
               ],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -474,8 +538,7 @@
               "options": {},
               "provides": [],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -499,8 +562,7 @@
               "options": {},
               "provides": [],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [
                 {
                   "family": "ubuntu",
@@ -535,7 +597,6 @@
           "contract_files": [],
           "verify_exceptions": [],
           "assets": [],
-          "provides_files": {},
           "overlay_files": {
             "/etc/shared-deb.conf": "core/shared",
             "/etc/shared.conf": "core/shared"

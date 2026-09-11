@@ -28,10 +28,10 @@
     :        `-- not part of the schema
  15 |     bootloader "grub2"
     `----
-  help: a base entry holds `about`, `family`, `provides`, `provides-file`,
-        `requires`, `signed`, `scap-content` and `bootloader`: what an image
-        built on it may assume, what it still needs, what a person picks it
-        by, what measures it and what it boots with
+  help: a base entry holds `about`, `family`, `provides`, `requires`,
+        `signed`, `scap-content` and `bootloader`: what an image built on it
+        may assume, what it still needs, what a person picks it by, what
+        measures it and what it boots with
 
   x `base` declares no `about`
     ,-[./collections/two/bases.kdl:12:1]
@@ -45,32 +45,32 @@
         reference
 
   x `signed` needs #true or #false
-    ,-[./collections/two/bases.kdl:23:5]
- 22 |     provides-file "usr/bin/flatpak"
- 23 |     signed "yes"
+    ,-[./collections/two/bases.kdl:22:5]
+ 21 |     provides "Rechunking" "/usr/bin/flatpak"
+ 22 |     signed "yes"
     :     ^^^|^^
     :        `-- not a boolean
- 24 |     bootloader "grub2"
+ 23 |     bootloader "grub2"
     `----
   help: `signed #true` records that this base publishes a cosign signature
 
   x `example.invalid/wrong-names:1` is described twice
-    ,-[./collections/two/bases.kdl:27:1]
- 26 | 
- 27 | base "example.invalid/wrong-names:1" {
+    ,-[./collections/two/bases.kdl:26:1]
+ 25 | 
+ 26 | base "example.invalid/wrong-names:1" {
     : ^^|^
     :   `-- already described above
- 28 |     about "Described twice in one file"
+ 27 |     about "Described twice in one file"
     `----
   help: one base is one entry; a second would shadow the first silently
 
   x `base` describes no `family`
-    ,-[./collections/two/bases.kdl:33:1]
- 32 | 
- 33 | base "example.invalid/no-family:1" {
+    ,-[./collections/two/bases.kdl:34:1]
+ 33 | 
+ 34 | base "example.invalid/no-family:1" {
     : ^^|^
     :   `-- no family
- 34 |     about "Nothing to build against"
+ 35 |     about "Nothing to build against"
     `----
   help: the family is what an image scaffolded on this base declares, and an
         entry without one describes nothing the tool can write
@@ -78,21 +78,33 @@
   x invalid capability name `Rechunking`
     ,-[./collections/two/bases.kdl:21:5]
  20 |     family "fedora"
- 21 |     provides "Rechunking"
+ 21 |     provides "Rechunking" "/usr/bin/flatpak"
     :     ^^^^|^^^
     :         `-- lowercase, digits and dashes, starting with a letter
- 22 |     provides-file "usr/bin/flatpak"
+ 22 |     signed "yes"
     `----
   help: the name is written into the generated graph as a mermaid label and a
         markdown table cell, neither of which quotes anything
 
+  x `/usr/bin/flatpak` is a path where a capability is named
+    ,-[./collections/two/bases.kdl:21:5]
+ 20 |     family "fedora"
+ 21 |     provides "Rechunking" "/usr/bin/flatpak"
+    :     ^^^^|^^^
+    :         `-- a name, such as `ssh` or `bootc`
+ 22 |     signed "yes"
+    `----
+  help: a capability is found at `/usr/bin/<name>` or `/usr/sbin/<name>`;
+        anywhere else, a module writes `provides "<name>" file="<path>"`, or
+        bases.kdl a `capability "<name>" "<path>"` row
+
   x `usr/bin/flatpak` is not an absolute path
-    ,-[./collections/two/bases.kdl:22:5]
- 21 |     provides "Rechunking"
- 22 |     provides-file "usr/bin/flatpak"
-    :     ^^^^^^|^^^^^^
-    :           `-- `provides-file` takes absolute paths
- 23 |     signed "yes"
+    ,-[./collections/two/bases.kdl:32:1]
+ 31 | 
+ 32 | capability "flatpak" "usr/bin/flatpak"
+    : ^^^^^|^^^^
+    :      `-- an absolute path
+ 33 | 
     `----
   help: the path is checked on the finished image, where nothing has a working
         directory

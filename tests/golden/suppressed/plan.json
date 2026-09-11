@@ -38,9 +38,32 @@
           "rechunking",
           "flatpak"
         ],
-        "provides_files": [
-          "/usr/bin/flatpak"
-        ],
+        "witnesses": {
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
+          ]
+        },
         "requires": [],
         "satisfies": [
           {
@@ -78,15 +101,12 @@
               "requires": [
                 "flatpak"
               ],
-              "provides_files": [],
-              "requires_files": [
-                "/usr/bin/flatpak"
-              ],
+              "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "6b5011cea8d1b0778c71ed6de4797852d7ab9cb42da35597dc41a0411318d43d",
+                "content": "9653e06e8ebde711a9544cabdd7f4d9b7a60af2ca893fdf42be227ac29b90503",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -112,10 +132,7 @@
                 "flatpak"
               ],
               "requires": [],
-              "provides_files": [
-                "/usr/bin/flatpak"
-              ],
-              "requires_files": [],
+              "files": {},
               "packages": [
                 {
                   "family": "fedora",
@@ -128,7 +145,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "7ac8f97efcb0b90bb41debeca1784b9f8283a1e4b31266cac27423c4bee19ea5",
+                "content": "4c6d5c98776ca0b87887befcd01a7692a1f9d6874eebc26b2feeaddb5e1545f0",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -151,7 +168,6 @@
           ],
           "verify_exceptions": [],
           "assets": [],
-          "provides_files": {},
           "overlay_files": {},
           "overlay_overridden": [],
           "collected_files": {},

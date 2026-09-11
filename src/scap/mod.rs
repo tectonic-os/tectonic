@@ -1428,7 +1428,6 @@ mod tests {
             image: image.to_string(),
             family: family.to_string(),
             provides: Vec::new(),
-            provides_files: Vec::new(),
             requires: Vec::new(),
             about: String::new(),
             signed: false,

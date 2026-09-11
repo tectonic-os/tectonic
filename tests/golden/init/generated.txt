@@ -230,53 +230,37 @@ graph LR
 
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
-| `/usr/bin/bootc` | file | `base` |  |  |
-| `/usr/bin/bootupctl` | file | `base` |  |  |
-| `/usr/bin/crun` | file | `base` |  |  |
-| `/usr/bin/podman` | file | `base` |  |  |
-| `/usr/sbin/sshd` | file | `base` |  |  |
+| `bootc` | capability | `base` |  |  |
+| `bootupctl` | capability | `base` |  |  |
+| `crun` | capability | `base` |  |  |
 | `initramfs-generation` | capability | `base` |  |  |
+| `podman` | capability | `base` |  |  |
 | `rechunking` | capability | `base` |  |  |
 | `selinux-policy` | capability | `base` |  |  |
+| `ssh` | capability | `base` |  |  |
 ==== generated/example/graph.json
 {
   "image": "example",
   "capabilities": [
     {
-      "name": "/usr/bin/bootc",
-      "kind": "file",
+      "name": "bootc",
+      "kind": "capability",
       "build_only": false,
       "provider": "base",
       "required_by": [],
       "after": []
     },
     {
-      "name": "/usr/bin/bootupctl",
-      "kind": "file",
+      "name": "bootupctl",
+      "kind": "capability",
       "build_only": false,
       "provider": "base",
       "required_by": [],
       "after": []
     },
     {
-      "name": "/usr/bin/crun",
-      "kind": "file",
-      "build_only": false,
-      "provider": "base",
-      "required_by": [],
-      "after": []
-    },
-    {
-      "name": "/usr/bin/podman",
-      "kind": "file",
-      "build_only": false,
-      "provider": "base",
-      "required_by": [],
-      "after": []
-    },
-    {
-      "name": "/usr/sbin/sshd",
-      "kind": "file",
+      "name": "crun",
+      "kind": "capability",
       "build_only": false,
       "provider": "base",
       "required_by": [],
@@ -284,6 +268,14 @@ graph LR
     },
     {
       "name": "initramfs-generation",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "podman",
       "kind": "capability",
       "build_only": false,
       "provider": "base",
@@ -300,6 +292,14 @@ graph LR
     },
     {
       "name": "selinux-policy",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "ssh",
       "kind": "capability",
       "build_only": false,
       "provider": "base",

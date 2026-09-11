@@ -97,11 +97,8 @@ pub struct Base {
     /// The full image reference, emitted verbatim as the generated `FROM`.
     pub image: String,
     pub family: String,
-    /// Capabilities the base satisfies that no module could implement
-    /// portably: rechunking, initramfs generation, MAC policy.
+    /// Capabilities the base image already ships, by name.
     pub provides: Vec<Decl>,
-    /// Binaries the base guarantees.
-    pub provides_files: Vec<Decl>,
     /// Capabilities the base is unusable without: a container base a module
     /// set turns into a bootc image declares what that module set has to
     /// provide, and `check` refuses the image until something does.
@@ -278,6 +275,8 @@ pub struct List {
     /// Whether a provenance fact that is missing or does not match is an error.
     /// Every fact is recorded either way.
     pub audit_enforce: bool,
+    /// Where each capability's presence is read, off the catalog.
+    pub capabilities: Vec<crate::base::Capability>,
     /// What repo.kdl declares, which is `SCHEMA_VERSION` or the load failed.
     pub schema_version: Option<u32>,
     /// Whether the node was there at all, so a malformed one is reported once.

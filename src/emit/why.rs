@@ -7,8 +7,8 @@
 use crate::emit::json::{field, items, strings, text, Json};
 use crate::emit::{Part, Table};
 use crate::layout;
-use crate::model::image::{Base, Image, List};
-use crate::model::module::{Decl, Module};
+use crate::model::image::{Image, List};
+use crate::model::module::Module;
 use crate::provenance::Evidence;
 use std::fmt::Write as _;
 
@@ -68,10 +68,6 @@ pub struct Why {
     pub provides: Vec<(String, Vec<String>)>,
     /// A capability it requires, and what provides it.
     pub requires: Vec<(String, Option<String>)>,
-    /// The same two keyed on a path: one graph, two key types, and a reader
-    /// asking `why` is owed both edges.
-    pub provides_files: Vec<(String, Vec<String>)>,
-    pub requires_files: Vec<(String, Option<String>)>,
     /// Family, package names, and the repository enabled for that install.
     pub packages: Vec<(String, Vec<String>, Option<String>)>,
     /// The same, for the package groups the family adapter installs.
@@ -234,56 +230,28 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
 
     // Who trades with it, which is the half a manifest cannot answer alone.
     let peers: Vec<&Module> = list.images.iter().flat_map(Image::modules).collect();
-    // One graph, two key types: each row names the field it is keyed on.
-    type Edges<T> = fn(&T) -> &Vec<Decl>;
-    let provided: [(_, Edges<Module>, _); 2] = [
-        (&module.provides, |m| &m.requires, &mut why.provides),
-        (
-            &module.provides_files,
-            |m| &m.requires_files,
-            &mut why.provides_files,
-        ),
-    ];
-    for (declared, asks, into) in provided {
-        for decl in declared {
-            let wanted: Vec<String> = peers
-                .iter()
-                .filter(|other| other.path != path)
-                .filter(|other| asks(other).iter().any(|r| r.name == decl.name))
-                .map(|other| other.path.clone())
-                .collect();
-            into.push((decl.name.clone(), wanted));
-        }
+    for decl in &module.provides {
+        let wanted: Vec<String> = peers
+            .iter()
+            .filter(|other| other.path != path)
+            .filter(|other| other.requires.iter().any(|r| r.name == decl.name))
+            .map(|other| other.path.clone())
+            .collect();
+        why.provides.push((decl.name.clone(), wanted));
     }
-    let required: [(_, Edges<Module>, Edges<Base>, _); 2] = [
-        (
-            &module.requires,
-            |m| &m.provides,
-            |b| &b.provides,
-            &mut why.requires,
-        ),
-        (
-            &module.requires_files,
-            |m| &m.provides_files,
-            |b| &b.provides_files,
-            &mut why.requires_files,
-        ),
-    ];
-    for (declared, from_module, from_base, into) in required {
-        for decl in declared {
-            let from = peers
-                .iter()
-                .find(|other| from_module(other).iter().any(|p| p.name == decl.name))
-                .map(|other| other.path.clone())
-                .or_else(|| {
-                    list.images
-                        .iter()
-                        .filter_map(|i| i.base.as_ref())
-                        .any(|base| from_base(base).iter().any(|p| p.name == decl.name))
-                        .then(|| "base".to_string())
-                });
-            into.push((decl.name.clone(), from));
-        }
+    for decl in &module.requires {
+        let from = peers
+            .iter()
+            .find(|other| other.provides.iter().any(|p| p.name == decl.name))
+            .map(|other| other.path.clone())
+            .or_else(|| {
+                list.images
+                    .iter()
+                    .filter_map(|i| i.base.as_ref())
+                    .any(|base| base.provides.iter().any(|p| p.name == decl.name))
+                    .then(|| "base".to_string())
+            });
+        why.requires.push((decl.name.clone(), from));
     }
 
     Some(why)
@@ -380,14 +348,8 @@ impl Why {
         }
 
         out.push(Part::Heading("What it exchanges".into()));
-        let provided = [
-            ("provides", &self.provides),
-            ("provides file", &self.provides_files),
-        ];
-        let required = [
-            ("requires", &self.requires),
-            ("requires file", &self.requires_files),
-        ];
+        let provided = [("provides", &self.provides)];
+        let required = [("requires", &self.requires)];
         let rows: Vec<_> = provided
             .into_iter()
             .flat_map(|(direction, declared)| {
@@ -808,10 +770,7 @@ pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why
             }
         }
         why.description = text(module, "description").unwrap_or_default();
-        for (offers, asks, into) in [
-            ("provides", "requires", &mut why.provides),
-            ("provides_files", "requires_files", &mut why.provides_files),
-        ] {
+        for (offers, asks, into) in [("provides", "requires", &mut why.provides)] {
             for name in strings(module, offers) {
                 if into.iter().any(|(have, _)| *have == name) {
                     continue;
@@ -825,10 +784,7 @@ pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why
                 into.push((name, wanted));
             }
         }
-        for (asks, offers, into) in [
-            ("requires", "provides", &mut why.requires),
-            ("requires_files", "provides_files", &mut why.requires_files),
-        ] {
+        for (asks, offers, into) in [("requires", "provides", &mut why.requires)] {
             for name in strings(module, asks) {
                 if into.iter().any(|(have, _)| *have == name) {
                     continue;

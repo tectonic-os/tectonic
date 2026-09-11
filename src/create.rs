@@ -1449,11 +1449,7 @@ fn image_kdl(
     };
     let mut ships = String::new();
     if let Some(known) = known {
-        for (node, names) in [
-            ("provides", &known.provides),
-            ("provides-file", &known.provides_files),
-            ("requires", &known.requires),
-        ] {
+        for (node, names) in [("provides", &known.provides), ("requires", &known.requires)] {
             if !names.is_empty() {
                 let listed: Vec<String> = names.iter().map(|name| format!("\"{name}\"")).collect();
                 ships.push_str(&format!("\x20       {node} {}\n", listed.join(" ")));
@@ -1655,10 +1651,6 @@ mod tests {
             known.contains("    layout {\n        bootloader \"grub2\"\n    }\n"),
             "{known}"
         );
-        assert!(
-            known.contains("        provides-file \"/usr/bin/flatpak\"\n"),
-            "{known}"
-        );
 
         let shared = image_kdl(
             "Server",
@@ -1680,7 +1672,6 @@ mod tests {
             image: "example.invalid/own:1".to_string(),
             family: "fedora".to_string(),
             provides: Vec::new(),
-            provides_files: Vec::new(),
             requires: Vec::new(),
             about: "what a collection describes".to_string(),
             signed: true,
@@ -1754,9 +1745,16 @@ mod tests {
             for name in &base.provides {
                 assert!(is_name(name), "{} provides {name}", base.image);
             }
-            for path in &base.provides_files {
-                assert!(path.starts_with('/'), "{} provides {path}", base.image);
-            }
+        }
+        let rows =
+            crate::base::capabilities(Path::new("."), &[], &mut crate::diag::Issues::default());
+        for row in rows {
+            assert!(is_name(&row.name), "capability {}", row.name);
+            assert!(
+                row.path.as_deref().is_none_or(|p| p.starts_with('/')),
+                "{}",
+                row.name
+            );
         }
     }
 

@@ -17,8 +17,7 @@ image {
 
     base "quay.io/fedora/fedora-bootc:44" {
         family "fedora"
-        provides "rechunking" "initramfs-generation" "selinux-policy"
-        provides-file "/usr/sbin/sshd" "/usr/bin/bootc" "/usr/bin/bootupctl" "/usr/bin/podman" "/usr/bin/crun"
+        provides "rechunking" "initramfs-generation" "selinux-policy" "ssh" "bootc" "bootupctl" "podman" "crun"
         signed #false
     }
 
@@ -41,8 +40,7 @@ image {
 
     base "quay.io/fedora/fedora-bootc:44" {
         family "fedora"
-        provides "rechunking" "initramfs-generation" "selinux-policy"
-        provides-file "/usr/sbin/sshd" "/usr/bin/bootc" "/usr/bin/bootupctl" "/usr/bin/podman" "/usr/bin/crun"
+        provides "rechunking" "initramfs-generation" "selinux-policy" "ssh" "bootc" "bootupctl" "podman" "crun"
         signed #false
     }
 

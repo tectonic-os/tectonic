@@ -7,7 +7,7 @@ use crate::model::module::Refusal;
 use crate::model::remote::REMOTE_DIR;
 use crate::parse::prop;
 use crate::parse::schema::{Arg, Kind, Node, Prop, Say, NEEDS_VALUE};
-use crate::parse::{bool_arg, check_capability, check_path, child, flag, kids, options};
+use crate::parse::{bool_arg, check_capability, child, flag, kids, options};
 use crate::parse::{string_arg, string_args, text};
 use crate::provenance::evidence::{self, Role, PIN};
 use crate::provenance::Evidence;
@@ -93,10 +93,8 @@ pub const IMAGE: Node = Node::new("image",
                         "every module declares which families it `supports`, and the two are \
                          checked against each other")),
                 Node::new("provides",
-                    "Capabilities the upstream image already ships; a module providing only these is suppressed.")
-                    .arg(Arg::Strs, Say::NONE),
-                Node::new("provides-file",
-                    "Absolute paths the base guarantees, which a module may require.")
+                    "Capabilities the upstream image already ships, by name; a module providing \
+                     only these is suppressed, and the finished image is checked for each.")
                     .arg(Arg::Strs, Say::NONE),
                 Node::new("requires",
                     "Capabilities the base is unusable without, which an enabled module must provide.")
@@ -112,8 +110,7 @@ pub const IMAGE: Node = Node::new("image",
                          base-sig-probe.yml keeps it current"))
                     .once(""),
             ], Say::new("unknown base property `{}`", "not part of the schema",
-                "a base accepts `family`, `provides`, `provides-file`, `requires`, `satisfies` \
-                 and `signed`")),
+                "a base accepts `family`, `provides`, `requires`, `satisfies` and `signed`")),
 
         Node::new("layout", "What the installer lays down, where the family's answer is not the one the image wants.")
             .arg(Arg::None, Say::new("`layout` takes no argument", "the declarations belong in the block",
@@ -368,7 +365,6 @@ impl Image {
             image: image.to_string(),
             family: text(node, "family"),
             provides: decls(node, "provides"),
-            provides_files: decls(node, "provides-file"),
             requires: decls(node, "requires"),
             satisfies: child(node, "satisfies")
                 .map(|block| crate::parse::module::coverages(block, src, issues))
@@ -379,9 +375,6 @@ impl Image {
 
         for decl in base.provides.iter().chain(&base.requires) {
             check_capability(&decl.name, decl.span, src, issues);
-        }
-        for decl in &base.provides_files {
-            check_path(&decl.name, decl.span, src, issues);
         }
 
         self.base = Some(base);

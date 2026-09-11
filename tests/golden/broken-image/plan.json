@@ -50,7 +50,6 @@
           "contract_files": [],
           "verify_exceptions": [],
           "assets": [],
-          "provides_files": {},
           "overlay_files": {},
           "overlay_overridden": [],
           "collected_files": {},

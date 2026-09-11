@@ -53,7 +53,32 @@
         "provides": [
           "rechunking"
         ],
-        "provides_files": [],
+        "witnesses": {
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
+          ]
+        },
         "requires": [],
         "satisfies": []
       },
@@ -94,8 +119,7 @@
                 "build-environment"
               ],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -119,8 +143,7 @@
               "options": {},
               "provides": [],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [
                 {
                   "family": "fedora",
@@ -157,10 +180,7 @@
                 "flatpak"
               ],
               "requires": [],
-              "provides_files": [
-                "/usr/bin/flatpak"
-              ],
-              "requires_files": [],
+              "files": {},
               "packages": [
                 {
                   "family": "fedora",
@@ -173,7 +193,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "0179980f392ae7c6c8b7bb593c99c97d140a879abf2620a2a4ff21f49fb092fa",
+                "content": "44de8f207845d70ba2eea51b605cdb86366917a27225143feedc49a6c8befcab",
                 "repo": false,
                 "source": "tectonic-os",
                 "pin": {
@@ -199,9 +219,6 @@
           ],
           "verify_exceptions": [],
           "assets": [],
-          "provides_files": {
-            "/usr/bin/flatpak": "tectonic-os/flatpak"
-          },
           "overlay_files": {},
           "overlay_overridden": [],
           "collected_files": {},
@@ -235,8 +252,7 @@
                 "build-environment"
               ],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -260,8 +276,7 @@
               "options": {},
               "provides": [],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [
                 {
                   "family": "fedora",
@@ -298,10 +313,7 @@
                 "flatpak"
               ],
               "requires": [],
-              "provides_files": [
-                "/usr/bin/flatpak"
-              ],
-              "requires_files": [],
+              "files": {},
               "packages": [
                 {
                   "family": "fedora",
@@ -314,7 +326,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "0179980f392ae7c6c8b7bb593c99c97d140a879abf2620a2a4ff21f49fb092fa",
+                "content": "44de8f207845d70ba2eea51b605cdb86366917a27225143feedc49a6c8befcab",
                 "repo": false,
                 "source": "tectonic-os",
                 "pin": {
@@ -342,8 +354,7 @@
               "options": {},
               "provides": [],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [
                 {
                   "family": "fedora",
@@ -373,9 +384,6 @@
           ],
           "verify_exceptions": [],
           "assets": [],
-          "provides_files": {
-            "/usr/bin/flatpak": "tectonic-os/flatpak"
-          },
           "overlay_files": {},
           "overlay_overridden": [],
           "collected_files": {},

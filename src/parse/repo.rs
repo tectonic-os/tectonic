@@ -300,6 +300,7 @@ impl List {
             schema_version_seen: false,
             repo_src: Source::new(root.join(layout::REPO_FILE).display().to_string(), ""),
             files: Vec::new(),
+            capabilities: Vec::new(),
         }
     }
 
@@ -367,6 +368,8 @@ impl List {
         }
 
         list.check_images(&mut issues);
+        // `check` reports what is wrong with the catalog; this only reads it.
+        list.capabilities = crate::base::capabilities(root, &list.sources, &mut Issues::default());
         (list, issues)
     }
 

@@ -3,7 +3,6 @@ description "Installs flatpak and enables the remotes an image asks for"
 supports "fedora"
 
 provides "flatpak"
-provides-file "/usr/bin/flatpak"
 
 option "remotes" type="list" {
     description "Remotes to enable"

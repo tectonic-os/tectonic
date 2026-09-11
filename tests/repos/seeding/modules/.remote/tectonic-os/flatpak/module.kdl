@@ -3,7 +3,6 @@ description "A module imported from the collection this repository publishes"
 supports "fedora"
 
 provides "flatpak"
-provides-file "/usr/bin/flatpak"
 
 option "remotes" type="list" {
     description "Remotes to enable"

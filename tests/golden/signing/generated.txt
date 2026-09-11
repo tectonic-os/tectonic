@@ -152,40 +152,22 @@ graph LR
     m0["kernel/signed-kernel"]
     m1["drivers/kvmfr"]
     base -->|"initramfs-generation"| m0
-    m0 -->|"/usr/libexec/kernel-devel-helpers.sh, kernel-devel"| m1
+    m0 -->|"kernel-devel, kernel-devel-helpers"| m1
 ```
 
 ## Capabilities
 
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
-| `/usr/libexec/kernel-devel-helpers.sh` | file, build only | `kernel/signed-kernel` | `drivers/kvmfr` |  |
-| `/usr/share/secureboot/sb_cert.der` | file | `kernel/signed-kernel` |  |  |
 | `initramfs-generation` | capability | `base` | `kernel/signed-kernel` |  |
 | `kernel-devel` | capability | `kernel/signed-kernel` | `drivers/kvmfr` |  |
+| `kernel-devel-helpers` | file, build only | `kernel/signed-kernel` | `drivers/kvmfr` |  |
 | `rechunking` | capability | `base` |  |  |
+| `secureboot-key` | file | `kernel/signed-kernel` |  |  |
 ==== generated/signing/graph.json
 {
   "image": "signing",
   "capabilities": [
-    {
-      "name": "/usr/libexec/kernel-devel-helpers.sh",
-      "kind": "file",
-      "build_only": true,
-      "provider": "kernel/signed-kernel",
-      "required_by": [
-        "drivers/kvmfr"
-      ],
-      "after": []
-    },
-    {
-      "name": "/usr/share/secureboot/sb_cert.der",
-      "kind": "file",
-      "build_only": false,
-      "provider": "kernel/signed-kernel",
-      "required_by": [],
-      "after": []
-    },
     {
       "name": "initramfs-generation",
       "kind": "capability",
@@ -207,10 +189,28 @@ graph LR
       "after": []
     },
     {
+      "name": "kernel-devel-helpers",
+      "kind": "file",
+      "build_only": true,
+      "provider": "kernel/signed-kernel",
+      "required_by": [
+        "drivers/kvmfr"
+      ],
+      "after": []
+    },
+    {
       "name": "rechunking",
       "kind": "capability",
       "build_only": false,
       "provider": "base",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "secureboot-key",
+      "kind": "file",
+      "build_only": false,
+      "provider": "kernel/signed-kernel",
       "required_by": [],
       "after": []
     }

@@ -53,7 +53,36 @@
         "provides": [
           "rechunking"
         ],
-        "provides_files": [],
+        "witnesses": {
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "hello": [
+            "/usr/bin/hello",
+            "/usr/sbin/hello"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
+          ]
+        },
         "requires": [],
         "satisfies": []
       },
@@ -83,8 +112,7 @@
                 "hello"
               ],
               "requires": [],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -138,8 +166,7 @@
               "requires": [
                 "hello"
               ],
-              "provides_files": [],
-              "requires_files": [],
+              "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
@@ -175,7 +202,6 @@
               }
             }
           ],
-          "provides_files": {},
           "overlay_files": {},
           "overlay_overridden": [],
           "collected_files": {},

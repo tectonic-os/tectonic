@@ -12,7 +12,6 @@ Nowhere. suppressed lists it and builds no layer for it: everything it provides,
 | Direction | What | With |
 | --- | --- | --- |
 | provides | `flatpak` | apps/browser |
-| provides file | `/usr/bin/flatpak` | apps/browser |
 
 ## What it declares to install
 
@@ -32,7 +31,7 @@ A claim the tool records rather than certifies. The scan is what confirms it.
 
 | Content | Hash |
 | --- | --- |
-| declared | `7ac8f97efcb0b90bb41debeca1784b9f8283a1e4b31266cac27423c4bee19ea5` |
+| declared | `4c6d5c98776ca0b87887befcd01a7692a1f9d6874eebc26b2feeaddb5e1545f0` |
 
 It was written in this repository rather than imported, so nothing upstream to compare it against.
 

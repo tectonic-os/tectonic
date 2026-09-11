@@ -263,8 +263,7 @@ image {
 
     base "quay.io/fedora/fedora-bootc:44" {
         family "fedora"
-        provides "rechunking" "initramfs-generation" "selinux-policy"
-        provides-file "/usr/bin/bootc" "/usr/bin/systemctl"
+        provides "rechunking" "initramfs-generation" "selinux-policy" "bootc"
     }
 
     flavours {
@@ -292,8 +291,8 @@ target and no other, and everything else builds for all of them.
 A list entry sets the options its module declares, one child node per option,
 named as the module named it.
 
-`base { provides }` is what the upstream image already ships. A listed module
-whose every `provides` and `provides-file` the base already carries is
+`base { provides }` is what the upstream image already ships, by name. A
+listed module whose every `provides` the base already carries is
 suppressed: it is not ordered, not built, and nothing it ships reaches the
 image, since its layer would provision what is already there a second time.
 The generated graph lists what was suppressed and `plan.json` carries it
@@ -330,8 +329,7 @@ The image every layer builds on, and what building on it may assume.
 | Node | Takes | Meaning |
 | --- | --- | --- |
 | `family` | a string, exactly one | The base's family, matched against every module's `supports`. |
-| `provides` | one or more strings | Capabilities the upstream image already ships; a module providing only these is suppressed. |
-| `provides-file` | one or more strings | Absolute paths the base guarantees, which a module may require. |
+| `provides` | one or more strings | Capabilities the upstream image already ships, by name; a module providing only these is suppressed, and the finished image is checked for each. |
 | `requires` | one or more strings | Capabilities the base is unusable without, which an enabled module must provide. |
 | `signed` | `#true` or `#false`, at most one | Whether the base publishes a cosign signature. |
 
@@ -486,10 +484,18 @@ base "ghcr.io/ublue-os/bazzite:stable" {
     about "KDE, gaming and hardware support over kinoite-main"
     family "fedora"
     provides "rechunking" "flatpak"
-    provides-file "/usr/bin/flatpak"
     signed #true
 }
+
+capability "ssh" "/usr/sbin/sshd"
+capability "rechunking"
 ```
+
+A name is witnessed by a path: a module's `provides "<name>" file="<path>"`,
+then a `capability` row, then `/usr/bin/<name>` or `/usr/sbin/<name>`. A row
+with no path names a capability nothing witnesses. `validate-image` checks the
+finished image for every name the base claims and every name a module or a row
+locates, and `base-sig-probe` reads the same witnesses when it measures a base.
 
 A collection entry wins over the selected catalog's entry of the same
 reference, which is how a stale one is corrected without a tool release, and
@@ -533,6 +539,10 @@ image file says what the next one will.
 
 <!-- schema: bases -->
 
+| Node | Takes | Meaning |
+| --- | --- | --- |
+| `capability` | one or more strings, one per name | Where a capability's presence is read: the path that witnesses it, or none for a capability nothing witnesses. |
+
 ### `base`
 
 One base a collection describes, named by the reference an image builds on.
@@ -543,8 +553,7 @@ One base a collection describes, named by the reference an image builds on.
 | --- | --- | --- |
 | `about` | a string, exactly one | The line a base picker shows beside the reference. |
 | `family` | a string, exactly one | The family an image built on this base declares, matched against every module's `supports`. |
-| `provides` | one or more strings | Capabilities this base already ships, written into every image scaffolded on it. |
-| `provides-file` | one or more strings | Absolute paths this base guarantees, written into every image scaffolded on it. |
+| `provides` | one or more strings | Capabilities this base already ships, by name, written into every image scaffolded on it. |
 | `requires` | one or more strings | Capabilities this base is unusable without, which an enabled module must provide. |
 | `signed` | `#true` or `#false`, at most one | Whether this base publishes a cosign signature, which a scaffolded image records. |
 | `scap-content` | a string, at most one | The SSG datastream this base is measured against, named as a bare filename. |
@@ -754,10 +763,8 @@ Also holds [`option`](#option), [`variant`](#variant) and [`asset`](#asset).
 | --- | --- | --- |
 | `description` | a string, at most one | One line naming the module in the resolved build summary. |
 | `supports` | one or more strings | The base families this module builds on, matched against the image's `family`. |
-| `provides` | one or more strings | A capability this module satisfies for the modules that require it. |
 | `requires` | one or more strings | A capability another module has to provide, which also orders the build. |
 | `after` | one or more strings | A module this one builds after without requiring anything of it. |
-| `requires-file` | one or more strings | An absolute path some other module has to ship. |
 | `overrides` | one or more strings | An absolute path this module replaces deliberately. |
 | `mode` | two strings: path, then octal mode, one per name | An octal file mode applied to one path in this module's overlay. |
 | `secret` | one or more strings | A build secret this module's layer mounts. |
@@ -765,15 +772,16 @@ Also holds [`option`](#option), [`variant`](#variant) and [`asset`](#asset).
 | `helpers` | one or more strings | Files from this module mounted by basename into /ctx/lib in every module layer. |
 | `copr` | a string, one per name | A COPR repository this module enables for its own installs, as owner/project. Fedora only. |
 
-### `provides-file`
+### `provides`
 
-An absolute path this module guarantees, which another module may require.
+A capability this module satisfies for the modules that require it.
 
 *one or more strings*
 
 | Property | Value | Meaning |
 | --- | --- | --- |
-| `build-only=` | `#true` or `#false` | Whether the path exists only while the build runs. |
+| `file=` | a string | The absolute path that witnesses the one name given, where it is neither `/usr/bin/<name>` nor `/usr/sbin/<name>`; the finished image is checked for it. |
+| `build-only=` | `#true` or `#false` | Whether the `file` exists only while the build runs. |
 
 ### `key`
 
@@ -798,7 +806,7 @@ Which of the generators the tool implements writes this key.
 
 #### `public`
 
-Where the public half is shipped, which is a contract path this module provides.
+Where the public half is shipped, which witnesses the `<kind>-key` capability this module provides.
 
 *a string, exactly one*
 

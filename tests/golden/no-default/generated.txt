@@ -152,7 +152,7 @@ graph LR
 
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
-| `/usr/bin/eza` | file | `core/shared` |  |  |
+| `eza` | capability | `core/shared` |  |  |
 | `rechunking` | capability | `base` |  |  |
 | `shell-tools` | capability | `core/shared` |  |  |
 ==== generated/server/graph.json
@@ -160,8 +160,8 @@ graph LR
   "image": "server",
   "capabilities": [
     {
-      "name": "/usr/bin/eza",
-      "kind": "file",
+      "name": "eza",
+      "kind": "capability",
       "build_only": false,
       "provider": "core/shared",
       "required_by": [],
@@ -351,7 +351,7 @@ graph LR
 
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
-| `/usr/bin/eza` | file | `core/shared` |  |  |
+| `eza` | capability | `core/shared` |  |  |
 | `rechunking` | capability | `base` |  |  |
 | `shell-tools` | capability | `core/shared` | `core/dev-tools` |  |
 ==== generated/workstation/graph.json
@@ -359,8 +359,8 @@ graph LR
   "image": "workstation",
   "capabilities": [
     {
-      "name": "/usr/bin/eza",
-      "kind": "file",
+      "name": "eza",
+      "kind": "capability",
       "build_only": false,
       "provider": "core/shared",
       "required_by": [],

@@ -1,7 +1,7 @@
 //! `bases.kdl`: the bases a collection describes, read the same way as any
 //! other manifest it holds.
 
-use crate::base::Base;
+use crate::base::{Base, Capability};
 use crate::diag::{Issue, Issues, Source, Span};
 use crate::parse::schema::{check_doc, Arg, Node, Say};
 use crate::parse::{bool_arg, check_capability, check_path, child, string_arg, string_args, text};
@@ -34,10 +34,8 @@ const BASE: Node = Node::new("base",
                 "the family is what an image scaffolded on this base declares, and an entry \
                  without one describes nothing the tool can write")),
         Node::new("provides",
-            "Capabilities this base already ships, written into every image scaffolded on it.")
-            .arg(Arg::Strs, Say::NONE),
-        Node::new("provides-file",
-            "Absolute paths this base guarantees, written into every image scaffolded on it.")
+            "Capabilities this base already ships, by name, written into every image scaffolded \
+             on it.")
             .arg(Arg::Strs, Say::NONE),
         Node::new("requires",
             "Capabilities this base is unusable without, which an enabled module must provide.")
@@ -64,21 +62,40 @@ const BASE: Node = Node::new("base",
                 "`bootloader \"grub2\"` states what an image on it boots with, and `tect create \
                  image` writes it into the image")),
     ], Say::new("unknown node `{}` in a base", "not part of the schema",
-        "a base entry holds `about`, `family`, `provides`, `provides-file`, `requires`, \
-         `signed`, `scap-content` and `bootloader`: what an image built on it may assume, \
-         what it still needs, what a person picks it by, what measures it and what it boots \
-         with"));
+        "a base entry holds `about`, `family`, `provides`, `requires`, `signed`, \
+         `scap-content` and `bootloader`: what an image built on it may assume, what it still \
+         needs, what a person picks it by, what measures it and what it boots with"));
+
+/// Where a capability's presence is read, for a name found neither at
+/// `/usr/bin/<name>` nor at `/usr/sbin/<name>`.
+#[rustfmt::skip]
+const CAPABILITY: Node = Node::new("capability",
+    "Where a capability's presence is read: the path that witnesses it, or none for a capability \
+     nothing witnesses.")
+    .arg(Arg::Strs, Say::new("`capability` needs a name", "nothing named",
+        "`capability \"ssh\" \"/usr/sbin/sshd\"`, or `capability \"rechunking\"` for one no \
+         path witnesses"))
+    .unique(Say::new("capability `{}` is described twice", "already described above",
+        "one name is one row"));
 
 /// bases.kdl's grammar, and the whole of it.
 #[rustfmt::skip]
 pub const BASES: Node = Node::new("bases",
     "The bases a collection describes, which extend the ones the tool ships with.")
-    .children(&[BASE], Say::new("unknown node `{}` in bases.kdl", "not part of the schema",
-        "bases.kdl holds `base` entries and nothing else; a module goes in a directory of its own"));
+    .children(&[BASE, CAPABILITY], Say::new("unknown node `{}` in bases.kdl",
+        "not part of the schema",
+        "bases.kdl holds `base` and `capability` entries; a module goes in a directory of its own"));
 
-/// Every base one collection describes, and the file they were read out of. A
+/// What one bases.kdl describes.
+pub struct Catalog {
+    pub bases: Vec<Base>,
+    pub capabilities: Vec<Capability>,
+    pub src: Source,
+}
+
+/// Every entry one collection describes, and the file they were read out of. A
 /// file that is not there is a collection that extends nothing.
-pub fn read(path: &Path, issues: &mut Issues) -> Option<(Vec<Base>, Source)> {
+pub fn read(path: &Path, issues: &mut Issues) -> Option<Catalog> {
     match std::fs::read_to_string(path) {
         Ok(text) => Some(parse(&path.display().to_string(), &text, issues)),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
@@ -88,19 +105,27 @@ pub fn read(path: &Path, issues: &mut Issues) -> Option<(Vec<Base>, Source)> {
                 format!("{} could not be read: {err}", path.display()),
                 &src,
             ));
-            Some((Vec::new(), src))
+            Some(Catalog {
+                bases: Vec::new(),
+                capabilities: Vec::new(),
+                src,
+            })
         }
     }
 }
 
-/// Every base in KDL text and the supplied diagnostic source.
-pub fn parse(name: &str, text: &str, issues: &mut Issues) -> (Vec<Base>, Source) {
+/// Every entry in KDL text and the supplied diagnostic source.
+pub fn parse(name: &str, text: &str, issues: &mut Issues) -> Catalog {
     let src = Source::new(name, text);
     let doc: KdlDocument = match text.parse() {
         Ok(doc) => doc,
         Err(err) => {
             issues.push(syntax_issue(&err, src.name(), &src));
-            return (Vec::new(), src);
+            return Catalog {
+                bases: Vec::new(),
+                capabilities: Vec::new(),
+                src,
+            };
         }
     };
     check_doc(&doc, &BASES, &src, issues);
@@ -116,7 +141,43 @@ pub fn parse(name: &str, text: &str, issues: &mut Issues) -> (Vec<Base>, Source)
             bases.push(base);
         }
     }
-    (bases, src)
+    let mut capabilities: Vec<Capability> = Vec::new();
+    for node in doc
+        .nodes()
+        .iter()
+        .filter(|n| n.name().value() == "capability")
+    {
+        let span: Span = node.name().span().into();
+        let args = string_args(node);
+        let Some(name) = args.first() else { continue };
+        check_capability(name, span, &src, issues);
+        let path = args.get(1).map(|path| {
+            check_path(path, span, &src, issues);
+            path.to_string()
+        });
+        if args.len() > 2 {
+            issues.push(
+                Issue::new(
+                    format!("capability `{name}` names more than one path"),
+                    &src,
+                )
+                .at(span, "one witness")
+                .help("a capability is witnessed by one path; the first is where it is read"),
+            );
+        }
+        if !capabilities.iter().any(|first| first.name == *name) {
+            capabilities.push(Capability {
+                name: name.to_string(),
+                path,
+                span,
+            });
+        }
+    }
+    Catalog {
+        bases,
+        capabilities,
+        src,
+    }
 }
 
 /// One entry, or nothing where it describes too little to write an image with.
@@ -126,7 +187,6 @@ fn entry(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Base> {
         for value in string_args(kid) {
             match kid.name().value() {
                 "provides" | "requires" => check_capability(value, span, src, issues),
-                "provides-file" => check_path(value, span, src, issues),
                 "bootloader" if !crate::parse::image::BOOTLOADERS.contains(&value) => issues.push(
                     Issue::new(
                         format!("`{value}` is not a bootloader the installer installs"),
@@ -143,7 +203,6 @@ fn entry(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Base> {
         image: string_arg(node)?.to_string(),
         family: text(node, "family"),
         provides: strings(node, "provides"),
-        provides_files: strings(node, "provides-file"),
         requires: strings(node, "requires"),
         about: text(node, "about"),
         signed: child(node, "signed").and_then(bool_arg).unwrap_or(false),

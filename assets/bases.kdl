@@ -12,21 +12,28 @@
 
 // Under-claiming refuses a module and says why; over-claiming is silent —
 // `resolve::graph::suppress` drops a module the base covers entirely with no
-// diagnostic — so nothing goes in this node that has not been run against the
-// image.
-//
-// The five paths are the ones the collection contracts on: `login-access`
-// requires the first, and `deb-family/bootc-base` and
-// `deb-family/container-runtime` provide the other four, which is what makes a
-// module written against them family-neutral. `/usr/bin/dracut` and
-// `/usr/sbin/semodule` are witnesses for claims this row already makes and are
-// left out. `rechunking` has no witness path and stays hand-declared.
+// diagnostic — so nothing goes in `provides` that has not been run against the
+// image, and `validate-image` checks every name on the finished one.
+
+// Where a capability's presence is read, for a name found neither at
+// `/usr/bin/<name>` nor at `/usr/sbin/<name>`; a row with no path is one
+// nothing witnesses. The rows at a default path are the names `base-sig-probe`
+// looks for on a base that does not claim them yet.
+capability "ssh" "/usr/sbin/sshd"
+capability "initramfs-generation" "/usr/bin/dracut"
+capability "selinux-policy" "/usr/sbin/semodule"
+capability "flatpak" "/usr/bin/flatpak"
+capability "bootc" "/usr/bin/bootc"
+capability "bootupctl" "/usr/bin/bootupctl"
+capability "podman" "/usr/bin/podman"
+capability "crun" "/usr/bin/crun"
+capability "rechunking"
+
 base "quay.io/fedora/fedora-bootc:44" {
     about "Fedora 44, nothing above the base system"
     family "fedora"
-    provides "rechunking" "initramfs-generation" "selinux-policy"
-    provides-file "/usr/sbin/sshd" "/usr/bin/bootc" "/usr/bin/bootupctl" \
-        "/usr/bin/podman" "/usr/bin/crun"
+    provides "rechunking" "initramfs-generation" "selinux-policy" "ssh" "bootc" "bootupctl" \
+        "podman" "crun"
     scap-content "ssg-fedora-ds.xml"
     signed #false
     bootloader "grub2"
@@ -43,9 +50,8 @@ base "quay.io/fedora/fedora-bootc:44" {
 base "quay.io/centos-bootc/centos-bootc:stream10" {
     about "CentOS Stream 10, the EL base a stated claim can be measured against"
     family "rhel"
-    provides "rechunking" "initramfs-generation" "selinux-policy"
-    provides-file "/usr/sbin/sshd" "/usr/bin/bootc" "/usr/bin/bootupctl" \
-        "/usr/bin/podman" "/usr/bin/crun"
+    provides "rechunking" "initramfs-generation" "selinux-policy" "ssh" "bootc" "bootupctl" \
+        "podman" "crun"
     scap-content "ssg-cs10-ds.xml"
     signed #true
     bootloader "grub2"
@@ -63,9 +69,8 @@ base "quay.io/centos-bootc/centos-bootc:stream10" {
 base "registry.redhat.io/rhel10/rhel-bootc:latest" {
     about "RHEL 10, the supported EL base, behind a Red Hat login"
     family "rhel"
-    provides "rechunking" "initramfs-generation" "selinux-policy"
-    provides-file "/usr/sbin/sshd" "/usr/bin/bootc" "/usr/bin/bootupctl" \
-        "/usr/bin/podman" "/usr/bin/crun"
+    provides "rechunking" "initramfs-generation" "selinux-policy" "ssh" "bootc" "bootupctl" \
+        "podman" "crun"
     scap-content "ssg-rhel10-ds.xml"
     // Unmeasured: `registry.redhat.io` answers no signature read without a
     // login. `#false` is the under-claim, and a line `base-sig-probe` can
@@ -85,9 +90,8 @@ base "registry.redhat.io/rhel10/rhel-bootc:latest" {
 base "quay.io/almalinuxorg/almalinux-bootc:10" {
     about "AlmaLinux 10, the RHEL rebuild, whose benchmark needs no entitlement"
     family "rhel"
-    provides "rechunking" "initramfs-generation" "selinux-policy"
-    provides-file "/usr/sbin/sshd" "/usr/bin/bootc" "/usr/bin/bootupctl" \
-        "/usr/bin/podman" "/usr/bin/crun"
+    provides "rechunking" "initramfs-generation" "selinux-policy" "ssh" "bootc" "bootupctl" \
+        "podman" "crun"
     scap-content "ssg-almalinux10-ds.xml"
     signed #true
     bootloader "grub2"
@@ -98,7 +102,6 @@ base "ghcr.io/ublue-os/bazzite:stable" {
     about "KDE, gaming and hardware support over kinoite-main"
     family "fedora"
     provides "rechunking" "flatpak"
-    provides-file "/usr/bin/flatpak"
     signed #true
     scap-content "ssg-fedora-ds.xml"
     bootloader "grub2"
@@ -108,7 +111,6 @@ base "ghcr.io/ublue-os/aurora:stable" {
     about "KDE developer workstation over kinoite-main"
     family "fedora"
     provides "rechunking" "flatpak"
-    provides-file "/usr/bin/flatpak"
     signed #true
     scap-content "ssg-fedora-ds.xml"
     bootloader "grub2"
@@ -118,7 +120,6 @@ base "ghcr.io/ublue-os/bluefin:stable" {
     about "GNOME developer workstation over silverblue-main"
     family "fedora"
     provides "rechunking" "flatpak"
-    provides-file "/usr/bin/flatpak"
     signed #true
     scap-content "ssg-fedora-ds.xml"
     bootloader "grub2"
@@ -128,7 +129,6 @@ base "ghcr.io/ublue-os/kinoite-main:44" {
     about "Fedora Kinoite with the ublue additions, what bazzite builds on"
     family "fedora"
     provides "rechunking" "flatpak"
-    provides-file "/usr/bin/flatpak"
     signed #true
     scap-content "ssg-fedora-ds.xml"
     bootloader "grub2"

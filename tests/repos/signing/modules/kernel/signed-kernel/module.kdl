@@ -3,7 +3,7 @@ description "A kernel that signs its own modules against a Secure Boot key"
 supports "fedora"
 
 provides "kernel-devel"
-provides-file "/usr/libexec/kernel-devel-helpers.sh" build-only=#true
+provides "kernel-devel-helpers" file="/usr/libexec/kernel-devel-helpers.sh" build-only=#true
 
 key "secureboot" {
     generator "openssl" profile="module-signing" bits=4096

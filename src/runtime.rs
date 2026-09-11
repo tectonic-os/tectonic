@@ -94,6 +94,12 @@ fn unexpected<'a>(text: &'a str, unit: &str, allowed: &[&str]) -> Vec<&'a str> {
         .collect()
 }
 
+/// Which path of a contract token is there: `a|b` is one capability found at
+/// either.
+fn found(token: &str) -> Option<&str> {
+    token.split('|').find(|path| Path::new(path).exists())
+}
+
 pub fn class_names() -> String {
     VERIFY_CLASSES
         .iter()
@@ -525,13 +531,13 @@ pub fn validate_image() -> Result<(), String> {
     if contracts.trim().is_empty() {
         println!("    (none declared)");
     } else {
-        for path in contracts.split_whitespace() {
-            if Path::new(path).exists() {
-                println!("    {path} ok");
-            } else {
-                report.fail(format!(
-                    "{path}: the manifest declares it, the image does not have it"
-                ));
+        for token in contracts.split_whitespace() {
+            match found(token) {
+                Some(path) => println!("    {path} ok"),
+                None => report.fail(format!(
+                    "{}: the manifest declares it, the image does not have it",
+                    token.replace('|', " or ")
+                )),
             }
         }
     }
@@ -878,6 +884,16 @@ mod tests {
         );
         assert_eq!(classify("'(man)' failed with exit status ."), None);
         assert_eq!(classify("Unit is bad in some other way"), None);
+    }
+
+    #[test]
+    fn a_contract_is_met_by_any_of_its_paths() {
+        let here = std::env::temp_dir().join(format!("tect-found-{}", std::process::id()));
+        fs::write(&here, "").unwrap();
+        let there = here.display().to_string();
+        assert_eq!(found(&format!("/nonexistent|{there}")), Some(there.as_str()));
+        assert_eq!(found("/nonexistent|/nonexistent/too"), None);
+        fs::remove_file(here).unwrap();
     }
 
     /// systemd 261 on the deb base, verifying a unit whose man page is

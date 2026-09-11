@@ -34,25 +34,14 @@ jobs:
 
       - name: Probe each base and correct the declaration
         id: probe
-        # Every path this workflow manages. A row with a capability is a
-        # witness: the path decides whether the base claims it, and is never
-        # written into `provides-file`. A row with `-` is a file contract and is
-        # written into `provides-file` when it is there. `rechunking` has no
-        # witness path and stays hand-declared.
+        # The plan names every capability a probe can decide and the paths that
+        # witness it: the catalog's located rows, what the base claims, and what
+        # the image's modules require. A name it cannot witness, such as the
+        # abstract `rechunking`, is left as it was.
         #
-        # A path already declared is measured whether the table names it or not:
-        # an under-claim refuses a module and says so, an over-claim is silent.
-        # Nothing this table does not name is ever removed.
-        env:
-          WITNESS: |
-            /usr/bin/flatpak     flatpak
-            /usr/sbin/semodule   selinux-policy
-            /usr/bin/dracut      initramfs-generation
-            /usr/sbin/sshd       -
-            /usr/bin/bootc       -
-            /usr/bin/bootupctl   -
-            /usr/bin/podman      -
-            /usr/bin/crun        -
+        # A name already declared is measured whether or not anything requires
+        # it: an under-claim refuses a module and says so, an over-claim is
+        # silent.
         run: |
           set -euo pipefail
           ./scripts/tect.sh fetch modules
@@ -64,42 +53,29 @@ jobs:
           plan="$(mktemp)"
           ./scripts/tect.sh plan --json > "${plan}"
 
-          # Reads the table, what the container answered and what the manifest
-          # says; rewrites the `provides` and `provides-file` nodes of every
-          # block naming this base, and prints what it changed. Silence is a
-          # base that already matches.
+          # Reads the witnesses, what the container answered and what the
+          # manifest says; rewrites the `provides` node of every block naming
+          # this base, and prints what it changed. Silence is a base that
+          # already matches.
           reconcile="$(mktemp)"
           cat > "${reconcile}" <<'PYTHON'
           import os
           import pathlib
 
           witness = {}
-          for line in os.environ["WITNESS"].splitlines():
-              row = line.split()
-              if len(row) == 2:
-                  witness[row[0]] = None if row[1] == "-" else row[1]
+          for entry in os.environ["WITNESSES"].split():
+              name, _, paths = entry.partition("=")
+              witness[name] = paths.split(",")
 
           present = set(os.environ["MEASURED"].split())
           base = os.environ["BASE"]
           caps_were = os.environ["PROVIDES"].split()
-          files_were = os.environ["FILES"].split()
 
-          # A capability this table cannot witness is left exactly as it was,
-          # which is how `rechunking` survives a probe that cannot see it.
-          witnessed = {cap for path, cap in witness.items() if cap and path in present}
-          tabled = {cap for cap in witness.values() if cap}
-          caps = [c for c in caps_were if c not in tabled or c in witnessed]
+          witnessed = {n for n, paths in witness.items() if any(p in present for p in paths)}
+          caps = [c for c in caps_were if c not in witness or c in witnessed]
           caps += sorted(c for c in witnessed if c not in caps_were)
 
-          # A path keeps its place if the image still carries it, and a file
-          # contract the table names is appended when it turns up.
-          files = [p for p in files_were if p in present]
-          files += sorted(
-              p for p, cap in witness.items()
-              if cap is None and p in present and p not in files_were
-          )
-
-          if caps == caps_were and files == files_were:
+          if caps == caps_were:
               raise SystemExit(0)
 
           path = pathlib.Path(os.environ["IMAGE_FILE"])
@@ -118,11 +94,8 @@ jobs:
                   block.append(lines[index])
                   index += 1
               indent = " " * (len(block[0]) - len(block[0].lstrip())) if block else "        "
-              kept = [b for b in block if b.split()[:1] not in (["provides"], ["provides-file"])]
-              nodes = []
-              for name, values in (("provides", caps), ("provides-file", files)):
-                  if values:
-                      nodes.append(indent + name + " " + " ".join(f'"{v}"' for v in values))
+              kept = [b for b in block if b.split()[:1] != ["provides"]]
+              nodes = [indent + "provides " + " ".join(f'"{c}"' for c in caps)] if caps else []
               at = next(
                   (n for n, b in enumerate(kept) if b.split()[:1] == ["family"]),
                   -1,
@@ -131,21 +104,18 @@ jobs:
           path.write_text("\n".join(out))
 
           said = []
-          for name, was, now in (
-              ("provides", caps_were, caps), ("provides-file", files_were, files)
-          ):
-              gone = [v for v in was if v not in now]
-              came = [v for v in now if v not in was]
-              if gone:
-                  said.append(f"`{name}` lost " + ", ".join(f"`{v}`" for v in gone))
-              if came:
-                  said.append(f"`{name}` gained " + ", ".join(f"`{v}`" for v in came))
+          gone = [c for c in caps_were if c not in caps]
+          came = [c for c in caps if c not in caps_were]
+          if gone:
+              said.append("`provides` lost " + ", ".join(f"`{c}`" for c in gone))
+          if came:
+              said.append("`provides` gained " + ", ".join(f"`{c}`" for c in came))
           print("; ".join(said))
           PYTHON
 
           memos="$(mktemp -d)"
           changed=""
-          while IFS='|' read -r image base recorded file provides files; do
+          while IFS='|' read -r image base recorded file provides witnesses; do
             [ -n "${image}" ] || continue
             # `signed` records that a signature is published, which is not the
             # same as one a consumer can attribute: a keyless signature carries
@@ -170,12 +140,12 @@ jobs:
               changed="${changed}${changed:+, }\`${image}\` (\`${base}\`): \`signed #${recorded}\` to \`#${actual}\`"
             fi
 
-            # One pull and one container for the whole table: the ublue bases
-            # are several gigabytes each and the runner has one disk. The answer
-            # is memoised, since it is a property of the base.
-            probe="$(printf '%s\n%s\n' "${WITNESS}" "${files}" \
-              | awk '{ print $1 }' | grep '^/' | sort -u | tr '\n' ' ')"
-            memo="${memos}/$(printf '%s' "${base}" | md5sum | cut -d' ' -f1)"
+            # One pull and one container for every path: the ublue bases are
+            # several gigabytes each and the runner has one disk. The answer is
+            # memoised per base and set of paths.
+            probe="$(tr ' ' '\n' <<< "${witnesses}" | cut -d= -f2 | tr ',' '\n' | sort -u \
+              | tr '\n' ' ')"
+            memo="${memos}/$(printf '%s %s' "${base}" "${probe}" | md5sum | cut -d' ' -f1)"
             if [ -f "${memo}" ]; then
               measured="$(cat "${memo}")"
             else
@@ -185,8 +155,8 @@ jobs:
               podman rmi -f "${base}" > /dev/null 2>&1 || true
             fi
 
-            correction="$(WITNESS="${WITNESS}" MEASURED="${measured}" \
-              PROVIDES="${provides}" FILES="${files}" IMAGE_FILE="${file}" \
+            correction="$(WITNESSES="${witnesses}" MEASURED="${measured}" \
+              PROVIDES="${provides}" IMAGE_FILE="${file}" \
               BASE="${base}" python3 "${reconcile}")"
             [ -n "${correction}" ] || continue
             echo "  ${correction}"
@@ -194,7 +164,8 @@ jobs:
           done < <(jq -r '.images[]
                 | [.id, .base.image, (.base.signed | tostring), .file,
                    (.base.provides | join(" ")),
-                   (.base.provides_files | join(" "))]
+                   (.base.witnesses | to_entries
+                     | map(.key + "=" + (.value | join(","))) | join(" "))]
                 | join("|")' "${plan}")
 
           if [ -z "${changed}" ]; then
@@ -258,20 +229,20 @@ jobs:
           signatures and has stopped, which is worth finding out about before
           merging.
 
-          ## If `provides` or `provides-file` changed
+          ## If `provides` changed
 
-          **This one does change the build.** A capability or a path the base
-          carries is one no module has to build, and `tect check` refuses a
-          module whose `requires-file` nothing declares — so a claim that is
-          missing refuses a module for a binary the image ships.
+          **This one does change the build.** A capability the base carries is
+          one no module has to build, and `tect check` refuses a module whose
+          `requires` nothing declares — so a claim that is missing refuses a
+          module for a binary the image ships.
 
           A claim that is *added* is the quieter direction and the one to read
           carefully: a module every one of whose `provides` the base now covers
           comes off the build with no diagnostic. The PR title says which
           modules those are if there are any.
 
-          `rechunking` is not measured — it has no witness path and stays
-          hand-declared — and no claim this workflow does not name is ever
+          `rechunking` is not measured — no path witnesses it and it stays
+          hand-declared — and no claim the plan names no witness for is ever
           removed.
           EOF
 

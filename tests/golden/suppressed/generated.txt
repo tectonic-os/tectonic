@@ -141,14 +141,13 @@ right.
 graph LR
     base["ghcr.io/ublue-os/bazzite:stable"]
     m0["apps/browser"]
-    base -->|"/usr/bin/flatpak, flatpak"| m0
+    base -->|"flatpak"| m0
 ```
 
 ## Capabilities
 
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
-| `/usr/bin/flatpak` | file | `base` | `apps/browser` |  |
 | `flatpak` | capability | `base` | `apps/browser` |  |
 | `rechunking` | capability | `base` |  |  |
 
@@ -159,21 +158,11 @@ them.
 
 | Module | Provides |
 |---|---|
-| `apps/flatpak` | `flatpak`, `/usr/bin/flatpak` |
+| `apps/flatpak` | `flatpak` |
 ==== generated/suppressed/graph.json
 {
   "image": "suppressed",
   "capabilities": [
-    {
-      "name": "/usr/bin/flatpak",
-      "kind": "file",
-      "build_only": false,
-      "provider": "base",
-      "required_by": [
-        "apps/browser"
-      ],
-      "after": []
-    },
     {
       "name": "flatpak",
       "kind": "capability",
@@ -198,8 +187,7 @@ them.
     {
       "module": "apps/flatpak",
       "provides": [
-        "flatpak",
-        "/usr/bin/flatpak"
+        "flatpak"
       ]
     }
   ]

@@ -64,15 +64,39 @@
         "provides": [
           "rechunking",
           "initramfs-generation",
-          "selinux-policy"
+          "selinux-policy",
+          "ssh",
+          "bootc",
+          "bootupctl",
+          "podman",
+          "crun"
         ],
-        "provides_files": [
-          "/usr/sbin/sshd",
-          "/usr/bin/bootc",
-          "/usr/bin/bootupctl",
-          "/usr/bin/podman",
-          "/usr/bin/crun"
-        ],
+        "witnesses": {
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
+          ]
+        },
         "requires": [],
         "satisfies": []
       },
@@ -93,6 +117,8 @@
           "suppressed": [],
           "secrets": [],
           "contract_files": [
+            "/usr/bin/dracut",
+            "/usr/sbin/semodule",
             "/usr/sbin/sshd",
             "/usr/bin/bootc",
             "/usr/bin/bootupctl",
@@ -101,7 +127,6 @@
           ],
           "verify_exceptions": [],
           "assets": [],
-          "provides_files": {},
           "overlay_files": {},
           "overlay_overridden": [],
           "collected_files": {},
