@@ -872,9 +872,7 @@ pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why
             why.content = text(provenance, "content");
             // A copy carries the record it was imported with; a reference
             // carries the collection it is fetched from, beside its pin.
-            if let Some(imported) =
-                field(provenance, "imported").filter(|v| !matches!(v, Json::Null))
-            {
+            if let Some(imported) = field(provenance, "imported") {
                 if let (Some(collection), Some(pin)) =
                     (text(imported, "collection"), field(imported, "pin"))
                 {

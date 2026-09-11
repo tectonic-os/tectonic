@@ -369,9 +369,14 @@ fn utf8_width(byte: u8) -> usize {
 
 /// Reading a document back, which the manifest and the build record an image
 /// carries are the only cases of: everything else here writes one.
+/// An explicit `null` reads as absent, the way `Json::optional` writes one.
 pub fn field<'a>(value: &'a Json, key: &str) -> Option<&'a Json> {
     match value {
-        Json::Object(fields) => fields.iter().find(|(name, _)| name == key).map(|(_, v)| v),
+        Json::Object(fields) => fields
+            .iter()
+            .find(|(name, _)| name == key)
+            .map(|(_, v)| v)
+            .filter(|v| !matches!(v, Json::Null)),
         _ => None,
     }
 }
@@ -405,4 +410,19 @@ pub fn strings(value: &Json, key: &str) -> Vec<String> {
             _ => None,
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{field, Json};
+
+    /// A key written as `null` and a key never written read the same, so an
+    /// `if let … else` over one does not take the wrong branch.
+    #[test]
+    fn an_explicit_null_is_absent() {
+        let doc = Json::parse(r#"{"imported": null, "source": "one"}"#).unwrap();
+        assert!(field(&doc, "imported").is_none());
+        assert!(field(&doc, "missing").is_none());
+        assert!(field(&doc, "source").is_some());
+    }
 }
