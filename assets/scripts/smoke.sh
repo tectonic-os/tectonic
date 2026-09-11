@@ -101,7 +101,15 @@ for code in /usr/share/OVMF/OVMF_CODE_4M.fd /usr/share/edk2/ovmf/OVMF_CODE.fd; d
 done
 [ -f "$code" ] || die "no OVMF firmware is installed"
 cp "${code/CODE/VARS}" "${dir}/vars.fd"
+# A hardened image refuses root over ssh. The drop-in reaches the machine as a
+# credential and lives in /run, so the /etc a scan measures is the image's.
+# shellcheck disable=SC2016 # expanded by systemd, from each family's EnvironmentFile
+dropin="$(printf '%s\n' '[Service]' 'ExecStart=' \
+    'ExecStart=/usr/sbin/sshd -D -oPermitRootLogin=prohibit-password $OPTIONS $SSHD_OPTS' \
+    | base64 -w0)"
 qemu-system-x86_64 \
+    -smbios "type=11,value=io.systemd.credential.binary:systemd.unit-dropin.sshd.service=${dropin}" \
+    -smbios "type=11,value=io.systemd.credential.binary:systemd.unit-dropin.ssh.service=${dropin}" \
     -machine q35 -m "${RAM:-4096}" -smp 2 -cpu host -enable-kvm -display none \
     -drive "if=pflash,unit=0,format=raw,readonly=on,file=${code}" \
     -drive "if=pflash,unit=1,format=raw,file=${dir}/vars.fd" \
@@ -112,7 +120,7 @@ qemu-system-x86_64 \
     > "${dir}/qemu.log" 2>&1
 
 for i in $(seq 60); do
-    if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    if ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
         -o ConnectTimeout=5 -o LogLevel=ERROR -i "${dir}/key" -p "$PORT" \
         root@localhost true 2> /dev/null; then
         echo "smoke: ssh answered after ${i} attempts"
