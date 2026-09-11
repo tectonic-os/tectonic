@@ -102,6 +102,7 @@
               "provenance": {
                 "content": "5c6f954af6de4efc68c5525e8a65e941dff618e34ac7cb721cf0abb9f85e1364",
                 "repo": false,
+                "source": null,
                 "pin": null,
                 "imported": null
               },
@@ -134,6 +135,7 @@
               "provenance": {
                 "content": "1e3bca8b5bd1fac5812bbc04987737b5119fee8f22da0f011843d4f5c208daaa",
                 "repo": false,
+                "source": null,
                 "pin": null,
                 "imported": null
               },
@@ -173,6 +175,7 @@
               "provenance": {
                 "content": "0179980f392ae7c6c8b7bb593c99c97d140a879abf2620a2a4ff21f49fb092fa",
                 "repo": false,
+                "source": "tectonic-os",
                 "pin": {
                   "locator": "https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz",
                   "selector": "v1.0.0",
@@ -183,19 +186,7 @@
                   "path": null,
                   "resolved": "https://github.com/tectonic-os/modules/archive/refs/tags/v1.0.0.tar.gz"
                 },
-                "imported": {
-                  "collection": "tectonic-os",
-                  "pin": {
-                    "locator": "https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz",
-                    "selector": "v1.0.0",
-                    "verifier": "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3",
-                    "tracker": "renovate",
-                    "reason": null,
-                    "from": "asset",
-                    "path": null,
-                    "resolved": "https://github.com/tectonic-os/modules/archive/refs/tags/v1.0.0.tar.gz"
-                  }
-                }
+                "imported": null
               },
               "satisfies": [],
               "refuses": []
@@ -252,6 +243,7 @@
               "provenance": {
                 "content": "5c6f954af6de4efc68c5525e8a65e941dff618e34ac7cb721cf0abb9f85e1364",
                 "repo": false,
+                "source": null,
                 "pin": null,
                 "imported": null
               },
@@ -284,6 +276,7 @@
               "provenance": {
                 "content": "1e3bca8b5bd1fac5812bbc04987737b5119fee8f22da0f011843d4f5c208daaa",
                 "repo": false,
+                "source": null,
                 "pin": null,
                 "imported": null
               },
@@ -323,6 +316,7 @@
               "provenance": {
                 "content": "0179980f392ae7c6c8b7bb593c99c97d140a879abf2620a2a4ff21f49fb092fa",
                 "repo": false,
+                "source": "tectonic-os",
                 "pin": {
                   "locator": "https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz",
                   "selector": "v1.0.0",
@@ -333,19 +327,7 @@
                   "path": null,
                   "resolved": "https://github.com/tectonic-os/modules/archive/refs/tags/v1.0.0.tar.gz"
                 },
-                "imported": {
-                  "collection": "tectonic-os",
-                  "pin": {
-                    "locator": "https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz",
-                    "selector": "v1.0.0",
-                    "verifier": "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3",
-                    "tracker": "renovate",
-                    "reason": null,
-                    "from": "asset",
-                    "path": null,
-                    "resolved": "https://github.com/tectonic-os/modules/archive/refs/tags/v1.0.0.tar.gz"
-                  }
-                }
+                "imported": null
               },
               "satisfies": [],
               "refuses": []
@@ -376,6 +358,7 @@
               "provenance": {
                 "content": "ee0f1fd3170c1a308f38630297cce8898bd1d81ab4de46e0bbc46bfdcd9194fc",
                 "repo": false,
+                "source": null,
                 "pin": null,
                 "imported": null
               },

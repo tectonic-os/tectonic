@@ -149,12 +149,8 @@ pub struct VarDisk {
     pub span: Span,
 }
 
-/// A name the base declares, with the span to point at when something about it
-/// is wrong.
-pub struct Decl {
-    pub name: String,
-    pub span: Span,
-}
+/// A base declares capabilities and paths the way a module does.
+pub use crate::model::module::Decl;
 
 pub struct Flavour {
     pub name: String,

@@ -91,6 +91,7 @@
               "provenance": {
                 "content": "5c6f954af6de4efc68c5525e8a65e941dff618e34ac7cb721cf0abb9f85e1364",
                 "repo": false,
+                "source": null,
                 "pin": null,
                 "imported": null
               },
@@ -123,6 +124,7 @@
               "provenance": {
                 "content": "ff8e03106067dc485e959cd95c77f9dabccf23a0e65b91fdfd9f8afbec44cebf",
                 "repo": false,
+                "source": "tectonic-os",
                 "pin": {
                   "locator": "https://github.com/tectonic-os/modules/archive/refs/heads/{version}.tar.gz",
                   "selector": "main",
@@ -133,19 +135,7 @@
                   "path": null,
                   "resolved": "https://github.com/tectonic-os/modules/archive/refs/heads/main.tar.gz"
                 },
-                "imported": {
-                  "collection": "tectonic-os",
-                  "pin": {
-                    "locator": "https://github.com/tectonic-os/modules/archive/refs/heads/{version}.tar.gz",
-                    "selector": "main",
-                    "verifier": null,
-                    "tracker": "unpinned",
-                    "reason": "the collection this tool is published alongside, followed at its branch head",
-                    "from": "asset",
-                    "path": null,
-                    "resolved": "https://github.com/tectonic-os/modules/archive/refs/heads/main.tar.gz"
-                  }
-                }
+                "imported": null
               },
               "satisfies": [],
               "refuses": []

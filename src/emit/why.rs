@@ -235,8 +235,8 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
     // Who trades with it, which is the half a manifest cannot answer alone.
     let peers: Vec<&Module> = list.images.iter().flat_map(Image::modules).collect();
     // One graph, two key types: each row names the field it is keyed on.
-    type Edges<T, D> = fn(&T) -> &Vec<D>;
-    let wants: [(_, Edges<Module, Decl>, _); 2] = [
+    type Edges<T> = fn(&T) -> &Vec<Decl>;
+    let provided: [(_, Edges<Module>, _); 2] = [
         (&module.provides, |m| &m.requires, &mut why.provides),
         (
             &module.provides_files,
@@ -244,7 +244,7 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
             &mut why.provides_files,
         ),
     ];
-    for (declared, asks, into) in wants {
+    for (declared, asks, into) in provided {
         for decl in declared {
             let wanted: Vec<String> = peers
                 .iter()
@@ -255,12 +255,7 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
             into.push((decl.name.clone(), wanted));
         }
     }
-    let offers: [(
-        _,
-        Edges<Module, Decl>,
-        Edges<Base, crate::model::image::Decl>,
-        _,
-    ); 2] = [
+    let required: [(_, Edges<Module>, Edges<Base>, _); 2] = [
         (
             &module.requires,
             |m| &m.provides,
@@ -274,7 +269,7 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
             &mut why.requires_files,
         ),
     ];
-    for (declared, from_module, from_base, into) in offers {
+    for (declared, from_module, from_base, into) in required {
         for decl in declared {
             let from = peers
                 .iter()
@@ -385,15 +380,15 @@ impl Why {
         }
 
         out.push(Part::Heading("What it exchanges".into()));
-        let offers = [
+        let provided = [
             ("provides", &self.provides),
             ("provides file", &self.provides_files),
         ];
-        let wants = [
+        let required = [
             ("requires", &self.requires),
             ("requires file", &self.requires_files),
         ];
-        let rows: Vec<_> = offers
+        let rows: Vec<_> = provided
             .into_iter()
             .flat_map(|(direction, declared)| {
                 declared.iter().map(move |(name, wanted)| {
@@ -403,7 +398,7 @@ impl Why {
                     )
                 })
             })
-            .chain(wants.into_iter().flat_map(|(direction, declared)| {
+            .chain(required.into_iter().flat_map(|(direction, declared)| {
                 declared.iter().map(move |(name, from)| {
                     (
                         vec![
@@ -875,17 +870,22 @@ pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why
 
         if let Some(provenance) = field(module, "provenance") {
             why.content = text(provenance, "content");
-            if let Some(imported) = field(provenance, "imported") {
+            // A copy carries the record it was imported with; a reference
+            // carries the collection it is fetched from, beside its pin.
+            if let Some(imported) =
+                field(provenance, "imported").filter(|v| !matches!(v, Json::Null))
+            {
                 if let (Some(collection), Some(pin)) =
                     (text(imported, "collection"), field(imported, "pin"))
                 {
-                    // Only a copy records what it hashed to, so the hash is
-                    // also what says which of the two this is.
-                    let recorded = text(imported, "content");
-                    why.copied = recorded.is_some();
-                    why.modified = why.copied && recorded != why.content;
+                    why.copied = true;
+                    why.modified = text(imported, "content") != why.content;
                     why.imported = Some((collection, pin_of(pin, "collection")));
                 }
+            } else if let (Some(collection), Some(pin)) =
+                (text(provenance, "source"), field(provenance, "pin"))
+            {
+                why.imported = Some((collection, pin_of(pin, "collection")));
             }
             if matches!(field(provenance, "repo"), Some(Json::Bool(true))) {
                 // The module tree is not in the finished image, so the file

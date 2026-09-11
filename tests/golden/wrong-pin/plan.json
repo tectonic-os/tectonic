@@ -73,6 +73,7 @@
               "provenance": {
                 "content": null,
                 "repo": false,
+                "source": null,
                 "pin": null,
                 "imported": null
               },

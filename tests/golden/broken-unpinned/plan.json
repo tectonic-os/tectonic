@@ -89,6 +89,7 @@
               "provenance": {
                 "content": null,
                 "repo": false,
+                "source": null,
                 "pin": {
                   "locator": "https://github.com/owner/modules/archive/refs/heads/{version}.tar.gz",
                   "selector": "main",

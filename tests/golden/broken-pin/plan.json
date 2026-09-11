@@ -89,6 +89,7 @@
               "provenance": {
                 "content": null,
                 "repo": false,
+                "source": null,
                 "pin": {
                   "locator": "http://example.com/modules.zip",
                   "selector": null,

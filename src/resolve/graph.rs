@@ -104,7 +104,7 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
         }
     }
 
-    let base_caps: BTreeMap<&str, &crate::model::image::Decl> = image
+    let base_caps: BTreeMap<&str, &crate::model::module::Decl> = image
         .base
         .iter()
         .flat_map(|b| b.provides.iter().chain(b.provides_files.iter()))
