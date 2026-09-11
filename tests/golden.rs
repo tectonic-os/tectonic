@@ -2670,3 +2670,40 @@ fn scap() {
 
     compare("scap", "report.txt", &out);
 }
+
+/// `create repo` on a real terminal, sealed like `flow`: the owner question is
+/// the one drawn line with a prefix, and its echo is what carries it.
+#[test]
+fn drawn_create_repo() {
+    let dir = empty("flow-create-repo-drawn-in");
+    drawn_flow(
+        "flow-create-repo-drawn",
+        &dir,
+        &format!(
+            "env PATH='{}' HOME='{}' GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
+             '{}' create repo",
+            bin("flow-create-repo-drawn", None).display(),
+            tmp().display(),
+            env!("CARGO_BIN_EXE_tect")
+        ),
+        "Creating example...",
+        &[
+            b"Example\r",
+            // Synced, to github.com, as `someone`.
+            b"\r",
+            b"\r",
+            b"someone\r",
+            // Skip creating it on the forge, and define no image.
+            b"\x1b[B\r",
+            b"\x1b[B\r",
+            // The workflows, both cadences and the time, as offered.
+            b"\r",
+            b"\r",
+            b"\r",
+            b"\r",
+            // Down the review past its eight fields to `Create`.
+            b"\x1b[B\x1b[B\x1b[B\x1b[B\x1b[B\x1b[B\x1b[B\x1b[B\r",
+        ],
+    );
+    assert!(dir.join("example/repo.kdl").is_file());
+}

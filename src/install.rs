@@ -196,13 +196,6 @@ pub struct Encryption {
 }
 
 impl Encryption {
-    fn none() -> Self {
-        Self {
-            kind: NONE.to_string(),
-            passphrase: String::new(),
-        }
-    }
-
     fn wants_passphrase(kind: &str) -> bool {
         kind.ends_with("passphrase")
     }
@@ -330,9 +323,9 @@ impl Answers {
     }
 
     /// Every field before any of them is asked. On a screen nothing is asked
-    /// here: the flags and defaults seed the form, and the form asks. With no
-    /// screen there is no form, and a value no flag gave is a refusal naming
-    /// the flag.
+    /// here: the flags and defaults seed the form, and the form asks, the
+    /// secrets masked. With no screen there is no form, and a value no flag
+    /// gave is a refusal naming the flag.
     fn seeded(payload: &Payload, given: Given, prompt: &Prompt) -> Result<Self, String> {
         if !prompt.draws() {
             return Ok(Self {
@@ -344,13 +337,13 @@ impl Answers {
                     Some(&payload.hostname),
                 )?,
                 user: prompt.text(given.user, copy::INSTALL_USER, "--user", None)?,
-                password: prompt.secret(given.password, copy::INSTALL_PASSWORD, "--password")?,
-                encryption: ask_encryption(
-                    given.encryption,
-                    given.passphrase,
-                    &Encryption::none(),
-                    prompt,
+                password: prompt.text(
+                    given.password,
+                    copy::INSTALL_PASSWORD,
+                    "--password",
+                    None,
                 )?,
+                encryption: ask_encryption(given.encryption, given.passphrase, prompt)?,
             });
         }
         Ok(Self {
@@ -660,37 +653,28 @@ fn kinds(tpm: bool) -> Vec<Choice> {
         .collect()
 }
 
-/// A `tpm2-` form on a machine with no TPM is shown and not pickable. The
-/// passphrase is asked every time the kind is, so editing the row can change it.
+/// The encryption where there is no form. A `tpm2-` kind on a machine with no
+/// TPM is shown and not pickable.
 fn ask_encryption(
     given: Option<String>,
     passphrase: Option<String>,
-    current: &Encryption,
     prompt: &Prompt,
 ) -> Result<Encryption, String> {
     let kind = match given {
         Some(kind) => named(kind)?,
-        None if !prompt.asks() => current.kind.clone(),
+        None if !prompt.asks() => NONE.to_string(),
         None => {
             let options = kinds(tpm().exists());
-            let at = KINDS
-                .iter()
-                .position(|(name, _)| *name == current.kind)
-                .unwrap_or(0);
-            match prompt.choose_current(copy::INSTALL_ENCRYPTION, &options, at)? {
+            match prompt.choose_current(copy::INSTALL_ENCRYPTION, &options, 0)? {
                 Some(at) => KINDS[at].0.to_string(),
-                None => current.kind.clone(),
+                None => NONE.to_string(),
             }
         }
     };
     Ok(Encryption {
-        passphrase: match (Encryption::wants_passphrase(&kind), prompt.draws()) {
-            (false, _) => String::new(),
-            // The form's own re-ask, where leaving the question keeps the
-            // passphrase already held and the action stays blocked while there
-            // is none.
-            (true, true) => prompt.secret_current(copy::LUKS_PASSPHRASE, &current.passphrase)?,
-            (true, false) => prompt.secret(passphrase, copy::LUKS_PASSPHRASE, "--passphrase")?,
+        passphrase: match Encryption::wants_passphrase(&kind) {
+            true => prompt.text(passphrase, copy::LUKS_PASSPHRASE, "--passphrase", None)?,
+            false => String::new(),
         },
         kind,
     })
@@ -1336,24 +1320,14 @@ mod tests {
     /// naming the four that it does.
     #[test]
     fn an_encryption_no_backend_takes_is_refused_by_name() {
-        let refused = ask_encryption(
-            Some("luks".to_string()),
-            None,
-            &Encryption::none(),
-            &Prompt::silent(),
-        )
-        // `.err()`, because `unwrap_err` would want a `Debug` on a struct
-        // holding a passphrase.
-        .err()
-        .expect("a refusal");
+        let refused = ask_encryption(Some("luks".to_string()), None, &Prompt::silent())
+            // `.err()`, because `unwrap_err` would want a `Debug` on a struct
+            // holding a passphrase.
+            .err()
+            .expect("a refusal");
         assert!(refused.contains("tpm2-luks-passphrase"), "{refused}");
-        let kept = ask_encryption(
-            Some("tpm2-luks".to_string()),
-            None,
-            &Encryption::none(),
-            &Prompt::silent(),
-        )
-        .expect("one of the four");
+        let kept = ask_encryption(Some("tpm2-luks".to_string()), None, &Prompt::silent())
+            .expect("one of the four");
         assert_eq!(kept.kind, "tpm2-luks");
         assert!(kept.passphrase.is_empty());
     }
@@ -1483,7 +1457,10 @@ tmpfs /run tmpfs rw,nosuid,nodev 0 0
             hostname: "deb2".to_string(),
             user: "tect".to_string(),
             password: "hunter2".to_string(),
-            encryption: Encryption::none(),
+            encryption: Encryption {
+                kind: NONE.to_string(),
+                passphrase: String::new(),
+            },
         };
         assert_eq!(
             answers.summary(&Payload {

@@ -1,0 +1,86 @@
+Creating example...
+
+[6n
+
+
+[1;1H[1m[38;5;6;49mSync this repo to a provider?[2;1H[22m[39;49m>[2;3HYes[3;3HNo[4;1H[2mup and down to move, enter to answer[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hSync this repo to a provider?: Yes
+
+[6n
+
+
+[1;1H[1m[38;5;6;49mWhere will the repo be hosted?[2;1H[22m[39;49m>[2;3Hgithub.com[2;15H[2mGithub, and the workflows Tectonic ships[3;3H[22mforgejo[3;12H[2ma Forgejo instance, whose address you give[4;1Hup and down to move, enter to choose, esc cancels[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hWhere will the repo be hosted?: github.com
+
+[6n
+
+[1;1H[1m[38;5;6;49mWhat is your github username?[2;1H[22m[39;49mgithub.com/[3;1H[2menter confirms[39m[49m[59m[0m[?25l[2;12Hs[39m[49m[59m[0m[?25l[2;13Ho[39m[49m[59m[0m[?25l[2;14Hm[39m[49m[59m[0m[?25l[2;15He[39m[49m[59m[0m[?25l[2;16Ho[39m[49m[59m[0m[?25l[2;17Hn[39m[49m[59m[0m[?25l[2;18He[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hWhat is your github username?: github.com/someone
+
+Added github.com/someone/example as the origin repo
+[6n
+
+
+[1;1H[1m[38;5;6;49mWould you like to create this repo on Github now?[2;1H[22m[39;49m>[2;3HYes[3;3HSkip[4;1H[2mup and down to move, enter to answer[39m[49m[59m[0m[?25l[2;1H [3;1H>[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hWould you like to create this repo on Github now?: Skip
+
+[6n
+
+
+[1;1H[1m[38;5;6;49mDefine an image now?[2;1H[22m[39;49m>[2;3HYes[3;3HNo[4;1H[2mup and down to move, enter to answer[39m[49m[59m[0m[?25l[2;1H [3;1H>[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hDefine an image now?: No
+
+[6n
+
+
+
+
+
+
+[1;1H[1m[38;5;6;49mWhich workflows?[2;1H[22m[39;49m>[2;3H[x][2;7Hbuild[2;14H[2mbuilds, scans, signs and publishes every image[3;3H[ ] build-disk[3;19Hneeds a fedora or rhel image[4;3H[22m[x][4;7Hbase-sig-probe[4;23H[2mmeasures what each base signs and ships, and fixes it[5;3H[22m[x][5;7Hcleanup-registry[5;25H[2mprunes old versions of the images off the registry[6;3H[ ] kernel-freshness[6;25Hneeds a module taking a KERNEL arg[7;3H[22m[x][7;7Hsmoke-test[7;19H[2minstalls the image to a disk and boots it under qemu[8;1Hspace toggles, enter confirms, esc cancels[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hWhich workflows?: build, base-sig-probe, cleanup-registry, smoke-test
+
+[6n
+
+
+[1;1H[1m[38;5;6;49mPublish images only on scheduled builds?[2;3H[22m[39;49mYes[3;1H>[3;3HNo[4;1H[2mup and down to move, enter to answer[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hPublish images only on scheduled builds?: No
+
+[6n
+
+
+[1;1H[1m[38;5;6;49mRun image scans only on scheduled builds?[2;3H[22m[39;49mYes[3;1H>[3;3HNo[4;1H[2mup and down to move, enter to answer[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hRun image scans only on scheduled builds?: No
+
+[6n
+
+[1;1H[1m[38;5;6;49mwhat time the daily build runs, UTC[2;1H[22m[2m[39;49m12:30[3;1Henter confirms[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hwhat time the daily build runs, UTC: 12:30
+
+[6n
+
+
+
+
+
+
+
+
+
+
+[1;1H[1m[38;5;6;49mReview what will be created[2;1H[22m[39;49m>[2;3Hname[2;16H[2mExample[3;3H[22mprovider[3;16H[2mgithub.com/someone[4;3H[22mgithub[4;10Hrepo[4;16H[2mnot created[5;3H[22mimage[5;16H[2mnone[6;3H[22mworkflows[6;16H[2mbuild, base-sig-probe, cleanup-registry, smoke-test[7;3H[22mpublish[7;16H[2mon every push[8;3H[22mimage[8;9Hscans[8;16H[2mon every build[9;3H[22mdaily[9;9Hbuild[9;16H[2m12:30[11;3H[22mCreate[12;1H[2menter to change a field, Create to write, esc cancels[39m[49m[59m[0m[?25l[2;1H [3;1H>[39m[49m[59m[0m[?25l[3;1H [4;1H>[39m[49m[59m[0m[?25l[4;1H [5;1H>[39m[49m[59m[0m[?25l[5;1H [6;1H>[39m[49m[59m[0m[?25l[6;1H [7;1H>[39m[49m[59m[0m[?25l[7;1H [8;1H>[39m[49m[59m[0m[?25l[8;1H [9;1H>[39m[49m[59m[0m[?25l[9;1H [11;1H>[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hinitialised a git repository in example
+
+example/
+├── .github/
+│   └── [38;5;10m+[39m renovate.json5
+├── disk_config/
+│   └── [38;5;10m+[39m disk.toml
+├── modules/
+│   └── [38;5;10m+[39m .gitkeep
+├── scripts/
+│   └── [38;5;10m+[39m Containerfile.skeleton
+├── [38;5;10m+[39m .dockerignore
+├── [38;5;10m+[39m .gitattributes
+├── [38;5;10m+[39m .gitignore
+├── [38;5;10m+[39m .shellcheckrc
+├── [38;5;10m+[39m README.md
+└── [38;5;10m+[39m repo.kdl
+
+next:
+  cd example
+  tect generate
+  git add -A && git commit
+  gh repo create someone/example --source=. --push
+
+==== exit 0
