@@ -725,10 +725,12 @@ fn shown(kind: &str) -> &'static str {
 fn kinds(tpm: bool) -> Vec<Choice> {
     KINDS
         .iter()
-        .map(|(name, shown, detail)| match tpm || !name.starts_with("tpm2") {
-            true => Choice::new(*shown, *detail),
-            false => Choice::new(*shown, copy::NO_TPM).unavailable(),
-        })
+        .map(
+            |(name, shown, detail)| match tpm || !name.starts_with("tpm2") {
+                true => Choice::new(*shown, *detail),
+                false => Choice::new(*shown, copy::NO_TPM).unavailable(),
+            },
+        )
         .collect()
 }
 
@@ -1897,16 +1899,15 @@ tmpfs /run tmpfs rw,nosuid,nodev 0 0
         // same gate for an encryption answered after it.
         let mut encrypted = form("hunter2", "hunter2", "tpm2-luks", "");
         data(&mut encrypted, copy::DATA_HERE.to_string(), "200 GB");
-        assert_eq!(short_of(&encrypted).as_deref(), Some(copy::DATA_UNENCRYPTED));
+        assert_eq!(
+            short_of(&encrypted).as_deref(),
+            Some(copy::DATA_UNENCRYPTED)
+        );
 
         // And `/var` on the disk this is installing to is the one row the list
         // cannot leave out, since nothing has answered the disk when it is built.
         let mut same = form("hunter2", "hunter2", NONE, "");
-        data(
-            &mut same,
-            copy::on_disk("/dev/vda", copy::DATA_ERASED),
-            "",
-        );
+        data(&mut same, copy::on_disk("/dev/vda", copy::DATA_ERASED), "");
         assert_eq!(short_of(&same).as_deref(), Some(copy::DATA_SAME_DISK));
     }
 
