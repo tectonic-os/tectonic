@@ -22,7 +22,7 @@ without needing the URL again: it says what is running and what the latest
 release is, moves both halves, and says so instead when there is nothing to
 move.
 
-x86_64 Linux is what is published. Anywhere else, build it.
+x86_64 and aarch64 Linux are what is published. Anywhere else, build it.
 
 Both resolve the latest release at run time, so what arrives is what is tagged
 rather than what is on `main`. `tect upgrade` is newer than the current tag, so

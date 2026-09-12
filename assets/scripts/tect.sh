@@ -41,10 +41,21 @@ if [[ "$rest" =~ (^|[[:space:]])sha256[[:space:]]*= ]]; then
         || die "repo.kdl declares a malformed sha256 for tect-version"
 fi
 
+case "$(uname -m)" in
+    x86_64 | aarch64) arch="$(uname -m)" ;;
+    *) die "Linux is published for x86_64 and aarch64, and this is $(uname -m)" ;;
+esac
+
+# One pin, one architecture: the sha256 repo.kdl declares is the x86_64
+# asset's, so it cannot verify another architecture's download.
+if [ -n "$sha256" ] && [ "$arch" != "x86_64" ]; then
+    die "repo.kdl pins the sha256 of the x86_64 release, and this is ${arch}"
+fi
+
 bin="${TECT_BIN:-out/tect-${version}${sha256:+-${sha256}}}"
 
 if [ ! -x "$bin" ]; then
-    asset="tect-v${version}-x86_64-linux-musl.tar.gz"
+    asset="tect-v${version}-${arch}-linux-musl.tar.gz"
     url="https://github.com/${REPO}/releases/download/v${version}/${asset}"
 
     mkdir -p out

@@ -12,6 +12,10 @@ use std::process::Command;
 
 const REPO: &str = "tectonic-os/tectonic";
 
+/// The architectures a release publishes, spelled the way
+/// `std::env::consts::ARCH` and the asset name both spell them.
+const PUBLISHED: [&str; 2] = ["x86_64", "aarch64"];
+
 /// Where the two halves come from and where they go, decided before anything
 /// is fetched.
 #[derive(Debug, PartialEq, Eq)]
@@ -28,6 +32,7 @@ pub struct Plan {
 /// between them is the guess this command exists not to make.
 fn plan(
     version: &str,
+    arch: &str,
     euid: u32,
     home: Option<PathBuf>,
     data: Option<PathBuf>,
@@ -47,7 +52,7 @@ fn plan(
         version: version.to_string(),
         url: format!(
             "https://github.com/{REPO}/releases/download/v{version}/\
-             tect-v{version}-x86_64-linux-musl.tar.gz"
+             tect-v{version}-{arch}-linux-musl.tar.gz"
         ),
         bin: bindir.join("tect"),
         assets,
@@ -150,9 +155,10 @@ impl Drop for Staged {
 
 pub fn run() -> Result<(), String> {
     let arch = std::env::consts::ARCH;
-    if arch != "x86_64" {
+    if !PUBLISHED.contains(&arch) {
         return Err(format!(
-            "only x86_64 Linux is published, and this is {arch}"
+            "Linux is published for {}, and this is {arch}",
+            PUBLISHED.join(" and ")
         ));
     }
 
@@ -176,6 +182,7 @@ pub fn run() -> Result<(), String> {
     let euid = unsafe { libc::geteuid() };
     let plan = plan(
         &latest,
+        arch,
         euid,
         std::env::var_os("HOME").map(PathBuf::from),
         init::data_home(),
@@ -288,7 +295,7 @@ mod tests {
 
     #[test]
     fn root_and_a_person_take_different_pairs_and_never_each_others() {
-        let root = plan("0.3.8", 0, None, None).unwrap();
+        let root = plan("0.3.8", "x86_64", 0, None, None).unwrap();
         assert_eq!(root.bin, PathBuf::from("/usr/local/bin/tect"));
         assert_eq!(
             root.assets,
@@ -306,6 +313,7 @@ mod tests {
         let home = PathBuf::from("/home/someone");
         let user = plan(
             "0.3.8",
+            "x86_64",
             1000,
             Some(home.clone()),
             Some(PathBuf::from("/elsewhere/data")),
@@ -318,10 +326,30 @@ mod tests {
         );
     }
 
+    /// The asset is named for the architecture, so an aarch64 host never
+    /// fetches the x86_64 binary and finds out at the first exec.
+    #[test]
+    fn the_asset_is_named_for_the_architecture() {
+        for arch in PUBLISHED {
+            let url = plan("0.3.8", arch, 0, None, None).unwrap().url;
+            assert!(
+                url.ends_with(&format!("tect-v0.3.8-{arch}-linux-musl.tar.gz")),
+                "{url}"
+            );
+        }
+    }
+
     #[test]
     fn a_person_with_no_home_is_refused_rather_than_sent_to_usr_local() {
-        assert!(plan("0.3.8", 1000, None, None).is_err());
-        assert!(plan("0.3.8", 1000, Some(PathBuf::from("/home/x")), None).is_err());
+        assert!(plan("0.3.8", "x86_64", 1000, None, None).is_err());
+        assert!(plan(
+            "0.3.8",
+            "x86_64",
+            1000,
+            Some(PathBuf::from("/home/x")),
+            None
+        )
+        .is_err());
     }
 
     #[test]

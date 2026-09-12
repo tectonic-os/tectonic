@@ -13,8 +13,8 @@ command -v tar > /dev/null || die "tar is required"
 command -v sha256sum > /dev/null || die "sha256sum is required"
 
 case "$(uname -m)" in
-    x86_64) ;;
-    *) die "only x86_64 Linux is published" ;;
+    x86_64 | aarch64) arch="$(uname -m)" ;;
+    *) die "Linux is published for x86_64 and aarch64, and this is $(uname -m)" ;;
 esac
 
 version="${1:-}"
@@ -66,7 +66,7 @@ fi
 tmp="$(mktemp -d "$parent/.install.XXXXXXXX")" || die "cannot create a temp dir"
 trap 'rm -rf "$tmp"' EXIT
 
-asset="tect-v${version}-x86_64-linux-musl.tar.gz"
+asset="tect-v${version}-${arch}-linux-musl.tar.gz"
 url="https://github.com/$repo/releases/download/v${version}/${asset}"
 
 curl -fsSL --retry 3 -o "$tmp/$asset" "$url" \

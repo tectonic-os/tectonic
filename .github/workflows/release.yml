@@ -28,27 +28,36 @@ jobs:
       - name: Build
         run: |
           set -euo pipefail
-          rustup target add x86_64-unknown-linux-musl
+          rustup target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl
           cargo build --profile dist --locked --target x86_64-unknown-linux-musl
+          # The runner's cc cannot link aarch64; the toolchain carries a linker
+          # that can, and the musl target ships its own crt objects and libc.a.
+          lld="$(rustc --print sysroot)/lib/rustlib/$(rustc -vV | sed -n 's/^host: //p')/bin/rust-lld"
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="-C linker-flavor=ld.lld -C linker=${lld}" \
+            cargo build --profile dist --locked --target aarch64-unknown-linux-musl
 
-      - name: Package with checksum
-        id: pkg
+      - name: Package with checksums
         run: |
           set -euo pipefail
-          bin=target/x86_64-unknown-linux-musl/dist/tect
-          # It mounts into build layers, so it has to carry no interpreter
-          file "$bin" | grep -q static
           version="${GITHUB_REF_NAME#v}"
-          asset="tect-v${version}-x86_64-linux-musl.tar.gz"
-          # The binary plus the scaffolding `tect init` writes
-          tar -czf "$asset" --transform "s|^${bin%/tect}/||" "$bin" assets
-          sha256sum "$asset" | cut -d' ' -f1 > "${asset}.sha256"
-          echo "asset=${asset}" >> "$GITHUB_OUTPUT"
+          for arch in x86_64:x86-64 aarch64:"ARM aarch64"; do
+            machine="${arch#*:}"
+            arch="${arch%%:*}"
+            bin="target/${arch}-unknown-linux-musl/dist/tect"
+            # It mounts into build layers, so it has to carry no interpreter,
+            # and a cross build naming the wrong machine must not ship.
+            file "$bin" | grep -q "${machine}"
+            file "$bin" | grep -q static
+            asset="tect-v${version}-${arch}-linux-musl.tar.gz"
+            # The binary plus the scaffolding `tect init` writes
+            tar -czf "$asset" --transform "s|^${bin%/tect}/||" "$bin" assets
+            sha256sum "$asset" | cut -d' ' -f1 > "${asset}.sha256"
+          done
 
-      - name: Attest the tarball
+      - name: Attest the tarballs
         uses: actions/attest-build-provenance@bd77c077858b8d561b7a36cbe48ef4cc642ca39d # v2.2.2
         with:
-          subject-path: ${{ steps.pkg.outputs.asset }}
+          subject-path: tect-v*-linux-musl.tar.gz
 
       - name: Create release
         env:
@@ -57,5 +66,4 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" \
             --title "${GITHUB_REF_NAME}" \
             --generate-notes \
-            "${{ steps.pkg.outputs.asset }}" \
-            "${{ steps.pkg.outputs.asset }}.sha256"
+            tect-v*-linux-musl.tar.gz tect-v*-linux-musl.tar.gz.sha256

@@ -93,8 +93,8 @@ the same or when the running build is ahead of the tag.
 - An `assets` directory beside the binary outranks the pair this places, and is
   refused before anything is fetched. A set `TECT_ASSETS` outranks it too, but
   that is environment rather than disk and may be deliberate, so it warns.
-- x86_64 Linux is what is published. Anywhere else it refuses by name rather
-  than fetching a 404.
+- x86_64 and aarch64 Linux are what is published. Anywhere else it refuses by
+  name rather than fetching a 404.
 - On a machine with no `tect` yet, the same thing is
   `curl -fsSL https://raw.githubusercontent.com/tectonic-os/tectonic/main/install.sh | sh`.
 
