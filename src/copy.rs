@@ -126,12 +126,36 @@ pub const INSTALL_USER: &str = "Username";
 pub const INSTALL_PASSWORD: &str = "Password";
 pub const INSTALL_ENCRYPTION: &str = "Encryption type";
 pub const LUKS_PASSPHRASE: &str = "LUKS passphrase";
-pub const ENC_NONE: &str = "not encrypted";
-pub const ENC_TPM2: &str = "unlocked by TPM";
-pub const ENC_PASSPHRASE: &str = "unlocked by passphrase";
-pub const ENC_BOTH: &str = "TPM with passphrase fallback";
+/// The four descriptions, which are what the rows say. The wire names
+/// `--encryption` takes are fisherman's and stay in `install::KINDS`.
+pub const ENC_NONE: &str = "none";
+pub const ENC_TPM2: &str = "luks with TPM2 decryption and recovery key";
+pub const ENC_PASSPHRASE: &str = "luks with passphrase decryption";
+pub const ENC_BOTH: &str = "luks with TPM2 decryption and recovery passphrase";
+/// What each costs, beside the row. Nothing here is marked strongest: a TPM
+/// binds the key to a measured boot, a passphrase binds it to a person.
+pub const ENC_ANY_HOLDER: &str = "opens for anyone who has the machine";
+pub const ENC_ONLY_YOU: &str = "nothing opens it without you";
 pub const NO_TPM: &str = "No TPM available";
 pub const REMOVABLE: &str = "removable";
+
+// Where `/home` goes. `/home` is `/var/home` on a bootc system, so a separate
+// home is a separate `/var`, and that is a partition of the install disk or a
+// disk of its own.
+
+pub const DATA_HERE: &str = "this disk, sized";
+pub const DATA_ERASED: &str = "erased";
+pub const DATA_KEPT: &str = "keep what is on it";
+/// Beside every row but `none` while the root is encrypted, which is what
+/// makes them unpickable until the encrypted `/var` lands.
+pub const DATA_UNENCRYPTED: &str = "an unencrypted home under an encrypted root";
+pub const DATA_SAME_DISK: &str = "that is the disk this installs to";
+
+/// A whole disk, and which of the two things happens to it. The label is the
+/// answer, so it says both.
+pub fn on_disk(disk: &str, how: &str) -> String {
+    format!("{disk}, {how}")
+}
 
 /// The question asked over the summary, once, after the form is complete and
 /// before anything is written. It carries what installing costs, in one
@@ -215,10 +239,15 @@ pub fn layout(filesystem: &str, bootloader: &str) -> String {
 
 /// The same, spelled out over the confirmation, a row per partition. This is
 /// the half of what is about to be written that no question above covers.
-pub fn written_over(bootloader: &str, filesystem: &str) -> Vec<(String, String)> {
+pub fn written_over(bootloader: &str, filesystem: &str, var: &str) -> Vec<(String, String)> {
     let mut rows = vec![("esp".to_string(), "2 GB  fat32".to_string())];
     if bootloader != "systemd" {
         rows.push(("/boot".to_string(), "2 GB  ext4".to_string()));
+    }
+    // Cut out of this disk, so it is a partition here. A `/var` on another
+    // disk is a row of the summary above instead.
+    if !var.is_empty() {
+        rows.push(("/var".to_string(), format!("{var}  {filesystem}")));
     }
     rows.push(("root".to_string(), format!("the rest  {filesystem}")));
     rows
@@ -232,6 +261,8 @@ pub const ROW_ACCOUNT: &str = "username";
 pub const ROW_PASSWORD: &str = "password";
 pub const ROW_ENCRYPTION: &str = "encryption";
 pub const ROW_PASSPHRASE: &str = "passphrase";
+pub const ROW_DATA: &str = "home and data";
+pub const ROW_SIZE: &str = "size";
 pub const PASSWORD_SET: &str = "set";
 /// What a field nobody has answered yet reads as. On a form the difference
 /// between a value and a gap has to be on the screen.

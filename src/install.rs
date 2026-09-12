@@ -156,13 +156,15 @@ fn mounted(device: &str) -> Result<PathBuf, String> {
     }
 }
 
-/// The four fisherman takes. The two whose name ends in `passphrase` are the
-/// two it refuses the recipe without one.
-const KINDS: [(&str, &str); 4] = [
-    (NONE, copy::ENC_NONE),
-    ("tpm2-luks", copy::ENC_TPM2),
-    ("luks-passphrase", copy::ENC_PASSPHRASE),
-    ("tpm2-luks-passphrase", copy::ENC_BOTH),
+/// The four fisherman takes: the name it is written as, the description the
+/// screen shows, and what that one costs. The two whose name ends in
+/// `passphrase` are the two it refuses the recipe without one, and `tpm2-luks`
+/// hands back a recovery key of its own.
+const KINDS: [(&str, &str, &str); 4] = [
+    (NONE, copy::ENC_NONE, ""),
+    ("tpm2-luks", copy::ENC_TPM2, copy::ENC_ANY_HOLDER),
+    ("luks-passphrase", copy::ENC_PASSPHRASE, copy::ENC_ONLY_YOU),
+    ("tpm2-luks-passphrase", copy::ENC_BOTH, copy::ENC_ANY_HOLDER),
 ];
 
 const NONE: &str = "none";
@@ -195,6 +197,26 @@ pub struct Encryption {
     pub passphrase: String,
 }
 
+/// Where `/home` goes. `/home` is `/var/home` on a bootc system, so a separate
+/// home is a separate `/var`: a partition cut out of the install disk, a whole
+/// disk of its own, or neither.
+#[derive(Default)]
+pub struct Data {
+    /// The whole disk, empty where `/var` is not one.
+    pub disk: String,
+    /// What to cut out of the install disk, empty where none is.
+    pub size: String,
+    /// Mount the disk as it is. Off formats it, which erases a second disk.
+    pub keep: bool,
+}
+
+impl Data {
+    /// Whether `/var` is going anywhere at all.
+    fn wanted(&self) -> bool {
+        !self.disk.is_empty() || !self.size.is_empty()
+    }
+}
+
 impl Encryption {
     fn wants_passphrase(kind: &str) -> bool {
         kind.ends_with("passphrase")
@@ -208,6 +230,7 @@ pub struct Answers {
     pub user: String,
     pub password: String,
     pub encryption: Encryption,
+    pub data: Data,
 }
 
 /// What the flags gave, which the first pass reads and a re-ask does not: a
@@ -344,6 +367,8 @@ impl Answers {
                     None,
                 )?,
                 encryption: ask_encryption(given.encryption, given.passphrase, prompt)?,
+                // No flag names it, so a run with no screen installs without one.
+                data: Data::default(),
             });
         }
         Ok(Self {
@@ -363,6 +388,7 @@ impl Answers {
                 },
                 passphrase: given.passphrase.unwrap_or_default(),
             },
+            data: Data::default(),
         })
     }
 
@@ -398,9 +424,17 @@ impl Answers {
                 kinds(tpm().exists()),
                 KINDS
                     .iter()
-                    .position(|(name, _)| *name == self.encryption.kind),
+                    .position(|(name, _, _)| *name == self.encryption.kind),
             ),
             Field::secret(copy::ROW_PASSPHRASE, &self.encryption.passphrase),
+            // Nothing seeds this one: no flag names it, and a form asked again
+            // is built from the payload's own answers.
+            Field::pick(
+                copy::ROW_DATA,
+                data_rows(&self.disk, &found, self.encryption.kind != NONE),
+                Some(0),
+            ),
+            Field::text(copy::ROW_SIZE, &self.data.size),
         ]
     }
 
@@ -414,9 +448,13 @@ impl Answers {
             user: at(ROW_ACCOUNT),
             password: at(ROW_PASSWORD),
             encryption: Encryption {
-                kind: at(ROW_ENCRYPTION),
+                // The rows are descriptions and the recipe takes wire names,
+                // and a recipe naming a description is refused by fisherman
+                // after the disk is gone.
+                kind: written(&at(ROW_ENCRYPTION)).to_string(),
                 passphrase: at(ROW_PASSPHRASE),
             },
+            data: chose(&at(ROW_DATA), &at(ROW_SIZE)),
         }
     }
 
@@ -433,13 +471,18 @@ impl Answers {
             ),
             (
                 copy::ROW_ENCRYPTION.to_string(),
-                self.encryption.kind.clone(),
+                shown(&self.encryption.kind).to_string(),
             ),
+            (copy::ROW_DATA.to_string(), data_said(&self.data)),
         ];
         // What the disk is about to be cut into. Nobody chose any of it, which
         // is why it is here: it is the half of what is being written that no
         // question above covers.
-        rows.extend(copy::written_over(&payload.bootloader, &payload.filesystem));
+        rows.extend(copy::written_over(
+            &payload.bootloader,
+            &payload.filesystem,
+            &self.data.size,
+        ));
         rows
     }
 }
@@ -453,14 +496,18 @@ const ROW_PASSWORD: usize = 4;
 const ROW_CONFIRM: usize = 5;
 const ROW_ENCRYPTION: usize = 6;
 const ROW_PASSPHRASE: usize = 7;
+const ROW_DATA: usize = 8;
+const ROW_SIZE: usize = 9;
 
 /// Which rows are questions. The passphrase is one only for the two encryption
 /// forms named for one; on the others it is not a field a person can answer
 /// wrongly, so it is not a field.
 fn asked(fields: &[crate::ui::Field]) -> Vec<usize> {
-    let wants = Encryption::wants_passphrase(&fields[ROW_ENCRYPTION].value());
+    let wants = Encryption::wants_passphrase(written(&fields[ROW_ENCRYPTION].value()));
+    let sized = fields[ROW_DATA].value() == copy::DATA_HERE;
     (0..fields.len())
         .filter(|row| *row != ROW_PASSPHRASE || wants)
+        .filter(|row| *row != ROW_SIZE || sized)
         .collect()
 }
 
@@ -472,12 +519,25 @@ fn short_of(fields: &[crate::ui::Field]) -> Option<String> {
     if !at(ROW_PASSWORD).is_empty() && at(ROW_PASSWORD) != at(ROW_CONFIRM) {
         return Some(copy::NO_MATCH_ROW.to_string());
     }
-    let wants = Encryption::wants_passphrase(&at(ROW_ENCRYPTION));
+    let data = chose(&at(ROW_DATA), &at(ROW_SIZE));
+    // The rows are drawn unpickable under an encrypted root, and this is the
+    // same gate for a `/var` answered before the encryption was.
+    if written(&at(ROW_ENCRYPTION)) != NONE && data.wanted() {
+        return Some(copy::DATA_UNENCRYPTED.to_string());
+    }
+    if !data.disk.is_empty() && data.disk == at(ROW_DISK) {
+        return Some(copy::DATA_SAME_DISK.to_string());
+    }
+    let wants = Encryption::wants_passphrase(written(&at(ROW_ENCRYPTION)));
     let missing: Vec<&str> = [
         (at(ROW_DISK).is_empty(), copy::ROW_DISK),
         (at(ROW_ACCOUNT).is_empty(), copy::ROW_ACCOUNT),
         (at(ROW_PASSWORD).is_empty(), copy::ROW_PASSWORD),
         (wants && at(ROW_PASSPHRASE).is_empty(), copy::ROW_PASSPHRASE),
+        (
+            at(ROW_DATA) == copy::DATA_HERE && at(ROW_SIZE).is_empty(),
+            copy::ROW_SIZE,
+        ),
     ]
     .into_iter()
     .filter(|(missing, _)| *missing)
@@ -628,17 +688,36 @@ fn ask_disk(
 /// The kind, if fisherman has one by that name. The form validates a flag this
 /// way without asking anything, which is why it is not inline in the question.
 fn named(kind: String) -> Result<String, String> {
-    if KINDS.iter().any(|(name, _)| *name == kind) {
+    if KINDS.iter().any(|(name, _, _)| *name == kind) {
         return Ok(kind);
     }
     Err(format!(
         "`{kind}` is not one of {}",
         KINDS
             .iter()
-            .map(|(name, _)| *name)
+            .map(|(name, _, _)| *name)
             .collect::<Vec<_>>()
             .join(", ")
     ))
+}
+
+/// The name a description is written as, which is the reverse of `named()`:
+/// the flag takes fisherman's names because a flag is scripted, and the screen
+/// shows the descriptions. A label no row holds is nothing chosen.
+fn written(shown: &str) -> &'static str {
+    KINDS
+        .iter()
+        .find(|(_, label, _)| *label == shown)
+        .map_or(NONE, |(name, _, _)| *name)
+}
+
+/// The description a name is shown as, for the screens that read an answer
+/// back.
+fn shown(kind: &str) -> &'static str {
+    KINDS
+        .iter()
+        .find(|(name, _, _)| *name == kind)
+        .map_or(copy::ENC_NONE, |(_, label, _)| *label)
 }
 
 /// A `tpm2-` form on a machine with no TPM is shown and refuses the key that
@@ -646,11 +725,66 @@ fn named(kind: String) -> Result<String, String> {
 fn kinds(tpm: bool) -> Vec<Choice> {
     KINDS
         .iter()
-        .map(|(name, detail)| match tpm || !name.starts_with("tpm2") {
-            true => Choice::new(*name, *detail),
-            false => Choice::new(*name, copy::NO_TPM).unavailable(),
+        .map(|(name, shown, detail)| match tpm || !name.starts_with("tpm2") {
+            true => Choice::new(*shown, *detail),
+            false => Choice::new(*shown, copy::NO_TPM).unavailable(),
         })
         .collect()
+}
+
+/// Where `/home` goes: a partition of the install disk, another whole disk
+/// formatted or mounted as it is, or neither. Every row but `none` is shown
+/// and refuses the key while the root is encrypted, because an unencrypted
+/// `/var` under an encrypted root is an unencrypted home.
+fn data_rows(disk: &str, found: &[(String, String)], encrypted: bool) -> Vec<Choice> {
+    let mut rows = vec![Choice::new(copy::NONE, "")];
+    let mut offered = vec![Choice::new(copy::DATA_HERE, "")];
+    for (other, detail) in found.iter().filter(|(other, _)| other != disk) {
+        offered.push(Choice::new(copy::on_disk(other, copy::DATA_ERASED), detail));
+        offered.push(Choice::new(copy::on_disk(other, copy::DATA_KEPT), detail));
+    }
+    rows.extend(offered.into_iter().map(|row| match encrypted {
+        false => row,
+        true => Choice::new(row.label, copy::DATA_UNENCRYPTED).unavailable(),
+    }));
+    rows
+}
+
+/// The answer the `/var` row holds, read back off its own label: the label is
+/// the answer, which is why it names the disk and what happens to it.
+fn chose(shown: &str, size: &str) -> Data {
+    if shown == copy::DATA_HERE {
+        return Data {
+            size: size.to_string(),
+            ..Data::default()
+        };
+    }
+    for (how, keep) in [(copy::DATA_KEPT, true), (copy::DATA_ERASED, false)] {
+        if let Some(disk) = shown.strip_suffix(&format!(", {how}")) {
+            return Data {
+                disk: disk.to_string(),
+                keep,
+                ..Data::default()
+            };
+        }
+    }
+    Data::default()
+}
+
+/// What the summary says the answer was. The size is left to the partition row
+/// under it, which is the one place the disk is spelled out.
+fn data_said(data: &Data) -> String {
+    match (data.disk.is_empty(), data.size.is_empty()) {
+        (true, true) => copy::NONE.to_string(),
+        (true, false) => copy::DATA_HERE.to_string(),
+        _ => copy::on_disk(
+            &data.disk,
+            match data.keep {
+                true => copy::DATA_KEPT,
+                false => copy::DATA_ERASED,
+            },
+        ),
+    }
 }
 
 /// The encryption where there is no form. A `tpm2-` kind on a machine with no
@@ -722,6 +856,26 @@ pub fn complete(recipe: &Path, answers: &Answers) -> Result<Json, String> {
         Json::string(hashed(&answers.password)?),
     );
     set(&mut doc, "user", user);
+    // An answer of none writes nothing, so a `var-disk` the image declared is
+    // left exactly as `emit::recipe` wrote it.
+    if !answers.data.disk.is_empty() {
+        set(
+            &mut doc,
+            "varDisk",
+            Json::object([
+                ("disk", Json::string(&answers.data.disk)),
+                ("keepExisting", Json::Bool(answers.data.keep)),
+            ]),
+        );
+    } else if !answers.data.size.is_empty() {
+        // Cut out of the install disk, which is what `size` without a `disk`
+        // means to fisherman.
+        set(
+            &mut doc,
+            "varDisk",
+            Json::object([("size", Json::string(&answers.data.size))]),
+        );
+    }
     Ok(doc)
 }
 
@@ -1130,6 +1284,22 @@ fn finish(recovery: Option<&str>, log: Option<&Path>, prompt: &Prompt) -> Result
     }
     // Inside the box, all of it. A key held in no file and shown on no screen
     // is a disk nobody can open.
+    match crate::ui::offer_over(
+        copy::INSTALL_DONE,
+        done_rows(recovery, log),
+        copy::RESTART,
+        copy::DONE_KEYS,
+    )? {
+        false => Ok(()),
+        true => restart(),
+    }
+}
+
+/// What the last screen holds: the key as text, the same key as a QR beside
+/// it, what scanning it is for, and where the log went. The QR carries the
+/// bare key and claims nothing further — nothing routes a text QR into a
+/// wallet.
+pub(crate) fn done_rows(recovery: Option<&str>, log: Option<&Path>) -> Vec<Choice> {
     let mut rows = Vec::new();
     if let Some(key) = recovery {
         rows.push(Choice::new(copy::WRITE_DOWN, "").content());
@@ -1138,10 +1308,7 @@ fn finish(recovery: Option<&str>, log: Option<&Path>, prompt: &Prompt) -> Result
         rows.push(Choice::new(copy::KEY_NOT_LOGGED, "").content());
     }
     rows.push(Choice::new(copy::logging(log), "").content());
-    match crate::ui::offer_over(copy::INSTALL_DONE, rows, copy::RESTART, copy::DONE_KEYS)? {
-        false => Ok(()),
-        true => restart(),
-    }
+    rows
 }
 
 /// The live environment is a systemd one, which is what puts the installer on
@@ -1244,6 +1411,7 @@ mod tests {
                 kind: "luks-passphrase".to_string(),
                 passphrase: "opensesame".to_string(),
             },
+            data: Data::default(),
         };
         let done = complete(&recipe, &answers).expect("the person's half goes in");
 
@@ -1289,31 +1457,167 @@ mod tests {
     fn only_the_forms_named_for_a_passphrase_are_asked_for_one() {
         let wants: Vec<&str> = KINDS
             .iter()
-            .map(|(name, _)| *name)
+            .map(|(name, _, _)| *name)
             .filter(|name| Encryption::wants_passphrase(name))
             .collect();
         assert_eq!(wants, ["luks-passphrase", "tpm2-luks-passphrase"]);
+    }
+
+    /// The rows are descriptions and the recipe takes fisherman's names, which
+    /// are two different strings for one answer. Writing the description into
+    /// the recipe is refused by fisherman after the disk is already gone.
+    #[test]
+    fn every_shown_description_is_written_as_the_name_fisherman_takes() {
+        let root = scratch("kinds");
+        let recipe = root.join(RECIPE);
+        std::fs::write(&recipe, EMITTED).expect("a recipe");
+        for (name, label, _) in KINDS {
+            let answers = Answers {
+                disk: "/dev/vda".to_string(),
+                hostname: "deb2".to_string(),
+                user: "tect".to_string(),
+                password: "hunter2".to_string(),
+                encryption: Encryption {
+                    kind: name.to_string(),
+                    passphrase: "opensesame".to_string(),
+                },
+                data: Data::default(),
+            };
+            // The form draws the description, and reading the form back gives
+            // the name again.
+            let fields = answers.fields("ext4", "grub2");
+            assert_eq!(fields[ROW_ENCRYPTION].value(), label);
+            let read = Answers::of(&fields);
+            assert_eq!(read.encryption.kind, name);
+            let done = complete(&recipe, &read).expect("a completed recipe");
+            let encryption = json::field(&done, "encryption").expect("an encryption");
+            assert_eq!(json::text(encryption, "type").as_deref(), Some(name));
+            // The summary says the description back, since that is what was
+            // picked.
+            assert_eq!(shown(name), label);
+            // And the flag keeps taking the name, because a flag is scripted.
+            let flagged = ask_encryption(
+                Some(name.to_string()),
+                Some("opensesame".to_string()),
+                &Prompt::silent(),
+            )
+            .expect("one of the four");
+            assert_eq!(flagged.kind, name);
+        }
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Every row but `none` is shown and refuses the key while the root is
+    /// encrypted: an unencrypted `/var` under an encrypted root is an
+    /// unencrypted home.
+    #[test]
+    fn the_var_rows_are_shown_and_unpickable_under_an_encrypted_root() {
+        let found = [
+            ("/dev/vda".to_string(), "68 GB".to_string()),
+            ("/dev/sdb".to_string(), "30 GB".to_string()),
+        ];
+        let open = data_rows("/dev/vda", &found, false);
+        let labels: Vec<&str> = open.iter().map(|row| row.label.as_str()).collect();
+        // The disk being installed to is not among them, and the other one is
+        // offered both formatted and as it is.
+        assert_eq!(
+            labels,
+            [
+                copy::NONE,
+                copy::DATA_HERE,
+                &copy::on_disk("/dev/sdb", copy::DATA_ERASED),
+                &copy::on_disk("/dev/sdb", copy::DATA_KEPT),
+            ]
+        );
+        assert!(open.iter().all(|row| row.available));
+
+        let gated = data_rows("/dev/vda", &found, true);
+        // `none` is the answer the gate leaves, so it stays pickable.
+        assert!(gated[0].available);
+        for row in &gated[1..] {
+            assert!(!row.available, "{} is pickable", row.label);
+            assert_eq!(row.detail, copy::DATA_UNENCRYPTED);
+        }
+    }
+
+    /// What each answer writes. `size` is cut out of the install disk and
+    /// `disk` is a second one, and fisherman takes one or the other.
+    #[test]
+    fn a_sized_var_writes_a_size_and_another_disk_writes_that_disk() {
+        let root = scratch("var");
+        let recipe = root.join(RECIPE);
+        std::fs::write(&recipe, EMITTED).expect("a recipe");
+        let written = |data: Data| {
+            let answers = Answers {
+                disk: "/dev/vda".to_string(),
+                hostname: "deb2".to_string(),
+                user: "tect".to_string(),
+                password: "hunter2".to_string(),
+                encryption: Encryption {
+                    kind: NONE.to_string(),
+                    passphrase: String::new(),
+                },
+                data,
+            };
+            complete(&recipe, &answers).expect("a completed recipe")
+        };
+        let held = |doc: &Json, key: &str| {
+            json::field(doc, "varDisk")
+                .and_then(|var| json::field(var, key))
+                .map(|value| value.render().trim().to_string())
+        };
+
+        let sized = written(chose(copy::DATA_HERE, "200 GB"));
+        assert_eq!(held(&sized, "size").as_deref(), Some("\"200 GB\""));
+        assert_eq!(held(&sized, "disk"), None);
+
+        let other = written(chose(&copy::on_disk("/dev/sdb", copy::DATA_ERASED), ""));
+        assert_eq!(held(&other, "disk").as_deref(), Some("\"/dev/sdb\""));
+        assert_eq!(held(&other, "size"), None);
+        assert_eq!(held(&other, "keepExisting").as_deref(), Some("false"));
+
+        // The same row, answered as the disk being kept.
+        let kept = written(chose(&copy::on_disk("/dev/sdb", copy::DATA_KEPT), ""));
+        assert_eq!(held(&kept, "disk").as_deref(), Some("\"/dev/sdb\""));
+        assert_eq!(held(&kept, "keepExisting").as_deref(), Some("true"));
+
+        // None writes nothing, so a `var-disk` the image declared stands.
+        assert!(json::field(&written(Data::default()), "varDisk").is_none());
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// A machine with no TPM still sees the two forms that need one, dim and
     /// saying why. A shorter list explains nothing.
     #[test]
     fn the_tpm_forms_are_shown_and_unpickable_where_there_is_no_tpm() {
-        let shown = kinds(false);
-        let without: Vec<(&str, bool)> = shown
+        let rows = kinds(false);
+        let without: Vec<(&str, &str, bool)> = rows
             .iter()
-            .map(|choice| (choice.detail.as_str(), choice.available))
+            .map(|choice| {
+                (
+                    choice.label.as_str(),
+                    choice.detail.as_str(),
+                    choice.available,
+                )
+            })
             .collect();
+        // The label is the description and the detail is what it costs, and
+        // the two `tpm2-` rows say what they are missing instead.
         assert_eq!(
             without,
             vec![
-                (copy::ENC_NONE, true),
-                (copy::NO_TPM, false),
-                (copy::ENC_PASSPHRASE, true),
-                (copy::NO_TPM, false),
+                (copy::ENC_NONE, "", true),
+                (copy::ENC_TPM2, copy::NO_TPM, false),
+                (copy::ENC_PASSPHRASE, copy::ENC_ONLY_YOU, true),
+                (copy::ENC_BOTH, copy::NO_TPM, false),
             ]
         );
-        assert!(kinds(true).iter().all(|choice| choice.available));
+        let with = kinds(true);
+        assert!(with.iter().all(|choice| choice.available));
+        // Nothing on the list is marked strongest: the two that a TPM opens
+        // say the same thing as each other.
+        assert_eq!(with[1].detail, copy::ENC_ANY_HOLDER);
+        assert_eq!(with[3].detail, copy::ENC_ANY_HOLDER);
     }
 
     /// A kind fisherman does not take is refused before anything is asked,
@@ -1461,6 +1765,7 @@ tmpfs /run tmpfs rw,nosuid,nodev 0 0
                 kind: NONE.to_string(),
                 passphrase: String::new(),
             },
+            data: Data::default(),
         };
         assert_eq!(
             answers.summary(&Payload {
@@ -1478,7 +1783,8 @@ tmpfs /run tmpfs rw,nosuid,nodev 0 0
                     copy::ROW_PASSWORD.to_string(),
                     copy::PASSWORD_SET.to_string()
                 ),
-                (copy::ROW_ENCRYPTION.to_string(), NONE.to_string()),
+                (copy::ROW_ENCRYPTION.to_string(), copy::ENC_NONE.to_string()),
+                (copy::ROW_DATA.to_string(), copy::NONE.to_string()),
                 // The layout nobody chose, which the last screen is the only
                 // place that spells out.
                 ("esp".to_string(), "2 GB  fat32".to_string()),
@@ -1508,17 +1814,33 @@ tmpfs /run tmpfs rw,nosuid,nodev 0 0
                 Field::text(copy::ROW_ACCOUNT, "tect"),
                 Field::secret(copy::ROW_PASSWORD, "hunter2"),
                 Field::secret(copy::ROW_CONFIRM, "hunter2"),
-                Field::pick(copy::ROW_ENCRYPTION, vec![Choice::new(kind, "")], Some(0)),
+                // The row holds the description, which is what a person picked.
+                Field::pick(
+                    copy::ROW_ENCRYPTION,
+                    vec![Choice::new(shown(kind), "")],
+                    Some(0),
+                ),
                 Field::secret(copy::ROW_PASSPHRASE, ""),
+                Field::pick(copy::ROW_DATA, vec![Choice::new(copy::NONE, "")], Some(0)),
+                Field::text(copy::ROW_SIZE, ""),
             ]
         };
         assert!(!asked(&form(NONE)).contains(&ROW_PASSPHRASE));
         assert!(!asked(&form("tpm2-luks")).contains(&ROW_PASSPHRASE));
         assert!(asked(&form("luks-passphrase")).contains(&ROW_PASSPHRASE));
         assert!(asked(&form("tpm2-luks-passphrase")).contains(&ROW_PASSPHRASE));
-        // Every other row is there whatever the encryption is, questions and
+        // A size is a question only where `/var` is cut out of this disk.
+        let mut sized = form(NONE);
+        assert!(!asked(&sized).contains(&ROW_SIZE));
+        sized[ROW_DATA] = Field::pick(
+            copy::ROW_DATA,
+            vec![Choice::new(copy::DATA_HERE, "")],
+            Some(0),
+        );
+        assert!(asked(&sized).contains(&ROW_SIZE));
+        // Every other row is there whatever either answer is, questions and
         // the layout alike.
-        assert_eq!(asked(&form(NONE)).len(), 7);
+        assert_eq!(asked(&form(NONE)).len(), 8);
     }
 
     /// The four things nothing derives, and the one thing a form can check
@@ -1534,8 +1856,14 @@ tmpfs /run tmpfs rw,nosuid,nodev 0 0
                 Field::text(copy::ROW_ACCOUNT, "tect"),
                 Field::secret(copy::ROW_PASSWORD, password),
                 Field::secret(copy::ROW_CONFIRM, confirm),
-                Field::pick(copy::ROW_ENCRYPTION, vec![Choice::new(kind, "")], Some(0)),
+                Field::pick(
+                    copy::ROW_ENCRYPTION,
+                    vec![Choice::new(shown(kind), "")],
+                    Some(0),
+                ),
                 Field::secret(copy::ROW_PASSPHRASE, passphrase),
+                Field::pick(copy::ROW_DATA, vec![Choice::new(copy::NONE, "")], Some(0)),
+                Field::text(copy::ROW_SIZE, ""),
             ]
         };
         assert!(short_of(&form("hunter2", "hunter2", NONE, "")).is_none());
@@ -1553,6 +1881,33 @@ tmpfs /run tmpfs rw,nosuid,nodev 0 0
             short.contains(copy::ROW_ACCOUNT) && short.contains(copy::ROW_PASSWORD),
             "{short}"
         );
+
+        // A `/var` cut out of this disk is short of the size it is cut to.
+        let data = |form: &mut Vec<crate::ui::Field>, label: String, size: &str| {
+            form[ROW_DATA] = Field::pick(copy::ROW_DATA, vec![Choice::new(label, "")], Some(0));
+            form[ROW_SIZE] = Field::text(copy::ROW_SIZE, size);
+        };
+        let mut sized = form("hunter2", "hunter2", NONE, "");
+        data(&mut sized, copy::DATA_HERE.to_string(), "");
+        assert!(short_of(&sized).unwrap().contains(copy::ROW_SIZE));
+        data(&mut sized, copy::DATA_HERE.to_string(), "200 GB");
+        assert!(short_of(&sized).is_none());
+
+        // The row is drawn unpickable under an encrypted root, and this is the
+        // same gate for an encryption answered after it.
+        let mut encrypted = form("hunter2", "hunter2", "tpm2-luks", "");
+        data(&mut encrypted, copy::DATA_HERE.to_string(), "200 GB");
+        assert_eq!(short_of(&encrypted).as_deref(), Some(copy::DATA_UNENCRYPTED));
+
+        // And `/var` on the disk this is installing to is the one row the list
+        // cannot leave out, since nothing has answered the disk when it is built.
+        let mut same = form("hunter2", "hunter2", NONE, "");
+        data(
+            &mut same,
+            copy::on_disk("/dev/vda", copy::DATA_ERASED),
+            "",
+        );
+        assert_eq!(short_of(&same).as_deref(), Some(copy::DATA_SAME_DISK));
     }
 
     /// Neither of the two cases that cannot install says nothing; each names

@@ -2266,7 +2266,10 @@ fn install_screens() {
             b"hunter2\r",
             b"hunter2\r",
             // Encryption, whose list opened by itself. Taking `none` drops the
-            // passphrase row, so the next row is the actions.
+            // passphrase row, so the next row is where /var goes.
+            b"\r",
+            // Home and data, also `none`, which leaves the size row behind it
+            // unasked: /var stays on the install disk with the root.
             b"\r",
             // `Install`, pickable only because nothing is missing now.
             b"\r",
