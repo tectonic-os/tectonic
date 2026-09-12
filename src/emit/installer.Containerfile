@@ -10,20 +10,21 @@ ARG LIVE_BASE=quay.io/fedora/fedora-bootc:44
 # Neither project publishes a binary worth pinning, so both are source archives
 # pinned by sha256 and built here.
 #
-# Fisherman is pinned to upstream and this project carries no fisherman fork.
-# The base it forks from is `tuna-os` deliberately: that repository's own
-# description reads `MOVED -> github.com/projectbluefin/fisherman`, and that
-# destination is a fork well behind this one. Do not "correct" this pin.
+# Fisherman is pinned to a fork again since 2026-09-12, for `varDisk.size`,
+# which cuts /var out of the install disk. The fork is of `tuna-os`
+# deliberately: that repository's own description reads
+# `MOVED -> github.com/projectbluefin/fisherman`, and that destination is a
+# fork well behind this one. Do not "correct" the base it forks from.
 #
 # CGO_ENABLED=0 because tacklebox's default build links `net` and `os/user`
 # against the builder's libc, and it is copied out of this stage to a host.
 # Fisherman's Go module is at `fisherman/` inside its own repository and not at
 # the root, which is why the two build directories below are not symmetrical.
 FROM ${GO_IMAGE} AS tools
-ARG FISHERMAN_ORG=tuna-os
-ARG FISHERMAN_COMMIT=027fa25c1d8bc01e2ac97d119cda9e8bb9c99ac7
-ARG FISHERMAN_SHA256=ffab2a2c1094fa02a9b4862958c280045c9390425c93195855a9f0f93956c72e
-# Tacklebox is the one fork left: the media needs a change upstream has not got.
+ARG FISHERMAN_ORG=tectonic-os
+ARG FISHERMAN_COMMIT=2fec4b24fcd26f139323f99e666099c733f5b7fd
+ARG FISHERMAN_SHA256=5504225365e92f6ec550cce84ec1aeddb4fed806ea7662ecd69bfa65a85f07c6
+# Tacklebox is the other fork: the media needs a change upstream has not got.
 # The pin is `feat/grub-bootloader-support`, which stages the live image's own
 # bootloader, a signed shim and GRUB pair in any of four layouts, the deb
 # families' `/usr/lib/shim` included. It keeps upstream's systemd-boot first,
