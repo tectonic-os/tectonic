@@ -316,12 +316,14 @@ pub const WRITE_DOWN: &str = "write this down, it is the recovery key:";
 pub const LEAVING: &str = "Leave the installer?";
 pub const LEAVE_BACK: &str = "Keep going";
 pub const LEAVE_OVER: &str = "Start the form again";
-pub const LEAVE_SHELL: &str = "Leave to a shell";
+/// Not "to a shell": on installer media the unit starts the installer again,
+/// and only a run from a shell returns to one.
+pub const LEAVE_SHELL: &str = "Quit the installer";
 pub const INSTALL_DONE: &str = "Installation Complete!";
 pub const RESTART: &str = "Restart now";
 /// The other way off the last screen is esc, which the legend already names,
 /// so it is not a row.
-pub const DONE_KEYS: &str = "enter to restart, esc for a shell";
+pub const DONE_KEYS: &str = "enter to restart, esc to quit the installer";
 /// Said under the key on the completion screen, because the log deliberately
 /// has no copy of it.
 pub const KEY_NOT_LOGGED: &str = "It is not in the install log.";

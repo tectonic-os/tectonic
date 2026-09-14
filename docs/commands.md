@@ -140,6 +140,19 @@ than from a registry. `fisherman` is the backend and does the partitioning, the
 LUKS work and the `bootc install`; this finds the payload, completes its recipe
 and hands it over.
 
+On installer media this runs as `tect-installer.service` on `tty1`, under
+kmscon where the base has it and on the kernel console where it does not. The
+media is single purpose: nothing logs in on `tty1`, and leaving the installer
+starts it again rather than reaching a shell. A serial console, where one is
+configured, autologins root to a shell for watching a run and does not start an
+installer.
+
+Run by hand it takes a lock on `/run/tect-installer.lock` for the length of the
+run, so a second one refuses and names the terminal holding the first. The lock
+is the process's: nothing has to be cleaned up after an installer that was
+killed. `$TECT_INSTALLER_LOCK` names the file elsewhere, which is how the
+screens are run without root.
+
 #### Flags:
     --from <dir>          the payload root, else the one a TECT partition or
                           this media carries

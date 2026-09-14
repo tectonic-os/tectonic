@@ -417,6 +417,10 @@ pub fn dispatch(
                     spec.name()
                 )));
             }
+            // Bound, not dropped: `let _` would release the lock before the
+            // disk is touched. Installer media starts this on tty1 and
+            // autologins root elsewhere, so this is what stops two at once.
+            let _lock = crate::install::hold()?;
             let root = match from {
                 Some(from) => PathBuf::from(from),
                 None => crate::install::root()?,

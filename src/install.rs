@@ -16,6 +16,132 @@ use std::io::{BufRead as _, Write as _};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+/// Where a running installer is recorded. `/run` is a tmpfs, so the lock cannot
+/// outlive the boot, and an install ends in a reboot.
+///
+/// `$TECT_INSTALLER_LOCK` names it instead where it is set, for the same reason
+/// `$TECT_TPM` and `$TECT_SYS_BLOCK` exist: `/run` is root-owned, and a test or
+/// a developer who is not root has nowhere to put this one.
+const LOCK: &str = "/run/tect-installer.lock";
+
+fn lock() -> PathBuf {
+    std::env::var_os("TECT_INSTALLER_LOCK")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(LOCK))
+}
+
+/// What to call the terminal a process is sitting on.
+fn console(pid: libc::pid_t) -> String {
+    name(std::fs::read_link(format!("/proc/{pid}/fd/0")).ok())
+}
+
+/// What to call a terminal, to the person reading the refusal.
+///
+/// A VT or a serial line names itself, and is somewhere a person can walk to.
+/// **A pty is not, and is not guessed at here.** kmscon gives its child a pty,
+/// and so does sshd, which the Fedora base ships enabled; naming a pty *the
+/// graphical console* would send somebody to a screen holding nothing.
+///
+/// Anything that is not a terminal falls back rather than printing `/dev/null`
+/// at somebody, since this verb is one people type and a script can redirect
+/// it.
+fn name(tty: Option<PathBuf>) -> String {
+    let is_console = |tty: &Path| {
+        tty.parent()
+            .is_some_and(|parent| parent.as_os_str() == "/dev")
+            && tty
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("tty") || name == "console")
+    };
+    match tty {
+        Some(tty) if is_console(&tty) => tty.display().to_string(),
+        Some(tty) if tty.starts_with("/dev/pts/") => {
+            format!("another session ({})", tty.display())
+        }
+        _ => "another console".into(),
+    }
+}
+
+/// Take the installer lock, or refuse naming the console that holds it.
+///
+/// `tect-installer.service` owns tty1 on installer media, so the autostart
+/// cannot start twice. This covers the other way in: the serial console and the
+/// other VTs autologin root, and `tect` is on `PATH` there. Two of these
+/// partitioning one disk is what it stops, and a guard in whatever starts the
+/// unit would not cover a command somebody types.
+///
+/// The lock is the file's and never its contents. `F_GETLK` is answered from
+/// the same kernel state that refused the lock, so there is no window where the
+/// file exists and says nothing, and no written-down pid to go stale.
+///
+/// **A record lock is the process's, which is why it is this and not
+/// `flock(2)`.** An `flock` belongs to the open file description, so any child
+/// inheriting the descriptor keeps it alive. This verb runs podman, and conmon
+/// and fuse-overlayfs double-fork and outlive the install, so an `flock` here
+/// would be held until reboot with the media stranded behind a holder nobody
+/// can see. `F_SETLK` is not inherited at all, and `std` opens `O_CLOEXEC` so
+/// the descriptor does not travel either.
+pub fn hold() -> Result<std::fs::File, String> {
+    hold_at(&lock())
+}
+
+/// The lock, at a path a test can own.
+fn hold_at(path: &Path) -> Result<std::fs::File, String> {
+    use std::os::fd::AsRawFd as _;
+
+    let file = std::fs::File::options()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(path)
+        .map_err(|why| {
+            // `/run` is root's, and this verb installs an operating system,
+            // so a lock that cannot be taken refuses rather than installs.
+            format!(
+                "{}: {why}\nset $TECT_INSTALLER_LOCK to somewhere writable to run this without root",
+                path.display()
+            )
+        })?;
+    let wrlck = || libc::flock {
+        l_type: libc::F_WRLCK as libc::c_short,
+        l_whence: libc::SEEK_SET as libc::c_short,
+        l_start: 0,
+        l_len: 0,
+        l_pid: 0,
+    };
+    // Twice, because `F_GETLK` answers `F_UNLCK` when the holder exited between
+    // the two calls, and the second pass takes the lock it freed.
+    for _ in 0..2 {
+        if unsafe { libc::fcntl(file.as_raw_fd(), libc::F_SETLK, &wrlck()) } != -1 {
+            return Ok(file);
+        }
+        let denied = std::io::Error::last_os_error().raw_os_error();
+        if denied != Some(libc::EACCES) && denied != Some(libc::EAGAIN) {
+            return Err(format!(
+                "{}: {}",
+                path.display(),
+                std::io::Error::last_os_error()
+            ));
+        }
+        let mut holder = wrlck();
+        if unsafe { libc::fcntl(file.as_raw_fd(), libc::F_GETLK, &mut holder) } == -1 {
+            break;
+        }
+        if holder.l_type != libc::F_UNLCK as libc::c_short {
+            return Err(format!(
+                "the installer is running on {}; run `tect installer` again once it finishes",
+                console(holder.l_pid)
+            ));
+        }
+    }
+    Err(
+        "the installer is running on another console; run `tect installer` again once it finishes"
+            .into(),
+    )
+}
+
 /// The document a payload root carries, written by `emit::recipe::build` and
 /// baked onto installer media by `tect vm build iso`.
 pub const RECIPE: &str = "install-recipe.json";
@@ -1920,5 +2046,93 @@ tmpfs /run tmpfs rw,nosuid,nodev 0 0
         assert!(nothing.contains("/mnt/tect"), "{nothing}");
         let repo = Found::Repo("/mnt/tect".into()).payload().unwrap_err();
         assert!(repo.contains("tect build"), "{repo}");
+    }
+
+    /// The holder half of the test below. A record lock belongs to the process,
+    /// so a second `hold_at` in this one would simply be granted and prove
+    /// nothing; the contention has to come from another process.
+    #[test]
+    #[ignore]
+    fn holds_a_lock_for_another_process_to_find() {
+        let Ok(path) = std::env::var("TECT_TEST_LOCK") else {
+            // Nothing is asking it to hold anything, which is what
+            // `cargo test -- --ignored` does.
+            return;
+        };
+        let _held = hold_at(Path::new(&path)).expect("the child takes the lock");
+        std::fs::write(format!("{path}.taken"), "").expect("the child reports it");
+        std::thread::sleep(std::time::Duration::from_secs(30));
+    }
+
+    /// Every console autostarts `tect installer` and the losing one still has
+    /// `tect` on `PATH`, so the second must be refused and told where the first
+    /// is. Two fisherman runs partitioning one disk is what this stops.
+    #[test]
+    fn a_second_installer_is_refused_and_told_where_the_first_one_is() {
+        let path = std::env::temp_dir().join(format!("tect-lock-{}", std::process::id()));
+        let taken = PathBuf::from(format!("{}.taken", path.display()));
+        let _ = std::fs::remove_file(&taken);
+
+        let mut child = Command::new(std::env::current_exe().expect("the test binary"))
+            .args([
+                "--ignored",
+                "--exact",
+                "install::tests::holds_a_lock_for_another_process_to_find",
+            ])
+            .env("TECT_TEST_LOCK", &path)
+            .stdout(Stdio::null())
+            .spawn()
+            .expect("the test binary re-runs itself as the holder");
+        for _ in 0..200 {
+            if taken.exists() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(25));
+        }
+        assert!(taken.exists(), "the holder never took the lock");
+
+        let refused = hold_at(&path).expect_err("a second installer is refused");
+        assert!(
+            refused.starts_with("the installer is running on "),
+            "{refused}"
+        );
+        assert!(refused.contains("again once it finishes"), "{refused}");
+        // What the holder is *called* is `name`'s, tested above. Under `cargo
+        // test` the holder's stdin is whatever ran the suite, so this asserts
+        // the refusal reached the naming and not which answer it gave.
+
+        child.kill().expect("the holder is killed");
+        child.wait().expect("the holder is reaped");
+        // The lock is the process's, so the next console gets it. Nothing has
+        // to clean up after a holder that died.
+        assert!(
+            hold_at(&path).is_ok(),
+            "the lock outlived the process holding it"
+        );
+
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(&taken);
+    }
+
+    /// kmscon gives its child a pty, so the graphical console reports a
+    /// `/dev/pts/N`, which names no console to the person reading the refusal.
+    #[test]
+    fn a_pty_holder_is_named_as_the_graphical_console() {
+        assert_eq!(name(Some("/dev/ttyS0".into())), "/dev/ttyS0");
+        assert_eq!(name(Some("/dev/tty1".into())), "/dev/tty1");
+        assert_eq!(name(Some("/dev/console".into())), "/dev/console");
+        // A pty is kmscon or it is sshd, and this cannot tell which, so it
+        // says a session holds it rather than sending somebody to a screen.
+        assert_eq!(
+            name(Some("/dev/pts/0".into())),
+            "another session (/dev/pts/0)"
+        );
+        // Not a terminal at all: a redirected run must not have `/dev/null`
+        // read back at the next console as though it were somewhere to go.
+        assert_eq!(name(Some("/dev/null".into())), "another console");
+        assert_eq!(name(Some("/proc/1/fd/0".into())), "another console");
+        // A holder whose /proc entry has gone is the fallback, not a panic.
+        assert_eq!(name(None), "another console");
+        assert_eq!(console(-1), "another console");
     }
 }

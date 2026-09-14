@@ -153,6 +153,10 @@ CONF
 # partitions disks and calls `bootc install`, so a console that cannot become
 # root cannot install anything. This image is built per target as
 # `<published>-installer`, boots only from the media, and never lands on a disk.
+#
+# Neither of these autostarts the installer any more. The serial console is a
+# root shell for watching a run, and `getty@tty1` is the last resort under both
+# installer units below. The installer itself is a unit and owns tty1.
 COPY <<'AUTOLOGIN' /usr/lib/systemd/system/serial-getty@.service.d/autologin.conf
 [Service]
 ExecStart=
@@ -178,21 +182,8 @@ QUIET
 # colours, and no console font carries the box-drawing arcs this screen uses.
 # `setfont` loads bitmaps, so a TTF is not an answer either. kmscon draws on DRM
 # through pango, and `monospace` already resolves to Adwaita Mono in this base.
-#
-# The serial console is untouched: it is how this media is driven headless, and
-# a graphical console that fails must not take the headless path with it.
-COPY <<'KMSCON' /usr/lib/systemd/system/kmsconvt@.service.d/autologin.conf
-[Service]
-ExecStart=
-ExecStart=kmscon --vt=%I --no-switchvt --login -- /bin/login -f root
-KMSCON
-
-# `kmsconvt@.service` ships `OnFailure=getty@%i.service`, so a kmscon that
-# cannot open DRM hands tty1 back to the plain VT with its own autologin above.
-# The enable is guarded because the apt arm of this file has no such package.
-RUN systemctl enable var-lib-tectonic-store.mount \
-    && { [ ! -f /usr/lib/systemd/system/kmsconvt@.service ] \
-        || systemctl enable kmsconvt@tty1.service; }
+# The installer's own unit below runs it, so no `kmsconvt@` login is involved.
+RUN systemctl enable var-lib-tectonic-store.mount
 
 # The frontend, staged into this build context from the running binary by
 # `tect vm build iso`. `--version` runs it here, so a binary that cannot execute
@@ -200,18 +191,95 @@ RUN systemctl enable var-lib-tectonic-store.mount \
 COPY tect /usr/bin/tect
 RUN /usr/bin/tect --version
 
-# Autostart is a login shell's profile and not a unit: root already autologins
-# on both consoles above, an installer answering `Leave to a shell` falls back
-# to the shell it was started from, and there is no tty to hand between a unit
-# and a getty. `/etc/profile.d` is read by bash and sh alike on both families.
-# `ui::inline` sets the window size itself.
+# The installer is this media's only job, so it is a unit on tty1 and not a
+# login shell's profile. A unit cannot be started twice and the console it
+# draws on is named here, so one installer per machine is structural rather
+# than enforced after the fact. Nothing logs in on tty1 at all.
 #
-# The word here is the command table's. Nothing else ties a command typed as
-# text to the table that resolves it, so a rename leaves the media booting to
+# Masking `getty@tty1` is what keeps the console; `Conflicts=` alone settles
+# only the boot transaction, where it is what makes systemd drop the getty's
+# start job rather than race it. logind spawns `autovt@` on a switch to an
+# unused VT within `NAutoVTs`, 6 by default and so including tty1, and
+# `autovt@.service` is a symlink to `getty@.service`. So Ctrl-Alt-F2 and back
+# would start `getty@tty1`, whose conflict then stops the installer, and a stop
+# systemd asked for is not one `Restart=` undoes: the installer would be gone
+# until reboot, mid-install if it was installing. Both names are masked below,
+# since `autovt@tty1` is its own unit and masking the getty does not cover it.
+#
+# `Restart=always` because leaving the installer on installation media starts it
+# again rather than reaching a shell.
+#
+# The word here is the command table's. Nothing else ties a command run as text
+# to the table that resolves it, so a rename leaves the media booting to
 # `unknown command`; the test
 # `the_verb_the_live_environment_autostarts_is_one_that_resolves` is the tie.
-COPY <<'START' /etc/profile.d/tect-installer.sh
-if [ "$(id -u)" = 0 ] && [ -t 0 ]; then
-    tect installer
-fi
-START
+COPY <<'UNIT' /usr/lib/systemd/system/tect-installer.service
+[Unit]
+Description=Install this image onto a disk
+After=var-lib-tectonic-store.mount systemd-user-sessions.service getty@tty1.service
+Conflicts=getty@tty1.service
+AssertPathExistsGlob=/dev/dri/card*
+OnFailure=tect-installer-vt.service
+StartLimitIntervalSec=60
+StartLimitBurst=10
+
+[Service]
+Type=idle
+ExecStart=/usr/bin/kmscon --vt=1 --no-switchvt --oneshot --login -- /usr/bin/tect installer
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+# `--oneshot` is load bearing. kmscon is a getty replacement and respawns its
+# login process in place by default, so without it `tect installer` exiting is
+# invisible to systemd: the unit stays active, `Restart=` never runs, the start
+# limit is never reached and the fallback below is unreachable. With it, kmscon
+# exits when the installer does and systemd owns the restart.
+#
+# The assertion decides the fallback, not the start limit. No DRM device is the
+# case this falls back for, and an assertion failure enters `failed` where a
+# condition failure would quietly skip. The limit is left to catch a kmscon that
+# fails some other way, and is loose enough that a person answering `Quit the
+# installer` repeatedly does not trip it. If they do, the cost is this unit
+# instead: the installer on the kernel's own VT, losing the box-drawing arcs.
+#
+# This one never hands over. `StartLimitIntervalSec=0` because leaving the
+# installer starts it again, and a rate limit here would answer a person's
+# fifth `Quit` with a root shell on the console that is meant to have no login
+# on it. Recovery from an installer that cannot run is Ctrl-Alt-F2 or the serial
+# console, both of which autologin root.
+COPY <<'UNIT' /usr/lib/systemd/system/tect-installer-vt.service
+[Unit]
+Description=Install this image onto a disk, on the kernel console
+After=var-lib-tectonic-store.mount systemd-user-sessions.service getty@tty1.service
+Conflicts=getty@tty1.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=idle
+ExecStart=/usr/bin/tect installer
+Restart=always
+RestartSec=1
+StandardInput=tty
+StandardOutput=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+# One of the two is enabled, never both. The apt arm of this file has no kmscon
+# package, and the dnf arm asks for it with `|| true`, so an EL base or a repo
+# that was down lands on the fallback too.
+RUN set -eux; \
+    systemctl mask getty@tty1.service autovt@tty1.service; \
+    if command -v kmscon > /dev/null 2>&1; then \
+        systemctl enable tect-installer.service; \
+    else \
+        systemctl enable tect-installer-vt.service; \
+    fi

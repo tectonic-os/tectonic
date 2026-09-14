@@ -2205,6 +2205,91 @@ fn flows() {
     );
 }
 
+/// The unit owns tty1, but the serial console and the other VTs autologin root
+/// with `tect` on `PATH`, so a second `tect installer` is refused and told
+/// where the first is. Two fisherman runs partitioning one disk is what this
+/// stops.
+///
+/// The first is held at its screen on a pty while the second asks. That is the
+/// part a unit test cannot reach: the lock has to still be held *while the
+/// installer runs*, which `let _` on the binding in `dispatch` would not do.
+#[test]
+fn a_second_installer_is_refused_while_the_first_holds_the_screen() {
+    use std::time::Duration;
+
+    let dir = empty("flow-install-lock");
+    std::fs::write(
+        dir.join(tect::install::RECIPE),
+        r#"{
+  "image": "ghcr.io/tectonic-os/deb2:latest",
+  "targetImgref": "ghcr.io/tectonic-os/deb2:latest",
+  "composeFsBackend": true,
+  "genericImage": true,
+  "bootloader": "grub2",
+  "filesystem": "ext4",
+  "hostname": "deb2",
+  "user": { "groups": ["sudo"] }
+}
+"#,
+    )
+    .unwrap();
+    let lock = dir.join("installer.lock");
+    let second = || {
+        std::process::Command::new(env!("CARGO_BIN_EXE_tect"))
+            .args(["installer", "--from", "."])
+            .current_dir(&dir)
+            .env("TECT_ASSETS", crate_dir().join("assets"))
+            .env("TECT_INSTALLER_LOCK", &lock)
+            .env("TECT_TPM", "/nonexistent")
+            .output()
+            .unwrap()
+    };
+
+    // The first console, on a pty so it reaches its screen and waits there.
+    let mut first = std::process::Command::new("script")
+        .args([
+            "-qfec",
+            &format!(
+                "TECT_INSTALLER_LOCK='{}' '{}' installer --from .",
+                lock.display(),
+                env!("CARGO_BIN_EXE_tect")
+            ),
+            "/dev/null",
+        ])
+        .current_dir(&dir)
+        .env("TECT_ASSETS", crate_dir().join("assets"))
+        .env("COLUMNS", "80")
+        .env("TECT_TPM", "/nonexistent")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("script from util-linux");
+
+    let mut refused = None;
+    for _ in 0..100 {
+        std::thread::sleep(Duration::from_millis(50));
+        let out = second();
+        let said = String::from_utf8_lossy(&out.stderr).into_owned();
+        if said.contains("the installer is running on") {
+            refused = Some(said);
+            break;
+        }
+    }
+    let killed = first.kill().and_then(|()| first.wait());
+    let refused = refused.expect("the first installer never held the lock while it ran");
+    killed.expect("the first installer is reaped");
+
+    assert!(refused.contains("run `tect installer` again"), "{refused}");
+    // Once the holder is gone the next console gets it: the lock is the
+    // process's, and nothing has to clean up after one that died.
+    let after = second();
+    assert!(
+        !String::from_utf8_lossy(&after.stderr).contains("the installer is running on"),
+        "the lock outlived the process holding it"
+    );
+}
+
 /// The installer's one screen, over a payload root and on a real terminal.
 /// Every question is on it at once and answered in place, and `Install` is dim
 /// until nothing is missing. The steps walk that screen, then take `Install`,
@@ -2246,7 +2331,8 @@ fn install_screens() {
         "flow-install-drawn",
         &dir,
         &format!(
-            "TECT_SYS_BLOCK='{}' '{}' installer --from .",
+            "TECT_INSTALLER_LOCK='{}' TECT_SYS_BLOCK='{}' '{}' installer --from .",
+            dir.join("installer.lock").display(),
             sys.display(),
             env!("CARGO_BIN_EXE_tect")
         ),

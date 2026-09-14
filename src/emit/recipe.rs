@@ -532,20 +532,66 @@ mod tests {
         assert!(media(&deb, "not-a-target", "image", "imgref").is_none());
     }
 
-    /// The live environment starts the installer by typing its name, and
-    /// nothing else ties that word to the command table.
+    /// The live environment starts the installer from a unit, and nothing else
+    /// ties the word an `ExecStart` runs to the table that resolves it.
+    ///
+    /// The rest of this is what a resolving verb does not prove: that a unit is
+    /// enabled at all, that it draws on the console the media shows a person,
+    /// and that no login is left on that console beside it. Media can fail
+    /// every one of those while both verbs still resolve.
     #[test]
     fn the_verb_the_live_environment_autostarts_is_one_that_resolves() {
-        let typed: Vec<&str> = LIVE_ENV
+        let started: Vec<Vec<&str>> = LIVE_ENV
             .lines()
-            .map(str::trim)
-            .find(|line| line.starts_with("tect "))
-            .expect("the live environment types one command")
-            .split_whitespace()
-            .skip(1)
+            .filter(|line| line.starts_with("ExecStart=") && line.contains("/usr/bin/tect "))
+            .filter_map(|line| line.split_once("/usr/bin/tect "))
+            .map(|(_, rest)| rest.split_whitespace().collect())
             .collect();
-        let resolved = crate::command::resolve(&typed);
-        assert!(resolved.is_ok(), "{typed:?}: {:?}", resolved.err());
+        assert!(!started.is_empty(), "no unit runs the binary");
+        for verb in &started {
+            let resolved = crate::command::resolve(verb);
+            assert!(resolved.is_ok(), "{verb:?}: {:?}", resolved.err());
+        }
+        // Every unit that runs it is enabled by name somewhere, or the media
+        // boots to whatever else claims the console.
+        for unit in ["tect-installer.service", "tect-installer-vt.service"] {
+            assert!(
+                LIVE_ENV.contains(&format!("systemctl enable {unit}")),
+                "{unit} is never enabled"
+            );
+            assert!(
+                LIVE_ENV.contains(&format!("/usr/lib/systemd/system/{unit}")),
+                "{unit} is enabled but never written"
+            );
+        }
+        // Directive lines, not mentions: the comments above these units name
+        // the same settings, and a test counting prose would pass on prose.
+        let directives = |want: &str| LIVE_ENV.lines().filter(|line| line.trim() == want).count();
+        // tty1 is the console the media shows, and `getty@tty1` is the login
+        // that must not be on it. One of each per unit, or a switch to that VT
+        // hands it to a login and stops the installer for the rest of the boot.
+        assert_eq!(directives("Conflicts=getty@tty1.service"), 2);
+        // Masked by name, both of them: `autovt@tty1` is its own unit, and
+        // masking the getty does not cover the name logind actually starts.
+        let masks = LIVE_ENV
+            .lines()
+            .find(|line| line.contains("systemctl mask getty@"))
+            .expect("the getty on the installer's console is masked");
+        for masked in ["getty@tty1.service", "autovt@tty1.service"] {
+            assert!(masks.contains(masked), "{masked} is not in {masks}");
+        }
+        assert_eq!(directives("TTYPath=/dev/tty1"), 1);
+        // kmscon respawns its child in place without `--oneshot`, so the
+        // installer exiting would be invisible to systemd, `Restart=` would
+        // never run and the fallback would be unreachable.
+        let kmscon: Vec<&str> = LIVE_ENV
+            .lines()
+            .filter(|line| line.starts_with("ExecStart=") && line.contains("kmscon"))
+            .collect();
+        assert_eq!(kmscon.len(), 1, "{kmscon:?}");
+        for want in ["--vt=1", "--oneshot", "--no-switchvt"] {
+            assert!(kmscon[0].contains(want), "{want} is not in {}", kmscon[0]);
+        }
     }
 
     /// No family, no recipe. The refusal is the point: `bootc install` reaches
