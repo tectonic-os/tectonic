@@ -25,8 +25,8 @@ ARG LIVE_BASE=quay.io/fedora/fedora-bootc:44
 # the root, which is why the two build directories below are not symmetrical.
 FROM ${GO_IMAGE} AS tools
 ARG FISHERMAN_ORG=tectonic-os
-ARG FISHERMAN_COMMIT=efad0b3249117cfc6366605cd7d80d9c5b60a543
-ARG FISHERMAN_SHA256=5024a51f29fb2f1784641c675a364b1eedad44132e3b7e7257829b990eced039
+ARG FISHERMAN_COMMIT=738e437ff9c5ea4bb2bfc2955a2d38980d63ea3e
+ARG FISHERMAN_SHA256=aa01f941784d1b06faef33e87b786216e88198a42c3fd213b62d7a7e02c142d6
 # Tacklebox is the other fork: the media needs a change upstream has not got.
 # The pin is `feat/grub-bootloader-support`, which stages the live image's own
 # bootloader, a signed shim and GRUB pair in any of four layouts, the deb
