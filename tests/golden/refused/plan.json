@@ -28,6 +28,7 @@
       "keywords": [],
       "logo_url": "",
       "conforms": "standard",
+      "boot": "",
       "allows": [
         {
           "rule": "sshd_disable_root_login",

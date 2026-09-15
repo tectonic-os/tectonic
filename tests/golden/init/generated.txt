@@ -91,11 +91,19 @@ RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     ASSET_RESOLUTIONS="${ASSET_RESOLUTIONS}" AUDIT_ENFORCE="${AUDIT_ENFORCE}" \
     IMAGE_ID="${IMAGE_ID}" IMAGE_VERSION="${IMAGE_VERSION}" /ctx/tect build-record
 
+RUN --mount=type=tmpfs,target=/run --network=none bootc container lint
+
+# ---- BEGIN GENERATED (tail fragments) ----
+
+# ---- END GENERATED (tail fragments) ----
+
+ARG FAMILY
 ARG CONTRACT_FILES=""
 ARG VERIFY_EXCEPTIONS=""
 ARG MODULE_PRESETS=""
-RUN --mount=type=tmpfs,target=/run --network=none bootc container lint
 RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    --mount=type=tmpfs,target=/tmp \
+    --mount=type=tmpfs,target=/run \
     CONTRACT_FILES="${CONTRACT_FILES}" \
     VERIFY_EXCEPTIONS="${VERIFY_EXCEPTIONS}" \
     MODULE_PRESETS="${MODULE_PRESETS}" \

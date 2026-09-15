@@ -1,0 +1,26 @@
+  x `missing` declares `boot "uki-db"` but no ungated module provides `boot-
+  | chain-uki`
+    ,-[./image.kdl:29:1]
+ 28 | 
+ 29 | image {
+    : ^^|^^
+    :   `-- incomplete UKI chain
+ 30 |     id "missing"
+    `----
+  help: uki would satisfy it; add it to this image. Nothing is included
+        automatically, so the list stays the complete statement of what is in
+        the image
+
+  x `missing` declares `boot "uki-db"` but no ungated module provides
+  | `secureboot-enrolment`
+    ,-[./image.kdl:29:1]
+ 28 | 
+ 29 | image {
+    : ^^|^^
+    :   `-- incomplete UKI chain
+ 30 |     id "missing"
+    `----
+  help: enrolment would satisfy it; add it to this image. Nothing is included
+        automatically, so the list stays the complete statement of what is in
+        the image
+

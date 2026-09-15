@@ -476,6 +476,97 @@ fn output(program: &str, args: &[&str]) -> Result<(bool, String), String> {
     Ok((out.status.success(), text))
 }
 
+fn signed_by(path: &Path, cert: &str, report: &mut Report) {
+    let name = path.display().to_string();
+    match output("sbverify", &["--cert", cert, &name]) {
+        Ok((true, _)) => println!("    {name} signed by the owner certificate"),
+        Ok((_, text)) => report.fail(format!(
+            "{name}: owner signature is invalid: {}",
+            text.trim()
+        )),
+        Err(message) => report.fail(message),
+    }
+}
+
+/// Checks performed after a tail fragment has added the UKI to the split
+/// rootfs. The ordinary finalize check runs before that fragment and cannot
+/// truthfully inspect these files.
+fn validate_boot_chain(report: &mut Report) {
+    println!("==> owner-signed UKI boot chain");
+    let uki_dir = Path::new("/boot/EFI/Linux");
+    let mut ukis: Vec<PathBuf> = fs::read_dir(uki_dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_file() && path.extension().is_some_and(|ext| ext == "efi"))
+        .collect();
+    ukis.sort();
+    if ukis.is_empty() {
+        report.fail(format!("{} carries no UKI", uki_dir.display()));
+    }
+    if Path::new("/usr/lib/efi/grub2").exists() {
+        report.fail("/usr/lib/efi/grub2: GRUB payload remains in a UKI image");
+    }
+    for uki in &ukis {
+        let name = uki.display().to_string();
+        match output("objdump", &["--section-headers", &name]) {
+            Ok((true, text)) if text.split_whitespace().any(|field| field == ".initrd") => {
+                println!("    {name} carries .initrd")
+            }
+            Ok((_, _)) => report.fail(format!("{name}: UKI carries no .initrd section")),
+            Err(message) => report.fail(message),
+        }
+    }
+
+    let recorded =
+        fs::read_to_string("/usr/share/tectonic/composefs-sealer-version").unwrap_or_default();
+    match output("bootc", &["--version"]) {
+        Ok((true, actual)) if actual.trim() == recorded.trim() => {
+            println!("    sealed with {}", recorded.trim())
+        }
+        Ok((_, actual)) => report.fail(format!(
+            "composefs sealer version moved: recorded `{}`, image carries `{}`",
+            recorded.trim(),
+            actual.trim()
+        )),
+        Err(message) => report.fail(message),
+    }
+    let signed = Path::new("/usr/share/tectonic/secureboot-signed").exists();
+    match fs::read_to_string("/usr/share/tectonic/boot-chain")
+        .unwrap_or_default()
+        .trim()
+    {
+        "uki-shim" if !Path::new("/usr/libexec/secureboot-enrolment").is_file() => {
+            report.fail("/usr/libexec/secureboot-enrolment: shim installer is missing")
+        }
+        "uki-db" if signed => {
+            for name in ["PK", "KEK", "db"] {
+                let path = format!("/usr/lib/bootc/install/secureboot-keys/auto/{name}.auth");
+                if !Path::new(&path).is_file() {
+                    report.fail(format!("{path}: firmware enrollment file is missing"));
+                }
+            }
+        }
+        "uki-shim" | "uki-db" => {}
+        chain => report.fail(format!("unknown recorded UKI boot chain `{chain}`")),
+    }
+
+    if !signed {
+        println!("    unsigned build: signature checks skipped");
+        return;
+    }
+    let cert = "/usr/share/secureboot/sb_cert.pem";
+    signed_by(
+        Path::new("/usr/lib/systemd/boot/efi/systemd-bootx64.efi"),
+        cert,
+        report,
+    );
+    for uki in ukis {
+        signed_by(&uki, cert, report);
+    }
+}
+
 /// Every check a built image has to pass before it is published.
 pub fn validate_image() -> Result<(), String> {
     let mut report = Report { failures: 0 };
@@ -487,16 +578,20 @@ pub fn validate_image() -> Result<(), String> {
     }
 
     println!("==> initramfs");
-    match kernel_version() {
-        Some(version) => {
-            let initramfs = format!("/usr/lib/modules/{version}/initramfs.img");
-            if Path::new(&initramfs).is_file() {
-                println!("    {initramfs} present");
-            } else {
-                report.fail(format!("initramfs missing at {initramfs}"));
+    if Path::new("/usr/share/tectonic/composefs-sealer-version").is_file() {
+        println!("    embedded in the UKI; checked below");
+    } else {
+        match kernel_version() {
+            Some(version) => {
+                let initramfs = format!("/usr/lib/modules/{version}/initramfs.img");
+                if Path::new(&initramfs).is_file() {
+                    println!("    {initramfs} present");
+                } else {
+                    report.fail(format!("initramfs missing at {initramfs}"));
+                }
             }
+            None => report.fail("cannot determine the kernel version"),
         }
-        None => report.fail("cannot determine the kernel version"),
     }
 
     println!("==> /usr/lib/opt symlinks");
@@ -699,6 +794,10 @@ pub fn validate_image() -> Result<(), String> {
     // layer, so the directory is committed into the image — where `bootc
     // container lint` reports `nonempty-run-tmp` and `--fatal-warnings` fails.
     clear_run_systemd();
+
+    if Path::new("/usr/share/tectonic/composefs-sealer-version").is_file() {
+        validate_boot_chain(&mut report);
+    }
 
     println!();
     if report.failures == 0 {

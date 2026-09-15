@@ -28,6 +28,7 @@
       "keywords": [],
       "logo_url": "",
       "conforms": "",
+      "boot": "",
       "allows": [],
       "layout": {
         "filesystem": "btrfs",
@@ -212,6 +213,7 @@
       "keywords": [],
       "logo_url": "",
       "conforms": "",
+      "boot": "",
       "allows": [],
       "layout": {
         "filesystem": "",
@@ -446,6 +448,7 @@
       "keywords": [],
       "logo_url": "",
       "conforms": "",
+      "boot": "",
       "allows": [],
       "layout": {
         "filesystem": "",

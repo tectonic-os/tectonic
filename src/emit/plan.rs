@@ -30,10 +30,10 @@ pub(crate) fn of_target<'a>(
     Some((image, flavour, entries))
 }
 
-/// The shape of this document. A host binary reads it back and is pinned
-/// independently of the one that wrote it, so this moves when a field in the
-/// plan moves. `model::image::SCHEMA_VERSION` is a separate number: `repo.kdl`'s
-/// own grammar, held against every repository by `parse::repo::compatible`.
+/// The shape of this document. Additive fields stay in version 1 while the
+/// software has no external consumers; bump this only for an incompatible
+/// shape. `model::image::SCHEMA_VERSION` is a separate number: `repo.kdl`'s own
+/// grammar, held against every repository by `parse::repo::compatible`.
 pub const SCHEMA_VERSION: u32 = 1;
 
 pub fn build(list: &List, resolved: &[Resolved], workflows: &[Declared]) -> Json {
@@ -127,6 +127,7 @@ fn image(list: &List, image: &Image, resolved: &Resolved) -> Json {
         ("keywords", Json::strings(image.keywords.iter().cloned())),
         ("logo_url", Json::string(&image.logo_url)),
         ("conforms", Json::string(&image.conforms)),
+        ("boot", Json::string(&image.boot)),
         ("allows", refusals(&image.allows)),
         (
             "layout",
@@ -508,6 +509,9 @@ pub(crate) fn contract_files(
         }
     };
     for decl in image.base.iter().flat_map(|b| b.provides.iter()) {
+        if !image.boot.is_empty() && decl.name == "bootupctl" {
+            continue;
+        }
         if let Some(paths) = crate::base::witness(&decl.name, rows) {
             add(paths);
         }

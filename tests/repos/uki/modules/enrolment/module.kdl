@@ -1,0 +1,3 @@
+description "Secure Boot enrollment provider fixture"
+supports "fedora"
+provides "secureboot-enrolment"

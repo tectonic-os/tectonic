@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
-  "default_image": "alpha",
-  "default_image_name": "Alpha",
-  "pr_image": "alpha",
-  "default_target": "alpha",
-  "default_published": "alpha",
-  "pr_target": "alpha",
-  "pr_published": "alpha",
-  "ungated_target": "alpha",
-  "ungated_published": "alpha",
-  "cache_image": "alpha-cache",
+  "default_image": "shim",
+  "default_image_name": "Shim",
+  "pr_image": "shim",
+  "default_target": "shim",
+  "default_published": "shim",
+  "pr_target": "shim",
+  "pr_published": "shim",
+  "ungated_target": "shim",
+  "ungated_published": "shim",
+  "cache_image": "shim-cache",
   "workflows": [],
   "audit": {
     "enforce": false
@@ -18,8 +18,8 @@
   "assets": [],
   "images": [
     {
-      "id": "alpha",
-      "name": "Alpha",
+      "id": "shim",
+      "name": "Shim",
       "pretty_name": "",
       "file": "./image.kdl",
       "url": "",
@@ -28,7 +28,7 @@
       "keywords": [],
       "logo_url": "",
       "conforms": "",
-      "boot": "",
+      "boot": "uki-shim",
       "allows": [],
       "layout": null,
       "base": {
@@ -36,7 +36,7 @@
         "family": "fedora",
         "signed": false,
         "provides": [
-          "rechunking"
+          "bootupctl"
         ],
         "witnesses": {
           "bootc": [
@@ -71,10 +71,10 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "alpha",
-          "image": "alpha",
+          "name": "shim",
+          "image": "shim",
           "flavour": null,
-          "published": "alpha",
+          "published": "shim",
           "conforms": "",
           "allows": [],
           "default": true,
@@ -82,15 +82,15 @@
           "siblings": [],
           "modules": [
             {
-              "path": "fedora-family",
-              "dir": "fedora-family",
+              "path": "uki",
+              "dir": "uki",
               "flavour": null,
               "variant": null,
               "remote": null,
-              "description": "dnf5 and its plugins, which every fedora build layer reaches for",
+              "description": "UKI provider fixture",
               "options": {},
               "provides": [
-                "build-environment"
+                "boot-chain-uki"
               ],
               "requires": [],
               "files": {},
@@ -98,7 +98,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "5c6f954af6de4efc68c5525e8a65e941dff618e34ac7cb721cf0abb9f85e1364",
+                "content": "8446cc792256fc58578fa7cba48206a10f3b3e43680eeb1f4529f7ab5dedd27f",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -108,29 +108,23 @@
               "refuses": []
             },
             {
-              "path": "core/hello",
-              "dir": "core/hello",
+              "path": "enrolment",
+              "dir": "enrolment",
               "flavour": null,
               "variant": null,
               "remote": null,
-              "description": "The smallest module a repository can hold",
+              "description": "Secure Boot enrollment provider fixture",
               "options": {},
-              "provides": [],
+              "provides": [
+                "secureboot-enrolment"
+              ],
               "requires": [],
               "files": {},
-              "packages": [
-                {
-                  "family": "fedora",
-                  "names": [
-                    "fastfetch"
-                  ],
-                  "enablerepo": null
-                }
-              ],
+              "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "79eff4641bb557335ba31eafb6eb51199853fb7c261a9ef947c44d777abefe54",
+                "content": "66d6f73be42d22813b13b81cf8e15a2be342c30e3e2b3dbcf71341fad1b39e72",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -153,8 +147,8 @@
       ]
     },
     {
-      "id": "beta",
-      "name": "Beta",
+      "id": "db",
+      "name": "DB",
       "pretty_name": "",
       "file": "./image.kdl",
       "url": "",
@@ -163,7 +157,7 @@
       "keywords": [],
       "logo_url": "",
       "conforms": "",
-      "boot": "",
+      "boot": "uki-db",
       "allows": [],
       "layout": null,
       "base": {
@@ -171,7 +165,7 @@
         "family": "fedora",
         "signed": false,
         "provides": [
-          "rechunking"
+          "bootupctl"
         ],
         "witnesses": {
           "bootc": [
@@ -206,10 +200,10 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "beta",
-          "image": "beta",
+          "name": "db",
+          "image": "db",
           "flavour": null,
-          "published": "beta",
+          "published": "db",
           "conforms": "",
           "allows": [],
           "default": false,
@@ -217,15 +211,15 @@
           "siblings": [],
           "modules": [
             {
-              "path": "fedora-family",
-              "dir": "fedora-family",
+              "path": "uki",
+              "dir": "uki",
               "flavour": null,
               "variant": null,
               "remote": null,
-              "description": "dnf5 and its plugins, which every fedora build layer reaches for",
+              "description": "UKI provider fixture",
               "options": {},
               "provides": [
-                "build-environment"
+                "boot-chain-uki"
               ],
               "requires": [],
               "files": {},
@@ -233,7 +227,7 @@
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "5c6f954af6de4efc68c5525e8a65e941dff618e34ac7cb721cf0abb9f85e1364",
+                "content": "8446cc792256fc58578fa7cba48206a10f3b3e43680eeb1f4529f7ab5dedd27f",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -243,29 +237,23 @@
               "refuses": []
             },
             {
-              "path": "core/hello",
-              "dir": "core/hello",
+              "path": "enrolment",
+              "dir": "enrolment",
               "flavour": null,
               "variant": null,
               "remote": null,
-              "description": "The smallest module a repository can hold",
+              "description": "Secure Boot enrollment provider fixture",
               "options": {},
-              "provides": [],
+              "provides": [
+                "secureboot-enrolment"
+              ],
               "requires": [],
               "files": {},
-              "packages": [
-                {
-                  "family": "fedora",
-                  "names": [
-                    "fastfetch"
-                  ],
-                  "enablerepo": null
-                }
-              ],
+              "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "79eff4641bb557335ba31eafb6eb51199853fb7c261a9ef947c44d777abefe54",
+                "content": "66d6f73be42d22813b13b81cf8e15a2be342c30e3e2b3dbcf71341fad1b39e72",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -275,6 +263,82 @@
               "refuses": []
             }
           ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "overlay_files": {},
+          "overlay_overridden": [],
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    },
+    {
+      "id": "missing",
+      "name": "Missing",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "description": "",
+      "keywords": [],
+      "logo_url": "",
+      "conforms": "",
+      "boot": "uki-db",
+      "allows": [],
+      "layout": null,
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "bootupctl"
+        ],
+        "witnesses": {
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
+          ]
+        },
+        "requires": [],
+        "satisfies": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "missing",
+          "image": "missing",
+          "flavour": null,
+          "published": "missing",
+          "conforms": "",
+          "allows": [],
+          "default": false,
+          "pr": false,
+          "siblings": [],
+          "modules": [],
           "suppressed": [],
           "secrets": [],
           "contract_files": [],

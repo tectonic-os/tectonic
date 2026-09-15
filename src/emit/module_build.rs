@@ -62,7 +62,15 @@ pub fn scripts(image: &Image, collection: &Collection, root: &Path) -> Vec<(Path
         };
         out.push((
             path(image, entry),
-            script(entry, module, collection, base_family, &has, root),
+            script(
+                entry,
+                module,
+                collection,
+                base_family,
+                &image.boot,
+                &has,
+                root,
+            ),
         ));
     }
     out
@@ -73,12 +81,17 @@ fn script(
     module: &Module,
     collection: &Collection,
     base_family: &str,
+    boot: &str,
     has: &BTreeSet<&str>,
     root: &Path,
 ) -> String {
     let dir = format!("/ctx/modules/{}", entry.dir());
     let mut out = String::from(HEADER);
     let _ = write!(out, "\nMODDIR={dir}\nexport MODDIR\n");
+    if !boot.is_empty() {
+        let _ = writeln!(out, "BOOT_CHAIN={}", shell(boot));
+        out.push_str("export BOOT_CHAIN\n");
+    }
 
     if let Some(flavour) = &entry.flavour {
         let _ = write!(
@@ -191,6 +204,12 @@ fn script(
         roots.push((on_disk.join(gated), format!("{dir}/{gated}")));
     }
 
+    for key in &module.keys {
+        let from = shell(&format!("/ctx/keys{}", key.public));
+        let to = shell(&key.public);
+        let _ = writeln!(out, "\ninstall -D -m 0644 -- {from} {to}",);
+    }
+
     for (at, ctx) in &roots {
         if at.join("module.sh").is_file() {
             let _ = write!(out, "\nsource {ctx}/module.sh\n");
@@ -249,12 +268,6 @@ fn script(
                 shell(&declared.path)
             );
         }
-    }
-
-    for key in &module.keys {
-        let from = shell(&format!("/ctx/keys{}", key.public));
-        let to = shell(&key.public);
-        let _ = writeln!(out, "\ninstall -D -m 0644 -- {from} {to}",);
     }
 
     if let Some(collected) = collection.by_module.get(&entry.path) {

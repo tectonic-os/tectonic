@@ -173,6 +173,8 @@ pub struct Payload {
     /// `grub2` or `systemd`, which is what decides whether the layout has a
     /// separate `/boot` at all.
     pub bootloader: String,
+    /// The declared UKI trust chain, empty for the existing boot path.
+    pub boot: String,
 }
 
 /// Which of the three cases a root is.
@@ -211,6 +213,7 @@ pub fn classify(root: &Path) -> Result<Found, String> {
             hostname: field("hostname")?,
             filesystem: told("filesystem"),
             bootloader: told("bootloader"),
+            boot: told("boot"),
             recipe,
         }));
     }
@@ -323,6 +326,140 @@ pub struct Encryption {
     pub passphrase: String,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+struct CustomMount {
+    partition: String,
+    target: String,
+    fstype: String,
+}
+
+/// How a person opens a container: a passphrase typed here, or a key file
+/// this live system can read. It is secret either way, so it is never drawn,
+/// logged or written into a recipe.
+#[derive(Clone, PartialEq)]
+enum Key {
+    Passphrase(String),
+    File(PathBuf),
+    /// A key read out of an old system, which no longer has a path once the
+    /// walk that found it unmounts. The bytes are what `cryptsetup` is given,
+    /// the same way a passphrase is.
+    Data(Vec<u8>),
+}
+
+impl Key {
+    /// What the key gives `cryptsetup` on stdin, which a file path does not:
+    /// a file is passed by name and never travels through this process.
+    fn bytes(&self) -> Option<&[u8]> {
+        match self {
+            Self::Passphrase(passphrase) => Some(passphrase.as_bytes()),
+            Self::Data(bytes) => Some(bytes),
+            Self::File(_) => None,
+        }
+    }
+}
+
+impl std::fmt::Debug for Key {
+    fn fmt(&self, form: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Passphrase(_) => form.write_str("Passphrase(***)"),
+            Self::Data(_) => form.write_str("Data(***)"),
+            Self::File(path) => form.debug_tuple("File").field(path).finish(),
+        }
+    }
+}
+
+/// A container somebody asked to open, and where what is inside it mounts.
+#[derive(Clone, Debug, PartialEq)]
+struct LuksOpen {
+    partition: String,
+    target: String,
+    key: Key,
+}
+
+/// One container the editor's answers name, before its key is known.
+#[derive(Clone, Debug, PartialEq)]
+struct Opening {
+    partition: String,
+    target: String,
+}
+
+/// What one partition's answer was: where it mounts, and how it is made ready.
+/// `OPEN` is a container that is decrypted and kept; `unformatted` is a
+/// filesystem that is kept as it is.
+#[derive(Clone, Debug, PartialEq)]
+struct Mounted {
+    target: String,
+    fstype: String,
+}
+
+/// The sentinel an answer carries for a container that is opened instead of
+/// formatted. It is read out of an answer and never written into a recipe.
+const OPEN: &str = "open";
+
+#[derive(Clone, Debug, PartialEq)]
+struct CustomLayout {
+    disk: String,
+    mounts: Vec<CustomMount>,
+    opens: Vec<LuksOpen>,
+}
+
+#[derive(Debug, PartialEq)]
+struct Partition {
+    device: String,
+    size: String,
+    fstype: String,
+    label: String,
+    parttype: String,
+    /// What an old system's crypttab names the container by. Empty where the
+    /// partition carries none.
+    uuid: String,
+}
+
+impl CustomLayout {
+    fn summary(&self) -> String {
+        copy::custom_layout(
+            &self.disk,
+            self.mounts.len(),
+            self.mounts
+                .iter()
+                .filter(|mount| mount.fstype == "unformatted")
+                .count(),
+            self.opens.len(),
+        )
+    }
+
+    /// What a partition's answer already was, for the editor opened a second
+    /// time: an answer that is still there keeps what it carried.
+    fn answer(&self, partition: &Partition) -> Option<Mounted> {
+        self.mounts
+            .iter()
+            .find(|mount| mount.partition == partition.device)
+            .map(|mount| Mounted {
+                target: mount.target.clone(),
+                fstype: mount.fstype.clone(),
+            })
+            .or_else(|| {
+                self.opens
+                    .iter()
+                    .find(|open| open.partition == partition.device)
+                    .map(|open| Mounted {
+                        target: open.target.clone(),
+                        fstype: OPEN.to_string(),
+                    })
+            })
+    }
+
+    /// The mapper name each opened container gets, in the order they are
+    /// opened: `cryptsetup` takes the bare name and fisherman the path.
+    fn mappers(&self) -> Vec<(String, &LuksOpen)> {
+        self.opens
+            .iter()
+            .enumerate()
+            .map(|(at, open)| (format!("tect-{}", at + 1), open))
+            .collect()
+    }
+}
+
 /// Where `/home` goes. `/home` is `/var/home` on a bootc system, so a separate
 /// home is a separate `/var`: a partition cut out of the install disk, a whole
 /// disk of its own, or neither.
@@ -357,6 +494,7 @@ pub struct Answers {
     pub password: String,
     pub encryption: Encryption,
     pub data: Data,
+    layout: Option<CustomLayout>,
 }
 
 /// What the flags gave, which the first pass reads and a re-ask does not: a
@@ -426,18 +564,27 @@ impl Answers {
         if !prompt.draws() {
             return Ok(Some(seeded));
         }
-        let mut fields = seeded.fields(&payload.filesystem, &payload.bootloader);
+        let mut layout = seeded.layout.clone();
+        let mut fields = seeded.fields(&payload.filesystem, &payload.bootloader, &payload.boot);
         loop {
             let actions = [copy::INSTALL, copy::SHUT_DOWN];
-            let filled =
-                crate::ui::form(&mut fields, &actions, short_of, asked, copy::INSTALL_KEYS);
+            let filled = crate::ui::form(
+                &mut fields,
+                &actions,
+                |fields| short_of(fields, layout.as_ref()),
+                |fields| asked(fields, layout.is_some()),
+                copy::INSTALL_KEYS,
+            );
             match filled {
                 Ok(crate::ui::Filled::Took(0)) => {
-                    let answers = Self::of(&fields);
+                    let answers = Self::of(&fields, layout.clone());
                     // The one question that costs a disk, asked over what it
                     // would do, after the form is complete and never before.
                     if crate::ui::confirm_over(
-                        &copy::erasing(&answers.disk),
+                        &match answers.layout.is_some() {
+                            true => copy::changing_partitions(&answers.disk),
+                            false => copy::erasing(&answers.disk),
+                        },
                         &answers.summary(payload),
                         copy::CONTINUE,
                         copy::GO_BACK,
@@ -450,19 +597,92 @@ impl Answers {
                     power_off()?;
                     return Ok(None);
                 }
+                Ok(crate::ui::Filled::Opened(ROW_LAYOUT)) => {
+                    let disk = fields[ROW_DISK].value();
+                    let automatic =
+                        || copy::layout(&payload.filesystem, &payload.bootloader, &payload.boot);
+                    let summary = if disk.is_empty() {
+                        format!("{}; {}", automatic(), copy::CUSTOM_NEEDS_DISK)
+                    } else {
+                        if layout.as_ref().is_some_and(|held| held.disk != disk) {
+                            layout = None;
+                        }
+                        let discovered =
+                            partitions(&disk).and_then(|partitions| match partitions.is_empty() {
+                                true => Err(format!(
+                                    "{disk} has no partitions to use in a custom layout"
+                                )),
+                                false => Ok(partitions),
+                            });
+                        match discovered {
+                            Ok(partitions) => {
+                                // What the old system on this disk already
+                                // holds, looked for before any key is asked
+                                // for and while its filesystems are still
+                                // where fisherman has not yet moved them.
+                                let found = old_keys(&disk, &partitions);
+                                match edit_layout(
+                                    &disk,
+                                    &payload.filesystem,
+                                    &payload.bootloader,
+                                    &partitions,
+                                    &mut layout,
+                                    &found,
+                                ) {
+                                    Ok(()) => {}
+                                    Err(err) if leaving(&err) => match leave(prompt)? {
+                                        Leave::Shell => return Ok(None),
+                                        Leave::Over => {
+                                            layout = None;
+                                            fields =
+                                                Self::seeded(payload, Given::default(), prompt)?
+                                                    .fields(
+                                                        &payload.filesystem,
+                                                        &payload.bootloader,
+                                                        &payload.boot,
+                                                    );
+                                            continue;
+                                        }
+                                        Leave::Back => continue,
+                                    },
+                                    Err(err) => return Err(err),
+                                }
+                                layout
+                                    .as_ref()
+                                    .map_or_else(automatic, CustomLayout::summary)
+                            }
+                            Err(err) => format!(
+                                "{}; {err}",
+                                layout
+                                    .as_ref()
+                                    .map_or_else(automatic, CustomLayout::summary)
+                            ),
+                        }
+                    };
+                    fields[ROW_LAYOUT] = crate::ui::Field::action(copy::ROW_LAYOUT, &summary);
+                }
+                Ok(crate::ui::Filled::Opened(_)) => {}
                 Ok(crate::ui::Filled::Left) => match leave(prompt)? {
                     Leave::Shell => return Ok(None),
                     Leave::Over => {
-                        fields = Self::seeded(payload, Given::default(), prompt)?
-                            .fields(&payload.filesystem, &payload.bootloader)
+                        layout = None;
+                        fields = Self::seeded(payload, Given::default(), prompt)?.fields(
+                            &payload.filesystem,
+                            &payload.bootloader,
+                            &payload.boot,
+                        )
                     }
                     Leave::Back => {}
                 },
                 Err(err) if leaving(&err) => match leave(prompt)? {
                     Leave::Shell => return Ok(None),
                     Leave::Over => {
-                        fields = Self::seeded(payload, Given::default(), prompt)?
-                            .fields(&payload.filesystem, &payload.bootloader)
+                        layout = None;
+                        fields = Self::seeded(payload, Given::default(), prompt)?.fields(
+                            &payload.filesystem,
+                            &payload.bootloader,
+                            &payload.boot,
+                        )
                     }
                     Leave::Back => {}
                 },
@@ -495,6 +715,7 @@ impl Answers {
                 encryption: ask_encryption(given.encryption, given.passphrase, prompt)?,
                 // No flag names it, so a run with no screen installs without one.
                 data: Data::default(),
+                layout: None,
             });
         }
         Ok(Self {
@@ -515,13 +736,14 @@ impl Answers {
                 passphrase: given.passphrase.unwrap_or_default(),
             },
             data: Data::default(),
+            layout: None,
         })
     }
 
     /// The form's rows, in the order `ROW_*` names them. The passphrase row is
     /// always present: the list is built once, so a row that came and went
     /// would rebuild the screen under the person editing it.
-    fn fields(&self, filesystem: &str, bootloader: &str) -> Vec<crate::ui::Field> {
+    fn fields(&self, filesystem: &str, bootloader: &str, boot: &str) -> Vec<crate::ui::Field> {
         use crate::ui::Field;
         let found = disks(&sys_block(), &in_use_now());
         let at = found.iter().position(|(disk, _)| *disk == self.disk);
@@ -539,8 +761,13 @@ impl Answers {
         };
         vec![
             disk,
-            // Under the disk it describes, and answerable by nobody.
-            Field::fixed(copy::ROW_LAYOUT, &copy::layout(filesystem, bootloader)),
+            Field::action(
+                copy::ROW_LAYOUT,
+                &self.layout.as_ref().map_or_else(
+                    || copy::layout(filesystem, bootloader, boot),
+                    CustomLayout::summary,
+                ),
+            ),
             Field::text(copy::ROW_HOSTNAME, &self.hostname),
             Field::text(copy::ROW_ACCOUNT, &self.user),
             Field::secret(copy::ROW_PASSWORD, &self.password),
@@ -566,7 +793,7 @@ impl Answers {
 
     /// The answers the form holds. Only reached where `short_of` is empty, so
     /// every value here is one somebody typed or chose.
-    fn of(fields: &[crate::ui::Field]) -> Self {
+    fn of(fields: &[crate::ui::Field], layout: Option<CustomLayout>) -> Self {
         let at = |row: usize| fields[row].value();
         Self {
             disk: at(ROW_DISK),
@@ -580,7 +807,11 @@ impl Answers {
                 kind: written(&at(ROW_ENCRYPTION)).to_string(),
                 passphrase: at(ROW_PASSPHRASE),
             },
-            data: chose(&at(ROW_DATA), &at(ROW_SIZE)),
+            data: match layout {
+                Some(_) => Data::default(),
+                None => chose(&at(ROW_DATA), &at(ROW_SIZE)),
+            },
+            layout,
         }
     }
 
@@ -599,23 +830,47 @@ impl Answers {
                 copy::ROW_ENCRYPTION.to_string(),
                 shown(&self.encryption.kind).to_string(),
             ),
-            (copy::ROW_DATA.to_string(), data_said(&self.data)),
         ];
+        if self.layout.is_none() {
+            rows.push((copy::ROW_DATA.to_string(), data_said(&self.data)));
+        }
         // What the disk is about to be cut into. Nobody chose any of it, which
         // is why it is here: it is the half of what is being written that no
         // question above covers.
-        rows.extend(copy::written_over(
-            &payload.bootloader,
-            &payload.filesystem,
-            &self.data.size,
-        ));
+        match &self.layout {
+            Some(layout) => {
+                rows.extend(layout.mounts.iter().map(|mount| {
+                    let how = match mount.fstype.as_str() {
+                        "unformatted" => format!("{}  kept", mount.partition),
+                        fstype => format!("{}  format as {fstype}", mount.partition),
+                    };
+                    (mount.target.clone(), how)
+                }));
+                rows.extend(
+                    layout
+                        .opens
+                        .iter()
+                        .map(|open| (open.target.clone(), copy::opened(&open.partition))),
+                );
+                if let Some(chain) = copy::boot_chain(&payload.boot) {
+                    rows.push(("boot chain".to_string(), chain.to_string()));
+                }
+            }
+            None => rows.extend(copy::written_over(
+                &payload.bootloader,
+                &payload.filesystem,
+                &self.data.size,
+                &payload.boot,
+            )),
+        }
         rows
     }
 }
 
 /// The form's rows, by position, for the code that reads one back. Row 1 is the
-/// layout, which is derived from the payload and read back by nothing.
+/// layout, which opens the custom-layout editor.
 const ROW_DISK: usize = 0;
+const ROW_LAYOUT: usize = 1;
 const ROW_HOSTNAME: usize = 2;
 const ROW_ACCOUNT: usize = 3;
 const ROW_PASSWORD: usize = 4;
@@ -628,24 +883,36 @@ const ROW_SIZE: usize = 9;
 /// Which rows are questions. The passphrase is one only for the two encryption
 /// forms named for one; on the others it is not a field a person can answer
 /// wrongly, so it is not a field.
-fn asked(fields: &[crate::ui::Field]) -> Vec<usize> {
+fn asked(fields: &[crate::ui::Field], custom: bool) -> Vec<usize> {
     let wants = Encryption::wants_passphrase(written(&fields[ROW_ENCRYPTION].value()));
     let sized = fields[ROW_DATA].value() == copy::DATA_HERE;
     (0..fields.len())
         .filter(|row| *row != ROW_PASSPHRASE || wants)
-        .filter(|row| *row != ROW_SIZE || sized)
+        .filter(|row| !custom || (*row != ROW_DATA && *row != ROW_SIZE))
+        .filter(|row| custom || *row != ROW_SIZE || sized)
         .collect()
 }
 
 /// What the form is still short of, which is what `Install` says while it is
 /// unpickable: the values nothing derives and no default covers, plus that both
 /// halves of the password agree.
-fn short_of(fields: &[crate::ui::Field]) -> Option<String> {
+fn short_of(fields: &[crate::ui::Field], layout: Option<&CustomLayout>) -> Option<String> {
     let at = |row: usize| fields[row].value();
     if !at(ROW_PASSWORD).is_empty() && at(ROW_PASSWORD) != at(ROW_CONFIRM) {
         return Some(copy::NO_MATCH_ROW.to_string());
     }
-    let data = chose(&at(ROW_DATA), &at(ROW_SIZE));
+    if let Some(layout) = layout {
+        if layout.disk != at(ROW_DISK) {
+            return Some(copy::CUSTOM_OTHER_DISK.to_string());
+        }
+        if written(&at(ROW_ENCRYPTION)) != NONE {
+            return Some(copy::CUSTOM_ENCRYPTION.to_string());
+        }
+    }
+    let data = match layout {
+        Some(_) => Data::default(),
+        None => chose(&at(ROW_DATA), &at(ROW_SIZE)),
+    };
     // The rows are drawn unpickable under an encrypted root, and this is the
     // same gate for a `/var` answered before the encryption was.
     if written(&at(ROW_ENCRYPTION)) != NONE && data.wanted() {
@@ -673,6 +940,883 @@ fn short_of(fields: &[crate::ui::Field]) -> Option<String> {
         true => None,
         false => Some(copy::still_needs(&missing)),
     }
+}
+
+fn edit_layout(
+    disk: &str,
+    filesystem: &str,
+    bootloader: &str,
+    partitions: &[Partition],
+    held: &mut Option<CustomLayout>,
+    found: &Discovered,
+) -> Result<(), String> {
+    loop {
+        let mut fields: Vec<crate::ui::Field> = partitions
+            .iter()
+            .map(|partition| {
+                let options = mount_choices(partition, filesystem, bootloader);
+                let previous = held.as_ref().and_then(|layout| layout.answer(partition));
+                let at = previous
+                    .and_then(|previous| {
+                        options.iter().position(|option| {
+                            option.available
+                                && mounted_answer(&option.label) == Some(previous.clone())
+                        })
+                    })
+                    // A container the old system opens is the default answer:
+                    // a wrong answer here is a disk that boots fine and is
+                    // missing something, and the old system's own fstab says
+                    // where it was mounted.
+                    .or_else(|| found.default_at(partition, &options))
+                    .or_else(|| {
+                        is_esp(partition)
+                            .then(|| copy::keep_as("/boot/efi"))
+                            .and_then(|default| {
+                                options.iter().position(|option| option.label == default)
+                            })
+                    })
+                    .unwrap_or(0);
+                crate::ui::Field::pick(&partition_label(partition), options, Some(at))
+            })
+            .collect();
+        let actions = [copy::USE_LAYOUT, copy::AUTOMATIC_LAYOUT, copy::GO_BACK];
+        match crate::ui::form(
+            &mut fields,
+            &actions,
+            layout_short_of,
+            |fields| (0..fields.len()).collect(),
+            copy::INSTALL_KEYS,
+        )? {
+            crate::ui::Filled::Took(0) => {
+                let (mounts, openings) = layout_from(partitions, &fields);
+                match opens_from(&openings, held.as_ref(), found) {
+                    Ok(opens) => {
+                        *held = Some(CustomLayout {
+                            disk: disk.to_string(),
+                            mounts,
+                            opens,
+                        });
+                        return Ok(());
+                    }
+                    // A key question left is the editor again, not the whole
+                    // install: the layout is still being built.
+                    Err(err) if leaving(&err) => continue,
+                    Err(err) => return Err(err),
+                }
+            }
+            crate::ui::Filled::Took(1) => {
+                *held = None;
+                return Ok(());
+            }
+            crate::ui::Filled::Took(_) | crate::ui::Filled::Opened(_) => {}
+            crate::ui::Filled::Left => return Ok(()),
+        }
+    }
+}
+
+fn partition_label(partition: &Partition) -> String {
+    [
+        partition.device.as_str(),
+        partition.size.as_str(),
+        partition.fstype.as_str(),
+        partition.label.as_str(),
+    ]
+    .into_iter()
+    .filter(|part| !part.is_empty())
+    .collect::<Vec<_>>()
+    .join("  ")
+}
+
+const LINUX_FILESYSTEMS: [&str; 4] = ["ext3", "ext4", "xfs", "btrfs"];
+
+fn is_fat(fstype: &str) -> bool {
+    ["vfat", "fat", "fat32"].contains(&fstype)
+}
+
+fn is_esp(partition: &Partition) -> bool {
+    is_fat(&partition.fstype)
+        && (partition
+            .parttype
+            .eq_ignore_ascii_case("c12a7328-f81f-11d2-ba4b-00a0c93ec93b")
+            || partition.parttype.eq_ignore_ascii_case("0xef"))
+}
+
+fn mount_choices(partition: &Partition, filesystem: &str, bootloader: &str) -> Vec<Choice> {
+    let mut choices = vec![Choice::new(copy::LEAVE_PARTITION, "")];
+    for (target, format) in [
+        ("/", filesystem),
+        ("/boot", "ext4"),
+        ("/boot/efi", "fat32"),
+        ("/var", filesystem),
+    ] {
+        if partition.fstype == "crypto_LUKS" && target != "/boot/efi" {
+            // A container nobody opens mounts nothing, and fisherman refuses
+            // to create encryption on a layout somebody chose. So the four
+            // answers are: leave it, open it, or erase it and take one of the
+            // two filesystems a fresh one could be given.
+            let choice = Choice::new(copy::open_at(target), copy::open_cost(target));
+            choices.push(match target {
+                "/boot" if bootloader == "systemd" => {
+                    Choice::new(copy::open_at(target), copy::custom_keep_boot(bootloader))
+                        .unavailable()
+                }
+                "/boot" => Choice::new(copy::open_at(target), copy::CUSTOM_OPEN_BOOT).unavailable(),
+                _ => choice,
+            });
+        }
+        if !partition.fstype.is_empty() && partition.fstype != "crypto_LUKS" {
+            let choice = Choice::new(copy::keep_as(target), "preserve its filesystem");
+            choices.push(match target {
+                "/boot" if bootloader == "systemd" || partition.fstype != "ext4" => {
+                    Choice::new(copy::keep_as(target), copy::custom_keep_boot(bootloader))
+                        .unavailable()
+                }
+                "/boot/efi" if !is_fat(&partition.fstype) => {
+                    Choice::new(copy::keep_as(target), copy::CUSTOM_KEEP_ESP).unavailable()
+                }
+                "/" | "/var" if !LINUX_FILESYSTEMS.contains(&partition.fstype.as_str()) => {
+                    Choice::new(copy::keep_as(target), copy::CUSTOM_KEEP_FILESYSTEM).unavailable()
+                }
+                _ => choice,
+            });
+        }
+        let choice = Choice::new(copy::format_at(format, target), "erase this partition");
+        choices.push(match target {
+            "/boot" if bootloader == "systemd" => Choice::new(
+                copy::format_at(format, target),
+                copy::custom_keep_boot(bootloader),
+            )
+            .unavailable(),
+            "/" | "/var" if !LINUX_FILESYSTEMS.contains(&format) => Choice::new(
+                copy::format_at(format, target),
+                copy::CUSTOM_FORMAT_FILESYSTEM,
+            )
+            .unavailable(),
+            _ => choice,
+        });
+    }
+    choices
+}
+
+/// What one mount answer means, whichever of the editor's three forms it
+/// takes. `leave unchanged` is not a mount and answers nothing.
+fn mounted_answer(answer: &str) -> Option<Mounted> {
+    if let Some(target) = answer.strip_prefix("open it as ") {
+        return Some(Mounted {
+            target: target.to_string(),
+            fstype: OPEN.to_string(),
+        });
+    }
+    if let Some(target) = answer.strip_prefix("keep as ") {
+        return Some(Mounted {
+            target: target.to_string(),
+            fstype: "unformatted".to_string(),
+        });
+    }
+    let (fstype, target) = answer.strip_prefix("format as ")?.split_once(" at ")?;
+    Some(Mounted {
+        target: target.to_string(),
+        fstype: fstype.to_string(),
+    })
+}
+
+/// The two halves of a layout as the editor's answers give them: what
+/// fisherman mounts, and the containers that have to be open before it can.
+fn layout_from(
+    partitions: &[Partition],
+    fields: &[crate::ui::Field],
+) -> (Vec<CustomMount>, Vec<Opening>) {
+    let mut mounts = Vec::new();
+    let mut openings = Vec::new();
+    for (partition, field) in partitions.iter().zip(fields) {
+        let Some(answer) = mounted_answer(&field.value()) else {
+            continue;
+        };
+        match answer.fstype.as_str() {
+            OPEN => openings.push(Opening {
+                partition: partition.device.clone(),
+                target: answer.target,
+            }),
+            fstype => mounts.push(CustomMount {
+                partition: partition.device.clone(),
+                target: answer.target,
+                fstype: fstype.to_string(),
+            }),
+        }
+    }
+    (mounts, openings)
+}
+
+/// A key for every container the answers name. One the held layout already
+/// carries keeps it: an editor opened again does not ask a second time. One
+/// the old system holds is taken without a screen, because the walk already
+/// proved it opens the container.
+fn opens_from(
+    openings: &[Opening],
+    held: Option<&CustomLayout>,
+    found: &Discovered,
+) -> Result<Vec<LuksOpen>, String> {
+    let mut opens = Vec::new();
+    for opening in openings {
+        let carried = held
+            .and_then(|layout| {
+                layout.opens.iter().find(|open| {
+                    open.partition == opening.partition && open.target == opening.target
+                })
+            })
+            .map(|open| open.key.clone());
+        let key = match carried.or_else(|| found.key(&opening.partition).cloned()) {
+            Some(key) => key,
+            None => ask_key(opening, found.why(&opening.partition))?,
+        };
+        opens.push(LuksOpen {
+            partition: opening.partition.clone(),
+            target: opening.target.clone(),
+            key,
+        });
+    }
+    Ok(opens)
+}
+
+/// The key for one container, as a screen of its own: how it opens, then the
+/// key itself. Esc is the editor again, not a way out of the install. `why` is
+/// what the walk over the old system could not do, drawn beside the question
+/// so a person is told the search happened and came to nothing.
+fn ask_key(opening: &Opening, why: Option<&str>) -> Result<Key, String> {
+    let mut fields = vec![
+        crate::ui::Field::pick(
+            &copy::open_question(&opening.partition, &opening.target),
+            key_methods(),
+            Some(0),
+        ),
+        crate::ui::Field::secret(copy::ROW_PASSPHRASE, ""),
+        crate::ui::Field::text(copy::KEY_FILE_PATH, ""),
+    ];
+    if let Some(why) = why {
+        fields.push(crate::ui::Field::fixed(copy::OLD_SYSTEM, why));
+    }
+    let reason = fields.len() > 3;
+    let actions = [copy::USE_KEY];
+    let filled = crate::ui::form(
+        &mut fields,
+        &actions,
+        |fields| key_short_of(&fields[0].value(), &fields[1].value(), &fields[2].value()),
+        |fields| {
+            let mut rows = key_asked(&fields[0].value());
+            if reason {
+                rows.push(3);
+            }
+            rows
+        },
+        copy::INSTALL_KEYS,
+    )?;
+    match filled {
+        crate::ui::Filled::Took(0) => Ok(key_of(
+            &fields[0].value(),
+            &fields[1].value(),
+            &fields[2].value(),
+        )),
+        _ => Err(crate::ui::INTERRUPTED.to_string()),
+    }
+}
+
+/// The two ways a container opens, and what each one costs the person.
+fn key_methods() -> Vec<Choice> {
+    vec![
+        Choice::new(copy::KEY_PASSPHRASE, copy::KEY_PASSPHRASE_COST),
+        Choice::new(copy::KEY_FILE, copy::KEY_FILE_COST),
+    ]
+}
+
+/// One of the two keys is asked for, never both: which row the answer makes a
+/// question is the whole of what the method decides.
+fn key_asked(method: &str) -> Vec<usize> {
+    match method == copy::KEY_FILE {
+        true => vec![0, 2],
+        false => vec![0, 1],
+    }
+}
+
+fn key_short_of(method: &str, passphrase: &str, path: &str) -> Option<String> {
+    match method == copy::KEY_FILE {
+        true if path.is_empty() => Some(copy::still_needs(&[copy::KEY_FILE_PATH])),
+        true if !Path::new(path).is_file() => Some(copy::KEY_FILE_MISSING.to_string()),
+        true => None,
+        false if passphrase.is_empty() => Some(copy::still_needs(&[copy::ROW_PASSPHRASE])),
+        false => None,
+    }
+}
+
+fn key_of(method: &str, passphrase: &str, path: &str) -> Key {
+    match method == copy::KEY_FILE {
+        true => Key::File(PathBuf::from(path)),
+        false => Key::Passphrase(passphrase.to_string()),
+    }
+}
+
+fn layout_short_of(fields: &[crate::ui::Field]) -> Option<String> {
+    let targets: Vec<String> = fields
+        .iter()
+        .filter_map(|field| mounted_answer(&field.value()).map(|mount| mount.target))
+        .collect();
+    if !targets.iter().any(|target| target == "/") {
+        return Some(copy::CUSTOM_ROOT.to_string());
+    }
+    for (at, target) in targets.iter().enumerate() {
+        if targets[..at].contains(target) {
+            return Some(copy::CUSTOM_DUPLICATE.to_string());
+        }
+    }
+    None
+}
+
+fn partitions(disk: &str) -> Result<Vec<Partition>, String> {
+    let out = Command::new("lsblk")
+        .args([
+            "--json",
+            "--paths",
+            "--output",
+            "NAME,SIZE,FSTYPE,LABEL,TYPE,PARTTYPE,UUID",
+            disk,
+        ])
+        .output()
+        .map_err(|err| format!("lsblk {disk}: {err}"))?;
+    if !out.status.success() {
+        return Err(format!(
+            "lsblk {disk}: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
+    }
+    partition_rows(&String::from_utf8_lossy(&out.stdout))
+}
+
+fn partition_rows(raw: &str) -> Result<Vec<Partition>, String> {
+    fn visit(node: &Json, found: &mut Vec<Partition>) {
+        if json::text(node, "type").as_deref() == Some("part") {
+            found.push(Partition {
+                device: json::text(node, "name").unwrap_or_default(),
+                size: json::text(node, "size").unwrap_or_default(),
+                fstype: json::text(node, "fstype").unwrap_or_default(),
+                label: json::text(node, "label").unwrap_or_default(),
+                parttype: json::text(node, "parttype").unwrap_or_default(),
+                uuid: json::text(node, "uuid").unwrap_or_default(),
+            });
+        }
+        for child in json::items(node, "children") {
+            visit(child, found);
+        }
+    }
+
+    let doc = Json::parse(raw).map_err(|err| format!("lsblk wrote invalid JSON: {err}"))?;
+    let mut found = Vec::new();
+    for block in json::items(&doc, "blockdevices") {
+        visit(block, &mut found);
+    }
+    Ok(found)
+}
+
+/// An old system the walk could mount and read: its crypttab, its fstab, and
+/// where it is mounted while the keys it names are read.
+#[derive(Debug)]
+struct OldSystem {
+    at: PathBuf,
+    crypttab: String,
+    fstab: String,
+}
+
+/// Where one crypttab line says a container's key is, before any of it is
+/// read.
+#[derive(Clone, Debug, PartialEq)]
+enum KeySource {
+    /// A path inside the old system that named it.
+    Inside(PathBuf),
+    /// The systemd default for the volume's name, inside the old root:
+    /// `/etc/cryptsetup-keys.d/<name>.key`.
+    Default,
+    /// A path on another filesystem, which the old system names by an
+    /// fstab-style device spec and the walk resolves and mounts read-only.
+    OnDevice { device: String, path: PathBuf },
+    /// A keyscript this installer cannot run.
+    Unreadable,
+}
+
+/// One line of an old system's `/etc/crypttab`.
+#[derive(Clone, Debug, PartialEq)]
+struct Crypttab {
+    /// The name the container is opened as, which is what `/dev/mapper/<name>`
+    /// in the old fstab refers to.
+    name: String,
+    /// The container itself, as the line says it: `UUID=<uuid>`, a by-uuid
+    /// symlink, or a device path.
+    device: String,
+    key: KeySource,
+}
+
+/// Whether something names a block device: a path, or one of the fstab-style
+/// specs.
+fn device_spec(said: &str) -> bool {
+    said.starts_with("/dev/")
+        || ["UUID=", "PARTUUID=", "LABEL="]
+            .iter()
+            .any(|prefix| said.starts_with(prefix))
+}
+
+/// A `path:device` third field, where the path is relative to that device's
+/// filesystem root, or `device:path[:timeout]` as Debian's `passdev` writes
+/// it. The half that names a device is the device; the other is the path.
+fn on_device(said: &str, passdev: bool) -> Option<KeySource> {
+    let (first, rest) = said.split_once(':')?;
+    let (device, path, timed) = match (device_spec(first), passdev) {
+        (true, _) => (first, rest, true),
+        (false, false) if device_spec(rest) => (rest, first, false),
+        _ => return None,
+    };
+    let path = match timed {
+        true => path.split_once(':').map_or(path, |(path, _timeout)| path),
+        false => path,
+    };
+    Some(KeySource::OnDevice {
+        device: device.to_string(),
+        path: PathBuf::from(path),
+    })
+}
+
+/// The lines of `/etc/crypttab`, as the volumes they open and where their
+/// keys are. A line naming a mechanism this installer cannot read keeps its
+/// name, so the reason can say so rather than staying silent.
+fn crypttabs(raw: &str) -> Vec<Crypttab> {
+    let mut found = Vec::new();
+    for line in raw.lines() {
+        let line = line.split('#').next().unwrap_or("").trim();
+        let mut words = line.split_whitespace();
+        let (Some(name), Some(device)) = (words.next(), words.next()) else {
+            continue;
+        };
+        let field = words.next().unwrap_or("none");
+        let options = words.next().unwrap_or("");
+        let keyscript = options
+            .split(',')
+            .find_map(|option| option.strip_prefix("keyscript="));
+        let key = match keyscript {
+            Some(script) if script.rsplit('/').next() == Some("passdev") => {
+                on_device(field, true).unwrap_or(KeySource::Unreadable)
+            }
+            // Any other script derives its key in a way this installer cannot
+            // repeat, whatever the third field says.
+            Some(_) => KeySource::Unreadable,
+            None if field == "none" || field == "-" => KeySource::Default,
+            None => {
+                on_device(field, false).unwrap_or_else(|| KeySource::Inside(PathBuf::from(field)))
+            }
+        };
+        found.push(Crypttab {
+            name: name.to_string(),
+            device: device.to_string(),
+            key,
+        });
+    }
+    found
+}
+
+/// Whether a crypttab line names this container: by its LUKS uuid, by the
+/// by-uuid symlink to it, or by the device path itself.
+fn names(entry: &Crypttab, container: &Partition) -> bool {
+    let said = entry.device.as_str();
+    if let Some(uuid) = said.strip_prefix("UUID=") {
+        return !container.uuid.is_empty() && uuid.eq_ignore_ascii_case(&container.uuid);
+    }
+    if let Some(uuid) = said.strip_prefix("/dev/disk/by-uuid/") {
+        return !container.uuid.is_empty() && uuid.eq_ignore_ascii_case(&container.uuid);
+    }
+    said == container.device
+}
+
+/// Where the old system mounted a container, by the mapper name its crypttab
+/// gave it. Empty where the old fstab does not say.
+fn fstab_target(raw: &str, name: &str) -> String {
+    let mapper = format!("/dev/mapper/{name}");
+    for line in raw.lines() {
+        let line = line.split('#').next().unwrap_or("").trim();
+        let mut words = line.split_whitespace();
+        let (Some(device), Some(target)) = (words.next(), words.next()) else {
+            continue;
+        };
+        if device == mapper {
+            return target.to_string();
+        }
+    }
+    String::new()
+}
+
+/// Where the walk mounts what it reads. `/run` is RAM, so an old system is
+/// read without writing to any disk. `$TECT_MOUNT_ROOT` names it instead
+/// where it is set, for the same reason `$TECT_SYS_BLOCK` exists: the drawn
+/// golden and a developer who is not root have no `/run` of their own.
+const MOUNTS: &str = "/run/tect-old";
+
+fn mounts_root() -> PathBuf {
+    std::env::var_os("TECT_MOUNT_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(MOUNTS))
+}
+
+/// Every mount the walk made, unmounted when this drops. Nothing that read
+/// them depends on them afterwards, so a key that fails still unmounts
+/// everything, and the panic path does too.
+#[derive(Default)]
+struct Mounts(Vec<PathBuf>);
+
+impl Drop for Mounts {
+    fn drop(&mut self) {
+        for at in &self.0 {
+            let _ = Command::new("umount").arg(at).status();
+        }
+    }
+}
+
+/// How one old system's filesystem is mounted so that reading it cannot write
+/// to it. A read-only mount of a journaling filesystem still replays its
+/// journal, so the four the editor knows take `norecovery`; a filesystem with
+/// no journal is mounted plain.
+fn mount_options(fstype: &str) -> &'static str {
+    match LINUX_FILESYSTEMS.contains(&fstype) {
+        true => "ro,norecovery",
+        false => "ro",
+    }
+}
+
+/// Mounts one device read-only under the walk's own directory and records it
+/// for the guard.
+fn mount_ro(device: &Path, fstype: &str, mounts: &mut Mounts) -> Result<PathBuf, String> {
+    let at = mounts_root().join(format!("old-{}", mounts.0.len() + 1));
+    std::fs::create_dir_all(&at).map_err(|err| format!("{}: {err}", at.display()))?;
+    let options = mount_options(fstype);
+    let out = Command::new("mount")
+        .args(["-o", options])
+        .arg(device)
+        .arg(&at)
+        .output()
+        .map_err(|err| format!("mount: {err}, and it is what reads {}", device.display()))?;
+    if !out.status.success() {
+        return Err(format!(
+            "mounting {} read-only: {}",
+            device.display(),
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
+    }
+    mounts.0.push(at.clone());
+    Ok(at)
+}
+
+/// The filesystem a device carries, by `blkid`. Empty where `blkid` does not
+/// say, which mounts it as something with no journal to replay.
+fn fstype_of(device: &Path) -> String {
+    Command::new("blkid")
+        .args(["-s", "TYPE", "-o", "value"])
+        .arg(device)
+        .output()
+        .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
+        .unwrap_or_default()
+}
+
+/// The filesystems on the disk the walk may read an old system from, as
+/// `lsblk` writes them: the editor's partitions, and the opened containers
+/// and logical volumes above them, which `lsblk` calls `crypt` and `lvm`.
+fn mountable_rows(raw: &str) -> Result<Vec<(String, String)>, String> {
+    fn visit(node: &Json, found: &mut Vec<(String, String)>) {
+        let kind = json::text(node, "type").unwrap_or_default();
+        let fstype = json::text(node, "fstype").unwrap_or_default();
+        if ["part", "crypt", "lvm"].contains(&kind.as_str())
+            && !fstype.is_empty()
+            && fstype != "crypto_LUKS"
+        {
+            found.push((json::text(node, "name").unwrap_or_default(), fstype));
+        }
+        for child in json::items(node, "children") {
+            visit(child, found);
+        }
+    }
+    let doc = Json::parse(raw).map_err(|err| format!("lsblk wrote invalid JSON: {err}"))?;
+    let mut found = Vec::new();
+    for block in json::items(&doc, "blockdevices") {
+        visit(block, &mut found);
+    }
+    Ok(found)
+}
+
+/// Which filesystems a whole disk holds, read through `lsblk`.
+fn mountables(disk: &str) -> Result<Vec<(String, String)>, String> {
+    let out = Command::new("lsblk")
+        .args(["--json", "--paths", "--output", "NAME,FSTYPE,TYPE", disk])
+        .output()
+        .map_err(|err| format!("lsblk {disk}: {err}"))?;
+    if !out.status.success() {
+        return Err(format!(
+            "lsblk {disk}: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
+    }
+    mountable_rows(&String::from_utf8_lossy(&out.stdout))
+}
+
+/// Mounts every filesystem the disk has and keeps the ones carrying
+/// `/etc/fstab`, which is what makes one an old system. A mount that failed
+/// is named rather than passed over: a walk that could not read something
+/// must not look like a disk with nothing on it.
+fn old_systems(disk: &str, mounts: &mut Mounts) -> (Vec<OldSystem>, Vec<String>) {
+    let mut systems = Vec::new();
+    let mut unread = Vec::new();
+    match mountables(disk) {
+        Ok(devices) => {
+            for (device, fstype) in devices {
+                let at = match mount_ro(Path::new(&device), &fstype, mounts) {
+                    Ok(at) => at,
+                    Err(err) => {
+                        unread.push(err);
+                        continue;
+                    }
+                };
+                let fstab = at.join("etc/fstab");
+                if !fstab.is_file() {
+                    continue;
+                }
+                // Neither file is opened where it is not a regular file: a
+                // hostile old system otherwise names a FIFO and the walk
+                // blocks on it with nothing drawn.
+                let crypttab = at.join("etc/crypttab");
+                systems.push(OldSystem {
+                    crypttab: match crypttab.is_file() {
+                        true => std::fs::read_to_string(&crypttab).unwrap_or_default(),
+                        false => String::new(),
+                    },
+                    fstab: std::fs::read_to_string(&fstab).unwrap_or_default(),
+                    at,
+                });
+            }
+        }
+        Err(err) => unread.push(err),
+    }
+    (systems, unread)
+}
+
+/// What an old system's key opens, and where the old system mounted it.
+#[derive(Debug, PartialEq)]
+struct OldKey {
+    /// The mount point the old fstab gives it, empty where the fstab says
+    /// nothing.
+    target: String,
+    /// The key itself, proved against the container.
+    key: Key,
+}
+
+/// What looking for the old system's keys came back with: the key proved for
+/// each container, and for the rest what stopped the walk.
+#[derive(Default)]
+struct Discovered {
+    found: Vec<(String, OldKey)>,
+    why: Vec<(String, String)>,
+}
+
+impl Discovered {
+    /// The answer a container's row opens on where the old system held its
+    /// key: the mount point the old fstab gives it, and nothing where the
+    /// fstab does not name one or names one the editor does not offer. `None`
+    /// leaves the row on `leave unchanged`, because opening a container as
+    /// `/` on a guess is how the new system lands on the old `/var`.
+    fn default_at(&self, partition: &Partition, options: &[Choice]) -> Option<usize> {
+        let (_, old) = self
+            .found
+            .iter()
+            .find(|(device, _)| device == &partition.device)?;
+        if old.target.is_empty() {
+            return None;
+        }
+        options
+            .iter()
+            .position(|option| option.available && option.label == copy::open_at(&old.target))
+    }
+
+    /// The key the old system holds for one container.
+    fn key(&self, partition: &str) -> Option<&Key> {
+        self.found
+            .iter()
+            .find(|(device, _)| device == partition)
+            .map(|(_, old)| &old.key)
+    }
+
+    /// What stopped the walk for one container, drawn where a person is asked
+    /// for a key anyway.
+    fn why(&self, partition: &str) -> Option<&str> {
+        self.why
+            .iter()
+            .find(|(device, _)| device == partition)
+            .map(|(_, why)| why.as_str())
+    }
+}
+
+/// One key file the old system names, read only where that system holds it:
+/// the path is resolved under the mount, and symlinks and `..` may not leave
+/// it. Only a regular file is read, so a hostile old system cannot name
+/// `/etc/shadow`, or a FIFO to block the installer on, and have it opened.
+fn key_file(volume: &str, root: &Path, path: &Path) -> Result<Vec<u8>, String> {
+    let said = root.join(path.strip_prefix("/").unwrap_or(path));
+    let file = std::fs::canonicalize(&said).map_err(|err| {
+        copy::old_root_key_missing(volume, &path.display().to_string(), &err.to_string())
+    })?;
+    let at = std::fs::canonicalize(root).map_err(|err| format!("{}: {err}", root.display()))?;
+    if !file.starts_with(&at) || !file.is_file() {
+        return Err(copy::old_root_key_outside(&path.display().to_string()));
+    }
+    std::fs::read(&file).map_err(|err| {
+        copy::old_root_key_missing(volume, &path.display().to_string(), &err.to_string())
+    })
+}
+
+/// The bytes of one key the old system names, read where the source says they
+/// are. An `OnDevice` key is mounted read-only for the read, and the mount
+/// guard unmounts it with everything else.
+fn key_bytes(system: &OldSystem, entry: &Crypttab, mounts: &mut Mounts) -> Result<Vec<u8>, String> {
+    match &entry.key {
+        KeySource::Inside(path) => key_file(&entry.name, &system.at, path),
+        KeySource::Default => key_file(
+            &entry.name,
+            &system.at,
+            &PathBuf::from(format!("/etc/cryptsetup-keys.d/{}.key", entry.name)),
+        ),
+        KeySource::OnDevice { device, path } => {
+            let resolved = resolve_device(device)?;
+            let fstype = fstype_of(&resolved);
+            let at = mount_ro(&resolved, &fstype, mounts)?;
+            key_file(&entry.name, &at, path)
+        }
+        KeySource::Unreadable => Err(copy::old_root_key_unreadable(&entry.name)),
+    }
+}
+
+/// The device an fstab-style spec names: a path is one, and a `UUID=`,
+/// `LABEL=` or `PARTUUID=` spec is resolved through `blkid`.
+fn resolve_device(said: &str) -> Result<PathBuf, String> {
+    if said.starts_with('/') {
+        return Ok(PathBuf::from(said));
+    }
+    let Some((tag, value)) = ["UUID", "LABEL", "PARTUUID"].iter().find_map(|tag| {
+        said.strip_prefix(&format!("{tag}="))
+            .map(|value| (*tag, value))
+    }) else {
+        return Err(format!("{said} is not a device"));
+    };
+    let out = Command::new("blkid")
+        .args(["-t", &format!("{tag}={value}"), "-o", "device"])
+        .output()
+        .map_err(|err| format!("blkid: {err}, and it is what resolves {said}"))?;
+    labelled(&String::from_utf8_lossy(&out.stdout))
+        .into_iter()
+        .next()
+        .map(PathBuf::from)
+        .ok_or_else(|| format!("{said} is not present"))
+}
+
+/// Whether a key opens a container, asked without opening it: `cryptsetup`
+/// tests the key and sets up no mapper, so a key that fails leaves nothing
+/// behind. A `cryptsetup` that cannot run at all is an error and not a wrong
+/// key: the two tell the person different things.
+fn test_key(container: &Partition, key: &[u8]) -> Result<bool, String> {
+    let mut command = Command::new("cryptsetup");
+    command
+        .args(["-q", "luksOpen", "--test-passphrase", "--key-file", "-"])
+        .arg(&container.device)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    let mut child = command
+        .spawn()
+        .map_err(|err| format!("cryptsetup: {err}, and it is what tests a key"))?;
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(key);
+    }
+    let status = child.wait().map_err(|err| format!("cryptsetup: {err}"))?;
+    Ok(status.success())
+}
+
+/// The keys the old systems hold for the editor's containers, each one proved
+/// against the container it opens. `opens` is that proof: `cryptsetup` in an
+/// install, and a closure in a test.
+fn discover(
+    partitions: &[Partition],
+    systems: &[OldSystem],
+    unread: &[String],
+    mounts: &mut Mounts,
+    opens: &dyn Fn(&Partition, &[u8]) -> Result<bool, String>,
+) -> Discovered {
+    let mut found = Discovered::default();
+    for partition in partitions
+        .iter()
+        .filter(|part| part.fstype == "crypto_LUKS")
+    {
+        let mut named = false;
+        let mut why = None;
+        let mut key = None;
+        'systems: for system in systems {
+            for entry in crypttabs(&system.crypttab) {
+                if !names(&entry, partition) {
+                    continue;
+                }
+                named = true;
+                match key_bytes(system, &entry, mounts)
+                    .and_then(|bytes| opens(partition, &bytes).map(|opens| (bytes, opens)))
+                {
+                    Ok((bytes, true)) => {
+                        key = Some(OldKey {
+                            target: fstab_target(&system.fstab, &entry.name),
+                            key: Key::Data(bytes),
+                        });
+                        break 'systems;
+                    }
+                    Ok((_, false)) => why = Some(copy::old_root_key_wrong(&partition.device)),
+                    Err(err) => why = Some(err),
+                }
+            }
+        }
+        match key {
+            Some(key) => found.found.push((partition.device.clone(), key)),
+            None => {
+                let why = why.unwrap_or_else(|| match named {
+                    // Named, so every read above either failed or served a key
+                    // that did not open it, and `why` says which.
+                    true => copy::old_root_key_wrong(&partition.device),
+                    // A device the walk could not read is named first: it may
+                    // hold the key, and "nothing readable named a key" stays
+                    // true whether or not another system was read.
+                    false if !unread.is_empty() => copy::old_root_partly(&unread[0]),
+                    // A system was read and names no key for this container:
+                    // the walk could not answer, and saying nothing was read
+                    // would be false.
+                    false if !systems.is_empty() => copy::old_root_unnamed(&partition.device),
+                    false => copy::OLD_ROOT_NONE.to_string(),
+                });
+                found.why.push((partition.device.clone(), why));
+            }
+        }
+    }
+    found
+}
+
+/// The whole walk: mount what the disk has, read the old systems' crypttabs
+/// and fstabs, and prove the keys they name against the editor's containers.
+/// A disk with no container to open is left alone entirely.
+fn old_keys(disk: &str, partitions: &[Partition]) -> Discovered {
+    if !partitions.iter().any(|part| part.fstype == "crypto_LUKS") {
+        return Discovered::default();
+    }
+    let mut mounts = Mounts::default();
+    let (systems, unread) = old_systems(disk, &mut mounts);
+    discover(
+        partitions,
+        &systems,
+        &unread,
+        &mut mounts,
+        &|container, key| test_key(container, key),
+    )
 }
 
 /// The other way off the installer's screen. The live environment is a
@@ -953,10 +2097,18 @@ fn set(value: &mut Json, key: &str, field: Json) {
     }
 }
 
+fn unset(value: &mut Json, key: &str) {
+    let Json::Object(fields) = value else { return };
+    fields.retain(|(name, _)| name != key);
+}
+
 /// The recipe with the person's half in it. `user` is merged: the groups
 /// already in it are the target's admin group, and `useradd` refuses the whole
 /// call when it names a group the target has not got.
 pub fn complete(recipe: &Path, answers: &Answers) -> Result<Json, String> {
+    if answers.layout.is_some() && answers.encryption.kind != NONE {
+        return Err(copy::CUSTOM_ENCRYPTION.to_string());
+    }
     let raw =
         std::fs::read_to_string(recipe).map_err(|err| format!("{}: {err}", recipe.display()))?;
     let mut doc = Json::parse(&raw).map_err(|err| format!("{}: {err}", recipe.display()))?;
@@ -984,6 +2136,31 @@ pub fn complete(recipe: &Path, answers: &Answers) -> Result<Json, String> {
         Json::string(hashed(&answers.password)?),
     );
     set(&mut doc, "user", user);
+    if let Some(layout) = &answers.layout {
+        unset(&mut doc, "varDisk");
+        let mut mounts: Vec<Json> = layout
+            .mounts
+            .iter()
+            .map(|mount| {
+                Json::object([
+                    ("partition", Json::string(&mount.partition)),
+                    ("target", Json::string(&mount.target)),
+                    ("fstype", Json::string(&mount.fstype)),
+                ])
+            })
+            .collect();
+        // An opened container is a mapper by the time fisherman sees it. The
+        // container device and the key stay here: fisherman decodes nothing.
+        for (name, open) in layout.mappers() {
+            mounts.push(Json::object([
+                ("partition", Json::string(&mapper_path(&name))),
+                ("target", Json::string(&open.target)),
+                ("fstype", Json::string("unformatted")),
+            ]));
+        }
+        set(&mut doc, "customMounts", Json::array(mounts));
+        return Ok(doc);
+    }
     // An answer of none writes nothing, so a `var-disk` the image declared is
     // left exactly as `emit::recipe` wrote it.
     if !answers.data.disk.is_empty() {
@@ -1165,6 +2342,126 @@ const RENDERER: &str = "/usr/libexec/grub-menu-from-bls";
 /// The renderer takes a root and looks under `<root>/boot`.
 const TARGET: &str = "/run/tect-target";
 
+/// Chain-specific files bootc cannot place itself. The firmware database path
+/// needs an explicit loader policy; the shim path replaces the fallback loader
+/// with Microsoft's shim and leaves the owner-signed systemd-boot at the name
+/// shim is compiled to load.
+fn configure_boot_chain(image: &str, disk: &str, chain: &str) -> Result<(), String> {
+    if chain.is_empty() {
+        return Ok(());
+    }
+    let at = PathBuf::from(TARGET);
+    let boot = at.join("boot");
+    std::fs::create_dir_all(&boot).map_err(|err| format!("{TARGET}: {err}"))?;
+    let Some((device, root)) = boot_partition(disk, &boot)? else {
+        return Err(format!(
+            "no partition of {disk} carries `loader/entries`, so the {chain} chain cannot be configured"
+        ));
+    };
+    let esp = match root {
+        "/target" => boot.clone(),
+        _ => boot.join("boot"),
+    };
+
+    let configured = match chain {
+        "uki-db" => {
+            let missing = ["PK", "KEK", "db"]
+                .into_iter()
+                .map(|name| esp.join(format!("loader/keys/auto/{name}.auth")))
+                .find(|key| !key.is_file());
+            match missing {
+                Some(key) => Err(format!(
+                    "{}: bootc did not install the {chain} enrollment key",
+                    key.display()
+                )),
+                None => {
+                    let loader = esp.join("loader/loader.conf");
+                    let current = std::fs::read_to_string(&loader).unwrap_or_default();
+                    let mut lines: Vec<&str> = current
+                        .lines()
+                        .filter(|line| !line.trim_start().starts_with("secure-boot-enroll "))
+                        .collect();
+                    lines.push("secure-boot-enroll force");
+                    std::fs::write(&loader, format!("{}\n", lines.join("\n")))
+                        .map_err(|err| format!("{}: {err}", loader.display()))
+                }
+            }
+        }
+        "uki-shim" => run_enrolment(image, &esp),
+        _ => Err(format!("unknown boot chain `{chain}`")),
+    };
+    let unmounted = Command::new("umount").arg(&boot).output();
+    configured?;
+    match unmounted {
+        Ok(out) if out.status.success() => {
+            eprintln!("tect: configured {chain} on {device}");
+            Ok(())
+        }
+        Ok(out) => Err(format!(
+            "unmounting {device}: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        )),
+        Err(err) => Err(format!("unmounting {device}: {err}")),
+    }
+}
+
+fn require_signed_boot_chain(image: &str, chain: &str) -> Result<(), String> {
+    if chain.is_empty() {
+        return Ok(());
+    }
+    let out = Command::new("podman")
+        .args([
+            "run",
+            "--rm",
+            "--pull=never",
+            "--net=none",
+            "--security-opt",
+            "label=disable",
+            "--entrypoint",
+            "/usr/bin/test",
+            image,
+            "-e",
+            "/usr/share/tectonic/secureboot-signed",
+        ])
+        .output()
+        .map_err(|err| format!("podman: {err}, and it is what verifies the {chain} chain"))?;
+    if out.status.success() {
+        return Ok(());
+    }
+    Err(format!(
+        "{image} is not signed for its declared {chain} chain; rebuild it with the Secure Boot private key before installing"
+    ))
+}
+
+fn run_enrolment(image: &str, esp: &Path) -> Result<(), String> {
+    let target = format!("{}:/esp", esp.display());
+    let out = Command::new("podman")
+        .args([
+            "run",
+            "--rm",
+            "--pull=never",
+            "--net=none",
+            "--security-opt",
+            "label=disable",
+            "--entrypoint",
+            "",
+            "-v",
+            &target,
+            image,
+            "/usr/libexec/secureboot-enrolment",
+            "/esp",
+        ])
+        .output()
+        .map_err(|err| format!("podman: {err}, and it is what installs the shim chain"))?;
+    match out.status.success() {
+        true => Ok(()),
+        false => Err(format!(
+            "/usr/libexec/secureboot-enrolment in {image}: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        )),
+    }
+}
+
 /// The menu the installed machine boots from, written after fisherman has
 /// finished and unmounted: `bootc` installs the bootloader before it writes the
 /// entries, so nothing during the install can render them. An image with no
@@ -1214,10 +2511,10 @@ fn boot_partition(disk: &str, boot: &Path) -> Result<Option<(String, &'static st
         if !matches!(&mounted, Ok(out) if out.status.success()) {
             continue;
         }
-        if boot.join("loader/entries").is_dir() {
+        if boot.join("loader/entries").is_dir() || boot.join("EFI/Linux").is_dir() {
             return Ok(Some((device, "/target")));
         }
-        if boot.join("boot/loader/entries").is_dir() {
+        if boot.join("boot/loader/entries").is_dir() || boot.join("boot/EFI/Linux").is_dir() {
             return Ok(Some((device, "/target/boot")));
         }
         let _ = Command::new("umount").arg(boot).output();
@@ -1294,11 +2591,118 @@ fn remounted_rw(at: &str) -> bool {
         .is_ok_and(|out| out.status.success())
 }
 
+/// Where an opened container appears once it is open: what fisherman mounts,
+/// and what names it.
+fn mapper_path(name: &str) -> String {
+    format!("/dev/mapper/{name}")
+}
+
+/// The mapper names an install has open, closed when this is dropped, which is
+/// every way out of `run`: a failed fisherman, a key that does not fit, and the
+/// ordinary end of a finished install all run this.
+#[derive(Default)]
+struct Mappers(Vec<String>);
+
+impl Drop for Mappers {
+    fn drop(&mut self) {
+        for name in &self.0 {
+            if let Err(why) = close_volume(name) {
+                eprintln!("tect: {why}");
+            }
+        }
+    }
+}
+
+/// Opens every container the layout names, before anything is written. One
+/// that does not open stops the install here, with the partitions untouched.
+fn open_volumes(layout: Option<&CustomLayout>) -> Result<Mappers, String> {
+    let mut opened = Mappers::default();
+    let Some(layout) = layout else {
+        return Ok(opened);
+    };
+    for (name, open) in layout.mappers() {
+        open_volume(open, &name)?;
+        opened.0.push(name);
+    }
+    Ok(opened)
+}
+
+/// `cryptsetup`'s call for one container. A passphrase arrives on stdin, so it
+/// never reaches the process list.
+fn open_command(open: &LuksOpen, name: &str) -> Command {
+    let mut command = Command::new("cryptsetup");
+    command.args(["-q", "luksOpen"]);
+    match &open.key {
+        Key::Passphrase(_) | Key::Data(_) => {
+            command.args(["--key-file", "-"]);
+        }
+        Key::File(path) => {
+            command.args(["--key-file"]).arg(path);
+        }
+    }
+    command.arg(&open.partition).arg(name);
+    command
+}
+
+fn open_volume(open: &LuksOpen, name: &str) -> Result<(), String> {
+    // A mapper left behind by a killed install would fail `luksOpen` on a
+    // retry in the same boot; fisherman clears its own the same way.
+    if Path::new(&mapper_path(name)).exists() {
+        let _ = close_volume(name);
+    }
+    let mut command = open_command(open, name);
+    command.stdout(Stdio::null()).stderr(Stdio::piped());
+    if open.key.bytes().is_some() {
+        command.stdin(Stdio::piped());
+    }
+    let mut child = command
+        .spawn()
+        .map_err(|err| format!("cryptsetup: {err}, and it is what opens {}", open.partition))?;
+    if let Some(bytes) = open.key.bytes() {
+        child
+            .stdin
+            .take()
+            .ok_or("cryptsetup: no stdin")?
+            .write_all(bytes)
+            .map_err(|err| format!("cryptsetup: {err}"))?;
+    }
+    let out = child
+        .wait_with_output()
+        .map_err(|err| format!("cryptsetup: {err}"))?;
+    match out.status.success() {
+        true => Ok(()),
+        false => Err(format!(
+            "cryptsetup could not open {}: {}",
+            open.partition,
+            String::from_utf8_lossy(&out.stderr).trim()
+        )),
+    }
+}
+
+fn close_volume(name: &str) -> Result<(), String> {
+    let out = Command::new("cryptsetup")
+        .args(["-q", "close", name])
+        .output()
+        .map_err(|err| format!("cryptsetup: {err}, and it is what closes a container"))?;
+    match out.status.success() {
+        true => Ok(()),
+        false => Err(format!(
+            "{} is still open: {}",
+            mapper_path(name),
+            String::from_utf8_lossy(&out.stderr).trim()
+        )),
+    }
+}
+
 /// Completes the recipe and runs fisherman over it, drawing its event stream
 /// into a bounded region and writing all of it to a file.
 ///
 /// A failed draw is not a failed install, so nothing here is `?` on the region.
 pub fn run(payload: &Payload, answers: &Answers, prompt: &Prompt) -> Result<(), String> {
+    require_signed_boot_chain(&payload.image, &payload.boot)?;
+    // Every container the layout opens is open for the whole of fisherman and
+    // closed on every way out of this function, including the panic path.
+    let _opened = open_volumes(answers.layout.as_ref())?;
     let path = stage(&complete(&payload.recipe, answers)?)?;
     let (mut log, at) = open_log(payload);
     // Only where nothing is drawn. On the installer's own screen this would
@@ -1393,19 +2797,28 @@ pub fn run(payload: &Payload, answers: &Answers, prompt: &Prompt) -> Result<(), 
             copy::logging(at.as_deref())
         ));
     }
+    configure_boot_chain(&payload.image, &answers.disk, &payload.boot)?;
     render_menu(&payload.image, &answers.disk)?;
-    finish(recovery.as_deref(), at.as_deref(), prompt)
+    finish(recovery.as_deref(), at.as_deref(), &payload.boot, prompt)
 }
 
 /// What the last screen owes: the recovery key, on screen because it is
 /// deliberately in no file, and the restart, because the stick is still in the
 /// machine and nothing else says what to do next.
-fn finish(recovery: Option<&str>, log: Option<&Path>, prompt: &Prompt) -> Result<(), String> {
+fn finish(
+    recovery: Option<&str>,
+    log: Option<&Path>,
+    boot: &str,
+    prompt: &Prompt,
+) -> Result<(), String> {
     // Nothing draws, so the streams are the only channel there is.
     if !prompt.draws() {
         if let Some(key) = recovery {
             println!("\n{}", copy::recovery(key));
             println!("{}\n", copy::KEY_NOT_LOGGED);
+        }
+        if let Some(enrollment) = copy::enrollment(boot) {
+            println!("{enrollment}");
         }
         eprintln!("tect: {}", copy::logging(log));
         return Ok(());
@@ -1414,7 +2827,7 @@ fn finish(recovery: Option<&str>, log: Option<&Path>, prompt: &Prompt) -> Result
     // is a disk nobody can open.
     match crate::ui::offer_over(
         copy::INSTALL_DONE,
-        done_rows(recovery, log),
+        done_rows(recovery, log, boot),
         copy::RESTART,
         copy::DONE_KEYS,
     )? {
@@ -1427,13 +2840,16 @@ fn finish(recovery: Option<&str>, log: Option<&Path>, prompt: &Prompt) -> Result
 /// it, what scanning it is for, and where the log went. The QR carries the
 /// bare key and claims nothing further — nothing routes a text QR into a
 /// wallet.
-pub(crate) fn done_rows(recovery: Option<&str>, log: Option<&Path>) -> Vec<Choice> {
+pub(crate) fn done_rows(recovery: Option<&str>, log: Option<&Path>, boot: &str) -> Vec<Choice> {
     let mut rows = Vec::new();
     if let Some(key) = recovery {
         rows.push(Choice::new(copy::WRITE_DOWN, "").content());
         // The one row on the screen a person has to copy by eye.
         rows.push(Choice::new(key, "").content().tinted());
         rows.push(Choice::new(copy::KEY_NOT_LOGGED, "").content());
+    }
+    if let Some(enrollment) = copy::enrollment(boot) {
+        rows.push(Choice::new(enrollment, "").content());
     }
     rows.push(Choice::new(copy::logging(log), "").content());
     rows
@@ -1511,6 +2927,17 @@ mod tests {
         };
         assert_eq!(payload.image, "ghcr.io/tectonic-os/deb2:latest");
         assert_eq!(payload.hostname, "deb2");
+        assert!(payload.boot.is_empty());
+
+        let uki = EMITTED.replace(
+            "\"bootloader\": \"grub2\",",
+            "\"bootloader\": \"systemd\",\n  \"boot\": \"uki-db\",",
+        );
+        std::fs::write(root.join(RECIPE), uki).expect("a UKI recipe");
+        let Ok(Found::Image(payload)) = classify(&root) else {
+            panic!("a UKI recipe is a payload");
+        };
+        assert_eq!(payload.boot, "uki-db");
 
         // A payload that cannot be read is named, not skipped past: a stick
         // carrying a broken recipe is not a stick carrying nothing.
@@ -1540,6 +2967,7 @@ mod tests {
                 passphrase: "opensesame".to_string(),
             },
             data: Data::default(),
+            layout: None,
         };
         let done = complete(&recipe, &answers).expect("the person's half goes in");
 
@@ -1580,6 +3008,657 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    #[test]
+    fn lsblk_partitions_keep_the_details_the_editor_shows() {
+        let rows = partition_rows(
+            r#"{
+  "blockdevices": [{
+    "name": "/dev/vda", "size": "64G", "fstype": null, "label": null, "type": "disk",
+    "children": [
+      {"name": "/dev/vda1", "size": "512M", "fstype": "vfat", "label": "EFI", "type": "part", "parttype": "C12A7328-F81F-11D2-BA4B-00A0C93EC93B"},
+      {"name": "/dev/vda2", "size": "63.5G", "fstype": "crypto_LUKS", "label": null, "type": "part", "parttype": null, "uuid": "a1b2c3d4-0000-0000-0000-000000000000"}
+    ]
+  }]
+}"#,
+        )
+        .expect("lsblk JSON");
+        assert_eq!(
+            rows,
+            [
+                Partition {
+                    device: "/dev/vda1".to_string(),
+                    size: "512M".to_string(),
+                    fstype: "vfat".to_string(),
+                    label: "EFI".to_string(),
+                    parttype: "C12A7328-F81F-11D2-BA4B-00A0C93EC93B".to_string(),
+                    uuid: String::new(),
+                },
+                Partition {
+                    device: "/dev/vda2".to_string(),
+                    size: "63.5G".to_string(),
+                    fstype: "crypto_LUKS".to_string(),
+                    label: String::new(),
+                    parttype: String::new(),
+                    uuid: "a1b2c3d4-0000-0000-0000-000000000000".to_string(),
+                },
+            ]
+        );
+        assert!(is_esp(&rows[0]));
+        assert!(mount_choices(&rows[0], "ext4", "grub2")
+            .iter()
+            .any(|choice| choice.label == copy::keep_as("/boot/efi")));
+        // A container is never kept as it is: its filesystem is inside it.
+        // What it can be is opened, wherever the bootloader can read it.
+        let luks = mount_choices(&rows[1], "ext4", "grub2");
+        assert!(!luks
+            .iter()
+            .any(|choice| choice.label.starts_with("keep as ")));
+        for target in ["/", "/var"] {
+            assert!(
+                luks.iter()
+                    .any(|choice| choice.label == copy::open_at(target) && choice.available),
+                "{target} is not offered"
+            );
+        }
+        assert!(!luks
+            .iter()
+            .any(|choice| choice.label == copy::open_at("/boot/efi")));
+        // No loader here reads a container: GRUB is not configured to open
+        // one, and systemd-boot reads no separate /boot at all. So the answer
+        // is drawn refused whichever one is installed.
+        for bootloader in ["grub2", "systemd"] {
+            let choices = mount_choices(&rows[1], "ext4", bootloader);
+            let boot = choices
+                .iter()
+                .find(|choice| choice.label == copy::open_at("/boot"))
+                .expect("the opened /boot refusal");
+            assert!(!boot.available, "{bootloader} opens an encrypted /boot");
+        }
+
+        let choices = mount_choices(&rows[0], "zfs", "grub2");
+        assert!(
+            !choices
+                .iter()
+                .find(|choice| choice.label == copy::keep_as("/boot"))
+                .expect("the explicit /boot refusal")
+                .available
+        );
+        assert!(
+            !choices
+                .iter()
+                .find(|choice| choice.label == copy::format_at("zfs", "/"))
+                .expect("the unsupported format")
+                .available
+        );
+
+        let ext4 = Partition {
+            device: "/dev/vda3".to_string(),
+            size: "1G".to_string(),
+            fstype: "ext4".to_string(),
+            label: String::new(),
+            parttype: String::new(),
+            uuid: String::new(),
+        };
+        let choices = mount_choices(&ext4, "ext4", "systemd");
+        assert!(
+            !choices
+                .iter()
+                .find(|choice| choice.label == copy::keep_as("/boot"))
+                .expect("the kept systemd-boot refusal")
+                .available
+        );
+        assert!(
+            mount_choices(&ext4, "ext4", "grub2")
+                .iter()
+                .find(|choice| choice.label == copy::keep_as("/boot"))
+                .expect("the kept grub /boot")
+                .available
+        );
+        assert!(
+            !choices
+                .iter()
+                .find(|choice| choice.label == copy::format_at("ext4", "/boot"))
+                .expect("the formatted systemd-boot refusal")
+                .available
+        );
+    }
+
+    #[test]
+    fn custom_layouts_need_one_root_and_unique_mount_points() {
+        let field = |target| {
+            crate::ui::Field::pick(
+                "partition",
+                vec![Choice::new(copy::format_at("ext4", target), "")],
+                Some(0),
+            )
+        };
+        assert_eq!(
+            layout_short_of(&[field("/var")]).as_deref(),
+            Some(copy::CUSTOM_ROOT)
+        );
+        assert_eq!(
+            layout_short_of(&[field("/"), field("/")]).as_deref(),
+            Some(copy::CUSTOM_DUPLICATE)
+        );
+        assert!(layout_short_of(&[field("/"), field("/var")]).is_none());
+    }
+
+    /// The three forms a mount answer takes, and the one answer that is not a
+    /// mount. The sentinel is what separates an opened container from a kept
+    /// filesystem, and it must not survive into anything fisherman reads.
+    #[test]
+    fn every_answer_the_editor_takes_reads_back_as_a_mount() {
+        assert_eq!(
+            mounted_answer(&copy::open_at("/")),
+            Some(Mounted {
+                target: "/".to_string(),
+                fstype: OPEN.to_string(),
+            })
+        );
+        assert_eq!(
+            mounted_answer(&copy::keep_as("/boot/efi")),
+            Some(Mounted {
+                target: "/boot/efi".to_string(),
+                fstype: "unformatted".to_string(),
+            })
+        );
+        assert_eq!(
+            mounted_answer(&copy::format_at("btrfs", "/var")),
+            Some(Mounted {
+                target: "/var".to_string(),
+                fstype: "btrfs".to_string(),
+            })
+        );
+        assert_eq!(mounted_answer(copy::LEAVE_PARTITION), None);
+    }
+
+    /// An open answer is an opening before it is anything else: what fisherman
+    /// formats and what has to be open first are two different lists.
+    #[test]
+    fn an_open_container_is_an_opening_and_not_a_format() {
+        let partition = |device: &str, fstype: &str| Partition {
+            device: device.to_string(),
+            size: "4G".to_string(),
+            fstype: fstype.to_string(),
+            label: String::new(),
+            parttype: String::new(),
+            uuid: String::new(),
+        };
+        let rows = [
+            partition("/dev/vda1", "vfat"),
+            partition("/dev/vda2", "crypto_LUKS"),
+            partition("/dev/vda3", "xfs"),
+        ];
+        let field = |answer: &str| {
+            crate::ui::Field::pick("partition", vec![Choice::new(answer, "")], Some(0))
+        };
+        let fields = [
+            field(&copy::keep_as("/boot/efi")),
+            field(&copy::open_at("/")),
+            field(&copy::format_at("ext4", "/var")),
+        ];
+        let (mounts, openings) = layout_from(&rows, &fields);
+        assert_eq!(
+            mounts,
+            [
+                CustomMount {
+                    partition: "/dev/vda1".to_string(),
+                    target: "/boot/efi".to_string(),
+                    fstype: "unformatted".to_string(),
+                },
+                CustomMount {
+                    partition: "/dev/vda3".to_string(),
+                    target: "/var".to_string(),
+                    fstype: "ext4".to_string(),
+                },
+            ]
+        );
+        assert_eq!(
+            openings,
+            [Opening {
+                partition: "/dev/vda2".to_string(),
+                target: "/".to_string(),
+            }]
+        );
+    }
+
+    /// A layout opened again does not ask for a key it already carries: the
+    /// person answered that question the first time through.
+    #[test]
+    fn an_edited_layout_keeps_the_key_it_already_has() {
+        let opening = Opening {
+            partition: "/dev/vda2".to_string(),
+            target: "/".to_string(),
+        };
+        let held = CustomLayout {
+            disk: "/dev/vda".to_string(),
+            mounts: Vec::new(),
+            opens: vec![LuksOpen {
+                partition: opening.partition.clone(),
+                target: opening.target.clone(),
+                key: Key::Passphrase("opensesame".to_string()),
+            }],
+        };
+        let opens = opens_from(
+            std::slice::from_ref(&opening),
+            Some(&held),
+            &Discovered::default(),
+        )
+        .expect("the carried key");
+        assert_eq!(opens, held.opens);
+    }
+
+    /// A container somebody opened is a mapper by the time fisherman sees it,
+    /// and neither the container device nor the key is written anywhere.
+    #[test]
+    fn an_opened_container_reaches_fisherman_as_its_mapper() {
+        let root = scratch("opened-layout");
+        let recipe = root.join(RECIPE);
+        std::fs::write(&recipe, EMITTED).expect("a recipe");
+        let answers = Answers {
+            disk: "/dev/vda".to_string(),
+            hostname: "deb2".to_string(),
+            user: "tect".to_string(),
+            password: "hunter2".to_string(),
+            encryption: Encryption {
+                kind: NONE.to_string(),
+                passphrase: String::new(),
+            },
+            data: Data::default(),
+            layout: Some(CustomLayout {
+                disk: "/dev/vda".to_string(),
+                mounts: vec![CustomMount {
+                    partition: "/dev/vda1".to_string(),
+                    target: "/boot/efi".to_string(),
+                    fstype: "unformatted".to_string(),
+                }],
+                opens: vec![
+                    LuksOpen {
+                        partition: "/dev/vda2".to_string(),
+                        target: "/".to_string(),
+                        key: Key::Passphrase("opensesame".to_string()),
+                    },
+                    LuksOpen {
+                        partition: "/dev/vda3".to_string(),
+                        target: "/var".to_string(),
+                        key: Key::File(PathBuf::from("/run/keyfile")),
+                    },
+                ],
+            }),
+        };
+        let done = complete(&recipe, &answers).expect("a custom recipe");
+        let mounts = json::items(&done, "customMounts");
+        assert_eq!(mounts.len(), 3);
+        assert_eq!(
+            json::text(&mounts[1], "partition").as_deref(),
+            Some("/dev/mapper/tect-1")
+        );
+        assert_eq!(json::text(&mounts[1], "target").as_deref(), Some("/"));
+        assert_eq!(
+            json::text(&mounts[1], "fstype").as_deref(),
+            Some("unformatted")
+        );
+        assert_eq!(
+            json::text(&mounts[2], "partition").as_deref(),
+            Some("/dev/mapper/tect-2")
+        );
+        assert_eq!(json::text(&mounts[2], "target").as_deref(), Some("/var"));
+        // The container device and the key are the installer's, not the
+        // recipe's: fisherman mounts an open mapper and decodes nothing.
+        let said = done.render();
+        for secret in ["/dev/vda2", "/dev/vda3", "opensesame", "/run/keyfile"] {
+            assert!(!said.contains(secret), "{secret} reached the recipe");
+        }
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The whole of what opening does: cryptsetup takes the mapper name, and a
+    /// passphrase is the one key that arrives on stdin instead of an argument.
+    #[test]
+    fn opening_a_container_names_cryptsetup_and_the_mapper() {
+        let open = |key| LuksOpen {
+            partition: "/dev/vda2".to_string(),
+            target: "/".to_string(),
+            key,
+        };
+        let args = |open: &LuksOpen| -> Vec<String> {
+            let command = open_command(open, "tect-1");
+            command
+                .get_args()
+                .map(|arg| arg.to_string_lossy().into_owned())
+                .collect()
+        };
+        assert_eq!(
+            args(&open(Key::File(PathBuf::from("/run/keyfile")))),
+            [
+                "-q",
+                "luksOpen",
+                "--key-file",
+                "/run/keyfile",
+                "/dev/vda2",
+                "tect-1"
+            ]
+        );
+        assert_eq!(
+            args(&open(Key::Passphrase("opensesame".to_string()))),
+            ["-q", "luksOpen", "--key-file", "-", "/dev/vda2", "tect-1"]
+        );
+        // A key read out of an old system travels the same way: `cryptsetup`
+        // reads it from stdin, so no path has to outlive the walk that found
+        // it.
+        assert_eq!(
+            args(&open(Key::Data(b"opensesame".to_vec()))),
+            ["-q", "luksOpen", "--key-file", "-", "/dev/vda2", "tect-1"]
+        );
+    }
+
+    /// A passphrase is in memory only where something opens with it: no debug
+    /// print, no failure message and no test output carries it. A key read
+    /// out of an old system is the same.
+    #[test]
+    fn a_passphrase_never_reads_back_out_of_a_key() {
+        let said = format!("{:?}", Key::Passphrase("opensesame".to_string()));
+        assert!(!said.contains("opensesame"), "{said}");
+        let said = format!("{:?}", Key::Data(b"opensesame".to_vec()));
+        assert!(!said.contains("opensesame"), "{said}");
+    }
+
+    /// The four shapes a crypttab's third field takes, plus the one script
+    /// this installer will not run. A line with two fields only asks for a
+    /// passphrase at boot, so it names no key and falls to the systemd
+    /// default.
+    #[test]
+    fn an_old_crypttab_says_where_each_key_is() {
+        let entries = crypttabs(
+            "\
+# a comment
+root UUID=aa11 none luks
+var UUID=bb22 /etc/luks/var.key luks,discard
+data UUID=cc33 /key:UUID=dd44 luks
+stick UUID=ee55 UUID=ff66:/key:10 luks,keyscript=/lib/cryptsetup/scripts/passdev
+other UUID=gg77 none luks,keyscript=/lib/cryptsetup/scripts/decrypt_derived
+passphrase UUID=hh88
+",
+        );
+        assert_eq!(entries.len(), 6);
+        assert_eq!(entries[0].key, KeySource::Default);
+        assert_eq!(
+            entries[1].key,
+            KeySource::Inside(PathBuf::from("/etc/luks/var.key"))
+        );
+        assert_eq!(
+            entries[2].key,
+            KeySource::OnDevice {
+                device: "UUID=dd44".to_string(),
+                path: PathBuf::from("/key"),
+            }
+        );
+        assert_eq!(
+            entries[3].key,
+            KeySource::OnDevice {
+                device: "UUID=ff66".to_string(),
+                path: PathBuf::from("/key"),
+            }
+        );
+        assert_eq!(entries[4].key, KeySource::Unreadable);
+        assert_eq!(entries[5].key, KeySource::Default);
+    }
+
+    /// A crypttab names its container by the LUKS uuid, the by-uuid symlink to
+    /// it, or the device path. Anything else is another disk.
+    #[test]
+    fn an_old_system_names_a_container_by_its_uuid_or_its_device() {
+        let container = Partition {
+            device: "/dev/vda3".to_string(),
+            size: String::new(),
+            fstype: "crypto_LUKS".to_string(),
+            label: String::new(),
+            parttype: String::new(),
+            uuid: "A1B2".to_string(),
+        };
+        let entry = |device: &str| Crypttab {
+            name: "var".to_string(),
+            device: device.to_string(),
+            key: KeySource::Default,
+        };
+        assert!(names(&entry("UUID=a1b2"), &container));
+        assert!(names(&entry("/dev/disk/by-uuid/A1B2"), &container));
+        assert!(names(&entry("/dev/vda3"), &container));
+        assert!(!names(&entry("UUID=ffff"), &container));
+        assert!(!names(&entry("/dev/vda2"), &container));
+    }
+
+    /// The walk reads what the old system's crypttab names, proves the key
+    /// against the container, and takes where its fstab mounted it — which is
+    /// also the answer the editor's row opens on. A key that does not open
+    /// the container is said, never used.
+    #[test]
+    fn a_key_the_old_system_names_is_read_and_proved_against_the_container() {
+        let root = scratch("old-system");
+        let etc = root.join("etc");
+        std::fs::create_dir_all(etc.join("cryptsetup-keys.d")).expect("a scratch /etc");
+        std::fs::write(etc.join("crypttab"), "var UUID=aa11 none luks\n").expect("a crypttab");
+        std::fs::write(
+            etc.join("fstab"),
+            "/dev/mapper/var /var ext4 defaults 0 0\n",
+        )
+        .expect("an fstab");
+        std::fs::write(etc.join("cryptsetup-keys.d/var.key"), b"opensesame").expect("a key");
+        let container = Partition {
+            device: "/dev/vda3".to_string(),
+            size: "60G".to_string(),
+            fstype: "crypto_LUKS".to_string(),
+            label: String::new(),
+            parttype: String::new(),
+            uuid: "AA11".to_string(),
+        };
+        let system = OldSystem {
+            crypttab: std::fs::read_to_string(etc.join("crypttab")).unwrap(),
+            fstab: std::fs::read_to_string(etc.join("fstab")).unwrap(),
+            at: root.clone(),
+        };
+        let choices = mount_choices(&container, "ext4", "grub2");
+        let mut mounts = Mounts::default();
+        let found = discover(
+            std::slice::from_ref(&container),
+            std::slice::from_ref(&system),
+            &[],
+            &mut mounts,
+            &|_, key| Ok(key == b"opensesame"),
+        );
+        assert!(found.why.is_empty(), "{:?}", found.why);
+        let (partition, old) = &found.found[0];
+        assert_eq!(partition, "/dev/vda3");
+        assert_eq!(old.target, "/var");
+        assert!(matches!(&old.key, Key::Data(bytes) if bytes == b"opensesame"));
+        assert_eq!(
+            found.default_at(&container, &choices),
+            choices
+                .iter()
+                .position(|option| option.label == copy::open_at("/var"))
+        );
+        // No old system, no default: the row opens on `leave unchanged`.
+        assert_eq!(Discovered::default().default_at(&container, &choices), None);
+        // A fstab that does not name the mount point gives no default either:
+        // opening as `/` on a guess is how the new system lands on the old
+        // `/var`.
+        let unsaid = Discovered {
+            found: vec![(
+                container.device.clone(),
+                OldKey {
+                    target: String::new(),
+                    key: Key::Data(b"opensesame".to_vec()),
+                },
+            )],
+            why: Vec::new(),
+        };
+        assert_eq!(unsaid.default_at(&container, &choices), None);
+
+        let refused = discover(
+            std::slice::from_ref(&container),
+            std::slice::from_ref(&system),
+            &[],
+            &mut mounts,
+            &|_, _| Ok(false),
+        );
+        assert!(refused.found.is_empty());
+        assert_eq!(refused.why[0].1, copy::old_root_key_wrong("/dev/vda3"));
+
+        // A crypttab that names no key for this container, over a system that
+        // was read, says that rather than denying the system exists.
+        let unnamed = OldSystem {
+            crypttab: "root UUID=ffff none luks\n".to_string(),
+            fstab: String::new(),
+            at: root.clone(),
+        };
+        let missed = discover(
+            std::slice::from_ref(&container),
+            std::slice::from_ref(&unnamed),
+            &[],
+            &mut mounts,
+            &|_, _| Ok(true),
+        );
+        assert_eq!(missed.why[0].1, copy::old_root_unnamed("/dev/vda3"));
+        // A device the walk could not read is named first, because it may be
+        // the one holding the key.
+        let unread = ["mounting /dev/vda2 read-only: permission denied".to_string()];
+        let partly = discover(
+            std::slice::from_ref(&container),
+            std::slice::from_ref(&unnamed),
+            &unread,
+            &mut mounts,
+            &|_, _| Ok(true),
+        );
+        assert_eq!(partly.why[0].1, copy::old_root_partly(&unread[0]));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A key path is read only where the system that names it holds it. An
+    /// absolute symlink escapes to the live system and is refused; a `..` out
+    /// of the mount is refused; a FIFO is refused before anything blocks on
+    /// it.
+    #[test]
+    fn a_key_path_cannot_leave_the_system_that_names_it() {
+        let root = scratch("key-confine");
+        std::fs::create_dir_all(root.join("etc")).expect("a scratch /etc");
+        std::fs::write(root.join("etc/real.key"), b"opensesame").expect("a key");
+        std::os::unix::fs::symlink("/etc/hostname", root.join("etc/escape.key")).expect("a link");
+        let fifo = root.join("etc/slow.key");
+        let path = std::ffi::CString::new(fifo.as_os_str().as_encoded_bytes()).unwrap();
+        assert_eq!(unsafe { libc::mkfifo(path.as_ptr(), 0o600) }, 0);
+        assert!(key_file("var", &root, Path::new("/etc/real.key")).is_ok());
+        assert_eq!(
+            key_file("var", &root, Path::new("/etc/escape.key")).unwrap_err(),
+            copy::old_root_key_outside("/etc/escape.key")
+        );
+        assert_eq!(
+            key_file("var", &root, Path::new("/../../../etc/hostname")).unwrap_err(),
+            copy::old_root_key_outside("/../../../etc/hostname")
+        );
+        assert_eq!(
+            key_file("var", &root, Path::new("/etc/slow.key")).unwrap_err(),
+            copy::old_root_key_outside("/etc/slow.key")
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The walk reads the filesystems a disk has — partitions, opened
+    /// containers and logical volumes — and skips containers it cannot mount
+    /// and nodes that carry no filesystem.
+    #[test]
+    fn the_walk_reads_every_mountable_node_and_no_container() {
+        let rows = mountable_rows(
+            r#"{
+  "blockdevices": [
+    {"name": "/dev/vda1", "fstype": "vfat", "type": "part"},
+    {"name": "/dev/vda2", "fstype": "crypto_LUKS", "type": "part", "children": [
+      {"name": "/dev/mapper/vda2", "fstype": "ext4", "type": "crypt", "children": [
+        {"name": "/dev/mapper/vg-root", "fstype": "xfs", "type": "lvm"}
+      ]}
+    ]},
+    {"name": "/dev/vda3", "fstype": null, "type": "part"}
+  ]
+}"#,
+        )
+        .expect("lsblk JSON");
+        assert_eq!(
+            rows,
+            [
+                ("/dev/vda1".to_string(), "vfat".to_string()),
+                ("/dev/mapper/vda2".to_string(), "ext4".to_string()),
+                ("/dev/mapper/vg-root".to_string(), "xfs".to_string()),
+            ]
+        );
+        // A journaling filesystem is mounted without recovery: a read-only
+        // mount alone still writes a replayed journal. A filesystem with no
+        // journal has none to replay.
+        for fstype in ["ext3", "ext4", "xfs", "btrfs"] {
+            assert_eq!(mount_options(fstype), "ro,norecovery", "{fstype}");
+        }
+        for fstype in ["vfat", "exfat", "iso9660", ""] {
+            assert_eq!(mount_options(fstype), "ro", "{fstype}");
+        }
+    }
+
+    #[test]
+    fn a_custom_layout_is_the_recipe_fisherman_takes() {
+        let root = scratch("custom-layout");
+        let recipe = root.join(RECIPE);
+        let emitted = EMITTED.replace(
+            "\"user\": { \"groups\": [\"sudo\"] },",
+            "\"user\": { \"groups\": [\"sudo\"] },\n  \"varDisk\": { \"size\": \"20 GB\" },",
+        );
+        std::fs::write(&recipe, emitted).expect("a recipe");
+        let answers = Answers {
+            disk: "/dev/vda".to_string(),
+            hostname: "deb2".to_string(),
+            user: "tect".to_string(),
+            password: "hunter2".to_string(),
+            encryption: Encryption {
+                kind: NONE.to_string(),
+                passphrase: String::new(),
+            },
+            data: Data::default(),
+            layout: Some(CustomLayout {
+                disk: "/dev/vda".to_string(),
+                mounts: vec![
+                    CustomMount {
+                        partition: "/dev/vda1".to_string(),
+                        target: "/boot/efi".to_string(),
+                        fstype: "unformatted".to_string(),
+                    },
+                    CustomMount {
+                        partition: "/dev/vda2".to_string(),
+                        target: "/".to_string(),
+                        fstype: "ext4".to_string(),
+                    },
+                ],
+                opens: Vec::new(),
+            }),
+        };
+        let done = complete(&recipe, &answers).expect("a custom recipe");
+        let mounts = json::items(&done, "customMounts");
+        assert_eq!(mounts.len(), 2);
+        assert_eq!(
+            json::text(&mounts[0], "partition").as_deref(),
+            Some("/dev/vda1")
+        );
+        assert_eq!(
+            json::text(&mounts[0], "fstype").as_deref(),
+            Some("unformatted")
+        );
+        assert_eq!(json::text(&mounts[1], "target").as_deref(), Some("/"));
+        assert!(json::field(&done, "varDisk").is_none());
+
+        let mut encrypted = answers;
+        encrypted.encryption.kind = "luks-passphrase".to_string();
+        let Err(refused) = complete(&recipe, &encrypted) else {
+            panic!("encrypted custom layout was accepted")
+        };
+        assert_eq!(refused, copy::CUSTOM_ENCRYPTION);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// The two of the four that take one, and the two that do not.
     #[test]
     fn only_the_forms_named_for_a_passphrase_are_asked_for_one() {
@@ -1610,12 +3689,13 @@ mod tests {
                     passphrase: "opensesame".to_string(),
                 },
                 data: Data::default(),
+                layout: None,
             };
             // The form draws the description, and reading the form back gives
             // the name again.
-            let fields = answers.fields("ext4", "grub2");
+            let fields = answers.fields("ext4", "grub2", "");
             assert_eq!(fields[ROW_ENCRYPTION].value(), label);
-            let read = Answers::of(&fields);
+            let read = Answers::of(&fields, None);
             assert_eq!(read.encryption.kind, name);
             let done = complete(&recipe, &read).expect("a completed recipe");
             let encryption = json::field(&done, "encryption").expect("an encryption");
@@ -1686,6 +3766,7 @@ mod tests {
                     passphrase: String::new(),
                 },
                 data,
+                layout: None,
             };
             complete(&recipe, &answers).expect("a completed recipe")
         };
@@ -1894,6 +3975,7 @@ tmpfs /run tmpfs rw,nosuid,nodev 0 0
                 passphrase: String::new(),
             },
             data: Data::default(),
+            layout: None,
         };
         assert_eq!(
             answers.summary(&Payload {
@@ -1902,6 +3984,7 @@ tmpfs /run tmpfs rw,nosuid,nodev 0 0
                 hostname: "deb2".to_string(),
                 filesystem: "ext4".to_string(),
                 bootloader: "grub2".to_string(),
+                boot: String::new(),
             }),
             vec![
                 (copy::ROW_DISK.to_string(), "/dev/vda".to_string()),
@@ -1937,7 +4020,7 @@ tmpfs /run tmpfs rw,nosuid,nodev 0 0
         let form = |kind: &str| {
             vec![
                 Field::text(copy::ROW_DISK, "/dev/vda"),
-                Field::fixed(copy::ROW_LAYOUT, "esp + ext4 /boot + ext4 root"),
+                Field::action(copy::ROW_LAYOUT, "esp + ext4 /boot + ext4 root"),
                 Field::text(copy::ROW_HOSTNAME, "deb2"),
                 Field::text(copy::ROW_ACCOUNT, "tect"),
                 Field::secret(copy::ROW_PASSWORD, "hunter2"),
@@ -1953,22 +4036,22 @@ tmpfs /run tmpfs rw,nosuid,nodev 0 0
                 Field::text(copy::ROW_SIZE, ""),
             ]
         };
-        assert!(!asked(&form(NONE)).contains(&ROW_PASSPHRASE));
-        assert!(!asked(&form("tpm2-luks")).contains(&ROW_PASSPHRASE));
-        assert!(asked(&form("luks-passphrase")).contains(&ROW_PASSPHRASE));
-        assert!(asked(&form("tpm2-luks-passphrase")).contains(&ROW_PASSPHRASE));
+        assert!(!asked(&form(NONE), false).contains(&ROW_PASSPHRASE));
+        assert!(!asked(&form("tpm2-luks"), false).contains(&ROW_PASSPHRASE));
+        assert!(asked(&form("luks-passphrase"), false).contains(&ROW_PASSPHRASE));
+        assert!(asked(&form("tpm2-luks-passphrase"), false).contains(&ROW_PASSPHRASE));
         // A size is a question only where `/var` is cut out of this disk.
         let mut sized = form(NONE);
-        assert!(!asked(&sized).contains(&ROW_SIZE));
+        assert!(!asked(&sized, false).contains(&ROW_SIZE));
         sized[ROW_DATA] = Field::pick(
             copy::ROW_DATA,
             vec![Choice::new(copy::DATA_HERE, "")],
             Some(0),
         );
-        assert!(asked(&sized).contains(&ROW_SIZE));
+        assert!(asked(&sized, false).contains(&ROW_SIZE));
         // Every other row is there whatever either answer is, questions and
         // the layout alike.
-        assert_eq!(asked(&form(NONE)).len(), 8);
+        assert_eq!(asked(&form(NONE), false).len(), 8);
     }
 
     /// The four things nothing derives, and the one thing a form can check
@@ -1979,7 +4062,7 @@ tmpfs /run tmpfs rw,nosuid,nodev 0 0
         let form = |password: &str, confirm: &str, kind: &str, passphrase: &str| {
             vec![
                 Field::text(copy::ROW_DISK, "/dev/vda"),
-                Field::fixed(copy::ROW_LAYOUT, "esp + ext4 /boot + ext4 root"),
+                Field::action(copy::ROW_LAYOUT, "esp + ext4 /boot + ext4 root"),
                 Field::text(copy::ROW_HOSTNAME, "deb2"),
                 Field::text(copy::ROW_ACCOUNT, "tect"),
                 Field::secret(copy::ROW_PASSWORD, password),
@@ -1994,17 +4077,17 @@ tmpfs /run tmpfs rw,nosuid,nodev 0 0
                 Field::text(copy::ROW_SIZE, ""),
             ]
         };
-        assert!(short_of(&form("hunter2", "hunter2", NONE, "")).is_none());
+        assert!(short_of(&form("hunter2", "hunter2", NONE, ""), None).is_none());
         // Both halves are on screen at once, so they are compared there.
-        let differ = short_of(&form("hunter2", "hunter3", NONE, "")).unwrap();
+        let differ = short_of(&form("hunter2", "hunter3", NONE, ""), None).unwrap();
         assert_eq!(differ, copy::NO_MATCH_ROW);
         // A passphrase is owed only by the forms named for one.
-        assert!(short_of(&form("hunter2", "hunter2", "luks-passphrase", "")).is_some());
-        assert!(short_of(&form("hunter2", "hunter2", "luks-passphrase", "x")).is_none());
+        assert!(short_of(&form("hunter2", "hunter2", "luks-passphrase", ""), None).is_some());
+        assert!(short_of(&form("hunter2", "hunter2", "luks-passphrase", "x"), None).is_none());
         // And an empty account is named beside an empty password.
         let mut bare = form("", "", NONE, "");
         bare[ROW_ACCOUNT] = Field::text(copy::ROW_ACCOUNT, "");
-        let short = short_of(&bare).unwrap();
+        let short = short_of(&bare, None).unwrap();
         assert!(
             short.contains(copy::ROW_ACCOUNT) && short.contains(copy::ROW_PASSWORD),
             "{short}"
@@ -2017,16 +4100,16 @@ tmpfs /run tmpfs rw,nosuid,nodev 0 0
         };
         let mut sized = form("hunter2", "hunter2", NONE, "");
         data(&mut sized, copy::DATA_HERE.to_string(), "");
-        assert!(short_of(&sized).unwrap().contains(copy::ROW_SIZE));
+        assert!(short_of(&sized, None).unwrap().contains(copy::ROW_SIZE));
         data(&mut sized, copy::DATA_HERE.to_string(), "200 GB");
-        assert!(short_of(&sized).is_none());
+        assert!(short_of(&sized, None).is_none());
 
         // The row is drawn unpickable under an encrypted root, and this is the
         // same gate for an encryption answered after it.
         let mut encrypted = form("hunter2", "hunter2", "tpm2-luks", "");
         data(&mut encrypted, copy::DATA_HERE.to_string(), "200 GB");
         assert_eq!(
-            short_of(&encrypted).as_deref(),
+            short_of(&encrypted, None).as_deref(),
             Some(copy::DATA_UNENCRYPTED)
         );
 
@@ -2034,7 +4117,7 @@ tmpfs /run tmpfs rw,nosuid,nodev 0 0
         // cannot leave out, since nothing has answered the disk when it is built.
         let mut same = form("hunter2", "hunter2", NONE, "");
         data(&mut same, copy::on_disk("/dev/vda", copy::DATA_ERASED), "");
-        assert_eq!(short_of(&same).as_deref(), Some(copy::DATA_SAME_DISK));
+        assert_eq!(short_of(&same, None).as_deref(), Some(copy::DATA_SAME_DISK));
     }
 
     /// Neither of the two cases that cannot install says nothing; each names

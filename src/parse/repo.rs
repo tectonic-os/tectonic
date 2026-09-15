@@ -281,7 +281,7 @@ impl List {
         }
     }
 
-    fn empty(root: &Path) -> Self {
+    pub(super) fn empty(root: &Path) -> Self {
         List {
             name: String::new(),
             id: String::new(),

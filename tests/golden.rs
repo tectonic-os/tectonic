@@ -2297,6 +2297,8 @@ fn a_second_installer_is_refused_while_the_first_holds_the_screen() {
 /// touched.
 #[test]
 fn install_screens() {
+    use std::os::unix::fs::PermissionsExt;
+
     let dir = empty("flow-install-drawn");
     std::fs::write(
         dir.join(tect::install::RECIPE),
@@ -2327,13 +2329,33 @@ fn install_screens() {
         std::fs::write(disk.join("removable"), removable).unwrap();
         std::fs::write(disk.join("device/model"), model).unwrap();
     }
+    let lsblk = dir.join("lsblk");
+    std::fs::write(
+        &lsblk,
+        r#"#!/bin/sh
+printf '%s\n' '{"blockdevices":[{"name":"/dev/vda","type":"disk","children":[{"name":"/dev/vda1","size":"512M","fstype":"vfat","label":"EFI","type":"part","parttype":"C12A7328-F81F-11D2-BA4B-00A0C93EC93B"},{"name":"/dev/vda2","size":"63.5G","fstype":"ext4","label":"old-root","type":"part","parttype":null},{"name":"/dev/vda3","size":"60G","fstype":"crypto_LUKS","label":"","type":"part","parttype":null}]}]}'
+"#,
+    )
+    .unwrap();
+    std::fs::set_permissions(&lsblk, std::fs::Permissions::from_mode(0o755)).unwrap();
+    // The walk over the old system mounts what the disk has read-only. The
+    // fake answers both ways in and out, and mounts nothing: on this rig the
+    // disk does not exist, and what the walk does with a real one is a VM
+    // proof rather than a drawn one.
+    for name in ["mount", "umount"] {
+        let fake = dir.join(name);
+        std::fs::write(&fake, "#!/bin/sh\nexit 0\n").unwrap();
+        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
     drawn_flow(
         "flow-install-drawn",
         &dir,
         &format!(
-            "TECT_INSTALLER_LOCK='{}' TECT_SYS_BLOCK='{}' '{}' installer --from .",
+            "PATH='{}':\"$PATH\" TECT_INSTALLER_LOCK='{}' TECT_SYS_BLOCK='{}' TECT_MOUNT_ROOT='{}' '{}' installer --from .",
+            dir.display(),
             dir.join("installer.lock").display(),
             sys.display(),
+            dir.join("mounts").display(),
             env!("CARGO_BIN_EXE_tect")
         ),
         // The discovery line, which is the last thing printed before the first
@@ -2345,17 +2367,31 @@ fn install_screens() {
             // from here every step is an answer and nothing navigates.
             b"\r",
             b"\x1b[B\r",
-            // The computer name, already seeded from the payload.
+            // The layout row opens the editor. Keep the discovered ESP at its
+            // safe default, format the second partition as root, and open the
+            // container third as /var: six rows down its list is the open
+            // answer, which stops there because the container needs a key.
             b"\r",
+            b"\r",
+            b"\r",
+            b"\x1b[B\x1b[B\r",
+            b"\x1b[B\x1b[B\x1b[B\x1b[B\x1b[B\x1b[B\r",
+            b"\r",
+            // The key question is a screen of its own: passphrase, typed once
+            // and compared by cryptsetup when it opens the volume.
+            b"\r",
+            b"\r",
+            b"opensesame\r",
+            b"\r",
+            // Returning from the editor redraws the form at its first row.
+            // Move through layout to the seeded computer name and accept it.
+            b"\x1b[B\x1b[B\r\r",
             b"tect\r",
             // Both halves of the password, compared against each other.
             b"hunter2\r",
             b"hunter2\r",
-            // Encryption, whose list opened by itself. Taking `none` drops the
-            // passphrase row, so the next row is where /var goes.
-            b"\r",
-            // Home and data, also `none`, which leaves the size row behind it
-            // unasked: /var stays on the install disk with the root.
+            // Encryption, whose list opened by itself. Custom layouts carry
+            // their own /var choice, so taking `none` moves to Install.
             b"\r",
             // `Install`, pickable only because nothing is missing now.
             b"\r",
@@ -2388,6 +2424,27 @@ fn install_screens() {
     // not, for the reason above.
     assert!(transcript.contains("/dev/sdb"), "{transcript}");
     assert!(transcript.contains("/dev/vda"), "{transcript}");
+    assert!(transcript.contains("/dev/vda1"), "{transcript}");
+    assert!(transcript.contains("old-root"), "{transcript}");
+    assert!(
+        transcript.contains("Partitions marked format"),
+        "{transcript}"
+    );
+    // The key question was a screen of its own, and the key was typed into it:
+    // a transcript is what a serial console keeps, so the container's
+    // passphrase must stay out of it and the question that took it must be on
+    // it.
+    assert!(!transcript.contains("opensesame"), "{transcript}");
+    assert!(
+        transcript.contains(&tect::copy::open_question("/dev/vda3", "/var")),
+        "{transcript}"
+    );
+    // The walk over the old system mounted what the disk has and found no
+    // `/etc/fstab` on any of it. The key question carries that outcome on its
+    // own row: a person asked for a key is told the search happened and came
+    // to nothing. The label is what is greppable — the reason beside it is
+    // redrawn cell by cell, so only its label arrives contiguous.
+    assert!(transcript.contains(tect::copy::OLD_SYSTEM), "{transcript}");
 }
 
 /// The reference in docs/schema.md, re-rendered from the tables. The renderer

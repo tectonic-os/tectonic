@@ -208,8 +208,7 @@ pub fn multi(question: &str, options: &[Choice], on: &[usize]) -> Result<Answer,
     })
 }
 
-/// One row of a form, and what a person does to it. Every field is answered on
-/// the screen it is read from: nothing here opens a screen of its own.
+/// One row of a form, and what a person does to it.
 pub enum Field {
     /// Typed in place.
     Text { label: String, value: String },
@@ -224,6 +223,8 @@ pub enum Field {
     /// Shown and not answerable. It is on the form because a person about to
     /// erase a disk should see what is going onto it.
     Fixed { label: String, value: String },
+    /// Opens a caller-owned screen and keeps its summary on this form.
+    Action { label: String, value: String },
 }
 
 impl Field {
@@ -256,6 +257,13 @@ impl Field {
         }
     }
 
+    pub fn action(label: &str, value: &str) -> Self {
+        Self::Action {
+            label: label.to_string(),
+            value: value.to_string(),
+        }
+    }
+
     /// Whether a person can answer it, which is what the cursor skips over
     /// when a field is answered and the next one opens.
     fn answerable(&self) -> bool {
@@ -267,16 +275,18 @@ impl Field {
             Self::Text { label, .. }
             | Self::Secret { label, .. }
             | Self::Pick { label, .. }
-            | Self::Fixed { label, .. } => label,
+            | Self::Fixed { label, .. }
+            | Self::Action { label, .. } => label,
         }
     }
 
     /// The answer, as the caller reads it back.
     pub fn value(&self) -> String {
         match self {
-            Self::Text { value, .. } | Self::Secret { value, .. } | Self::Fixed { value, .. } => {
-                value.clone()
-            }
+            Self::Text { value, .. }
+            | Self::Secret { value, .. }
+            | Self::Fixed { value, .. }
+            | Self::Action { value, .. } => value.clone(),
             Self::Pick { options, at, .. } => at
                 .and_then(|at| options.get(at))
                 .map(|choice| choice.label.clone())
@@ -308,7 +318,7 @@ impl Field {
     fn push(&mut self, letter: char) {
         match self {
             Self::Text { value, .. } | Self::Secret { value, .. } => value.push(letter),
-            Self::Pick { .. } | Self::Fixed { .. } => {}
+            Self::Pick { .. } | Self::Fixed { .. } | Self::Action { .. } => {}
         }
     }
 
@@ -317,7 +327,7 @@ impl Field {
             Self::Text { value, .. } | Self::Secret { value, .. } => {
                 value.pop();
             }
-            Self::Pick { .. } | Self::Fixed { .. } => {}
+            Self::Pick { .. } | Self::Fixed { .. } | Self::Action { .. } => {}
         }
     }
 }
@@ -327,6 +337,8 @@ impl Field {
 pub enum Filled {
     /// One of the actions, by index. The fields hold the answers.
     Took(usize),
+    /// A caller-owned screen requested by this field, by field index.
+    Opened(usize),
     Left,
 }
 
@@ -380,8 +392,14 @@ pub fn form(
                 actions,
                 blocked.as_deref(),
             );
+            let focus = match (at_row, open, blocked.is_some()) {
+                (Some(_), Some(option), _) => cursor + option + 1,
+                (Some(_), None, _) => cursor,
+                (None, _, true) => lines.len() - 1,
+                (None, _, false) => lines.len().saturating_sub(1),
+            };
             render(terminal, lines.len() as u16 + 1, keys, |frame, area| {
-                sheet_of(frame, area, &lines, keys)
+                sheet_of(frame, area, &lines, keys, focus)
             })?;
             let Some(key) = read()? else { continue };
             let Some(row) = at_row else {
@@ -445,6 +463,9 @@ pub fn form(
                     KeyCode::Esc | KeyCode::Char('q') => return Ok(Filled::Left),
                     KeyCode::Up | KeyCode::Char('k') => cursor = cursor.saturating_sub(1),
                     KeyCode::Down | KeyCode::Char('j') => cursor = (cursor + 1).min(visible.len()),
+                    KeyCode::Enter if matches!(fields[row], Field::Action { .. }) => {
+                        return Ok(Filled::Opened(row))
+                    }
                     KeyCode::Enter => mode = opened(&fields[row]),
                     _ => {}
                 },
@@ -488,7 +509,7 @@ fn backward(fields: &[Field], visible: &[usize], cursor: &mut usize) -> Mode {
 fn opened(field: &Field) -> Mode {
     match field {
         Field::Pick { at, .. } => Mode::Open(at.unwrap_or(0)),
-        Field::Fixed { .. } => Mode::Rows,
+        Field::Fixed { .. } | Field::Action { .. } => Mode::Rows,
         _ => Mode::Typing,
     }
 }
@@ -601,7 +622,7 @@ fn laid_out(
 
 /// The rows, and the keys under them. No question head: a form's rows say what
 /// they are, and the container's title says what is being filled in.
-fn sheet_of(frame: &mut Frame, area: Rect, lines: &[Line<'static>], keys: &str) {
+fn sheet_of(frame: &mut Frame, area: Rect, lines: &[Line<'static>], keys: &str, focus: usize) {
     // The row is only reserved where this widget is the one drawing the hint.
     // Inside a box the box's bottom edge has it, and a blank row under the
     // actions is a row of nothing.
@@ -611,7 +632,14 @@ fn sheet_of(frame: &mut Frame, area: Rect, lines: &[Line<'static>], keys: &str) 
         Constraint::Length(u16::from(!keys.is_empty())),
     ])
     .areas(area);
-    frame.render_widget(Paragraph::new(lines.to_vec()), body);
+    let height = usize::from(body.height);
+    let scroll = focus
+        .saturating_sub(height.saturating_sub(1))
+        .min(lines.len().saturating_sub(height));
+    frame.render_widget(
+        Paragraph::new(lines.to_vec()).scroll((scroll as u16, 0)),
+        body,
+    );
     frame.render_widget(Line::from(keys.dim()), foot);
 }
 
@@ -1625,6 +1653,20 @@ mod tests {
         assert!(!unsized_tty(Some((80, 24))));
     }
 
+    #[test]
+    fn a_form_scrolls_to_keep_its_focused_line_visible() {
+        let lines: Vec<Line<'static>> = (0..12)
+            .map(|row| Line::from(format!("row {row}")))
+            .collect();
+        let mut terminal = Terminal::new(TestBackend::new(20, 4)).unwrap();
+        terminal
+            .draw(|frame| sheet_of(frame, frame.area(), &lines, "", 11))
+            .unwrap();
+        let drawn = terminal.backend().to_string();
+        assert!(drawn.contains("row 11"), "{drawn}");
+        assert!(!drawn.contains("row 0"), "{drawn}");
+    }
+
     /// The completion screen draws the recovery key. It is generated at install
     /// time, kept out of the log on purpose and written to no file, so this
     /// screen is the only copy there is.
@@ -1830,7 +1872,7 @@ mod tests {
                 );
                 // What the widget is given inside a box: the box has the
                 // legend, so passing the keys here would draw a second one.
-                sheet_of(frame, area, &shown, "")
+                sheet_of(frame, area, &shown, "", 0)
             })
             .unwrap();
         let drawn = terminal.backend().to_string();
@@ -1958,7 +2000,7 @@ mod tests {
         );
         let mut terminal = Terminal::new(TestBackend::new(64, shown.len() as u16 + 1)).unwrap();
         terminal
-            .draw(|frame| sheet_of(frame, frame.area(), &shown, crate::copy::INSTALL_KEYS))
+            .draw(|frame| sheet_of(frame, frame.area(), &shown, crate::copy::INSTALL_KEYS, 0))
             .unwrap();
         let drawn = terminal.backend().to_string();
         eprintln!("SHOT\n{drawn}SHOT");

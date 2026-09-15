@@ -12,6 +12,8 @@ use std::path::{Path, PathBuf};
 pub const SKELETON: &str = "scripts/Containerfile.skeleton";
 pub const BEGIN: &str = "# ---- BEGIN GENERATED (module layers) ----";
 pub const END: &str = "# ---- END GENERATED ----";
+pub const TAIL_BEGIN: &str = "# ---- BEGIN GENERATED (tail fragments) ----";
+pub const TAIL_END: &str = "# ---- END GENERATED (tail fragments) ----";
 
 /// Where the assembled Containerfile for one image is written.
 pub fn path(image: &Image) -> PathBuf {
@@ -20,7 +22,7 @@ pub fn path(image: &Image) -> PathBuf {
 
 /// The skeleton with `section` between its markers, the syntax directive kept
 /// first and the header under it.
-pub fn file(skeleton: &str, image: &Image, section: &str) -> String {
+pub fn file(skeleton: &str, image: &Image, section: &str, tails: &str) -> String {
     let mut out = String::new();
     let mut lines = skeleton.lines().peekable();
     if lines.peek().is_some_and(|l| l.starts_with("# syntax=")) {
@@ -35,7 +37,7 @@ pub fn file(skeleton: &str, image: &Image, section: &str) -> String {
 
     let mut generated = false;
     for line in lines {
-        if line == END {
+        if line == END || line == TAIL_END {
             generated = false;
         }
         if !generated {
@@ -43,6 +45,9 @@ pub fn file(skeleton: &str, image: &Image, section: &str) -> String {
         }
         if line == BEGIN {
             let _ = write!(out, "\n{section}");
+            generated = true;
+        } else if line == TAIL_BEGIN {
+            let _ = write!(out, "\n{tails}");
             generated = true;
         }
     }
@@ -115,7 +120,7 @@ fn identity(image: &Image) -> Vec<(&'static str, String)> {
     vars
 }
 
-pub fn section(image: &Image, root: &Path) -> String {
+pub fn sections(image: &Image, root: &Path) -> (String, String) {
     let mut out = String::new();
     let mut tails: Vec<String> = Vec::new();
     let mut flavour_arg_emitted = false;
@@ -218,12 +223,19 @@ pub fn section(image: &Image, root: &Path) -> String {
 
     let _ = write!(out, "{}\n\n", finalize_layer(image, &identity_env, root));
 
-    // A tail fragment ends the lineage stage and is answerable for leaving one
-    // open that is the final image; the skeleton's own layers run in it.
+    let mut tail_out = String::new();
+    // A tail fragment ends the lineage stage after the skeleton has made its
+    // final rootfs changes, and leaves its last stage as the final image.
     for tail in &tails {
-        let _ = write!(out, "{tail}\n\n");
+        let _ = write!(tail_out, "{tail}\n\n");
     }
 
+    (out, tail_out)
+}
+
+pub fn section(image: &Image, root: &Path) -> String {
+    let (mut out, tail) = sections(image, root);
+    out.push_str(&tail);
     out
 }
 

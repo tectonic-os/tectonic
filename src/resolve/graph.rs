@@ -44,6 +44,26 @@ fn names(decls: &[&Decl]) -> String {
         .join(", ")
 }
 
+fn same_key(capability: &str, providers: &[&Module]) -> bool {
+    let Some(kind) = capability.strip_suffix("-key") else {
+        return false;
+    };
+    let Some(first) = providers[0].keys.iter().find(|key| key.kind == kind) else {
+        return false;
+    };
+    providers.iter().all(|module| {
+        module.keys.iter().any(|key| {
+            key.kind == first.kind
+                && key.generator == first.generator
+                && key.profile == first.profile
+                && key.bits == first.bits
+                && key.public == first.public
+                && key.format == first.format
+                && key.private == first.private
+        })
+    })
+}
+
 /// The help a requirement nothing anywhere provides gets: what the index
 /// searched, and what it did not. Resolution never fetches, so in a fresh clone
 /// every declared collection is unread.
@@ -213,7 +233,7 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
     }
 
     for (capability, providers) in &offered {
-        if providers.len() > 1 {
+        if providers.len() > 1 && !same_key(capability, providers) {
             let names: Vec<&str> = providers.iter().map(|m| m.path.as_str()).collect();
             let first = providers[0];
             issues.push(
@@ -253,6 +273,35 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
                 )
                 .at(decl.span, "the base is not usable without it")
                 .help(satisfied_by(index, image, &decl.name)),
+            );
+        }
+    }
+
+    if image.boot.is_empty() && offered.contains_key("boot-chain-uki") {
+        issues.push(
+            Issue::new(
+                format!("`{}` enables a UKI chain but declares no `boot`", image.id),
+                &image.src,
+            )
+            .at(image.span, "no UKI trust route")
+            .help("declare `boot \"uki-shim\"` or `boot \"uki-db\"`"),
+        );
+    }
+    for capability in ["boot-chain-uki", "secureboot-enrolment"] {
+        let present = offered
+            .get(capability)
+            .is_some_and(|providers| providers.iter().any(|module| module.flavour.is_none()));
+        if !image.boot.is_empty() && !present {
+            issues.push(
+                Issue::new(
+                    format!(
+                        "`{}` declares `boot \"{}\"` but no ungated module provides `{capability}`",
+                        image.id, image.boot
+                    ),
+                    &image.src,
+                )
+                .at(image.span, "incomplete UKI chain")
+                .help(satisfied_by(index, image, capability)),
             );
         }
     }

@@ -102,20 +102,35 @@ pub struct Run {
 /// The Containerfile skeleton, when the repository has one to splice into. A
 /// repository with no `scripts/` generates its module scripts and no
 /// Containerfile.
-fn skeleton(root: &Path, issues: &mut Issues) -> Option<String> {
-    use emit::containerfile::{BEGIN, END, SKELETON};
+fn skeleton(root: &Path, needs_tail: bool, issues: &mut Issues) -> Option<String> {
+    use emit::containerfile::{BEGIN, END, SKELETON, TAIL_BEGIN, TAIL_END};
 
     let text = std::fs::read_to_string(root.join(SKELETON)).ok()?;
     let src = Source::new(SKELETON, text.clone());
     let mut found = true;
-    for marker in [BEGIN, END] {
-        if !text.lines().any(|line| line == marker) {
+    let markers = if needs_tail {
+        &[BEGIN, END, TAIL_BEGIN, TAIL_END][..]
+    } else {
+        &[BEGIN, END][..]
+    };
+    for marker in markers {
+        if !text.lines().any(|line| line == *marker) {
             issues.push(
                 Issue::new(format!("`{SKELETON}` has no `{marker}` line"), &src)
                     .help("the generated module layers go between the two markers"),
             );
             found = false;
         }
+    }
+    if needs_tail && !text.contains("--mount=type=tmpfs,target=/run") {
+        issues.push(
+            Issue::new(
+                format!("`{SKELETON}` does not isolate `/run` from the final image"),
+                &src,
+            )
+            .help("mount `/run` as tmpfs in the final `validate-image` RUN before adding a UKI"),
+        );
+        found = false;
     }
     found.then_some(text)
 }
@@ -272,7 +287,12 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
             .and_then(|d| list.images.iter().position(|i| i.id == d.id)),
     };
 
-    let skeleton = skeleton(root, &mut issues);
+    let needs_tail = list
+        .images
+        .iter()
+        .flat_map(|image| image.modules())
+        .any(|module| module.fragment_position == model::module::Position::Tail);
+    let skeleton = skeleton(root, needs_tail, &mut issues);
 
     let mut files: Vec<(PathBuf, String)> = Vec::new();
     if matches!(command, Command::Generate | Command::Verify) {
@@ -291,10 +311,10 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
         );
         for (image, resolved) in list.images.iter().zip(&resolved) {
             if let Some(skeleton) = &skeleton {
-                let section = emit::containerfile::section(image, root);
+                let (section, tails) = emit::containerfile::sections(image, root);
                 files.push((
                     emit::containerfile::path(image),
-                    emit::containerfile::file(skeleton, image, &section),
+                    emit::containerfile::file(skeleton, image, &section, &tails),
                 ));
             }
             files.extend(emit::module_build::scripts(
@@ -569,4 +589,31 @@ pub(crate) fn tracked(dir: &Path) -> Vec<PathBuf> {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_tail_requires_an_ephemeral_run_directory() {
+        let root = std::env::temp_dir().join(format!("tect-skeleton-{}", std::process::id()));
+        let path = root.join(emit::containerfile::SKELETON);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let stale = include_str!("../assets/scripts/Containerfile.skeleton").replace(
+            "--mount=type=tmpfs,target=/run",
+            "--mount=type=cache,target=/run",
+        );
+        std::fs::write(&path, stale).unwrap();
+
+        assert!(skeleton(&root, false, &mut Issues::default()).is_some());
+        let mut issues = Issues::default();
+        assert!(skeleton(&root, true, &mut issues).is_none());
+        assert!(issues
+            .findings()
+            .iter()
+            .any(|message| message.contains("does not isolate `/run`")));
+
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }

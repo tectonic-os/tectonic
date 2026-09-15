@@ -1,0 +1,38 @@
+image {
+    id "shim"
+    name "Shim"
+    boot "uki-shim"
+    base "quay.io/fedora/fedora-bootc:44" {
+        family "fedora"
+        provides "bootupctl"
+    }
+    modules {
+        module "uki"
+        module "enrolment"
+    }
+}
+
+image {
+    id "db"
+    name "DB"
+    boot "uki-db"
+    base "quay.io/fedora/fedora-bootc:44" {
+        family "fedora"
+        provides "bootupctl"
+    }
+    modules {
+        module "uki"
+        module "enrolment"
+    }
+}
+
+image {
+    id "missing"
+    name "Missing"
+    boot "uki-db"
+    base "quay.io/fedora/fedora-bootc:44" {
+        family "fedora"
+        provides "bootupctl"
+    }
+    modules { }
+}
