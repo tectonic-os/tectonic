@@ -2347,6 +2347,21 @@ printf '%s\n' '{"blockdevices":[{"name":"/dev/vda","type":"disk","children":[{"n
         std::fs::write(&fake, "#!/bin/sh\nexit 0\n").unwrap();
         std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
     }
+    // The header the encryption row reads once the container is open. The rig
+    // has no `/dev/vda3`, so without this the row would draw whatever the
+    // host's `cryptsetup` says about a device that is not there.
+    let cryptsetup = dir.join("cryptsetup");
+    std::fs::write(
+        &cryptsetup,
+        r#"#!/bin/sh
+case "$1" in
+luksDump) printf '%s\n' '{"keyslots":{"0":{}},"tokens":{}}' ;;
+*) exit 1 ;;
+esac
+"#,
+    )
+    .unwrap();
+    std::fs::set_permissions(&cryptsetup, std::fs::Permissions::from_mode(0o755)).unwrap();
     drawn_flow(
         "flow-install-drawn",
         &dir,
@@ -2445,6 +2460,14 @@ printf '%s\n' '{"blockdevices":[{"name":"/dev/vda","type":"disk","children":[{"n
     // to nothing. The label is what is greppable — the reason beside it is
     // redrawn cell by cell, so only its label arrives contiguous.
     assert!(transcript.contains(tect::copy::OLD_SYSTEM), "{transcript}");
+    // The row the encryption kinds become once a container is open, and the
+    // ladder's answer for the machine: a passphrase was typed, so the
+    // installed system asks for one at boot.
+    assert!(transcript.contains(tect::copy::OPENED_KEEP), "{transcript}");
+    assert!(
+        transcript.contains(tect::copy::BOOT_PASSPHRASE),
+        "{transcript}"
+    );
 }
 
 /// The reference in docs/schema.md, re-rendered from the tables. The renderer

@@ -185,10 +185,111 @@ pub fn open_question(partition: &str, target: &str) -> String {
     format!("How does {partition} open as {target}?")
 }
 
-/// What the confirmation says about one container. Its filesystem is not
-/// visible until it is open, so this is the half of it the summary can say.
-pub fn opened(partition: &str) -> String {
-    format!("{partition}  decrypted and kept")
+/// What the confirmation says about one container: that it is decrypted and
+/// kept, and how the installed machine opens it again at boot. Its filesystem
+/// is not visible until it is open, so this is the half of it the summary can
+/// say.
+pub fn opened(partition: &str, how: &str) -> String {
+    format!("{partition}  {how}")
+}
+
+// A container the editor opens is not re-keyed by this installer. The
+// encryption row becomes what each header holds and what may be added to it,
+// because nothing is being formatted: how the installed machine opens it is
+// the ladder's answer, and only an addition is a question.
+
+pub const OPENED_KEEP: &str = "keep what is enrolled";
+pub const OPENED_TPM2: &str = "add a TPM2 token";
+pub const OPENED_ADD_KEY: &str = "add a key file for boot";
+pub const OPENED_TPM2_COST: &str = "first boot asks once, then no prompt";
+pub const OPENED_TPM2_HAS: &str = "this container already has one";
+pub const OPENED_ADD_KEY_COST: &str = "this machine reads it, the old one keeps its own";
+/// Why a root opened with a key file cannot keep what it has: the file would
+/// have to live on the filesystem its key opens, and a token staged inside it
+/// cannot be enrolled before the first boot unlocks it.
+pub const OPENED_ROOT_KEYFILE: &str = "a key file cannot open the root; use its passphrase";
+
+/// What one container's header holds, as the row and the summary say it.
+pub fn slots_said(keys: &[u32], tokens: &[String]) -> String {
+    let said: Vec<String> = keys
+        .iter()
+        .map(|at| format!("slot {at}"))
+        .chain(tokens.iter().map(|kind| format!("token {kind}")))
+        .collect();
+    match said.is_empty() {
+        true => "no slots".to_string(),
+        false => said.join(", "),
+    }
+}
+
+pub fn slots_unknown(why: &str) -> String {
+    format!("its slots could not be read: {why}")
+}
+
+/// How the installed machine opens a container it did not re-key. One per
+/// rung of the ladder, said on the confirmation and on the last screen. The
+/// first clause repeats what every one of them is, because the summary column
+/// is a few words wide and a bare "passphrase at boot" reads as the cost.
+pub const BOOT_KEYFILE: &str = "decrypted, keyfile at boot";
+pub const BOOT_PASSPHRASE: &str = "decrypted, passphrase at boot";
+pub const BOOT_TPM2: &str = "decrypted, TPM2 at boot";
+pub const BOOT_ADDED_KEY: &str = "decrypted, key added here";
+
+/// The end of the install says where a slot the machine no longer needs can
+/// go, and never removes one itself: nothing in the header says which slot
+/// holds what, and the old system may still open the volume with it. One row
+/// per sentence, because the last screen draws a row as a line.
+pub fn kill_slot(device: &str, slot: u32, count: usize) -> Vec<String> {
+    vec![
+        format!("{device} has {count} slots, and this machine no longer needs slot {slot}"),
+        format!("both keys open it, so it can go: cryptsetup luksKillSlot {device} {slot}"),
+    ]
+}
+
+pub fn kill_a_slot(device: &str, count: usize) -> Vec<String> {
+    vec![
+        format!("{device} has {count} slots, and this machine no longer needs one of them"),
+        format!("cryptsetup luksKillSlot {device} <slot>"),
+    ]
+}
+
+/// One line of the installed system's crypttab. `none` in the third field is
+/// a passphrase the machine asks for at boot.
+pub fn crypttab_line(name: &str, uuid: &str, keyfile: Option<&str>) -> String {
+    format!("{name} UUID={uuid} {} luks", keyfile.unwrap_or("none"))
+}
+
+/// The first-boot oneshot that adds a TPM2 token to a container the layout
+/// opened. `systemd-cryptenroll` seals against the PCRs of the machine it
+/// runs on, and the live installer's are not the installed machine's, so the
+/// enrollment belongs to the first boot and not to the install. The key that
+/// opens the container is staged beside the unit and shredded once the token
+/// is in.
+pub fn tpm2_unit(name: &str, key: &str, uuid: &str) -> String {
+    format!(
+        "[Unit]\n\
+         Description=Enroll the {name} container for TPM2 unlock\n\
+         ConditionPathExists={key}\n\
+         After=basic.target\n\
+         DefaultDependencies=no\n\
+         \n\
+         [Service]\n\
+         Type=oneshot\n\
+         RemainAfterExit=no\n\
+         ExecStart=/usr/bin/systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 \
+         --unlock-key-file={key} /dev/disk/by-uuid/{uuid}\n\
+         ExecStartPost=-/usr/bin/shred -u {key}\n\
+         ExecStartPost=-/usr/bin/systemctl disable tect-tpm2-enroll-{name}.service\n\
+         \n\
+         [Install]\n\
+         WantedBy=multi-user.target\n"
+    )
+}
+
+/// The key that was just added does not open the container it went into,
+/// which is a change nothing may leave behind.
+pub fn added_key_wrong(device: &str) -> String {
+    format!("the key just added to {device} does not open it")
 }
 
 pub const OPEN_WITH: &str = "opens with";
