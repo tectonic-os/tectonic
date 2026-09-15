@@ -11,10 +11,13 @@ ARG LIVE_BASE=quay.io/fedora/fedora-bootc:44
 # pinned by sha256 and built here.
 #
 # Fisherman is pinned to a fork again since 2026-09-12, for `varDisk.size`,
-# which cuts /var out of the install disk. The fork is of `tuna-os`
-# deliberately: that repository's own description reads
-# `MOVED -> github.com/projectbluefin/fisherman`, and that destination is a
-# fork well behind this one. Do not "correct" the base it forks from.
+# which cuts /var out of the install disk, and since 2026-09-16 for the retag
+# that lets an encrypted root boot under a sealed UKI. Each change is its own
+# branch, all merged into `tectonic-integration`, which is what this commit
+# points at. The fork is of `tuna-os` deliberately: that repository's own
+# description reads `MOVED -> github.com/projectbluefin/fisherman`, and that
+# destination is a fork well behind this one. Do not "correct" the base it
+# forks from.
 #
 # CGO_ENABLED=0 because tacklebox's default build links `net` and `os/user`
 # against the builder's libc, and it is copied out of this stage to a host.
@@ -22,8 +25,8 @@ ARG LIVE_BASE=quay.io/fedora/fedora-bootc:44
 # the root, which is why the two build directories below are not symmetrical.
 FROM ${GO_IMAGE} AS tools
 ARG FISHERMAN_ORG=tectonic-os
-ARG FISHERMAN_COMMIT=2fec4b24fcd26f139323f99e666099c733f5b7fd
-ARG FISHERMAN_SHA256=5504225365e92f6ec550cce84ec1aeddb4fed806ea7662ecd69bfa65a85f07c6
+ARG FISHERMAN_COMMIT=efad0b3249117cfc6366605cd7d80d9c5b60a543
+ARG FISHERMAN_SHA256=5024a51f29fb2f1784641c675a364b1eedad44132e3b7e7257829b990eced039
 # Tacklebox is the other fork: the media needs a change upstream has not got.
 # The pin is `feat/grub-bootloader-support`, which stages the live image's own
 # bootloader, a signed shim and GRUB pair in any of four layouts, the deb
