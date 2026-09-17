@@ -65,7 +65,7 @@ impl Key {
         unwritten(&public)?;
         unwritten(&private)?;
 
-        // The openssl generator is set up by its profile, and there is one.
+        // The openssl generator is set up by its profile, and there are two.
         let cn = match (declared.generator.as_str(), declared.profile.as_deref()) {
             (generator @ ("cosign" | "ssh-keygen"), _) if cn.is_some() => {
                 return Err(format!(
@@ -74,10 +74,20 @@ impl Key {
             }
             ("cosign" | "ssh-keygen", _) => None,
             ("openssl", Some("module-signing")) => Some(common_name(root, cn, prompt)?),
+            ("openssl", Some("pcr-signing")) => {
+                if cn.is_some() {
+                    return Err(
+                        "`--cn` is a certificate's common name, and `pcr-signing` writes \
+                                no certificate"
+                            .into(),
+                    );
+                }
+                None
+            }
             (generator, _) => {
                 return Err(format!(
                     "`{generator}` generates a key for a profile, and `key \"{kind}\"` names none; \
-                     `generator \"{generator}\" profile=\"module-signing\"` is the one it has"
+                     `profile=\"module-signing\"` and `profile=\"pcr-signing\"` are the two it has"
                 ))
             }
         };
@@ -92,9 +102,13 @@ impl Key {
 
     pub fn apply(&self, root: &Path) -> Result<(), String> {
         let work = workspace(&self.declared.kind)?;
-        let (public, private) = match self.declared.generator.as_str() {
-            "cosign" => cosign(&work),
-            "ssh-keygen" => ssh(&work, &self.declared.kind),
+        let (public, private) = match (
+            self.declared.generator.as_str(),
+            self.declared.profile.as_deref(),
+        ) {
+            ("cosign", _) => cosign(&work),
+            ("ssh-keygen", _) => ssh(&work, &self.declared.kind),
+            ("openssl", Some("pcr-signing")) => pcr_pair(&work, &self.declared),
             _ => openssl(
                 &work,
                 &self.declared,
@@ -118,19 +132,31 @@ impl Key {
     fn next(&self, root: &Path) -> String {
         let public = shown(root, &self.public);
         let private = shown(root, &self.private);
-        match self.declared.generator.as_str() {
-            "ssh-keygen" => format!(
+        match (
+            self.declared.generator.as_str(),
+            self.declared.profile.as_deref(),
+        ) {
+            ("ssh-keygen", _) => format!(
                 "\nthe private half is yours and is not the repository's: nothing in a build \
                  reads it,\nand the public half is what the image ships.\n\n\
                  next:\n\
                  \x20 commit {public}\n\
                  \x20 ssh -i {private} into a machine built from this image\n"
             ),
-            "cosign" => format!(
+            ("cosign", _) => format!(
                 "\nthe key carries no password, which is what the build workflow decrypts it with.\n\n\
                  next:\n\
                  \x20 commit {public}\n\
                  \x20 gh secret set SIGNING_SECRET < {private}\n"
+            ),
+            ("openssl", Some("pcr-signing")) => format!(
+                "\nthe private half signs the PCR 11 policy the machine unlocks with, and is not\n\
+                 the repository's. The public half is the one the UKI embeds and the machine\n\
+                 verifies that signature against.\n\n\
+                 next:\n\
+                 \x20 commit {public}\n\
+                 \x20 gh secret set PCR_PRIVKEY < {private}\n\
+                 \x20 tect build --secret pcr_privkey={private} is what a local build reads it from\n"
             ),
             _ => format!(
                 "\nnext:\n\
@@ -192,18 +218,22 @@ impl Recorded {
 /// is read now.
 fn holds(declared: &Declared, bytes: &[u8]) -> Result<(), String> {
     let text = String::from_utf8_lossy(bytes);
-    let (ok, wanted) = match declared.generator.as_str() {
-        "cosign" => (
+    let (ok, wanted) = match (declared.generator.as_str(), declared.profile.as_deref()) {
+        ("cosign", _) => (
             text.starts_with("-----BEGIN PUBLIC KEY-----"),
             "a PEM public key".to_string(),
         ),
-        "ssh-keygen" => (
+        ("ssh-keygen", _) => (
             text.split_whitespace().next().is_some_and(|kind| {
                 ["ssh-", "ecdsa-", "sk-"]
                     .iter()
                     .any(|p| kind.starts_with(p))
             }),
             "an OpenSSH public key line".to_string(),
+        ),
+        ("openssl", Some("pcr-signing")) => (
+            text.starts_with("-----BEGIN PUBLIC KEY-----"),
+            "a PEM public key".to_string(),
         ),
         _ => match declared.format.as_str() {
             // A DER certificate is an ASN.1 SEQUENCE, so it opens 0x30.
@@ -404,6 +434,38 @@ fn openssl(work: &Path, declared: &Declared, cn: &str) -> Result<(PathBuf, PathB
     Ok((public, private))
 }
 
+/// The RSA pair a PCR policy is signed and verified with: a bare public key
+/// and nothing else, because no certificate stands behind this one.
+fn pcr_pair(work: &Path, declared: &Declared) -> Result<(PathBuf, PathBuf), String> {
+    let public = work.join("public.pem");
+    let private = work.join("private.pem");
+
+    let mut generate = Command::new("openssl");
+    generate
+        .args(["genpkey", "-algorithm", "RSA", "-pkeyopt"])
+        .arg(format!("rsa_keygen_bits:{}", declared.bits))
+        .arg("-out")
+        .arg(&private);
+    finish(
+        generate,
+        "openssl",
+        "install it from your platform's openssl package",
+    )?;
+
+    let mut derive = Command::new("openssl");
+    derive
+        .args(["pkey", "-pubout", "-in"])
+        .arg(&private)
+        .arg("-out")
+        .arg(&public);
+    finish(
+        derive,
+        "openssl",
+        "install it from your platform's openssl package",
+    )?;
+    Ok((public, private))
+}
+
 /// A key already on disk is never replaced: the private half cannot be
 /// recovered. The zero-byte file a module ships as a placeholder is not one.
 fn unwritten(path: &Path) -> Result<(), String> {
@@ -535,6 +597,17 @@ key "ssh" {
     generator "ssh-keygen"
     public "/usr/lib/tectonic/authorized_keys"
     private "id_ed25519"
+}
+"#;
+
+    const PCR: &str = r#"description "x"
+
+supports "fedora"
+
+key "pcr" {
+    generator "openssl" profile="pcr-signing" bits=4096
+    public "/usr/share/secureboot/pcr.pub" format="pem"
+    private "pcr.priv"
 }
 "#;
 
@@ -765,6 +838,53 @@ key "ssh" {
         assert!(holds(&ssh, b"ssh-ed25519 AAAA c\n").is_ok());
         assert!(holds(&ssh, b"sk-ssh-ed25519@openssh.com AAAA c\n").is_ok());
         assert!(holds(&ssh, b"not a key\n").is_err());
+
+        let pcr = Declared {
+            profile: Some("pcr-signing".into()),
+            ..declared("openssl", "pem")
+        };
+        assert!(holds(&pcr, b"-----BEGIN PUBLIC KEY-----\n").is_ok());
+        assert!(holds(&pcr, b"-----BEGIN CERTIFICATE-----\n").is_err());
+    }
+
+    /// The PCR-policy pair is bare PEM on both sides and the halves match, so
+    /// `ukify` signs with the private half and embeds the public one the
+    /// machine's first boot verifies against.
+    #[test]
+    fn a_pcr_signing_key_is_a_pair_openssl_reads() {
+        if !have("openssl") {
+            return;
+        }
+        let root = repo("tect-pcr-key-test", PCR);
+        let err = Key::collect(
+            &root,
+            Some("pcr".into()),
+            None,
+            Some("Nobody".into()),
+            &Prompt::silent(),
+        )
+        .map(|_| ())
+        .unwrap_err();
+        assert!(err.contains("`pcr-signing` writes no certificate"), "{err}");
+
+        Key::collect(&root, Some("pcr".into()), None, None, &Prompt::silent())
+            .unwrap()
+            .apply(&root)
+            .unwrap();
+        let public = layout::public_key(&root, "/usr/share/secureboot/pcr.pub");
+        let private = layout::private_key(&root, "pcr.priv");
+        assert!(std::fs::read_to_string(&public)
+            .unwrap()
+            .starts_with("-----BEGIN PUBLIC KEY-----"));
+        // The pair is a pair: the private half prints the public one back.
+        let out = Command::new("openssl")
+            .args(["pkey", "-pubout", "-in"])
+            .arg(&private)
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        assert_eq!(std::fs::read(&public).unwrap(), out.stdout);
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]

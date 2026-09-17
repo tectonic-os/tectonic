@@ -36,7 +36,8 @@
         "family": "fedora",
         "signed": false,
         "provides": [
-          "bootupctl"
+          "bootupctl",
+          "luks-initramfs"
         ],
         "witnesses": {
           "bootc": [
@@ -165,7 +166,8 @@
         "family": "fedora",
         "signed": false,
         "provides": [
-          "bootupctl"
+          "bootupctl",
+          "luks-initramfs"
         ],
         "witnesses": {
           "bootc": [
@@ -294,7 +296,8 @@
         "family": "fedora",
         "signed": false,
         "provides": [
-          "bootupctl"
+          "bootupctl",
+          "luks-initramfs"
         ],
         "witnesses": {
           "bootc": [

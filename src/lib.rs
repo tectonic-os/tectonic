@@ -102,7 +102,12 @@ pub struct Run {
 /// The Containerfile skeleton, when the repository has one to splice into. A
 /// repository with no `scripts/` generates its module scripts and no
 /// Containerfile.
-fn skeleton(root: &Path, needs_tail: bool, issues: &mut Issues) -> Option<String> {
+fn skeleton(
+    root: &Path,
+    needs_tail: bool,
+    needs_luks: bool,
+    issues: &mut Issues,
+) -> Option<String> {
     use emit::containerfile::{BEGIN, END, SKELETON, TAIL_BEGIN, TAIL_END};
 
     let text = std::fs::read_to_string(root.join(SKELETON)).ok()?;
@@ -129,6 +134,21 @@ fn skeleton(root: &Path, needs_tail: bool, issues: &mut Issues) -> Option<String
                 &src,
             )
             .help("mount `/run` as tmpfs in the final `validate-image` RUN before adding a UKI"),
+        );
+        found = false;
+    }
+    if needs_luks
+        && (!text.contains("ARG LUKS_INITRAMFS=")
+            || !text.contains("LUKS_INITRAMFS=\"${LUKS_INITRAMFS}\""))
+    {
+        issues.push(
+            Issue::new(
+                format!("`{SKELETON}` does not pass the LUKS initramfs witness"),
+                &src,
+            )
+            .help(
+                "add `ARG LUKS_INITRAMFS=\"false\"` and pass `LUKS_INITRAMFS=\"${LUKS_INITRAMFS}\"` to the final `validate-image` RUN",
+            ),
         );
         found = false;
     }
@@ -292,7 +312,11 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
         .iter()
         .flat_map(|image| image.modules())
         .any(|module| module.fragment_position == model::module::Position::Tail);
-    let skeleton = skeleton(root, needs_tail, &mut issues);
+    let needs_luks = list.images.iter().any(|image| {
+        let entries: Vec<_> = image.entries.iter().collect();
+        emit::plan::provides(image, &entries, emit::recipe::LUKS_INITRAMFS)
+    });
+    let skeleton = skeleton(root, needs_tail, needs_luks, &mut issues);
 
     let mut files: Vec<(PathBuf, String)> = Vec::new();
     if matches!(command, Command::Generate | Command::Verify) {
@@ -596,7 +620,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_tail_requires_an_ephemeral_run_directory() {
+    fn a_tail_and_luks_require_their_skeleton_guards() {
         let root = std::env::temp_dir().join(format!("tect-skeleton-{}", std::process::id()));
         let path = root.join(emit::containerfile::SKELETON);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -606,13 +630,23 @@ mod tests {
         );
         std::fs::write(&path, stale).unwrap();
 
-        assert!(skeleton(&root, false, &mut Issues::default()).is_some());
+        assert!(skeleton(&root, false, false, &mut Issues::default()).is_some());
         let mut issues = Issues::default();
-        assert!(skeleton(&root, true, &mut issues).is_none());
+        assert!(skeleton(&root, true, false, &mut issues).is_none());
         assert!(issues
             .findings()
             .iter()
             .any(|message| message.contains("does not isolate `/run`")));
+
+        let stale = include_str!("../assets/scripts/Containerfile.skeleton")
+            .replace("LUKS_INITRAMFS=\"${LUKS_INITRAMFS}\"", "");
+        std::fs::write(&path, stale).unwrap();
+        let mut issues = Issues::default();
+        assert!(skeleton(&root, false, true, &mut issues).is_none());
+        assert!(issues
+            .findings()
+            .iter()
+            .any(|message| message.contains("does not pass the LUKS initramfs witness")));
 
         std::fs::remove_dir_all(root).unwrap();
     }

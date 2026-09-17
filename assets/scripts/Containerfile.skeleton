@@ -35,10 +35,12 @@ ARG FAMILY
 ARG CONTRACT_FILES=""
 ARG VERIFY_EXCEPTIONS=""
 ARG MODULE_PRESETS=""
+ARG LUKS_INITRAMFS="false"
 RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=tmpfs,target=/tmp \
     --mount=type=tmpfs,target=/run \
     CONTRACT_FILES="${CONTRACT_FILES}" \
     VERIFY_EXCEPTIONS="${VERIFY_EXCEPTIONS}" \
     MODULE_PRESETS="${MODULE_PRESETS}" \
+    LUKS_INITRAMFS="${LUKS_INITRAMFS}" \
     FAMILY="${FAMILY}" /ctx/tect validate-image

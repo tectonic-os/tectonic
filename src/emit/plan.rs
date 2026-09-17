@@ -533,6 +533,22 @@ pub(crate) fn contract_files(
     out
 }
 
+/// Whether the selected target declares a capability, from its base or one of
+/// the modules that actually lands in that target.
+pub(crate) fn provides(image: &Image, entries: &[&Entry], name: &str) -> bool {
+    image
+        .base
+        .iter()
+        .flat_map(|base| &base.provides)
+        .chain(
+            entries
+                .iter()
+                .filter_map(|entry| entry.module.as_ref())
+                .flat_map(|module| &module.provides),
+        )
+        .any(|decl| decl.name == name)
+}
+
 /// Every name a probe of the base can decide, to the paths that witness it:
 /// each located row, what the base claims, and what the image's modules
 /// require. An abstract row is left out, so a probe leaves it as it was.

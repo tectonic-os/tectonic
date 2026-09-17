@@ -5,7 +5,10 @@
 //! declaration here: a wrong answer erases a disk that then does not boot.
 
 use crate::emit::json::Json;
+use crate::emit::plan::{of_target, provides};
 use crate::model::image::{Layout, List};
+
+pub const LUKS_INITRAMFS: &str = "luks-initramfs";
 
 /// What the base family settles: two `bootc install` flags, the root
 /// filesystem the first of them forces, and the group an administrator is
@@ -164,8 +167,12 @@ pub fn build(
     imgref: &str,
     stores: &[String],
 ) -> Option<Json> {
-    let target = list.targets().into_iter().find(|t| t.to_string() == name)?;
-    let declared = list.images.iter().find(|i| i.id == target.image)?;
+    let published = list
+        .targets()
+        .into_iter()
+        .find(|target| target.to_string() == name)?
+        .published();
+    let (declared, _, entries) = of_target(list, name)?;
     let layout = declared.layout.as_ref();
     let (settled, bootloader) = settle(
         Some(&declared.base.as_ref()?.family),
@@ -182,7 +189,7 @@ pub fn build(
         ("filesystem", Json::string(&settled.filesystem)),
         // The published name, which is a hostname the person installing is
         // free to replace. Every other field here is one they are not.
-        ("hostname", Json::string(target.published())),
+        ("hostname", Json::string(published)),
         (
             "user",
             Json::object([("groups", Json::strings([&settled.admin]))]),
@@ -190,6 +197,9 @@ pub fn build(
     ];
     if !declared.boot.is_empty() {
         fields.push(("boot", Json::string(&declared.boot)));
+    }
+    if provides(declared, &entries, LUKS_INITRAMFS) {
+        fields.push(("luksInitramfs", Json::Bool(true)));
     }
     // Both are meaningful for one filesystem each, and fisherman ignores the
     // other. Emitted only where declared, so a recipe says what the image said.
@@ -650,5 +660,6 @@ mod tests {
             .render();
         assert!(recipe.contains("\"bootloader\": \"systemd\""), "{recipe}");
         assert!(recipe.contains("\"boot\": \"uki-shim\""), "{recipe}");
+        assert!(recipe.contains("\"luksInitramfs\": true"), "{recipe}");
     }
 }

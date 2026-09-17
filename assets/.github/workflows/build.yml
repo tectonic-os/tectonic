@@ -443,6 +443,7 @@ jobs:
         if: env.PUBLISH == 'true'
         env:
           SECRET_MOK_PRIVKEY: ${{ secrets.MOK_PRIVKEY }}
+          SECRET_PCR_PRIVKEY: ${{ secrets.PCR_PRIVKEY }}
         run: |
           umask 077
           mkdir -p "${RUNNER_TEMP}/build-secrets"

@@ -65,6 +65,7 @@
         "provides": [
           "rechunking",
           "initramfs-generation",
+          "luks-initramfs",
           "selinux-policy",
           "ssh",
           "bootc",

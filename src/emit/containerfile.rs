@@ -28,12 +28,7 @@ pub fn file(skeleton: &str, image: &Image, section: &str, tails: &str) -> String
     if lines.peek().is_some_and(|l| l.starts_with("# syntax=")) {
         let _ = writeln!(out, "{}", lines.next().unwrap_or_default());
     }
-    let _ = write!(
-        out,
-        "# GENERATED FILE, do not edit. Produced by `tect generate` from\n\
-         # {SKELETON} and the {} image definition.\n\n",
-        image.id
-    );
+    out.push_str(&preamble(&image.id, &image.boot));
 
     let mut generated = false;
     for line in lines {
@@ -50,6 +45,21 @@ pub fn file(skeleton: &str, image: &Image, section: &str, tails: &str) -> String
             let _ = write!(out, "\n{tails}");
             generated = true;
         }
+    }
+    out
+}
+
+/// The generated file's opening. A UKI target also declares the split base
+/// here: `tect build` seals the image with the split image's storage digest in
+/// a second pass that starts from what the first built, and buildah expands an
+/// `ARG` in a `FROM` only when it precedes the file's first `FROM`.
+fn preamble(id: &str, boot: &str) -> String {
+    let mut out = format!(
+        "# GENERATED FILE, do not edit. Produced by `tect generate` from\n\
+         # {SKELETON} and the {id} image definition.\n\n"
+    );
+    if !boot.is_empty() {
+        out.push_str("ARG SPLIT_BASE=kernel-split\n\n");
     }
     out
 }
@@ -347,4 +357,17 @@ fn fragment(entry: &Entry, body: &str) -> String {
             .replace(MODULE_DIR, &format!("/modules/{dir}"))
     );
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The sealing pass needs `SPLIT_BASE` before the first `FROM`, because
+    /// buildah expands an `ARG` nowhere else; a non-UKI file must not carry it.
+    #[test]
+    fn only_a_uki_target_declares_the_split_base() {
+        assert!(preamble("db", "uki-db").contains("ARG SPLIT_BASE=kernel-split"));
+        assert!(!preamble("db", "").contains("SPLIT_BASE"));
+    }
 }

@@ -28,12 +28,15 @@ capability "bootupctl" "/usr/bin/bootupctl"
 capability "podman" "/usr/bin/podman"
 capability "crun" "/usr/bin/crun"
 capability "rechunking"
+// No filesystem path can witness what is inside an initramfs. The final image
+// check opens it instead.
+capability "luks-initramfs"
 
 base "quay.io/fedora/fedora-bootc:44" {
     about "Fedora 44, nothing above the base system"
     family "fedora"
-    provides "rechunking" "initramfs-generation" "selinux-policy" "ssh" "bootc" "bootupctl" \
-        "podman" "crun"
+    provides "rechunking" "initramfs-generation" "luks-initramfs" "selinux-policy" "ssh" \
+        "bootc" "bootupctl" "podman" "crun"
     scap-content "ssg-fedora-ds.xml"
     signed #false
     bootloader "grub2"

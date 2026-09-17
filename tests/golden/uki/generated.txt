@@ -161,6 +161,7 @@ graph LR
 |---|---|---|---|---|
 | `boot-chain-uki` | capability | `uki` |  |  |
 | `bootupctl` | capability | `base` |  |  |
+| `luks-initramfs` | capability | `base` |  |  |
 | `secureboot-enrolment` | capability | `enrolment` |  |  |
 ==== generated/shim/graph.json
 {
@@ -176,6 +177,14 @@ graph LR
     },
     {
       "name": "bootupctl",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "luks-initramfs",
       "kind": "capability",
       "build_only": false,
       "provider": "base",
@@ -346,6 +355,7 @@ graph LR
 |---|---|---|---|---|
 | `boot-chain-uki` | capability | `uki` |  |  |
 | `bootupctl` | capability | `base` |  |  |
+| `luks-initramfs` | capability | `base` |  |  |
 | `secureboot-enrolment` | capability | `enrolment` |  |  |
 ==== generated/db/graph.json
 {
@@ -361,6 +371,14 @@ graph LR
     },
     {
       "name": "bootupctl",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "luks-initramfs",
       "kind": "capability",
       "build_only": false,
       "provider": "base",
@@ -510,12 +528,21 @@ graph LR
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
 | `bootupctl` | capability | `base` |  |  |
+| `luks-initramfs` | capability | `base` |  |  |
 ==== generated/missing/graph.json
 {
   "image": "missing",
   "capabilities": [
     {
       "name": "bootupctl",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    },
+    {
+      "name": "luks-initramfs",
       "kind": "capability",
       "build_only": false,
       "provider": "base",

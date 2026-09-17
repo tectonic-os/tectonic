@@ -2227,6 +2227,7 @@ fn a_second_installer_is_refused_while_the_first_holds_the_screen() {
   "genericImage": true,
   "bootloader": "grub2",
   "filesystem": "ext4",
+  "luksInitramfs": true,
   "hostname": "deb2",
   "user": { "groups": ["sudo"] }
 }
@@ -2309,6 +2310,7 @@ fn install_screens() {
   "genericImage": true,
   "bootloader": "grub2",
   "filesystem": "ext4",
+  "luksInitramfs": true,
   "hostname": "deb2",
   "user": { "groups": ["sudo"] }
 }
@@ -2466,6 +2468,20 @@ esac
     assert!(transcript.contains(tect::copy::OPENED_KEEP), "{transcript}");
     assert!(
         transcript.contains(tect::copy::BOOT_PASSPHRASE),
+        "{transcript}"
+    );
+    // This layout's root is an unencrypted mount, so a key file for `/var`
+    // would land readable beside the volume it opens: the key-file method and
+    // the `add a key file for boot` answer are both drawn with the reason.
+    // The transcript carries the clause once contiguously, on the form's row;
+    // reasons are redrawn cell by cell, so the key question's copy of it
+    // arrives in fragments and only the row is greppable.
+    assert!(
+        transcript.contains(tect::copy::OPENED_ADD_KEY),
+        "{transcript}"
+    );
+    assert!(
+        transcript.contains("the root is not encrypted"),
         "{transcript}"
     );
 }

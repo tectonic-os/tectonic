@@ -497,6 +497,11 @@ then a `capability` row, then `/usr/bin/<name>` or `/usr/sbin/<name>`. A row
 with no path names a capability nothing witnesses. `validate-image` checks the
 finished image for every name the base claims and every name a module or a row
 locates, and `base-sig-probe` reads the same witnesses when it measures a base.
+`luks-initramfs` is the exception because its witness is inside an archive:
+declaring it opts a target into `lsinitrd` validation during the build, and
+omitting it keeps root encryption unavailable in the installer. A custom base
+or module should declare it only when its initramfs is intended to unlock LUKS;
+`tect build` then proves the binary is present before installation can offer it.
 
 A collection entry wins over the selected catalog's entry of the same
 reference, which is how a stale one is corrected without a tool release, and
@@ -802,7 +807,7 @@ Which of the generators the tool implements writes this key.
 
 | Property | Value | Meaning |
 | --- | --- | --- |
-| `profile=` | `module-signing` | What the generator is set up for, where it can do more than one thing. |
+| `profile=` | `module-signing`, `pcr-signing` | What the generator is set up for, where it can do more than one thing. |
 | `bits=` | 2048 to 16384 | The RSA key size, 4096 where none is named. |
 
 #### `public`

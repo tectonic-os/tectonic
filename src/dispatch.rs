@@ -644,6 +644,7 @@ pub fn dispatch(
             };
             Ok(match crate::build::run(&repo_root(here)?, &opts)? {
                 crate::build::Stopped::Repository => ExitCode::from(REPO_ERROR),
+                crate::build::Stopped::Built => ExitCode::SUCCESS,
             })
         }
         // The disk path is the repository's own script, run as it stands.

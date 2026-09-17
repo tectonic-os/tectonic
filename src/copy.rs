@@ -137,6 +137,7 @@ pub const ENC_BOTH: &str = "luks with TPM2 decryption and recovery passphrase";
 pub const ENC_ANY_HOLDER: &str = "opens for anyone who has the machine";
 pub const ENC_ONLY_YOU: &str = "nothing opens it without you";
 pub const NO_TPM: &str = "No TPM available";
+pub const NO_LUKS_INITRAMFS: &str = "the image has not declared and proved `luks-initramfs`";
 pub const REMOVABLE: &str = "removable";
 
 // Where `/home` goes. `/home` is `/var/home` on a bootc system, so a separate
@@ -146,10 +147,16 @@ pub const REMOVABLE: &str = "removable";
 pub const DATA_HERE: &str = "this disk, sized";
 pub const DATA_ERASED: &str = "erased";
 pub const DATA_KEPT: &str = "keep what is on it";
-/// Beside every row but `none` while the root is encrypted, which is what
-/// makes them unpickable until the encrypted `/var` lands.
+/// Beside the row that keeps another disk's filesystem while the root is
+/// encrypted: a kept filesystem is not re-encrypted, so it would be an
+/// unencrypted home. The rows that erase what they take are encrypted by
+/// fisherman with the root's passphrase, and are pickable.
 pub const DATA_UNENCRYPTED: &str = "an unencrypted home under an encrypted root";
 pub const DATA_SAME_DISK: &str = "that is the disk this installs to";
+/// Beside the `/var` answer while the root is encrypted: fisherman wraps the
+/// `/var` it creates in the root's passphrase, which is what a reinstall that
+/// keeps the disk can open it with.
+pub const DATA_ENCRYPTED: &str = "encrypted with the root's passphrase";
 pub const CUSTOM_ENCRYPTION: &str = "custom layouts cannot create encryption";
 pub const CUSTOM_OTHER_DISK: &str = "the custom layout belongs to another disk";
 pub const CUSTOM_ROOT: &str = "still needs a / partition";
@@ -204,6 +211,12 @@ pub const OPENED_ADD_KEY: &str = "add a key file for boot";
 pub const OPENED_TPM2_COST: &str = "first boot asks once, then no prompt";
 pub const OPENED_TPM2_HAS: &str = "this container already has one";
 pub const OPENED_ADD_KEY_COST: &str = "this machine reads it, the old one keeps its own";
+/// Why a key file is not offered while the root is unencrypted. A data
+/// volume's key file — or the key a first-boot TPM2 enrolment is staged
+/// with — is read from the installed root, and an unencrypted root would
+/// leave it in the clear beside the volume it opens. The ladder falls to the
+/// passphrase instead.
+pub const OPENED_KEYFILE_PLAIN: &str = "the root is not encrypted, so the key would be readable";
 /// Why a root opened with a key file cannot keep what it has: the file would
 /// have to live on the filesystem its key opens, and a token staged inside it
 /// cannot be enrolled before the first boot unlocks it.
@@ -265,7 +278,23 @@ pub fn crypttab_line(name: &str, uuid: &str, keyfile: Option<&str>) -> String {
 /// enrollment belongs to the first boot and not to the install. The key that
 /// opens the container is staged beside the unit and shredded once the token
 /// is in.
-pub fn tpm2_unit(name: &str, key: &str, uuid: &str) -> String {
+///
+/// `pcr_policy` says the installed image carries a signed PCR 11 policy (the
+/// marker its build wrote beside the committed key), and then the token binds
+/// to that policy as well as PCR 7 — the lock needs both. `systemd-stub`
+/// places the booted UKI's `.pcrsig`/`.pcrpkey` in `/run/systemd/` as it
+/// boots, and both paths are named explicitly: the option's default is to bind
+/// to no PCRs at all when no public key and signature are found, and a machine
+/// that silently seals to nothing is worse than one that says so. Without the
+/// policy, PCR 7 alone is what every other chain gets.
+pub fn tpm2_unit(name: &str, key: &str, uuid: &str, pcr_policy: bool) -> String {
+    let enroll = match pcr_policy {
+        true => {
+            "--tpm2-pcrs=7 --tpm2-public-key=/run/systemd/tpm2-pcr-public-key.pem \
+                 --tpm2-signature=/run/systemd/tpm2-pcr-signature.json"
+        }
+        false => "--tpm2-pcrs=7",
+    };
     format!(
         "[Unit]\n\
          Description=Enroll the {name} container for TPM2 unlock\n\
@@ -276,7 +305,7 @@ pub fn tpm2_unit(name: &str, key: &str, uuid: &str) -> String {
          [Service]\n\
          Type=oneshot\n\
          RemainAfterExit=no\n\
-         ExecStart=/usr/bin/systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 \
+         ExecStart=/usr/bin/systemd-cryptenroll --tpm2-device=auto {enroll} \
          --unlock-key-file={key} /dev/disk/by-uuid/{uuid}\n\
          ExecStartPost=-/usr/bin/shred -u {key}\n\
          ExecStartPost=-/usr/bin/systemctl disable tect-tpm2-enroll-{name}.service\n\
@@ -326,6 +355,21 @@ pub fn old_root_key_wrong(partition: &str) -> String {
 }
 pub fn old_root_key_unreadable(volume: &str) -> String {
     format!("{volume} opens with a script this installer cannot run")
+}
+/// The old system reads this volume's key from removable media — Debian's
+/// `passdev`, or a `path:device` third field on a bus-attached disk. Refused
+/// rather than copied onto the root: the media is a thing its owner keeps
+/// apart from the machine, and moving the bytes would silently make it one
+/// with the machine.
+pub fn old_root_key_removable(volume: &str) -> String {
+    format!("{volume} opens with a key file on removable media, which this installer does not copy onto the machine")
+}
+
+/// The old system waits for this volume's key file to appear at boot
+/// (`keyfile-timeout=`), which is the same removable-media arrangement said
+/// another way, and one this installer does not configure.
+pub fn old_root_key_waited(volume: &str) -> String {
+    format!("{volume} waits for its key file at boot, which this installer does not configure")
 }
 
 pub fn custom_keep_boot(bootloader: &str) -> String {
@@ -462,6 +506,7 @@ pub fn written_over(
     filesystem: &str,
     var: &str,
     boot: &str,
+    encrypted: bool,
 ) -> Vec<(String, String)> {
     let mut rows = vec![("esp".to_string(), "2 GB  fat32".to_string())];
     if let Some(chain) = boot_chain(boot) {
@@ -473,7 +518,13 @@ pub fn written_over(
     // Cut out of this disk, so it is a partition here. A `/var` on another
     // disk is a row of the summary above instead.
     if !var.is_empty() {
-        rows.push(("/var".to_string(), format!("{var}  {filesystem}")));
+        rows.push((
+            "/var".to_string(),
+            match encrypted {
+                true => format!("{var}  {filesystem}  {DATA_ENCRYPTED}"),
+                false => format!("{var}  {filesystem}"),
+            },
+        ));
     }
     rows.push(("root".to_string(), format!("the rest  {filesystem}")));
     rows
@@ -590,12 +641,55 @@ mod tests {
     #[test]
     fn uki_chains_are_visible_before_and_after_install() {
         assert!(super::layout("ext4", "systemd", "uki-shim").contains("Microsoft shim"));
-        assert!(super::written_over("systemd", "ext4", "", "uki-db")
+        assert!(super::written_over("systemd", "ext4", "", "uki-db", false)
             .iter()
             .any(|(name, value)| name == "boot chain" && value.contains("firmware keys")));
         assert!(super::enrollment("uki-db")
             .is_some_and(|instruction| instruction.contains("clear the platform key")));
         assert!(super::enrollment("uki-shim")
             .is_some_and(|instruction| instruction.contains("EFI/BOOT/MOK.cer")));
+    }
+
+    /// A UKI's first-boot enrolment names the two files the stub places in
+    /// `/run/systemd/` and keeps PCR 7: the lock needs both the signed policy
+    /// and the machine's Secure Boot state, and a missing policy fails loudly
+    /// instead of binding the token to no PCRs at all. An image with no policy
+    /// keeps PCR 7 alone, exactly as every other chain.
+    #[test]
+    fn a_pcr_policy_tpm2_unit_names_the_embedded_files() {
+        let policy = super::tpm2_unit("root", "/etc/tect/tpm2-enroll-root.key", "u", true);
+        assert!(policy.contains("--tpm2-pcrs=7"), "{policy}");
+        assert!(
+            policy.contains("--tpm2-public-key=/run/systemd/tpm2-pcr-public-key.pem"),
+            "{policy}"
+        );
+        assert!(
+            policy.contains("--tpm2-signature=/run/systemd/tpm2-pcr-signature.json"),
+            "{policy}"
+        );
+        let other = super::tpm2_unit("root", "/etc/tect/tpm2-enroll-root.key", "u", false);
+        assert!(other.contains("--tpm2-pcrs=7"), "{other}");
+        assert!(!other.contains("tpm2-pcr-public-key"), "{other}");
+    }
+
+    /// The last screen before a disk is erased says a `/var` it will create is
+    /// encrypted with the root's passphrase, and says nothing of the kind
+    /// where the root is not encrypted.
+    #[test]
+    fn a_created_var_says_when_it_is_encrypted() {
+        let var = |encrypted: bool| {
+            super::written_over("grub2", "ext4", "200 GB", "", encrypted)
+                .into_iter()
+                .find(|(name, _)| name == "/var")
+                .expect("a /var row")
+                .1
+        };
+        assert!(var(true).contains(super::DATA_ENCRYPTED), "{}", var(true));
+        assert!(
+            !var(false).contains(super::DATA_ENCRYPTED),
+            "{}",
+            var(false)
+        );
+        assert!(super::DATA_ENCRYPTED.chars().count() < 60);
     }
 }

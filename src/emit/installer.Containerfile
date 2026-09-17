@@ -12,9 +12,13 @@ ARG LIVE_BASE=quay.io/fedora/fedora-bootc:44
 #
 # Fisherman is pinned to a fork again since 2026-09-12, for `varDisk.size`,
 # which cuts /var out of the install disk, and since 2026-09-16 for the retag
-# that lets an encrypted root boot under a sealed UKI. Each change is its own
-# branch, all merged into `tectonic-integration`, which is what this commit
-# points at. The fork is of `tuna-os` deliberately: that repository's own
+# that lets an encrypted root boot under a sealed UKI, the composefs user
+# creation fix (the deploy root's /var is a stateroot symlink, and login.defs
+# makes useradd create the home by default) and the first-boot TPM2 unit going
+# into the deployment's /etc instead of the physical root's, which no boot
+# reads. The PCR-policy change is stacked
+# on `tectonic-integration`, which holds the other changes. The fork is
+# of `tuna-os` deliberately: that repository's own
 # description reads `MOVED -> github.com/projectbluefin/fisherman`, and that
 # destination is a fork well behind this one. Do not "correct" the base it
 # forks from.
@@ -25,8 +29,8 @@ ARG LIVE_BASE=quay.io/fedora/fedora-bootc:44
 # the root, which is why the two build directories below are not symmetrical.
 FROM ${GO_IMAGE} AS tools
 ARG FISHERMAN_ORG=tectonic-os
-ARG FISHERMAN_COMMIT=738e437ff9c5ea4bb2bfc2955a2d38980d63ea3e
-ARG FISHERMAN_SHA256=aa01f941784d1b06faef33e87b786216e88198a42c3fd213b62d7a7e02c142d6
+ARG FISHERMAN_COMMIT=1caaf6023b4125c35bb3c4833ec2e5c4bb7cf14d
+ARG FISHERMAN_SHA256=ddb70a4b63925d9f0a79f9aef0eb9ebd894261e8402e963a633479b985593f1d
 # Tacklebox is the other fork: the media needs a change upstream has not got.
 # The pin is `feat/grub-bootloader-support`, which stages the live image's own
 # bootloader, a signed shim and GRUB pair in any of four layouts, the deb
@@ -57,6 +61,20 @@ RUN set -eux; \
 
 FROM ${LIVE_BASE}
 
+# A sealed UKI payload keeps the boot files outside the sealed rootfs under
+# `/kernel`; the media builder consumes their conventional module paths. This
+# wrapper is not the installed payload, so exposing symlinks here changes
+# neither the signed UKI nor the rootfs digest it carries.
+RUN set -eux; \
+    for split in /kernel/*; do \
+        [ -d "$split" ] || continue; \
+        kver="${split##*/}"; \
+        for file in vmlinuz initramfs.img; do \
+            [ ! -f "${split}/${file}" ] || [ -e "/usr/lib/modules/${kver}/${file}" ] \
+                || ln -s "/kernel/${kver}/${file}" "/usr/lib/modules/${kver}/${file}"; \
+        done; \
+    done
+
 # podman runs the install container, so the family installing is irrelevant to
 # the family installed and there is one live environment. fuse-overlayfs reads
 # the offline store; systemd-cryptenroll is what fisherman aborts before
@@ -70,6 +88,9 @@ FROM ${LIVE_BASE}
 # The apt arm produces unsigned media. EL packages no kmscon, so it is asked
 # for alone. The assertion below makes a wrong package name a failed ISO build
 # and not a wiped disk.
+#
+# A UKI payload removes GRUB from the installed chain. The media still boots
+# the vendor-signed shim and GRUB pair, restored only in this wrapper.
 RUN set -eux; \
     if command -v apt-get > /dev/null 2>&1; then \
         apt-get update -y; \
@@ -82,6 +103,12 @@ RUN set -eux; \
         dnf install -y --setopt=install_weak_deps=False \
             podman fuse-overlayfs cryptsetup skopeo openssl \
             util-linux dosfstools e2fsprogs xfsprogs; \
+        if [ -s /usr/share/tectonic/boot-chain ] && [ ! -d /usr/lib/efi/grub2 ]; then \
+            if ! dnf reinstall -y --setopt=install_weak_deps=False grub2-efi-x64; then \
+                dnf upgrade -y --setopt=install_weak_deps=False grub2-efi-x64; \
+            fi; \
+            test -d /usr/lib/efi/grub2; \
+        fi; \
         dnf install -y --setopt=install_weak_deps=False kmscon || true; \
         dnf clean all; \
     fi; \

@@ -82,9 +82,9 @@ const KEY: Node = Node::new("key",
             .once("")
             .missing(NEEDED)
             .props(&[
-                Prop { name: "profile", kind: Kind::One(&["module-signing"]),
+                Prop { name: "profile", kind: Kind::One(&["module-signing", "pcr-signing"]),
                     desc: "What the generator is set up for, where it can do more than one thing.",
-                    say: Say::new("`profile` must be \"module-signing\"", "not a profile", ""),
+                    say: Say::new("`profile` must be \"module-signing\" or \"pcr-signing\"", "not a profile", ""),
                     missing: Say::NONE },
                 Prop { name: "bits", kind: Kind::Int(2048, 16384),
                     desc: "The RSA key size, 4096 where none is named.",
@@ -1564,15 +1564,32 @@ pub fn parse_key(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Ke
         return None;
     }
 
+    let profile = prop(generator, "profile").map(str::to_string);
+    let format = prop(public, "format").unwrap_or("pem").to_string();
+    if profile.as_deref() == Some("pcr-signing") && format != "pem" {
+        issues.push(
+            Issue::new(
+                format!("`pcr-signing` writes a PEM public key, and `format` says {format}"),
+                src,
+            )
+            .at(public.name().span(), "the public half goes here")
+            .help(
+                "ukify embeds it and systemd-cryptenroll verifies the policy with it, \
+                 and both read PEM",
+            ),
+        );
+        return None;
+    }
+
     Some(Key {
         kind,
         generator: string_arg(generator)
             .filter(|g| GENERATORS.contains(g))?
             .to_string(),
-        profile: prop(generator, "profile").map(str::to_string),
+        profile,
         bits: int_prop(generator, "bits").unwrap_or(BITS as i128) as u32,
         public: path.to_string(),
-        format: prop(public, "format").unwrap_or("pem").to_string(),
+        format,
         private: name.to_string(),
         span: node.name().span().into(),
     })
@@ -2279,6 +2296,25 @@ asset "starship"
                 "unknown node `checksum` in an asset",
                 "asset `starship` is declared twice",
             ]
+        );
+    }
+
+    /// A PCR signing public half is PEM whatever `format` says, because that
+    /// is what `ukify` embeds and `systemd-cryptenroll` verifies with.
+    #[test]
+    fn a_pcr_signing_public_half_is_pem() {
+        let found = parsed(
+            "pcr",
+            "description \"x\"\n\nsupports \"fedora\"\n\n\
+             key \"pcr\" {\n\
+             \x20   generator \"openssl\" profile=\"pcr-signing\" bits=4096\n\
+             \x20   public \"/usr/share/secureboot/pcr.pub\" format=\"der\"\n\
+             \x20   private \"pcr.priv\"\n\
+             }\n",
+        );
+        assert_eq!(
+            found,
+            ["`pcr-signing` writes a PEM public key, and `format` says der"]
         );
     }
 }

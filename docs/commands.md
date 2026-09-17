@@ -450,6 +450,12 @@ The generators are closed, and each is one of:
   the `MOK_PRIVKEY` repository secret; `$MOK_KEY_PATH` points a local build at
   it. Every machine enrols the certificate once with `mokutil --import`, and
   until it does the modules signed with it will not load.
+- `openssl profile="pcr-signing"` writes the bare RSA pair a PCR 11 policy is
+  signed with, at the declared `bits`: no certificate, so the public half is a
+  PEM public key. A sealed UKI embeds it in `.pcrpkey` beside the signature in
+  `.pcrsig`, and the machine's first boot verifies them before it writes the
+  TPM2 token. Set the private half as the `PCR_PRIVKEY` repository secret; a
+  local build reads it through `tect build --secret pcr_privkey=<path>`.
 - `ssh-keygen` writes the keypair a person logs in with, ed25519 and with no
   passphrase. `bits` is an RSA size and means nothing here. Nothing in a build
   reads the private half: it is yours, and the public half is what the image
@@ -474,12 +480,14 @@ Asks you for:
 - The destination is the module's own `public` declaration, so nothing here
   takes a path to write to.
 - Only the public half. A private half is not the repository's: a cosign key
-  signs in CI, a MOK signs a kernel module and an authorized key logs a person
-  in, and none of the three wants its private half copied here.
+  signs in CI, a MOK signs a kernel module, a PCR key signs the machine's TPM
+  unlock policy, and an authorized key logs a person in — none of them wants
+  its private half copied here.
 - The file is read before it is written: a key in the wrong form for the
   generator that would have made it — a PEM public key for `cosign`, a PEM or
-  DER certificate for `openssl`, an OpenSSH key line for `ssh-keygen` — is
-  refused here rather than by a build a long way from here.
+  DER certificate for `module-signing`, a bare PEM public key for
+  `pcr-signing`, an OpenSSH key line for `ssh-keygen` — is refused here rather
+  than by a build a long way from here.
 - An existing key is never replaced, exactly as with `create key`.
 
 ### `set workflows`
@@ -667,6 +675,18 @@ bare image id. The default target when none is named.
   proving nothing. `tect fetch modules` and `tect generate` are what change the
   repository; run them first, or let `tect vm --rebuild` run all three in
   order.
+- A UKI target builds in two passes: the split image, then the whole image
+  sealed with that split's storage digest — the number `bootc install`
+  compares and a single build cannot read. The digest is computed from the
+  local buildah store, so `--backend buildx` is refused for a UKI target, and
+  the generated boot chain's tail must carry `FROM ${SPLIT_BASE}` and
+  `ARG COMPOSEFS_DIGEST`; a module collection that predates them is refused by
+  name. The sealed image is digested from the store again and its UKI cmdline
+  read back, both compared with the embedded digest, and only then are the
+  requested tags applied — so a failed check leaves nothing published as the
+  image that failed it. The skeleton's validation step also runs against the
+  sealed image: the seal pass stops at the tail, because a step that runs after
+  the seal writes to the image and moves the digest the UKI embedded.
 
 ### `vm build|run|spawn <type>`
 
@@ -707,11 +727,13 @@ or `iso`, asked for where there is a terminal to ask on. `build` converts,
   Containerfile and one upstream patch under `out/bootiso/`; they are not
   generated files, because each depends on `--target`, `--tag` and
   `$IMAGE_REGISTRY`, which are build-time rather than commit-time.
-- The recipe derives `composeFsBackend`, `genericImage`, `bootloader`,
-  `filesystem` and the admin group from the base family, and refuses a family
-  it has no measured answer for rather than guessing: a wrong value there is a
-  disk that is erased and then does not boot. `tect recipe` prints the same
-  document.
+- The recipe derives `composeFsBackend`, `genericImage`, the boot chain and
+  bootloader, `filesystem`, the admin group and the declared
+  `luks-initramfs` witness from the target, and refuses a family it has no
+  measured answer for rather than guessing: a wrong value there is a disk that
+  is erased and then does not boot. A successful `tect build` inspects the
+  initramfs before that witness can enable root encryption. `tect recipe` prints
+  the same document.
 - Building an `iso` needs a published reference, and says so when there is
   none. The media installs local bytes while recording `$IMAGE_REGISTRY`'s
   reference as the installed machine's update origin, so a local namespace
@@ -895,11 +917,11 @@ the target's name and tag. The ungated target when none is named.
 
 Prints the half of an installation recipe the declaration answers, as JSON for
 `fisherman`: the reference installed and the reference the installed machine
-updates from, and the four values that are properties of the image rather than
-questions — whether the deployment is sealed with composefs, whether the
-install skips the bootupd check, which bootloader it reaches, and the root
-filesystem sealing forces. The disk, the account and the encryption are the
-person's and are not in it.
+updates from, plus image properties such as composefs sealing, the boot chain
+and bootloader, the root filesystem and whether the target declares a
+LUKS-capable initramfs. A successful `tect build` validates that last
+declaration against the archive itself. The disk, the account and the encryption
+choice are the person's and are not in it.
 
 #### Flags:
     --target <t>          the target, else the ungated one

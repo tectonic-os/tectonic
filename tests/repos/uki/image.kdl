@@ -4,7 +4,7 @@ image {
     boot "uki-shim"
     base "quay.io/fedora/fedora-bootc:44" {
         family "fedora"
-        provides "bootupctl"
+        provides "bootupctl" "luks-initramfs"
     }
     modules {
         module "uki"
@@ -18,7 +18,7 @@ image {
     boot "uki-db"
     base "quay.io/fedora/fedora-bootc:44" {
         family "fedora"
-        provides "bootupctl"
+        provides "bootupctl" "luks-initramfs"
     }
     modules {
         module "uki"
@@ -32,7 +32,7 @@ image {
     boot "uki-db"
     base "quay.io/fedora/fedora-bootc:44" {
         family "fedora"
-        provides "bootupctl"
+        provides "bootupctl" "luks-initramfs"
     }
     modules { }
 }
