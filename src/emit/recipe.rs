@@ -85,8 +85,12 @@ fn settle(family: Option<&str>, layout: Option<&Layout>, boot: &str) -> Option<(
             || layout
                 .and_then(|l| l.generic)
                 .or(known.as_ref().map(|f| f.generic))?,
+        // A UKI image settles its own root: btrfs, the owner's default
+        // (NEXT-44, 2026-09-18). A declared layout never reaches here, because
+        // the boot chain is the image's own and the family's answer is for
+        // images that declare none.
         filesystem: if uki {
-            "ext4".into()
+            "btrfs".into()
         } else {
             told(|l| &l.filesystem).or_else(|| known.as_ref().map(|f| f.filesystem.clone()))?
         },
@@ -568,27 +572,65 @@ mod tests {
         assert!(media(&deb, "not-a-target", "image", "imgref").is_none());
     }
 
-    /// The live environment starts the installer from a unit, and nothing else
-    /// ties the word an `ExecStart` runs to the table that resolves it.
+    /// Both installer units hand over to the binary this file stages, and
+    /// they hand over to no other.
     ///
-    /// The rest of this is what a resolving verb does not prove: that a unit is
-    /// enabled at all, that it draws on the console the media shows a person,
-    /// and that no login is left on that console beside it. Media can fail
-    /// every one of those while both verbs still resolve.
+    /// **This proves less than the test it replaces, and the difference
+    /// matters to a later reader.** Until `NEXT-53` stage 3 the units ran
+    /// `/usr/bin/tect installer`, and the tie was that the word `installer`
+    /// resolved through `crate::command::resolve`. The installer is another
+    /// crate's binary now, so no command table here can answer for it and that
+    /// tie is gone rather than moved. What survives is that each unit's
+    /// `ExecStart=` ends at the path the `COPY` above writes. A binary that
+    /// cannot run is not caught here, and the Containerfile's own `--version`
+    /// is what catches that.
     #[test]
-    #[ignore = "the units start a verb this crate no longer owns; the media still has to be rewired"]
-    fn the_verb_the_live_environment_autostarts_is_one_that_resolves() {
-        let started: Vec<Vec<&str>> = LIVE_ENV
-            .lines()
-            .filter(|line| line.starts_with("ExecStart=") && line.contains("/usr/bin/tect "))
-            .filter_map(|line| line.split_once("/usr/bin/tect "))
-            .map(|(_, rest)| rest.split_whitespace().collect())
-            .collect();
-        assert!(!started.is_empty(), "no unit runs the binary");
-        for verb in &started {
-            let resolved = crate::command::resolve(verb);
-            assert!(resolved.is_ok(), "{verb:?}: {:?}", resolved.err());
+    fn both_installer_units_hand_over_to_the_binary_the_live_environment_stages() {
+        // Source and destination both. A `COPY` checked by its destination
+        // alone still passes when the source becomes another binary, and
+        // fisherman would then draw on tty1.
+        const STAGES: &str = "COPY --from=tools /out/tect-installer /usr/bin/tect-installer";
+        const RUNS: &str = "/usr/bin/tect-installer";
+        assert!(
+            LIVE_ENV.contains(STAGES),
+            "the live environment does not stage the installer"
+        );
+        // Each unit is read through the file it writes, rather than by
+        // filtering every `ExecStart=` in this Containerfile for one that
+        // looks like the installer. A filter loses the line that stopped
+        // naming the installer, and losing it is the edit that leaves the
+        // media booting to a login prompt, a root shell or a respawn loop.
+        for unit in ["tect-installer.service", "tect-installer-vt.service"] {
+            let heredoc = format!("/usr/lib/systemd/system/{unit}\n");
+            let body = LIVE_ENV
+                .split_once(&heredoc)
+                .map(|(_, rest)| rest.split_once("\nUNIT\n").map_or(rest, |(body, _)| body))
+                .unwrap_or_else(|| panic!("{unit} is never written"));
+            let exec: Vec<&str> = body
+                .lines()
+                .filter_map(|line| line.strip_prefix("ExecStart="))
+                .collect();
+            assert_eq!(exec.len(), 1, "{unit} runs {} things", exec.len());
+            // The last word, because one unit runs the installer directly and
+            // the other hands it to kmscon as that command's own argument. A
+            // `-` or `@` prefix would fail here, and it should: this unit
+            // failing is what the other one exists to catch.
+            assert_eq!(
+                exec[0].split_whitespace().last(),
+                Some(RUNS),
+                "{unit} hands over to something else: {}",
+                exec[0]
+            );
         }
+    }
+
+    /// What a resolving verb never proved: that a unit is enabled at all, that
+    /// it draws on the console the media shows a person, and that no login is
+    /// left on that console beside it. Media can fail every one of these while
+    /// the invocation above is perfectly good, which is why they are not one
+    /// test any more.
+    #[test]
+    fn the_units_that_autostart_the_installer_own_the_console_they_draw_on() {
         // Every unit that runs it is enabled by name somewhere, or the media
         // boots to whatever else claims the console.
         for unit in ["tect-installer.service", "tect-installer-vt.service"] {
@@ -651,7 +693,9 @@ mod tests {
         assert_eq!(bootloader, "systemd");
         assert!(family.composefs);
         assert!(family.generic);
-        assert_eq!(family.filesystem, "ext4");
+        // The UKI path settles btrfs (NEXT-44, 2026-09-18): the owner's
+        // default root, where the old one was the family's ext4.
+        assert_eq!(family.filesystem, "btrfs");
         assert!(seals("fedora", None, "uki-db"));
         assert_eq!(unanswered("fedora", None, "uki-db"), Vec::<&str>::new());
 

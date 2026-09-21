@@ -29,8 +29,8 @@ ARG LIVE_BASE=quay.io/fedora/fedora-bootc:44
 # the root, which is why the two build directories below are not symmetrical.
 FROM ${GO_IMAGE} AS tools
 ARG FISHERMAN_ORG=tectonic-os
-ARG FISHERMAN_COMMIT=1caaf6023b4125c35bb3c4833ec2e5c4bb7cf14d
-ARG FISHERMAN_SHA256=ddb70a4b63925d9f0a79f9aef0eb9ebd894261e8402e963a633479b985593f1d
+ARG FISHERMAN_COMMIT=cf7e275e89ff8531c999c9b335f7055ccdaff14d
+ARG FISHERMAN_SHA256=066a8ee5d3f03a9af2c17e62f7eb2e8c59ff5e0b4eba2be995e68b27c132ed8a
 # Tacklebox is the other fork: the media needs a change upstream has not got.
 # The pin is `feat/grub-bootloader-support`, which stages the live image's own
 # bootloader, a signed shim and GRUB pair in any of four layouts, the deb
@@ -58,6 +58,41 @@ RUN set -eux; \
     mkdir -p /out; \
     cd /src/fisherman/fisherman && CGO_ENABLED=0 go build -trimpath -o /out/fisherman ./cmd/fisherman/; \
     cd /src/tacklebox && CGO_ENABLED=0 go build -trimpath -o /out/tacklebox ./cmd/tacklebox
+
+# The installer does publish a binary worth pinning, so this one is fetched and
+# not built. It is staged here rather than in the live environment below
+# because this stage already has curl and tar, and the live base is asserted
+# for install tools and not for build tools.
+#
+# `uname -m` and not a build argument: this stage runs on the architecture the
+# media is built for, and the release names its assets with the same two words.
+# The tarball holds the binary at the top level with nothing beside it, so no
+# `--strip-components` is passed. Against a single top-level file that flag
+# extracts nothing and still exits 0.
+#
+# These three are bumped by hand, as the fisherman and tacklebox pins above
+# are. A `# renovate:` directive here would do nothing: the dockerfile manager
+# supports the apk, deb and docker datasources alone, and it reads an `ARG`
+# only to resolve a variable inside a `FROM`. Checked against
+# `lib/modules/manager/dockerfile/` on 2026-09-21. Tracking these needs a
+# `customManagers` regex in the repository that builds the media. Recheck if
+# that manager gains a releases datasource.
+ARG INSTALLER_VERSION=0.1.0
+ARG INSTALLER_SHA256_X86_64=2efefc4563d8b4c06803d290c9c509bfac1e0115da3ed3afb9d4ef62925425ff
+ARG INSTALLER_SHA256_AARCH64=9a366d74761ec19ac8f9fc1f85a44b63bd97b8e67c7d4d4293087bc3728a8b09
+RUN set -eux; \
+    arch="$(uname -m)"; \
+    case "$arch" in \
+        x86_64) sha="${INSTALLER_SHA256_X86_64}";; \
+        aarch64) sha="${INSTALLER_SHA256_AARCH64}";; \
+        *) echo "the installer publishes no release for ${arch}" >&2; exit 1;; \
+    esac; \
+    asset="tect-installer-v${INSTALLER_VERSION}-${arch}-linux-gnu.tar.gz"; \
+    curl --retry 3 -fsSLo /tmp/installer.tar.gz \
+        "https://github.com/tectonic-os/installer/releases/download/v${INSTALLER_VERSION}/${asset}"; \
+    echo "${sha}  /tmp/installer.tar.gz" | sha256sum -c -; \
+    mkdir -p /out; \
+    tar -xf /tmp/installer.tar.gz -C /out tect-installer
 
 FROM ${LIVE_BASE}
 
@@ -215,11 +250,16 @@ QUIET
 # The installer's own unit below runs it, so no `kmsconvt@` login is involved.
 RUN systemctl enable var-lib-tectonic-store.mount
 
-# The frontend, staged into this build context from the running binary by
-# `tect vm build iso`. `--version` runs it here, so a binary that cannot execute
-# in this environment fails the ISO build instead of the boot.
-COPY tect /usr/bin/tect
-RUN /usr/bin/tect --version
+# The frontend the units below start. `--version` runs it here, so a binary
+# that cannot execute in this environment fails the ISO build instead of the
+# boot. That check means more since the binary stopped being the one that built
+# the media: it is the net under `a user's own base`, whose live environment can
+# carry an older glibc than the release was built against.
+#
+# `tect` itself is not staged. Nothing on this media runs it since the
+# installer became its own binary, and the media carries one frontend.
+COPY --from=tools /out/tect-installer /usr/bin/tect-installer
+RUN /usr/bin/tect-installer --version
 
 # The installer is this media's only job, so it is a unit on tty1 and not a
 # login shell's profile. A unit cannot be started twice and the console it
@@ -239,10 +279,12 @@ RUN /usr/bin/tect --version
 # `Restart=always` because leaving the installer on installation media starts it
 # again rather than reaching a shell.
 #
-# The word here is the command table's. Nothing else ties a command run as text
-# to the table that resolves it, so a rename leaves the media booting to
-# `unknown command`; the test
-# `the_verb_the_live_environment_autostarts_is_one_that_resolves` is the tie.
+# The path here is the one the `COPY --from=tools` above writes. Nothing else
+# ties a unit's `ExecStart=` to the binary this file stages, so an edit to one
+# and not the other leaves the media booting to a login prompt, a root shell or
+# a respawn loop on a blank tty1. The test
+# `both_installer_units_hand_over_to_the_binary_the_live_environment_stages`
+# reads each unit's own body and is the tie.
 COPY <<'UNIT' /usr/lib/systemd/system/tect-installer.service
 [Unit]
 Description=Install this image onto a disk
@@ -255,7 +297,7 @@ StartLimitBurst=10
 
 [Service]
 Type=idle
-ExecStart=/usr/bin/kmscon --vt=1 --no-switchvt --oneshot --login -- /usr/bin/tect installer
+ExecStart=/usr/bin/kmscon --vt=1 --no-switchvt --oneshot --login -- /usr/bin/tect-installer
 Restart=always
 RestartSec=1
 
@@ -264,7 +306,7 @@ WantedBy=multi-user.target
 UNIT
 
 # `--oneshot` is load bearing. kmscon is a getty replacement and respawns its
-# login process in place by default, so without it `tect installer` exiting is
+# login process in place by default, so without it `tect-installer` exiting is
 # invisible to systemd: the unit stays active, `Restart=` never runs, the start
 # limit is never reached and the fallback below is unreachable. With it, kmscon
 # exits when the installer does and systemd owns the restart.
@@ -276,11 +318,12 @@ UNIT
 # installer` repeatedly does not trip it. If they do, the cost is this unit
 # instead: the installer on the kernel's own VT, losing the box-drawing arcs.
 #
-# This one never hands over. `StartLimitIntervalSec=0` because leaving the
-# installer starts it again, and a rate limit here would answer a person's
-# fifth `Quit` with a root shell on the console that is meant to have no login
-# on it. Recovery from an installer that cannot run is Ctrl-Alt-F2 or the serial
-# console, both of which autologin root.
+# This one never hands over on its own. `StartLimitIntervalSec=0` because
+# leaving the installer starts it again, and a rate limit here would answer a
+# person's fifth `Quit` with a root shell on the console. The action row's
+# `Exit to shell` is the deliberate route to one, and it puts this unit back
+# when the shell exits. Recovery from an installer that cannot run is
+# Ctrl-Alt-F2 or the serial console, both of which autologin root.
 COPY <<'UNIT' /usr/lib/systemd/system/tect-installer-vt.service
 [Unit]
 Description=Install this image onto a disk, on the kernel console
@@ -290,7 +333,7 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=idle
-ExecStart=/usr/bin/tect installer
+ExecStart=/usr/bin/tect-installer
 Restart=always
 RestartSec=1
 StandardInput=tty
