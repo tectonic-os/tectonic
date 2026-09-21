@@ -3,11 +3,11 @@
 //! through `Content::rules`, the search for who would help runs backward
 //! through `Content::numbering`, and the two are not interchangeable.
 
-use crate::emit::json::Json;
 use crate::emit::{Part, Table};
 use crate::model::image::{Entry, Image};
 use crate::provider::Index;
 use crate::scap::{ordinal, reached, Content, Profile};
+use common::json::Json;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 

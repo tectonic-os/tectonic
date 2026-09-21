@@ -284,15 +284,22 @@ fn create_image_surfaces_an_unreadable_runtime_catalog() {
         "a name argument",
         tect::create::Field::Image,
         None,
-        &tect::prompt::Prompt::silent(),
+        &common::prompt::Prompt::silent(),
     )
     .err()
     .expect("the unreadable runtime catalog must stop image creation");
 
     // Then: the create error retains the exact source and read failure.
     let error = flat(&error);
-    assert!(error.contains(&path.display().to_string()), "{error}");
     assert!(error.contains("could not be read"), "{error}");
+    // miette wraps on the width it is given, and a long enough working copy
+    // puts that wrap inside the path itself, where `flat` leaves a space.
+    // Comparing both without spaces keeps the assertion about the path.
+    let squashed = error.replace(' ', "");
+    assert!(
+        squashed.contains(&path.display().to_string().replace(' ', "")),
+        "{error}"
+    );
 }
 
 #[test]

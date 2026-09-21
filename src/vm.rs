@@ -5,8 +5,8 @@
 
 use crate::command::Spec;
 use crate::copy;
-use crate::prompt::Prompt;
-use crate::ui::Choice;
+use common::prompt::Prompt;
+use common::ui::Choice;
 use std::os::unix::process::CommandExt as _;
 use std::path::Path;
 use std::process::Command;

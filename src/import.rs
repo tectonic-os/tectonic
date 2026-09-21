@@ -7,10 +7,10 @@ use crate::create::{report, Change, Listing};
 use crate::dispatch::Error;
 use crate::layout;
 use crate::model::remote::{At, Collection, REMOTE_DIR};
-use crate::prompt::Prompt;
 use crate::provenance::record;
 use crate::provider::Provider;
-use crate::ui::Choice;
+use common::prompt::Prompt;
+use common::ui::Choice;
 use std::path::{Path, PathBuf};
 
 /// One collection that has the module, and where its directory is on disk.
@@ -269,8 +269,8 @@ fn choose_several(
 ) -> Result<Vec<String>, String> {
     let (listed, options) = offered(root, sources)?;
     let chosen = match prompt.choose_many(copy::WHICH_MODULES, &options, &[])? {
-        crate::ui::Answer::Chosen(chosen) => chosen,
-        crate::ui::Answer::Cancelled => Vec::new(),
+        common::ui::Answer::Chosen(chosen) => chosen,
+        common::ui::Answer::Cancelled => Vec::new(),
     };
     match chosen.is_empty() {
         true => Err(unchosen(command)),

@@ -108,7 +108,7 @@ fn init_repo(name: &str) -> PathBuf {
         Some("Example".into()),
         None,
         Some(root.clone()),
-        &tect::prompt::Prompt::silent(),
+        &common::prompt::Prompt::silent(),
     )
     .unwrap()
     .expect("a silent run draws no review screen")
@@ -174,7 +174,7 @@ fn verify(name: &str, root: &Path) {
 fn create(name: &str, root: &Path) {
     std::env::set_current_dir(root).expect("the created-into repository exists");
     let here = Path::new(".");
-    let silent = tect::prompt::Prompt::silent();
+    let silent = common::prompt::Prompt::silent();
 
     tect::create::Image::collect(
         here,
@@ -389,7 +389,7 @@ fn why(name: &str, root: &Path, module: &str) {
     out.push_str(&tect::run(Command::Why, Some("nosuch"), here).issues.plain());
 
     // The same answer with no repository at all, off what a build bakes.
-    let manifest = tect::emit::json::Json::parse(&tect::run(Command::Plan, None, here).stdout)
+    let manifest = common::json::Json::parse(&tect::run(Command::Plan, None, here).stdout)
         .expect("the plan is a document");
     let host = tect::emit::why::on_host(&manifest, None, module).expect("the manifest names it");
     out.push_str("==== from the baked manifest, with no repository\n");
@@ -401,7 +401,7 @@ fn why(name: &str, root: &Path, module: &str) {
 
     // The build record is what was observed. Two documents out of one build
     // cannot disagree, so a disagreement is worth saying out loud.
-    let record = tect::emit::json::Json::parse(&format!(
+    let record = common::json::Json::parse(&format!(
         "{{\"modules\": [{{\"path\": {module:?}, \"content\": \"not what was declared\"}}]}}"
     ))
     .expect("the record is a document");
@@ -428,15 +428,15 @@ fn why(name: &str, root: &Path, module: &str) {
 fn summary_on_host(root: &Path) {
     std::env::set_current_dir(root).expect("fixture root exists");
     let here = Path::new(".");
-    let manifest = tect::emit::json::Json::parse(&tect::run(Command::Plan, None, here).stdout)
+    let manifest = common::json::Json::parse(&tect::run(Command::Plan, None, here).stdout)
         .expect("the plan is a document");
 
     let (every, _) = tect::emit::why::built_as(&manifest, None);
     assert!(!every.is_empty(), "{} publishes nothing", root.display());
     for target in every {
-        let record = tect::emit::json::Json::parse(&format!(
+        let record = common::json::Json::parse(&format!(
             "{{\"target\": {:?}}}",
-            tect::emit::json::text(target, "name").expect("a target is named")
+            common::json::text(target, "name").expect("a target is named")
         ))
         .expect("the record is a document");
         let (scoped, _) = tect::emit::why::built_as(&manifest, Some(&record));
@@ -446,7 +446,7 @@ fn summary_on_host(root: &Path) {
         assert_eq!(
             tect::run(
                 Command::Summary,
-                tect::emit::json::text(target, "name").as_deref(),
+                common::json::text(target, "name").as_deref(),
                 here
             )
             .stdout,
@@ -807,8 +807,8 @@ fn drawn_flow(name: &str, dir: &Path, command: &str, after: &str, steps: &[&[u8]
         // A host exporting COLUMNS would leak into the pty and redraw at that
         // width, so the drawn width is pinned the way the golden captured it.
         .env("COLUMNS", "80")
-        // Whether this machine has a TPM decides what the encryption picker
-        // draws beside its two `tpm2-` rows, so it is pinned the same way.
+        // Whether this machine has a TPM decides which encryption rows are
+        // present, so it is pinned the same way.
         .env("TECT_TPM", "/nonexistent")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -1272,7 +1272,7 @@ fn flows() {
     );
     let listed = |at: &str| {
         let (list, _, _) = tect::declarations(&root);
-        tect::create::Listing::collect(&root, vec![at.into()], &tect::prompt::Prompt::silent())
+        tect::create::Listing::collect(&root, vec![at.into()], &common::prompt::Prompt::silent())
             .and_then(|listing| listing.refuse_duplicate(&list, "dev-tools", None))
             .err()
             .unwrap_or_default()
@@ -1860,7 +1860,7 @@ fn flows() {
         Vec::new(),
         None,
         tect::import::Place::Reference,
-        &tect::prompt::Prompt::silent(),
+        &common::prompt::Prompt::silent(),
     )
     .unwrap_or_else(|err| panic!("{}", err.message()))
     .apply(&root, &list.sources)
@@ -1875,7 +1875,7 @@ fn flows() {
         vec!["example".into()],
         None,
         tect::import::Place::Reference,
-        &tect::prompt::Prompt::silent(),
+        &common::prompt::Prompt::silent(),
     )
     .unwrap_or_else(|err| panic!("{}", err.message()))
     .apply(&root, &list.sources)
@@ -1895,7 +1895,7 @@ fn flows() {
         vec!["example".into()],
         None,
         tect::import::Place::Reference,
-        &tect::prompt::Prompt::silent(),
+        &common::prompt::Prompt::silent(),
     )
     .err()
     .map(|err| err.message().to_string())
@@ -2205,287 +2205,6 @@ fn flows() {
     );
 }
 
-/// The unit owns tty1, but the serial console and the other VTs autologin root
-/// with `tect` on `PATH`, so a second `tect installer` is refused and told
-/// where the first is. Two fisherman runs partitioning one disk is what this
-/// stops.
-///
-/// The first is held at its screen on a pty while the second asks. That is the
-/// part a unit test cannot reach: the lock has to still be held *while the
-/// installer runs*, which `let _` on the binding in `dispatch` would not do.
-#[test]
-fn a_second_installer_is_refused_while_the_first_holds_the_screen() {
-    use std::time::Duration;
-
-    let dir = empty("flow-install-lock");
-    std::fs::write(
-        dir.join(tect::install::RECIPE),
-        r#"{
-  "image": "ghcr.io/tectonic-os/deb2:latest",
-  "targetImgref": "ghcr.io/tectonic-os/deb2:latest",
-  "composeFsBackend": true,
-  "genericImage": true,
-  "bootloader": "grub2",
-  "filesystem": "ext4",
-  "luksInitramfs": true,
-  "hostname": "deb2",
-  "user": { "groups": ["sudo"] }
-}
-"#,
-    )
-    .unwrap();
-    let lock = dir.join("installer.lock");
-    let second = || {
-        std::process::Command::new(env!("CARGO_BIN_EXE_tect"))
-            .args(["installer", "--from", "."])
-            .current_dir(&dir)
-            .env("TECT_ASSETS", crate_dir().join("assets"))
-            .env("TECT_INSTALLER_LOCK", &lock)
-            .env("TECT_TPM", "/nonexistent")
-            .output()
-            .unwrap()
-    };
-
-    // The first console, on a pty so it reaches its screen and waits there.
-    let mut first = std::process::Command::new("script")
-        .args([
-            "-qfec",
-            &format!(
-                "TECT_INSTALLER_LOCK='{}' '{}' installer --from .",
-                lock.display(),
-                env!("CARGO_BIN_EXE_tect")
-            ),
-            "/dev/null",
-        ])
-        .current_dir(&dir)
-        .env("TECT_ASSETS", crate_dir().join("assets"))
-        .env("COLUMNS", "80")
-        .env("TECT_TPM", "/nonexistent")
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .expect("script from util-linux");
-
-    let mut refused = None;
-    for _ in 0..100 {
-        std::thread::sleep(Duration::from_millis(50));
-        let out = second();
-        let said = String::from_utf8_lossy(&out.stderr).into_owned();
-        if said.contains("the installer is running on") {
-            refused = Some(said);
-            break;
-        }
-    }
-    let killed = first.kill().and_then(|()| first.wait());
-    let refused = refused.expect("the first installer never held the lock while it ran");
-    killed.expect("the first installer is reaped");
-
-    assert!(refused.contains("run `tect installer` again"), "{refused}");
-    // Once the holder is gone the next console gets it: the lock is the
-    // process's, and nothing has to clean up after one that died.
-    let after = second();
-    assert!(
-        !String::from_utf8_lossy(&after.stderr).contains("the installer is running on"),
-        "the lock outlived the process holding it"
-    );
-}
-
-/// The installer's one screen, over a payload root and on a real terminal.
-/// Every question is on it at once and answered in place, and `Install` is dim
-/// until nothing is missing. The steps walk that screen, then take `Install`,
-/// which asks the one question that costs a disk. Exit 0, and no disk was
-/// touched.
-#[test]
-fn install_screens() {
-    use std::os::unix::fs::PermissionsExt;
-
-    let dir = empty("flow-install-drawn");
-    std::fs::write(
-        dir.join(tect::install::RECIPE),
-        r#"{
-  "image": "ghcr.io/tectonic-os/deb2:latest",
-  "targetImgref": "ghcr.io/tectonic-os/deb2:latest",
-  "composeFsBackend": true,
-  "genericImage": true,
-  "bootloader": "grub2",
-  "filesystem": "ext4",
-  "luksInitramfs": true,
-  "hostname": "deb2",
-  "user": { "groups": ["sudo"] }
-}
-"#,
-    )
-    .unwrap();
-    // The disks the form offers are this machine's, and no two machines agree
-    // on those — so the golden brings its own `/sys/block`, the same way it
-    // brings its own `$TECT_TPM`.
-    let sys = dir.join("sys-block");
-    for (name, size, removable, model) in [
-        ("vda", "134217728", "0", "QEMU HARDDISK"),
-        ("sdb", "31457280", "1", "Cruzer Blade"),
-    ] {
-        let disk = sys.join(name);
-        std::fs::create_dir_all(disk.join("device")).unwrap();
-        std::fs::write(disk.join("size"), size).unwrap();
-        std::fs::write(disk.join("removable"), removable).unwrap();
-        std::fs::write(disk.join("device/model"), model).unwrap();
-    }
-    let lsblk = dir.join("lsblk");
-    std::fs::write(
-        &lsblk,
-        r#"#!/bin/sh
-printf '%s\n' '{"blockdevices":[{"name":"/dev/vda","type":"disk","children":[{"name":"/dev/vda1","size":"512M","fstype":"vfat","label":"EFI","type":"part","parttype":"C12A7328-F81F-11D2-BA4B-00A0C93EC93B"},{"name":"/dev/vda2","size":"63.5G","fstype":"ext4","label":"old-root","type":"part","parttype":null},{"name":"/dev/vda3","size":"60G","fstype":"crypto_LUKS","label":"","type":"part","parttype":null}]}]}'
-"#,
-    )
-    .unwrap();
-    std::fs::set_permissions(&lsblk, std::fs::Permissions::from_mode(0o755)).unwrap();
-    // The walk over the old system mounts what the disk has read-only. The
-    // fake answers both ways in and out, and mounts nothing: on this rig the
-    // disk does not exist, and what the walk does with a real one is a VM
-    // proof rather than a drawn one.
-    for name in ["mount", "umount"] {
-        let fake = dir.join(name);
-        std::fs::write(&fake, "#!/bin/sh\nexit 0\n").unwrap();
-        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
-    }
-    // The header the encryption row reads once the container is open. The rig
-    // has no `/dev/vda3`, so without this the row would draw whatever the
-    // host's `cryptsetup` says about a device that is not there.
-    let cryptsetup = dir.join("cryptsetup");
-    std::fs::write(
-        &cryptsetup,
-        r#"#!/bin/sh
-case "$1" in
-luksDump) printf '%s\n' '{"keyslots":{"0":{}},"tokens":{}}' ;;
-*) exit 1 ;;
-esac
-"#,
-    )
-    .unwrap();
-    std::fs::set_permissions(&cryptsetup, std::fs::Permissions::from_mode(0o755)).unwrap();
-    drawn_flow(
-        "flow-install-drawn",
-        &dir,
-        &format!(
-            "PATH='{}':\"$PATH\" TECT_INSTALLER_LOCK='{}' TECT_SYS_BLOCK='{}' TECT_MOUNT_ROOT='{}' '{}' installer --from .",
-            dir.display(),
-            dir.join("installer.lock").display(),
-            sys.display(),
-            dir.join("mounts").display(),
-            env!("CARGO_BIN_EXE_tect")
-        ),
-        // The discovery line, which is the last thing printed before the first
-        // widget draws: anchoring on it keeps every question in the golden.
-        "tect: ghcr.io/tectonic-os/deb2:latest, from .\r\n",
-        &[
-            // The disk list opens under its own row; down past the removable
-            // one and take the disk. Answering a field opens the next one, so
-            // from here every step is an answer and nothing navigates.
-            b"\r",
-            b"\x1b[B\r",
-            // The layout row opens the editor. Keep the discovered ESP at its
-            // safe default, format the second partition as root, and open the
-            // container third as /var: six rows down its list is the open
-            // answer, which stops there because the container needs a key.
-            b"\r",
-            b"\r",
-            b"\r",
-            b"\x1b[B\x1b[B\r",
-            b"\x1b[B\x1b[B\x1b[B\x1b[B\x1b[B\x1b[B\r",
-            b"\r",
-            // The key question is a screen of its own: passphrase, typed once
-            // and compared by cryptsetup when it opens the volume.
-            b"\r",
-            b"\r",
-            b"opensesame\r",
-            b"\r",
-            // Returning from the editor redraws the form at its first row.
-            // Move through layout to the seeded computer name and accept it.
-            b"\x1b[B\x1b[B\r\r",
-            b"tect\r",
-            // Both halves of the password, compared against each other.
-            b"hunter2\r",
-            b"hunter2\r",
-            // Encryption, whose list opened by itself. Custom layouts carry
-            // their own /var choice, so taking `none` moves to Install.
-            b"\r",
-            // `Install`, pickable only because nothing is missing now.
-            b"\r",
-            // The last question, answered `Go back`, which is the whole reason
-            // it is a question. **Nothing here runs fisherman**: `Continue` is
-            // an install, and this rig has no disk to give one.
-            b"\x1b[B\r",
-            // Esc on the form asks, and the third answer leaves.
-            b"\x1b",
-            b"\x1b[B\x1b[B\r",
-        ],
-    );
-    // The one thing this screen exists to guarantee: what was typed is not in
-    // the transcript, which is what a serial console keeps and what a failed
-    // install is read back from.
-    let transcript =
-        std::fs::read_to_string(crate_dir().join("tests/golden/flow-install-drawn/transcript.txt"))
-            .unwrap();
-    assert!(!transcript.contains("hunter2"), "{transcript}");
-    // `Install` was reachable, which a green golden cannot show on its own: a
-    // run that leaves at the end exits 0 either way.
-    //
-    // Assert on contiguous text only. ratatui writes the cells a frame changed,
-    // so a label overlapping what was under it arrives in fragments with cursor
-    // moves between the words: `Go back` is not greppable here.
-    assert!(transcript.contains("Are you sure"), "{transcript}");
-    assert!(transcript.contains(tect::copy::CONTINUE), "{transcript}");
-    // Both disks were offered under the row, and the one taken is the one the
-    // steps moved to. Device names survive contiguously where their models do
-    // not, for the reason above.
-    assert!(transcript.contains("/dev/sdb"), "{transcript}");
-    assert!(transcript.contains("/dev/vda"), "{transcript}");
-    assert!(transcript.contains("/dev/vda1"), "{transcript}");
-    assert!(transcript.contains("old-root"), "{transcript}");
-    assert!(
-        transcript.contains("Partitions marked format"),
-        "{transcript}"
-    );
-    // The key question was a screen of its own, and the key was typed into it:
-    // a transcript is what a serial console keeps, so the container's
-    // passphrase must stay out of it and the question that took it must be on
-    // it.
-    assert!(!transcript.contains("opensesame"), "{transcript}");
-    assert!(
-        transcript.contains(&tect::copy::open_question("/dev/vda3", "/var")),
-        "{transcript}"
-    );
-    // The walk over the old system mounted what the disk has and found no
-    // `/etc/fstab` on any of it. The key question carries that outcome on its
-    // own row: a person asked for a key is told the search happened and came
-    // to nothing. The label is what is greppable — the reason beside it is
-    // redrawn cell by cell, so only its label arrives contiguous.
-    assert!(transcript.contains(tect::copy::OLD_SYSTEM), "{transcript}");
-    // The row the encryption kinds become once a container is open, and the
-    // ladder's answer for the machine: a passphrase was typed, so the
-    // installed system asks for one at boot.
-    assert!(transcript.contains(tect::copy::OPENED_KEEP), "{transcript}");
-    assert!(
-        transcript.contains(tect::copy::BOOT_PASSPHRASE),
-        "{transcript}"
-    );
-    // This layout's root is an unencrypted mount, so a key file for `/var`
-    // would land readable beside the volume it opens: the key-file method and
-    // the `add a key file for boot` answer are both drawn with the reason.
-    // The transcript carries the clause once contiguously, on the form's row;
-    // reasons are redrawn cell by cell, so the key question's copy of it
-    // arrives in fragments and only the row is greppable.
-    assert!(
-        transcript.contains(tect::copy::OPENED_ADD_KEY),
-        "{transcript}"
-    );
-    assert!(
-        transcript.contains("the root is not encrypted"),
-        "{transcript}"
-    );
-}
-
 /// The reference in docs/schema.md, re-rendered from the tables. The renderer
 /// is what checks that every marker names a schema and every schema is marked.
 #[test]
@@ -2580,7 +2299,7 @@ fn every_written_document_reads_back() {
         if text.trim().is_empty() {
             continue;
         }
-        let parsed = tect::emit::json::Json::parse(&text)
+        let parsed = common::json::Json::parse(&text)
             .unwrap_or_else(|err| panic!("{}: {err}", path.display()));
         assert!(
             parsed.render() == text,

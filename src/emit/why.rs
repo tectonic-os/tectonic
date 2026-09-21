@@ -4,12 +4,12 @@
 //! on a live host with no `repo.kdl` it comes off the manifest and the build
 //! record baked into the image.
 
-use crate::emit::json::{field, items, strings, text, Json};
 use crate::emit::{Part, Table};
 use crate::layout;
 use crate::model::image::{Image, List};
 use crate::model::module::Module;
 use crate::provenance::Evidence;
+use common::json::{field, items, strings, text, Json};
 use std::fmt::Write as _;
 
 /// Something the module pulls in from outside the repository.
@@ -907,7 +907,7 @@ pub fn known_on_host(manifest: &Json, record: Option<&Json>) -> Vec<String> {
 /// refuses, naming both numbers.
 fn readable(document: &Json, at: &std::path::Path, reads: u32) -> Result<(), String> {
     let tool = env!("CARGO_PKG_VERSION");
-    match crate::emit::json::declared(document, "schema_version") {
+    match common::json::declared(document, "schema_version") {
         Some(Json::Number(found)) if *found == reads => Ok(()),
         Some(Json::Number(found)) => Err(format!(
             "{}: this image was built against schema version {found}, and Tectonic v{tool} reads \
@@ -968,7 +968,7 @@ mod tests {
     /// target the repository declares. The record says which one is running.
     #[test]
     fn a_host_answer_is_scoped_to_the_target_the_record_names() {
-        let manifest = crate::emit::json::Json::parse(
+        let manifest = common::json::Json::parse(
             r#"{"images": [{"id": "desktop", "url": "https://example.com/os/desktop",
               "targets": [
                 {"name": "desktop", "image": "desktop", "published": "desktop", "modules": [
@@ -982,7 +982,7 @@ mod tests {
         )
         .expect("the manifest is a document");
         let record = |target: &str| {
-            crate::emit::json::Json::parse(&format!(r#"{{"target": "{target}"}}"#))
+            common::json::Json::parse(&format!(r#"{{"target": "{target}"}}"#))
                 .expect("the record is a document")
         };
 
@@ -1006,10 +1006,9 @@ mod tests {
 
         // The module tree is not in a finished image, so the read-out prints
         // the clone that fetches the real declarations.
-        let record = crate::emit::json::Json::parse(
-            r#"{"target": "desktop", "source_commit": "1f2bb19aa"}"#,
-        )
-        .expect("the record is a document");
+        let record =
+            common::json::Json::parse(r#"{"target": "desktop", "source_commit": "1f2bb19aa"}"#)
+                .expect("the record is a document");
         let built = on_host(&manifest, Some(&record), "apps/kde")
             .expect("the image carries it")
             .markdown();
@@ -1026,7 +1025,7 @@ mod tests {
 
         // No record, and no target in one that has none: the old answer, said
         // to be the old answer.
-        for record in [None, Some(&crate::emit::json::Json::parse("{}").unwrap())] {
+        for record in [None, Some(&common::json::Json::parse("{}").unwrap())] {
             let why = on_host(&manifest, record, "apps/kde").expect("the manifest names it");
             assert_eq!(why.images, ["desktop", "desktop-dx"]);
             assert!(why.scope == Scope::EveryTarget);
@@ -1054,7 +1053,7 @@ mod tests {
     /// the order that catches a read-out still matching on the suffix.
     #[test]
     fn the_read_out_loads_the_path_that_was_resolved() {
-        let manifest = crate::emit::json::Json::parse(
+        let manifest = common::json::Json::parse(
             r#"{"images": [{"targets": [{"name": "t", "modules": [
                 {"path": "b/a/x", "description": "the long one"},
                 {"path": "a/x", "description": "the short one"}

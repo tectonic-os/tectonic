@@ -7,12 +7,12 @@
 use crate::copy;
 use crate::create::Field;
 use crate::dispatch::Error;
-use crate::prompt::Prompt;
 use crate::resolve::workflow::{Basis, Shipped, DEFAULT_AT, SHIPPED};
 use crate::scap::{ordinal, rule_name, Content};
-use crate::ui::tree::Change;
-use crate::ui::{Answer, Choice};
 use crate::{layout, parse};
+use common::prompt::Prompt;
+use common::ui::tree::Change;
+use common::ui::{Answer, Choice};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 

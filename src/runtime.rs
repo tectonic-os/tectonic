@@ -562,9 +562,7 @@ fn validate_boot_chain(report: &mut Report) {
     }
     // The public half `boot/uki` writes beside its marker when the build had
     // the PCR signing key; nothing exists when it did not.
-    let pcr_key = fs::read("/usr/share/tectonic/pcr-policy.pem")
-        .ok()
-        .filter(|bytes| !bytes.is_empty());
+    let pcr_key = fs::read(PCR_POLICY).ok().filter(|bytes| !bytes.is_empty());
     for uki in &ukis {
         let name = uki.display().to_string();
         match output("objdump", &["--section-headers", &name]) {
@@ -590,9 +588,7 @@ fn validate_boot_chain(report: &mut Report) {
                         Some(bytes) if &bytes == expected => {
                             println!("    {name} embeds the declared PCR policy key")
                         }
-                        Some(_) => report.fail(format!(
-                            "{name}: .pcrpkey is not /usr/share/tectonic/pcr-policy.pem"
-                        )),
+                        Some(_) => report.fail(format!("{name}: .pcrpkey is not {PCR_POLICY}")),
                         None => report.fail(format!("{name}: .pcrpkey could not be read")),
                     }
                 }
@@ -615,7 +611,7 @@ fn validate_boot_chain(report: &mut Report) {
         )),
         Err(message) => report.fail(message),
     }
-    let signed = Path::new("/usr/share/tectonic/secureboot-signed").exists();
+    let signed = Path::new(SIGNED_MARKER).exists();
     match fs::read_to_string("/usr/share/tectonic/boot-chain")
         .unwrap_or_default()
         .trim()
@@ -636,7 +632,11 @@ fn validate_boot_chain(report: &mut Report) {
     }
 
     if !signed {
-        println!("    unsigned build: signature checks skipped");
+        // Two different images reach this line: one built without a MOK key,
+        // which is a supported thing to do, and one that was signed by a
+        // `boot/uki` old enough to write the marker somewhere else. They are
+        // indistinguishable here, so the path is named rather than the verdict.
+        println!("    no {SIGNED_MARKER}: signature checks skipped");
         return;
     }
     let cert = "/usr/share/secureboot/sb_cert.pem";
@@ -651,6 +651,16 @@ fn validate_boot_chain(report: &mut Report) {
 }
 
 /// Every check a built image has to pass before it is published.
+/// The image's own witness that its boot chain was signed, and the signed PCR
+/// policy beside it. **Hardcoded here and written by `boot/uki/module.sh`, so
+/// the two can drift**: a repository vendors the module and updates `tect`
+/// separately, and a module writing an older path leaves this reading an image
+/// as unsigned that is in fact signed. `NEXT-53` records the fix — the module
+/// declares the path with `provides "<name>" file="<path>"` and the recipe
+/// carries it, the way `luks-initramfs` already works.
+const SIGNED_MARKER: &str = "/usr/share/secureboot/signed";
+const PCR_POLICY: &str = "/usr/share/secureboot/pcr-policy.pem";
+
 pub fn validate_image() -> Result<(), String> {
     let mut report = Report { failures: 0 };
 

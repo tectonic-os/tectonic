@@ -1,7 +1,6 @@
 //! One resolved plan, as JSON: every fact anything downstream derives.
 
 use crate::base::Capability;
-use crate::emit::json::Json;
 use crate::model::asset::Asset;
 use crate::model::image::{Entry, Image, List, Target, NO_FLAVOUR};
 use crate::model::module::Module;
@@ -9,6 +8,7 @@ use crate::provenance::Evidence;
 use crate::resolve::overlay;
 use crate::resolve::workflow::Declared;
 use crate::resolve::Resolved;
+use common::json::Json;
 
 /// The image one target names, the flavour it gates on, and the entries that
 /// land in its build. None when nothing publishes under that name.

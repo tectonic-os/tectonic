@@ -12,7 +12,7 @@ pub mod evidence;
 pub mod record;
 
 use crate::diag::Span;
-use crate::emit::json::Json;
+use common::json::Json;
 
 /// Where the expected hash comes from when a version bump makes the pinned one
 /// stale.

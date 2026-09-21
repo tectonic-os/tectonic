@@ -4,7 +4,6 @@ pub mod containerfile;
 pub mod coverage;
 pub mod finalize;
 pub mod graph;
-pub mod json;
 pub mod module_build;
 pub mod plan;
 pub mod recipe;
@@ -73,7 +72,7 @@ pub enum Part {
 
 /// One table of a read-out, in whatever the caller renders tables with: a
 /// terminal draws it, a redirect gets the same data as markdown. Owned, and
-/// knowing nothing of the widget: that dependency runs from `ui/` to here.
+/// knowing nothing of the widget: that dependency runs from the widget to here.
 pub struct Table {
     pub title: String,
     pub header: &'static [&'static str],

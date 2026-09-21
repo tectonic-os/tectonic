@@ -3,8 +3,9 @@
 
 use crate::command::{self, Context, Spec, Verb};
 use crate::copy;
-use crate::prompt::Prompt;
+use crate::emit::Part;
 use crate::Command;
+use common::prompt::Prompt;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -48,16 +49,8 @@ pub struct Flags {
     pub images: Vec<String>,
     pub module: Option<String>,
     pub cn: Option<String>,
-    /// Where `set key` reads the public half it records from, and the root
-    /// `install` reads a payload from.
+    /// Where `set key` reads the public half it records from.
     pub from: Option<String>,
-    /// `install`'s half of a recipe, which the payload does not answer.
-    pub disk: Option<String>,
-    pub hostname: Option<String>,
-    pub user: Option<String>,
-    pub password: Option<String>,
-    pub encryption: Option<String>,
-    pub passphrase: Option<String>,
     pub base: Option<String>,
     pub format: Option<String>,
     pub target: Option<String>,
@@ -257,8 +250,8 @@ fn on_host(
 /// scoped the same way `on_host` is, so a name it resolves is one the image
 /// carries and the read-out cannot come back empty.
 fn why_on_host(
-    manifest: &crate::emit::json::Json,
-    record: Option<&crate::emit::json::Json>,
+    manifest: &common::json::Json,
+    record: Option<&common::json::Json>,
     rest: &[&str],
     format: Option<&str>,
     prompt: &Prompt,
@@ -301,7 +294,7 @@ fn why_on_host(
         "{}",
         match json {
             true => why.json().render(),
-            false if prompt.draws() && crate::ui::fits(&parts) => crate::ui::parts(&parts),
+            false if prompt.draws() && fits(&parts) => rendered(&parts),
             false => why.markdown(),
         }
     );
@@ -367,12 +360,6 @@ pub fn dispatch(
         module: module_arg,
         cn,
         from,
-        disk,
-        hostname,
-        user,
-        password,
-        encryption,
-        passphrase,
         base,
         format,
         target,
@@ -405,45 +392,6 @@ pub fn dispatch(
                 )));
             }
             crate::upgrade::run()?;
-            Ok(ExitCode::SUCCESS)
-        }
-        // The installer this project owns. Discovery says what a root holds;
-        // the three flags are the person's half of the recipe, and with nobody
-        // to ask each one fails naming itself. A guess here erases a disk.
-        Verb::Installer => {
-            if let [word, ..] = rest {
-                return Err(Error::Invocation(format!(
-                    "`{}` does not take {word}",
-                    spec.name()
-                )));
-            }
-            // Bound, not dropped: `let _` would release the lock before the
-            // disk is touched. Installer media starts this on tty1 and
-            // autologins root elsewhere, so this is what stops two at once.
-            let _lock = crate::install::hold()?;
-            let root = match from {
-                Some(from) => PathBuf::from(from),
-                None => crate::install::root()?,
-            };
-            let found = crate::install::classify(&root)?;
-            let payload = found.payload()?;
-            eprintln!("tect: {}, from {}", payload.image, root.display());
-            // From here the installer owns the console: the banner and the
-            // line above are not worth the room.
-            crate::install::own_screen(payload, prompt);
-            let given = crate::install::Given {
-                disk,
-                hostname,
-                user,
-                password,
-                encryption,
-                passphrase,
-            };
-            // Leaving the review is a leaving: no disk has been touched.
-            let Some(answers) = crate::install::Answers::collect(payload, given, prompt)? else {
-                return Ok(ExitCode::SUCCESS);
-            };
-            crate::install::run(payload, &answers, prompt)?;
             Ok(ExitCode::SUCCESS)
         }
         Verb::CreateRepo => {
@@ -944,7 +892,7 @@ fn reading(
         } else {
             let options = shown
                 .iter()
-                .map(|name| crate::ui::Choice::new(name, ""))
+                .map(|name| common::ui::Choice::new(name, ""))
                 .collect::<Vec<_>>();
             let Some(at) = prompt.choose(question, &options)? else {
                 return Ok(ExitCode::SUCCESS);
@@ -1042,10 +990,10 @@ fn reading(
         "{}",
         match matches!(command, Command::Graph | Command::Why | Command::Coverage)
             && prompt.draws()
-            && crate::ui::fits(&run.parts)
+            && fits(&run.parts)
         {
             false => run.stdout,
-            true => crate::ui::parts(&run.parts),
+            true => rendered(&run.parts),
         }
     );
     if command == Command::Check {
@@ -1092,4 +1040,31 @@ fn reading(
         );
     }
     Ok(ExitCode::SUCCESS)
+}
+
+/// Whether the terminal is wide enough that no table folds a word mid-way,
+/// which is the point at which a read-out falls back to its markdown.
+fn fits(parts: &[Part]) -> bool {
+    let room = common::ui::width();
+    parts.iter().all(|part| match part {
+        Part::Table(table) => room >= common::ui::table::floor(table.header, &table.rows),
+        _ => true,
+    })
+}
+
+fn rendered(parts: &[Part]) -> String {
+    parts
+        .iter()
+        .map(|part| match part {
+            Part::Heading(text) => common::ui::bold(text),
+            Part::Text(text) => common::ui::table::wrap(text, common::ui::width()).join("\n"),
+            Part::Table(table) => {
+                common::ui::table::render(&table.title, table.header, &table.rows)
+                    .trim_end()
+                    .to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n")
+        + "\n"
 }

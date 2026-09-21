@@ -8,7 +8,7 @@
 //! compared, so a daily-changing value would fail `verify`. This document is
 //! written in-layer from ARGs, so nothing under `generated/` holds it.
 
-use crate::emit::json::Json;
+use common::json::Json;
 use std::path::Path;
 use std::process::Command;
 

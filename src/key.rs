@@ -10,8 +10,8 @@ use crate::layout;
 use crate::model::module::Key as Declared;
 use crate::model::remote::REMOTE_DIR;
 use crate::parse::disk::Disk;
-use crate::prompt::Prompt;
-use crate::ui::Choice;
+use common::prompt::Prompt;
+use common::ui::Choice;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -65,15 +65,23 @@ impl Key {
         unwritten(&public)?;
         unwritten(&private)?;
 
-        // The openssl generator is set up by its profile, and there are two.
+        // The openssl generator is set up by its profile, and there are three.
         let cn = match (declared.generator.as_str(), declared.profile.as_deref()) {
             (generator @ ("cosign" | "ssh-keygen"), _) if cn.is_some() => {
                 return Err(format!(
                     "`--cn` is a certificate's common name, and `{generator}` writes no certificate"
                 ))
             }
-            ("cosign" | "ssh-keygen", _) => None,
-            ("openssl", Some("module-signing")) => Some(common_name(root, cn, prompt)?),
+            (generator @ ("cosign" | "ssh-keygen"), Some(profile)) => {
+                return Err(format!(
+                    "`{generator}` takes no profile, and `key \"{kind}\"` names \
+                     `profile=\"{profile}\"`; only `openssl` is set up by one"
+                ))
+            }
+            ("cosign" | "ssh-keygen", None) => None,
+            ("openssl", profile @ Some("module-signing" | "tls-ca")) => {
+                Some(common_name(root, cn, profile, prompt)?)
+            }
             ("openssl", Some("pcr-signing")) => {
                 if cn.is_some() {
                     return Err(
@@ -87,7 +95,8 @@ impl Key {
             (generator, _) => {
                 return Err(format!(
                     "`{generator}` generates a key for a profile, and `key \"{kind}\"` names none; \
-                     `profile=\"module-signing\"` and `profile=\"pcr-signing\"` are the two it has"
+                     `profile=\"module-signing\"`, `profile=\"pcr-signing\"` and \
+                     `profile=\"tls-ca\"` are the three it has"
                 ))
             }
         };
@@ -109,10 +118,11 @@ impl Key {
             ("cosign", _) => cosign(&work),
             ("ssh-keygen", _) => ssh(&work, &self.declared.kind),
             ("openssl", Some("pcr-signing")) => pcr_pair(&work, &self.declared),
-            _ => openssl(
+            (_, profile) => openssl(
                 &work,
                 &self.declared,
                 self.cn.as_deref().unwrap_or_default(),
+                profile,
             ),
         }?;
 
@@ -157,6 +167,14 @@ impl Key {
                  \x20 commit {public}\n\
                  \x20 gh secret set PCR_PRIVKEY < {private}\n\
                  \x20 tect build --secret pcr_privkey={private} is what a local build reads it from\n"
+            ),
+            ("openssl", Some("tls-ca")) => format!(
+                "\nthe private half issues the server certificates this authority stands\n\
+                 behind, and is not the repository's. The public half is what an image ships\n\
+                 and what a client verifies a server against.\n\n\
+                 next:\n\
+                 \x20 commit {public}\n\
+                 \x20 keep {private} where the build that issues a leaf can read it\n"
             ),
             _ => format!(
                 "\nnext:\n\
@@ -359,13 +377,25 @@ fn listed(disk: &Disk) -> String {
 }
 
 /// The common name the enrolment prompt shows, defaulting to the repository's.
-fn common_name(root: &Path, given: Option<String>, prompt: &Prompt) -> Result<String, String> {
+fn common_name(
+    root: &Path,
+    given: Option<String>,
+    profile: Option<&str>,
+    prompt: &Prompt,
+) -> Result<String, String> {
     let named = crate::create::named_after_root(root).unwrap_or_else(|| "tectonic".to_string());
+    // The subject says what the certificate is for. Without this both profiles
+    // suggest `Secure Boot`, and a repository holding each gets two
+    // certificates with one subject.
+    let what = match profile {
+        Some("tls-ca") => "TLS CA",
+        _ => "Secure Boot",
+    };
     let cn = prompt.text(
         given,
         copy::KEY_CN,
         "`--cn`",
-        Some(&format!("{named} Secure Boot")),
+        Some(&format!("{named} {what}")),
     )?;
     usable(&cn)?;
     Ok(cn)
@@ -405,10 +435,20 @@ fn ssh(work: &Path, kind: &str) -> Result<(PathBuf, PathBuf), String> {
 }
 
 /// A self-signed certificate and its key, at the declared size and in the
-/// declared form.
-fn openssl(work: &Path, declared: &Declared, cn: &str) -> Result<(PathBuf, PathBuf), String> {
+/// declared form. The profile is what the certificate is for, and the only
+/// thing that differs between them is the extensions block.
+fn openssl(
+    work: &Path,
+    declared: &Declared,
+    cn: &str,
+    profile: Option<&str>,
+) -> Result<(PathBuf, PathBuf), String> {
     let config = work.join("openssl.cnf");
-    crate::init::put(&config, &module_signing(cn))?;
+    let body = match profile {
+        Some("tls-ca") => tls_ca(cn),
+        _ => module_signing(cn),
+    };
+    crate::init::put(&config, &body)?;
     let public = work.join("public");
     let private = work.join("private.pem");
 
@@ -557,6 +597,27 @@ fn module_signing(cn: &str) -> String {
     )
 }
 
+/// The certificate authority the keylime registrar's server certificate is
+/// issued from, and that an agent verifies that registrar against. `CA:TRUE`
+/// is what makes it usable as a trust anchor, and `keyCertSign` is what lets
+/// it issue the leaf.
+fn tls_ca(cn: &str) -> String {
+    format!(
+        "[req]\n\
+         distinguished_name = dn\n\
+         prompt = no\n\
+         x509_extensions = ext\n\
+         \n\
+         [dn]\n\
+         CN = {cn}\n\
+         \n\
+         [ext]\n\
+         basicConstraints = critical,CA:TRUE\n\
+         keyUsage = critical,keyCertSign,cRLSign\n\
+         subjectKeyIdentifier = hash\n"
+    )
+}
+
 /// The scaffolded `.gitignore` covers every private half. One that does not is
 /// said so: the tool never rewrites a file it did not write.
 fn warn_unignored(root: &Path) {
@@ -608,6 +669,17 @@ key "pcr" {
     generator "openssl" profile="pcr-signing" bits=4096
     public "/usr/share/secureboot/pcr.pub" format="pem"
     private "pcr.priv"
+}
+"#;
+
+    const TLS_CA: &str = r#"description "x"
+
+supports "fedora"
+
+key "keylime-ca" {
+    generator "openssl" profile="tls-ca" bits=2048
+    public "/usr/share/keylime/tls/cacert.crt" format="pem"
+    private "keylime-ca.key"
 }
 "#;
 
@@ -671,6 +743,107 @@ key "pcr" {
 
         let again = ask().map(|_| ());
         assert!(again.is_err_and(|message| message.contains("never overwritten")));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A `tls-ca` certificate is only worth shipping if a TLS client will take
+    /// it as a trust anchor, and `CA:FALSE` -- which is what `module-signing`
+    /// writes and what this profile would inherit if its config were dropped --
+    /// is refused as one. The key usage is the other half: without
+    /// `keyCertSign` the authority cannot issue the leaf it exists to issue.
+    #[test]
+    fn a_tls_ca_is_an_authority_a_client_can_anchor_on() {
+        if !have("openssl") {
+            return;
+        }
+        let root = repo("tect-tls-ca-key-test", TLS_CA);
+        Key::collect(
+            &root,
+            Some("keylime-ca".into()),
+            None,
+            Some("Test CA".into()),
+            &Prompt::silent(),
+        )
+        .unwrap()
+        .apply(&root)
+        .unwrap();
+
+        let cert = layout::public_key(&root, "/usr/share/keylime/tls/cacert.crt");
+        let out = Command::new("openssl")
+            .args([
+                "x509",
+                "-in",
+                &cert.display().to_string(),
+                "-noout",
+                "-text",
+            ])
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "openssl x509 on the generated cert");
+        let text = String::from_utf8_lossy(&out.stdout);
+        assert!(text.contains("CA:TRUE"), "not a CA:\n{text}");
+        assert!(text.contains("Certificate Sign"), "cannot issue:\n{text}");
+        assert!(text.contains("CRL Sign"), "cannot revoke:\n{text}");
+        // Both extensions are marked critical, so a client that does not
+        // understand one refuses the certificate rather than ignoring it.
+        assert_eq!(
+            text.matches("critical").count(),
+            2,
+            "both extensions have to be critical:\n{text}"
+        );
+
+        // The property the whole design rests on: openssl anchors on it.
+        let anchored = Command::new("openssl")
+            .args([
+                "verify",
+                "-CAfile",
+                &cert.display().to_string(),
+                &cert.display().to_string(),
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            anchored.status.success(),
+            "openssl will not anchor on it: {}",
+            String::from_utf8_lossy(&anchored.stderr)
+        );
+
+        // The private half is the one that signs, so it has to match.
+        let private = layout::private_key(&root, "keylime-ca.key");
+        let openssl = |args: &[&str]| {
+            let out = Command::new("openssl").args(args).output().unwrap();
+            assert!(out.status.success(), "openssl {args:?}");
+            out.stdout
+        };
+        let from_cert = openssl(&[
+            "x509",
+            "-in",
+            &cert.display().to_string(),
+            "-noout",
+            "-pubkey",
+        ]);
+        let from_key = openssl(&["pkey", "-in", &private.display().to_string(), "-pubout"]);
+        assert_eq!(from_cert, from_key);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A profile on a generator that has none used to be ignored, so an
+    /// `ssh-keygen` key declaring `profile="tls-ca"` wrote an ed25519 pair and
+    /// the manifest's author learned it from whatever failed next.
+    #[test]
+    fn a_generator_that_takes_no_profile_says_so() {
+        let manifest = SSH.replace(
+            r#"generator "ssh-keygen""#,
+            r#"generator "ssh-keygen" profile="tls-ca""#,
+        );
+        let root = repo("tect-profiled-ssh-key-test", &manifest);
+        let message = Key::collect(&root, Some("ssh".into()), None, None, &Prompt::silent())
+            .map(|_| ())
+            .unwrap_err();
+        assert_eq!(
+            message,
+            "`ssh-keygen` takes no profile, and `key \"ssh\"` names `profile=\"tls-ca\"`; only `openssl` is set up by one"
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 

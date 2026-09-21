@@ -9,14 +9,25 @@ description = "Reads the image files and the per-module module.kdl manifests"
 kdl = "6.3.4"
 libc = "0.2"
 miette = { version = "7.6.0", features = ["fancy"] }
-ratatui = { version = "0.30.2", default-features = false, features = ["crossterm"] }
+# Pinned by rev, never by version. A change in `common` is a commit there and
+# a bump here, which keeps the rev that was built with visible in `Cargo.lock`.
+# To work on both trees at once, put a `paths` override in `.cargo/config.toml`,
+# which redirects a git dependency and leaves `Cargo.lock` alone.
+common = { git = "https://github.com/tectonic-os/common", rev = "0ee639b96e6d21628a8d97510fa06acf17eba456" }
 
 [profile.release]
 opt-level = 1
 debug = false
 lto = false
 codegen-units = 16
-panic = "abort"
+# No `panic = "abort"` here. **The reason this was written for left with the
+# installer** in `NEXT-53` stage 2 step 4: the LUKS, mount and staged-recipe
+# guards are `work/installer/`'s now. What is left in this crate is one guard,
+# `upgrade::Staged`, which removes a part-downloaded release so a panicking
+# `tect upgrade` does not leave one beside the running binary. That is a
+# smaller reason than the one that put this here, and unwinding costs about
+# 385 KB of the stripped `dist` binary, so whether `tect` still wants it is an
+# open question filed in `BACKLOG.md` rather than answered here.
 strip = true
 
 # What a release is built with; `release` stays tuned for rebuild speed

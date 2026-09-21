@@ -2,14 +2,13 @@
 //! of it, resolution reads it, and every dispatch arm answers a `Verb` that
 //! came out of it.
 
-use crate::ui::Choice;
+use common::ui::Choice;
 use std::path::{Path, PathBuf};
 
 /// Every command word the binary answers, one variant per dispatch arm.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Verb {
     Upgrade,
-    Installer,
     CreateRepo,
     CreateImage,
     CreateFlavour,
@@ -53,7 +52,6 @@ pub enum Verb {
 /// is a word nothing resolves to.
 pub const ALL: &[Verb] = &[
     Verb::Upgrade,
-    Verb::Installer,
     Verb::CreateRepo,
     Verb::CreateImage,
     Verb::CreateFlavour,
@@ -183,24 +181,6 @@ pub const COMMANDS: &[Spec] = &[
         family: Family::Anywhere,
         host: false,
         takes: &[],
-    },
-    Spec {
-        verb: Verb::Installer,
-        word: "installer",
-        noun: "",
-        arg: "",
-        about: "install a built tectonic image onto this machine",
-        family: Family::Anywhere,
-        host: false,
-        takes: &[
-            "from",
-            "disk",
-            "hostname",
-            "user",
-            "password",
-            "encryption",
-            "passphrase",
-        ],
     },
     Spec {
         verb: Verb::CreateRepo,
@@ -637,25 +617,15 @@ fn either(rows: &[&'static Spec]) -> String {
     }
 }
 
-/// Rows the help and the picker leave out. `installer` erases the disk it is
-/// pointed at. It still runs when it is typed, and `docs/commands.md` still
-/// documents it.
-const UNLISTED: &[Verb] = &[Verb::Installer];
-
 /// What a person is shown: what runs anywhere, then what needs a repository.
+/// Every row is shown now that the installer is its own binary; the rule that
+/// hid it lived here and went with it.
 pub fn listed() -> Vec<&'static Spec> {
-    let shown = |spec: &&'static Spec| !UNLISTED.contains(&spec.verb);
     let mut rows: Vec<&'static Spec> = COMMANDS
         .iter()
         .filter(|spec| spec.family == Family::Anywhere)
-        .filter(shown)
         .collect();
-    rows.extend(
-        COMMANDS
-            .iter()
-            .filter(|spec| spec.family == Family::Repo)
-            .filter(shown),
-    );
+    rows.extend(COMMANDS.iter().filter(|spec| spec.family == Family::Repo));
     rows
 }
 
@@ -900,24 +870,6 @@ mod tests {
             for here in [Context::Repo(".".into()), Context::Host, Context::Loose] {
                 assert!(usage(&here).contains(&spec.label()), "{}", spec.label());
             }
-        }
-    }
-
-    /// The one row neither rendering offers. It still resolves when it is
-    /// typed, which is the whole of the difference between hiding a command
-    /// and removing one.
-    #[test]
-    fn the_installer_is_in_no_list_and_still_runs() {
-        let installer = Verb::Installer.spec();
-        assert_eq!(installer.word, "installer");
-        assert!(resolve(&["installer"]).is_ok());
-        assert!(resolve(&["install"]).is_err());
-
-        assert!(!listed().iter().any(|spec| spec.verb == Verb::Installer));
-        for here in [Context::Repo(".".into()), Context::Host, Context::Loose] {
-            let (rows, _) = choices(&listed(), &here);
-            assert!(!rows.iter().any(|spec| spec.verb == Verb::Installer));
-            assert!(!usage(&here).contains(installer.about), "{}", usage(&here));
         }
     }
 

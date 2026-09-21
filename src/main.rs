@@ -1,5 +1,6 @@
 //! Reads the arguments, runs the command, prints what it produced.
 
+use common::prompt::Prompt;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -7,7 +8,6 @@ use tect::command::{self, Context, Spec, Verb};
 use tect::copy;
 use tect::dispatch::{self, Error, USAGE_ERROR};
 use tect::model::image::TECT_VERSION;
-use tect::prompt::Prompt;
 
 /// Where a person who has run out of commands is sent, which is what an
 /// operation that failed says. The whole surface is too much to print.
@@ -156,12 +156,6 @@ fn run() -> Result<ExitCode, Error> {
         module: args.flag("module")?,
         cn: args.flag("cn")?,
         from: args.flag("from")?,
-        disk: args.flag("disk")?,
-        hostname: args.flag("hostname")?,
-        user: args.flag("user")?,
-        password: args.flag("password")?,
-        encryption: args.flag("encryption")?,
-        passphrase: args.flag("passphrase")?,
         base: args.flag("base")?,
         format: args.flag("format")?,
         target: args.flag("target")?,
@@ -206,7 +200,7 @@ fn run() -> Result<ExitCode, Error> {
         };
         let (rows, options) = command::choices(&listed, &here);
         banner(false);
-        match tect::ui::select(copy::WHICH_COMMAND, &options)? {
+        match common::ui::select(copy::WHICH_COMMAND, &options)? {
             Some(at) => (rows[at], &[]),
             None => return Ok(ExitCode::SUCCESS),
         }

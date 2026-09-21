@@ -28,7 +28,7 @@
  8 |     private "keys/cosign.key"
    `----
 
-  x `profile` must be "module-signing" or "pcr-signing"
+  x `profile` must be "module-signing", "pcr-signing" or "tls-ca"
     ,-[./modules/core/keys/module.kdl:12:25]
  11 | key "secureboot" {
  12 |     generator "openssl" profile="signing" bits=1

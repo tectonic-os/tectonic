@@ -82,9 +82,9 @@ const KEY: Node = Node::new("key",
             .once("")
             .missing(NEEDED)
             .props(&[
-                Prop { name: "profile", kind: Kind::One(&["module-signing", "pcr-signing"]),
+                Prop { name: "profile", kind: Kind::One(&["module-signing", "pcr-signing", "tls-ca"]),
                     desc: "What the generator is set up for, where it can do more than one thing.",
-                    say: Say::new("`profile` must be \"module-signing\" or \"pcr-signing\"", "not a profile", ""),
+                    say: Say::new("`profile` must be \"module-signing\", \"pcr-signing\" or \"tls-ca\"", "not a profile", ""),
                     missing: Say::NONE },
                 Prop { name: "bits", kind: Kind::Int(2048, 16384),
                     desc: "The RSA key size, 4096 where none is named.",

@@ -1,8 +1,8 @@
 //! What one target is made of, as the markdown a build summary shows.
 
-use crate::emit::json::{field, items, strings, text, Json};
 use crate::emit::plan::of_target;
 use crate::model::image::{List, NO_FLAVOUR};
+use common::json::{field, items, strings, text, Json};
 use std::fmt::Write as _;
 
 /// One module's line, filled by either reading. `options` holds each value as

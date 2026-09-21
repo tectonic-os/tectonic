@@ -6,11 +6,11 @@
 mod xml;
 
 use crate::diag::{Issue, Issues, Source, Span};
-use crate::emit::json::{self, Json};
 use crate::emit::plan::of_target;
 use crate::model::image::{Entry, Image, List, NO_FLAVOUR};
 use crate::provider::Index;
 use crate::resolve::overlay;
+use common::json::{self, Json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};

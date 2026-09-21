@@ -807,7 +807,7 @@ Which of the generators the tool implements writes this key.
 
 | Property | Value | Meaning |
 | --- | --- | --- |
-| `profile=` | `module-signing`, `pcr-signing` | What the generator is set up for, where it can do more than one thing. |
+| `profile=` | `module-signing`, `pcr-signing`, `tls-ca` | What the generator is set up for, where it can do more than one thing. |
 | `bits=` | 2048 to 16384 | The RSA key size, 4096 where none is named. |
 
 #### `public`

@@ -1,11 +1,11 @@
 //! The pinned payloads one target carries, as the SPDX packages a scan of the
 //! built image cannot see.
 
-use crate::emit::json::Json;
 use crate::emit::plan::{of_target, pinned};
 use crate::model::asset::Asset;
 use crate::model::image::List;
 use crate::model::module::Module;
+use common::json::Json;
 
 /// None when nothing publishes under that name.
 pub fn build(list: &List, target: &str) -> Option<Json> {

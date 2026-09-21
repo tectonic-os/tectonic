@@ -1,10 +1,10 @@
 //! What one image's modules promise each other, as a diagram and as data.
 
-use crate::emit::json::Json;
 use crate::emit::{Part, Table};
 use crate::layout;
 use crate::model::image::Image;
 use crate::model::module::Module;
+use common::json::Json;
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::PathBuf;
