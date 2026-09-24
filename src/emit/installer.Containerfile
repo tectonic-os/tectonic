@@ -16,7 +16,11 @@ ARG LIVE_BASE=quay.io/fedora/fedora-bootc:44
 # creation fix (the deploy root's /var is a stateroot symlink, and login.defs
 # makes useradd create the home by default) and the first-boot TPM2 unit going
 # into the deployment's /etc instead of the physical root's, which no boot
-# reads. The PCR-policy change is stacked
+# reads. The branch above those carries the `tpm2-luks-pin` encryption kind,
+# drops the payload's signatures from the OCI export so a signed source can
+# install, and holds every login until the first-boot enrollment finishes,
+# with a 120-second start cap so a hung TPM cannot lock the machine out. The
+# PCR-policy change is stacked
 # on `tectonic-integration`, which holds the other changes. The fork is
 # of `tuna-os` deliberately: that repository's own
 # description reads `MOVED -> github.com/projectbluefin/fisherman`, and that
@@ -29,8 +33,8 @@ ARG LIVE_BASE=quay.io/fedora/fedora-bootc:44
 # the root, which is why the two build directories below are not symmetrical.
 FROM ${GO_IMAGE} AS tools
 ARG FISHERMAN_ORG=tectonic-os
-ARG FISHERMAN_COMMIT=cf7e275e89ff8531c999c9b335f7055ccdaff14d
-ARG FISHERMAN_SHA256=066a8ee5d3f03a9af2c17e62f7eb2e8c59ff5e0b4eba2be995e68b27c132ed8a
+ARG FISHERMAN_COMMIT=c7033b17fd7ccc5f71befe4f77bf93c7ebadb831
+ARG FISHERMAN_SHA256=1f826c102672c101e02b38448c22a4894cab12c4822983b16e1418fd8bfa5462
 # Tacklebox is the other fork: the media needs a change upstream has not got.
 # The pin is `feat/grub-bootloader-support`, which stages the live image's own
 # bootloader, a signed shim and GRUB pair in any of four layouts, the deb
@@ -77,9 +81,9 @@ RUN set -eux; \
 # `lib/modules/manager/dockerfile/` on 2026-09-21. Tracking these needs a
 # `customManagers` regex in the repository that builds the media. Recheck if
 # that manager gains a releases datasource.
-ARG INSTALLER_VERSION=0.1.0
-ARG INSTALLER_SHA256_X86_64=2efefc4563d8b4c06803d290c9c509bfac1e0115da3ed3afb9d4ef62925425ff
-ARG INSTALLER_SHA256_AARCH64=9a366d74761ec19ac8f9fc1f85a44b63bd97b8e67c7d4d4293087bc3728a8b09
+ARG INSTALLER_VERSION=0.1.2
+ARG INSTALLER_SHA256_X86_64=248d49d28beb19647ece8a0729365e675e6423d83818cd26ffebedef38190c68
+ARG INSTALLER_SHA256_AARCH64=7746831f2378c87f5258e8f51af48dd693b1dc3c3716038abf57c8b8a723ea56
 RUN set -eux; \
     arch="$(uname -m)"; \
     case "$arch" in \

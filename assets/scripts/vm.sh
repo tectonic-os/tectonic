@@ -403,17 +403,38 @@ login_credentials() {
     echo "vm: login as ${vm_user}; credentials provision the account on its first boot"
 }
 
+# A disk carrying a signature at the end of its first sector has a partition
+# table on it: an installer was run, or at least started. Blank is all zeros
+# there. The media is skipped only once that is true, because a run that still
+# has it attached boots it again after the restart the install asks for.
+partitioned() {
+    [ -f "$1" ] || return 1
+    [ "$(dd if="$1" bs=1 skip=510 count=2 2> /dev/null | od -An -tx1 | tr -d ' \n')" = "55aa" ]
+}
+
 # `GPU=Y` makes qemux build a `virtio-vga-gl` line carrying `host3d_blob_limit`,
 # which its own QEMU refuses, and the machine never boots. So qemux's own
 # variable is passed through at qemux's own default.
 run_qemu() {
-    local port=8006 arguments sysusers_base64 credential_args=() storage=()
+    local port=8006 arguments sysusers_base64 credential_args=() storage=() media=()
     # An iso boots an installer, so the disk it installs onto has to outlive the
     # container: qemux keeps it under /storage, which is otherwise thrown away
     # with `--rm` and takes the installation with it.
     if [ "$type" = iso ]; then
         mkdir -p "${staged}/storage"
         storage=(--volume "${PWD}/${staged}/storage":/storage)
+    fi
+    # Once the storage's disk has a partition table, this run boots it instead
+    # of the installer: the restart an install asks for comes back to the media
+    # while the container still has it attached, so the run after that is where
+    # the installed system can be reached at all. A partition table is also
+    # what a failed install leaves, which is why the message claims the disk
+    # and not the system on it. `rm -rf ${staged}/storage` installs again.
+    media=(--volume "${PWD}/${image_file}":"/boot.${type}")
+    if [ "$type" = iso ] && partitioned "${staged}/storage/data.img"; then
+        media=()
+        echo "vm: the storage disk has a partition table; booting the disk"
+        echo "vm: remove ${staged}/storage to boot the installer again"
     fi
     while ss -tunal | grep -q ":${port} "; do
         port=$((port + 1))
@@ -437,7 +458,7 @@ run_qemu() {
         "${credential_args[@]}" \
         "${storage[@]}" \
         --device=/dev/kvm \
-        --volume "${PWD}/${image_file}":"/boot.${type}" \
+        "${media[@]}" \
         docker.io/qemux/qemu
 }
 
