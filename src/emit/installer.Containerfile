@@ -33,8 +33,8 @@ ARG LIVE_BASE=quay.io/fedora/fedora-bootc:44
 # the root, which is why the two build directories below are not symmetrical.
 FROM ${GO_IMAGE} AS tools
 ARG FISHERMAN_ORG=tectonic-os
-ARG FISHERMAN_COMMIT=c7033b17fd7ccc5f71befe4f77bf93c7ebadb831
-ARG FISHERMAN_SHA256=1f826c102672c101e02b38448c22a4894cab12c4822983b16e1418fd8bfa5462
+ARG FISHERMAN_COMMIT=2ac6e1850734d82c3a40090d49a7565e02d610ea
+ARG FISHERMAN_SHA256=4ab6984245fd35843e86c7ff762b1672e193d3a2a6b939fada13be44605af933
 # Tacklebox is the other fork: the media needs a change upstream has not got.
 # The pin is `feat/grub-bootloader-support`, which stages the live image's own
 # bootloader, a signed shim and GRUB pair in any of four layouts, the deb
@@ -81,9 +81,9 @@ RUN set -eux; \
 # `lib/modules/manager/dockerfile/` on 2026-09-21. Tracking these needs a
 # `customManagers` regex in the repository that builds the media. Recheck if
 # that manager gains a releases datasource.
-ARG INSTALLER_VERSION=0.1.2
-ARG INSTALLER_SHA256_X86_64=248d49d28beb19647ece8a0729365e675e6423d83818cd26ffebedef38190c68
-ARG INSTALLER_SHA256_AARCH64=7746831f2378c87f5258e8f51af48dd693b1dc3c3716038abf57c8b8a723ea56
+ARG INSTALLER_VERSION=0.1.3
+ARG INSTALLER_SHA256_X86_64=9fea5189ce22ea53af7ab2804ba7c5221ca9b6438de7db8937d5ef8a728057ff
+ARG INSTALLER_SHA256_AARCH64=360c0dca9cb63d0878a9b313b6fc6aa9b3e9e2c4cb5345d18075db3773364d7c
 RUN set -eux; \
     arch="$(uname -m)"; \
     case "$arch" in \
