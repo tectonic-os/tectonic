@@ -864,7 +864,7 @@ dependencies = [
 
 [[package]]
 name = "tect"
-version = "0.6.47"
+version = "0.6.48"
 dependencies = [
  "common",
  "kdl",
