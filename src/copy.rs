@@ -1,4 +1,4 @@
-//! Every string a person is asked by a prompt, in one place.
+//! Every string a prompt asks the user, in one place.
 //!
 //! Prompts only: the questions, the labels of the answers beside them, and the
 //! hints under the widgets. Catalogue content — a base's `about`, a module's
@@ -6,9 +6,8 @@
 //! holds it, and so do diagnostics, errors, `next` lines and the command
 //! table.
 
-/// The name of the thing, which is what prose calls it. `tect` is the command
-/// and belongs in a command line, a flag or a diagnostic prefix; a title or a
-/// sentence a person reads says this.
+/// The product name prose uses. `tect` is the command: it belongs in a command
+/// line, a flag or a diagnostic prefix, and a title or a sentence says this.
 pub const PRODUCT: &str = "Tectonic";
 
 // The repository
@@ -17,15 +16,15 @@ pub const REPO_NAME: &str = "What will the repo be called?";
 pub const SCHEDULED: &str = "Sync this repo to a provider?";
 pub const REPO_HOST: &str = "Where will the repo be hosted?";
 pub const FORGEJO_ADDRESS: &str = "What is the address of the Forgejo instance?";
-pub const CREATE_REMOTE: &str = "Would you like to create this repo on Github now?";
+pub const CREATE_REMOTE: &str = "Create this repo on Github now?";
 pub const NO_GH: &str = "Install the Github CLI now?";
 
 /// Github is asked for by name, and every other host by its address, which is
-/// what a person who typed one recognises.
+/// what the user typed.
 pub fn username(host: &str) -> String {
     match host {
-        crate::create::HOST => "What is your github username?".to_string(),
-        host => format!("What is your username on {host}?"),
+        crate::create::HOST => "Github username?".to_string(),
+        host => format!("Username on {host}?"),
     }
 }
 
@@ -66,7 +65,7 @@ pub const BRING_REQUIRED: &str = "Bring what these modules require?";
 /// The same question against the base row, asked one step earlier: a base that
 /// is not a bootc image says what makes it one, and a fresh repository has
 /// neither that nor the family adapter.
-pub const BRING_FOR_BASE: &str = "Do you want to add them now?";
+pub const BRING_FOR_BASE: &str = "Add them now?";
 pub const IMPORT_CLAIMING: &str = "Import the modules claiming these rules?";
 
 /// What a list says above itself about an answer it cleared. `unmet` is the
@@ -101,7 +100,7 @@ pub fn claimed_rules(named: &str) -> String {
 
 pub const WHICH_KEY: &str = "Which key?";
 pub const KEY_CN: &str = "common name, which is what the enrolment prompt shows";
-pub const KEY_FROM: &str = "path to the public half you already hold";
+pub const KEY_FROM: &str = "path to the public half already held";
 
 /// Which module's, where more than one declares the kind. The modules are the
 /// rows below, so the question does not list them.
@@ -130,8 +129,13 @@ pub const SKIP_REMOTE: &str = "Skip Github repo creation";
 
 // The detail beside a choice, for the choices no catalogue describes.
 
-pub const HOST_GITHUB: &str = "Github, and the workflows Tectonic ships";
-pub const HOST_FORGEJO: &str = "a Forgejo instance, whose address you give";
+pub const HOST_FORGEJO: &str = "a Forgejo instance, at an address asked next";
+
+/// The first host's detail. It names the product, so it reads `PRODUCT` rather
+/// than repeating the name a rename would leave stale.
+pub fn host_github() -> String {
+    format!("Github, and the workflows {PRODUCT} ships")
+}
 
 // What each widget answers to.
 

@@ -3,5 +3,5 @@ Tectonic v{version}
 Error: The one/signature-policy module must be imported before creating cosign keys.
 You can add it with `tect import module one/signature-policy`
 
-You can find the available commands by typing 'tect' or 'tect --help'
+Run 'tect --help' to list the commands
 ==== exit 1

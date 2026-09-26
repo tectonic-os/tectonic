@@ -30,7 +30,7 @@ What is the base image for this image? [1-11, 0 for none]: 1
 quay.io/fedora/fedora-bootc:44 needs the following modules:
     one/fedora-family
 
-Do you want to add them now? (Yes/No)
+Add them now? (Yes/No)
 Yes
 
 initialised a git repository in example

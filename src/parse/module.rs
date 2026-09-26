@@ -332,7 +332,7 @@ pub const MODULE: Node = Node::new("module",
 
         FAMILY,
     ], Say::new("unknown node `{}`", "not part of the schema",
-        "docs/schema.md documents every node a manifest may hold"));
+        "docs/schema/module.md documents every node a manifest may hold"));
 
 /// `owner/project` split into its two segments, or None when it is not that.
 /// The one place a COPR name is read, so `copr` and an `enablerepo` naming one

@@ -25,8 +25,7 @@ move.
 x86_64 and aarch64 Linux are what is published. Anywhere else, build it.
 
 Both resolve the latest release at run time, so what arrives is what is tagged
-rather than what is on `main`. `tect upgrade` is newer than the current tag, so
-a copy installed today does not have it yet.
+rather than what is on `main`.
 
 ## What a repository looks like
 
@@ -36,57 +35,93 @@ a copy installed today does not have it yet.
                           named image.kdl or ends .image.kdl
     modules/<path>/       one module apiece, each with a module.kdl
 
-`tect create repo` writes that tree, along with the build scripts, the shell
-helpers, the disk config and the workflows, which the tool ships and a
-repository does not carry.
+`tect create repo` writes that tree along with the disk config, the root
+dotfiles and the Containerfile skeleton it scaffolds. `tect generate`, the step
+it prints next, writes the build scripts, the shell helpers and the workflows,
+which the tool ships and a repository does not carry.
 
-See [the schema](docs/schema.md), which documents
-[the repository file](docs/schema.md#the-repository-file),
-[image files](docs/schema.md#image-files) and
-[module manifests](docs/schema.md#module-manifests). Its reference tables are
+See [the schema](docs/schema.md), which indexes
+[the repository file](docs/schema/repo.md),
+[image files](docs/schema/image.md),
+[module manifests](docs/schema/module.md),
+[the base catalog](docs/schema/bases.md) and
+[pins](docs/schema/pins.md). Its reference tables are
 generated from the tables the parser reads, so they cannot drift from what the
 tool accepts.
 
 ## Commands
 
-This is the whole surface today. The rest of it is not built yet.
+`tect` with nothing after it opens a picker of what runs here where the output
+is a terminal, and prints the list where it is not. `tect --help` keeps every
+command a person runs and groups them by where they run. A verb with no noun,
+such as `tect create` or `tect vm`, opens a picker of its nouns. Leaving a
+picker is not an error: it exits 0 having done nothing.
 
-    tect upgrade          replace this tect and its assets with the latest
-    tect create repo [name]
-                          start a repository, and offer an image in it
-    tect create image [name]
-                          add an image: what it is called, and what it builds
-                          on
-    tect create module [name]
-                          write a module, with the packages it installs, and
-                          offer to list it in an image
-    tect import module [name]
-                          reference a module from a collection repo.kdl names
-    tect copy module [name]
-                          copy a collection module into modules/<name>
-    tect create key <kind>
-                          generate a key one of the repository's modules
-                          declares, with both halves under keys/
-    tect check            validate every manifest, and say where and why
-    tect generate         write the Containerfile per image, the per-module
-                          build scripts and the graph, under
-                          generated/<image>/
-    tect build [target]   verify the build files, then build the image
-    tect section [image]  the generated Containerfile module section
-    tect graph [--format md|json]
-                          the capability graph, as markdown holding a mermaid
-                          diagram, or as JSON
-    tect why [module]     one module's trust read-out: what builds it, what it
-                          exchanges, what it claims, and where it came from
+[The commands](docs/commands.md) documents every command with its flags. It is
+generated from the definition the parser reads, and `tect <command> --help`
+prints the same prose. The reference lists the global flags once, under `tect`.
 
-`tect plan --json`, `verify`, `summary`, `sbom`, `fetch modules` and
-`registry` are the build's, and `os-release`, `build-record`, `fetch` and
-`validate-image` run only inside a build layer. See
-[the commands](docs/commands.md), which documents all of them, and how every
-command takes a flag for everything it needs.
+The help a person reads names the commands that run anywhere or in a
+repository. The build's own commands are the `Script` family — `plan`,
+`verify`, `summary`, `sbom`, `fetch modules`, `scap` and its nouns, `registry`
+and its nouns, and `recipe` — which is the contract the build runs against.
+The `Layer` family — `os-release`, `build-record`, `fetch` and
+`validate-image` — reads the image around them, and runs only where the binary
+is mounted into a build layer.
 
-Data goes to stdout and diagnostics to stderr. Exit 1 is the invocation, exit
-2 the repository.
+The repository is the nearest directory at or above the working directory
+holding a `repo.kdl`, or `--root <dir>`. Data goes to stdout and diagnostics to
+stderr. Exit 1 is the invocation, exit 2 the repository.
+
+### Flags and prompts
+
+Every command takes a flag for everything it needs.
+
+- All of them supplied: nothing is asked, and nothing opens.
+- One missing, and stdin is a terminal: it is asked for.
+- One missing, and stdin is not a terminal: the command fails naming the flag.
+
+`--no-tui` forces the third case, so a script behaves the same whether or not
+it has a terminal.
+
+A yes or no step has no flag of its own. The flag that answers it is the
+answer: `--image desktop` on `create repo` means yes and names the image, and
+its absence under `--no-tui` means no. A repeatable flag answers a step that
+takes several values.
+
+Every question is asked before anything is written, so a name already taken or
+an image that is not declared is refused with nothing left behind. A step that
+fails stops the command: what earlier steps wrote stays, and each of those
+steps is a command of its own to finish the run with.
+
+`create repo`, `create image`, `create flavour`, `create module`, `import
+module`, `copy module` and `generate` end with a tree of the files they wrote,
+rooted at the repository, and a leaf a later step took further carries a phrase
+saying what it added. `create key` names its two halves instead: one of them is
+private and ignored, so a tracked-file tree omits it.
+
+`--root` and `--no-tui` are accepted by every command. A flag a command does
+not take is refused rather than ignored, including the switches: `--cache-to`
+and `--no-cache-from` belong to `build`, and `--rebuild` to the three `vm`
+nouns.
+
+### On a booted image
+
+A built image carries `/usr/share/tectonic/manifest.json`, what it declares it
+is made of, and `/usr/share/tectonic/build.json`, what the build resolved. With
+no `repo.kdl` anywhere above, `why`, `summary`, `scap content` and `plan`
+answer off those two and need no checkout. A repository wins whenever there is
+one, because it is the more specific answer and it has the source.
+
+Everything else needs the source tree and says so, naming what does answer here.
+
+**Every host answer is scoped to the target the record says this image was
+built as.** The manifest holds every target the repository declares, so an
+unscoped answer would describe an image that is not this one; a `summary` or
+`scap content` naming a different target is refused. If the record names no
+target, a one-target manifest is that target; with more than one, `why` reads
+across all of them and says so, and `summary` and `scap content` are refused
+because no honest answer exists.
 
 ## Building it
 
@@ -104,9 +139,10 @@ run one, and aim it at a repository elsewhere with `--root`.
     ./lint.sh --fix       rewrite everything into the format it gates on
 
 The tests are goldens: every command, over this repository's fixtures, is
-compared byte for byte against a committed file, and so is the generated half
-of `docs/schema.md`. `UPDATE_GOLDEN=1 cargo test` regenerates them, and the
-diff is the review.
+compared byte for byte against a committed file, and so are
+`docs/commands.md` and the generated half of `docs/schema.md` and
+`docs/schema/`.
+`UPDATE_GOLDEN=1 cargo test` regenerates them, and the diff is the review.
 
 ## Licence
 

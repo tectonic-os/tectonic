@@ -1,7 +1,6 @@
-//! What each row of the command table does, which is everything the binary
-//! is not allowed to decide for itself.
+//! The work behind every command the parser accepts.
 
-use crate::command::{self, Context, Spec, Verb};
+use crate::command::{self, Context, Verb};
 use crate::copy;
 use crate::emit::Part;
 use crate::Command;
@@ -10,17 +9,14 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-/// The invocation is wrong: an unknown command, a bad argument, no repository.
+/// Exit 1: a refused invocation, or a run that could not do its job.
 pub const USAGE_ERROR: u8 = 1;
 /// The repository is wrong, and every problem was printed to stderr.
 pub const REPO_ERROR: u8 = 2;
 
-/// Why a command did not run. Usage answers an invocation and says nothing
-/// about an operation that failed part way, so only the first prints it.
+/// Why a command did not run. A parse refusal is clap's, so what is left is a
+/// command that got the right words and then could not do the job.
 pub enum Error {
-    /// The words are not a command, which is the one failure the whole command
-    /// list answers.
-    Usage(String),
     Invocation(String),
     Operation(String),
 }
@@ -28,12 +24,12 @@ pub enum Error {
 impl Error {
     pub fn message(&self) -> &str {
         match self {
-            Self::Usage(message) | Self::Invocation(message) | Self::Operation(message) => message,
+            Self::Invocation(message) | Self::Operation(message) => message,
         }
     }
 }
 
-/// Anything the library reports is an operation that failed.
+/// A library error is an operation that failed, not a bad invocation.
 impl From<String> for Error {
     fn from(message: String) -> Self {
         Self::Operation(message)
@@ -71,13 +67,12 @@ pub struct Flags {
 }
 
 /// The optional name a `create` takes, and nothing else.
-fn one_name(rest: &[&str], spec: &Spec) -> Result<Option<String>, Error> {
+fn one_name(rest: &[&str], name: &str) -> Result<Option<String>, Error> {
     match rest {
         [] => Ok(None),
-        [name] => Ok(Some((*name).to_string())),
+        [one] => Ok(Some((*one).to_string())),
         _ => Err(Error::Invocation(format!(
-            "`{}` takes one name, not {}",
-            spec.name(),
+            "`{name}` takes one name, not {}",
             rest.join(" ")
         ))),
     }
@@ -109,11 +104,10 @@ fn repo_root(here: &Context) -> Result<PathBuf, Error> {
     Ok(root)
 }
 
-/// What a booted image can answer, for the refusal above.
 fn answers() -> String {
-    let rows: Vec<String> = command::on_host()
-        .iter()
-        .map(|spec| format!("`tect {}`", spec.label()))
+    let rows: Vec<String> = command::host_labels()
+        .into_iter()
+        .map(|label| format!("`tect {label}`"))
         .collect();
     match rows.split_last() {
         Some((last, [])) => format!("{last} answers"),
@@ -165,12 +159,11 @@ fn this_target(named: Option<&str>, scope: &crate::emit::why::Scope) -> Result<(
 
 /// The refusal when the record named no target and the manifest holds more
 /// than one, so there is no honest answer to give.
-fn unscoped(spec: &Spec) -> String {
+fn unscoped(name: &str) -> String {
     format!(
         "the build record does not name a target and the baked manifest holds more than one, so \
-         `{}` cannot say which of them is running\n\nhelp: `tect why <module>` still answers, \
-         and says that it read across all of them",
-        spec.name()
+         `{name}` cannot say which of them is running\n\nhelp: `tect why <module>` still answers, \
+         and says that it read across all of them"
     )
 }
 
@@ -179,7 +172,8 @@ fn unscoped(spec: &Spec) -> String {
 /// resolved. Both describe the whole repository, so everything here is scoped
 /// to the target the record names.
 fn on_host(
-    spec: &Spec,
+    verb: Verb,
+    name: &str,
     rest: &[&str],
     format: Option<&str>,
     target: Option<&str>,
@@ -188,15 +182,9 @@ fn on_host(
     use crate::emit::why::{built_as, image_of};
     use crate::provenance::build::{MANIFEST, RECORD};
 
-    let unwanted = || {
-        Error::Invocation(format!(
-            "`{}` does not take {}",
-            spec.name(),
-            rest.join(" ")
-        ))
-    };
-    // The manifest as it stands, before anything reads a field out of it.
-    if spec.verb == Verb::Plan {
+    let unwanted = || Error::Invocation(format!("`{name}` does not take {}", rest.join(" ")));
+    // The manifest as it stands, before the record is parsed for a target.
+    if verb == Verb::Plan {
         if !matches!(rest, [] | ["--json"]) {
             return Err(unwanted());
         }
@@ -210,14 +198,14 @@ fn on_host(
         .map_err(Error::Invocation)?;
     let (targets, scope) = built_as(&manifest, record.as_ref());
 
-    if spec.verb == Verb::Why {
+    if verb == Verb::Why {
         return why_on_host(&manifest, record.as_ref(), rest, format, prompt);
     }
 
     // `summary` names its target as an argument and `scap content` as a flag;
     // either way a host takes it only when it is the one that is running.
     this_target(
-        match (spec.verb, rest) {
+        match (verb, rest) {
             (Verb::ScapContent, []) => target,
             (Verb::Summary, []) => None,
             (Verb::Summary, [named]) => Some(*named),
@@ -226,24 +214,22 @@ fn on_host(
         &scope,
     )?;
     let [target] = targets.as_slice() else {
-        return Err(Error::Invocation(unscoped(spec)));
+        return Err(Error::Invocation(unscoped(name)));
     };
-    match spec.verb {
-        Verb::Summary => {
-            print!("{}", crate::emit::summary::on_host(target));
-            Ok(ExitCode::SUCCESS)
-        }
-        Verb::ScapContent => {
-            let image = image_of(&manifest, target).ok_or_else(|| {
-                Error::Invocation("the manifest names no image for this target".to_string())
-            })?;
-            Ok(match crate::scap::content_on_host(image, target)? {
-                crate::scap::Verdict::Clean => ExitCode::SUCCESS,
-                crate::scap::Verdict::Wrong => ExitCode::from(REPO_ERROR),
-            })
-        }
-        verb => unreachable!("{verb:?} is not answered on a host"),
+    if verb == Verb::Summary {
+        print!("{}", crate::emit::summary::on_host(target));
+        return Ok(ExitCode::SUCCESS);
     }
+    if verb == Verb::ScapContent {
+        let image = image_of(&manifest, target).ok_or_else(|| {
+            Error::Invocation("the manifest names no image for this target".to_string())
+        })?;
+        return Ok(match crate::scap::content_on_host(image, target)? {
+            crate::scap::Verdict::Clean => ExitCode::SUCCESS,
+            crate::scap::Verdict::Wrong => ExitCode::from(REPO_ERROR),
+        });
+    }
+    unreachable!("{verb:?} is not answered on a host");
 }
 
 /// The per-module trust read-out off the baked documents. `known_on_host` is
@@ -342,9 +328,9 @@ fn collection_repo(here: &Context) -> Result<Option<(PathBuf, crate::model::imag
     Ok((!issues.report(&context)).then_some((root, list)))
 }
 
-/// One command, from the row that named it.
 pub fn dispatch(
-    spec: &Spec,
+    verb: Verb,
+    name: &str,
     rest: &[&str],
     flags: Flags,
     prompt: &Prompt,
@@ -379,23 +365,30 @@ pub fn dispatch(
         rebuild,
     } = flags;
     // On a host the two baked documents are the whole of what there is to
-    // read, and the table's `host` column says which commands answer off them.
-    if *here == Context::Host && spec.host {
-        return on_host(spec, rest, format.as_deref(), target.as_deref(), prompt);
+    // read, and the place table says which commands answer off them.
+    if *here == Context::Host && command::on_host(verb) {
+        return on_host(
+            verb,
+            name,
+            rest,
+            format.as_deref(),
+            target.as_deref(),
+            prompt,
+        );
     }
-    match spec.verb {
+    match verb {
         Verb::Upgrade => {
             if let [word, ..] = rest {
                 return Err(Error::Invocation(format!(
                     "`{}` does not take {word}",
-                    spec.name()
+                    name
                 )));
             }
             crate::upgrade::run()?;
             Ok(ExitCode::SUCCESS)
         }
         Verb::CreateRepo => {
-            let name = one_name(rest, spec)?;
+            let name = one_name(rest, name)?;
             // The image `create repo` writes is one, so its `--image` is a name.
             let image = images.last().cloned();
             if let Some(repo) =
@@ -406,7 +399,7 @@ pub fn dispatch(
             Ok(ExitCode::SUCCESS)
         }
         Verb::CreateImage => {
-            let name = one_name(rest, spec)?;
+            let name = one_name(rest, name)?;
             let Some(root) = open(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
@@ -435,7 +428,7 @@ pub fn dispatch(
             Ok(ExitCode::SUCCESS)
         }
         Verb::CreateFlavour => {
-            let name = one_name(rest, spec)?;
+            let name = one_name(rest, name)?;
             let Some(root) = open(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
@@ -445,7 +438,7 @@ pub fn dispatch(
             Ok(ExitCode::SUCCESS)
         }
         Verb::CreateModule => {
-            let name = one_name(rest, spec)?;
+            let name = one_name(rest, name)?;
             let Some(root) = open(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
@@ -455,7 +448,7 @@ pub fn dispatch(
             Ok(ExitCode::SUCCESS)
         }
         Verb::CreateKey => {
-            let kind = one_name(rest, spec)?;
+            let kind = one_name(rest, name)?;
             let Some(root) = open(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
@@ -463,7 +456,7 @@ pub fn dispatch(
             Ok(ExitCode::SUCCESS)
         }
         Verb::SetKey => {
-            let kind = one_name(rest, spec)?;
+            let kind = one_name(rest, name)?;
             let Some(root) = open(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
@@ -471,7 +464,7 @@ pub fn dispatch(
             Ok(ExitCode::SUCCESS)
         }
         Verb::ImportModule => {
-            let name = one_name(rest, spec)?;
+            let name = one_name(rest, name)?;
             let Some((root, list)) = collection_repo(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
@@ -487,7 +480,7 @@ pub fn dispatch(
             Ok(ExitCode::SUCCESS)
         }
         Verb::CopyModule => {
-            let name = one_name(rest, spec)?;
+            let name = one_name(rest, name)?;
             let Some((root, list)) = collection_repo(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
@@ -506,7 +499,7 @@ pub fn dispatch(
             if let [word, ..] = rest {
                 return Err(Error::Invocation(format!(
                     "`{}` does not take {word}",
-                    spec.name()
+                    name
                 )));
             }
             let Some(root) = open(here)? else {
@@ -537,7 +530,7 @@ pub fn dispatch(
             Ok(ExitCode::SUCCESS)
         }
         Verb::SetConforms => {
-            let name = one_name(rest, spec)?;
+            let name = one_name(rest, name)?;
             let Some(root) = open(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
@@ -552,8 +545,8 @@ pub fn dispatch(
             Ok(ExitCode::SUCCESS)
         }
         Verb::SetClaims => {
-            let named = one_name(rest, spec)?.ok_or_else(|| {
-                Error::Invocation(format!("`{}` takes the module to claim for", spec.name()))
+            let named = one_name(rest, name)?.ok_or_else(|| {
+                Error::Invocation(format!("`{}` takes the module to claim for", name))
             })?;
             let Some(root) = open(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
@@ -581,7 +574,7 @@ pub fn dispatch(
         }
         Verb::Build => {
             let opts = crate::build::Options {
-                target: one_name(rest, spec)?.or(target),
+                target: one_name(rest, name)?.or(target),
                 kernel,
                 tags,
                 secrets,
@@ -605,7 +598,15 @@ pub fn dispatch(
                 ram,
                 rebuild,
             };
-            crate::vm::run(&root, spec, one_name(rest, spec)?.as_deref(), &opts, prompt)?;
+            let noun = name.rsplit(' ').next().expect("a vm command has a noun");
+            crate::vm::run(
+                &root,
+                noun,
+                name,
+                one_name(rest, name)?.as_deref(),
+                &opts,
+                prompt,
+            )?;
             Ok(ExitCode::SUCCESS)
         }
         Verb::RegistryNamespace => {
@@ -625,7 +626,7 @@ pub fn dispatch(
             Ok(ExitCode::SUCCESS)
         }
         // The half of an installer recipe the declaration answers. The disk,
-        // the account and the encryption are the person's, and are not here.
+        // the account and the encryption are the user's, and are not here.
         Verb::Recipe => {
             let root = repo_root(here)?;
             let (list, issues, context) = crate::declarations(&root);
@@ -738,7 +739,24 @@ pub fn dispatch(
             crate::runtime::fetch(rest)?;
             Ok(ExitCode::SUCCESS)
         }
-        _ => reading(spec, rest, format.as_deref(), datastream, prompt, here),
+        Verb::Check
+        | Verb::Generate
+        | Verb::Plan
+        | Verb::Verify
+        | Verb::Section
+        | Verb::Graph
+        | Verb::Why
+        | Verb::Coverage
+        | Verb::Summary
+        | Verb::Sbom => reading(
+            verb,
+            name,
+            rest,
+            format.as_deref(),
+            datastream,
+            prompt,
+            here,
+        ),
     }
 }
 
@@ -805,14 +823,15 @@ fn coverage(
 /// The commands the repository is read for, which is one call into the library
 /// and then the counts and read-outs that hang off it.
 fn reading(
-    spec: &Spec,
+    verb: Verb,
+    name: &str,
     rest: &[&str],
     format: Option<&str>,
     datastream: Option<PathBuf>,
     prompt: &Prompt,
     here: &Context,
 ) -> Result<ExitCode, Error> {
-    let command = spec.verb.reads().expect("a command run reads");
+    let command = verb.reads().expect("a command run reads");
     let command = match (command, format) {
         (Command::Graph, None | Some("md")) => Command::Graph,
         (Command::Graph, Some("json")) => Command::GraphJson,
@@ -830,12 +849,10 @@ fn reading(
 
     let arg = match rest {
         [] => None,
-        ["--json"] if command == Command::Plan => None,
         [one] if command.arg().is_some() => Some(*one),
         _ => {
             return Err(Error::Invocation(format!(
-                "`{}` does not take {}",
-                spec.name(),
+                "`{name}` does not take {}",
                 rest.join(" ")
             )));
         }
@@ -849,9 +866,6 @@ fn reading(
                 .into(),
         ));
     }
-
-    // On a host the two baked documents are the whole of what there is to
-    // read, and the table's `host` column says which commands answer off them.
 
     let root = repo_root(here)?;
     // The two read-outs about one thing: what is named is picked from what

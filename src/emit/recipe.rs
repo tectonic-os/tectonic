@@ -575,15 +575,10 @@ mod tests {
     /// Both installer units hand over to the binary this file stages, and
     /// they hand over to no other.
     ///
-    /// **This proves less than the test it replaces, and the difference
-    /// matters to a later reader.** Until `NEXT-53` stage 3 the units ran
-    /// `/usr/bin/tect installer`, and the tie was that the word `installer`
-    /// resolved through `crate::command::resolve`. The installer is another
-    /// crate's binary now, so no command table here can answer for it and that
-    /// tie is gone rather than moved. What survives is that each unit's
-    /// `ExecStart=` ends at the path the `COPY` above writes. A binary that
-    /// cannot run is not caught here, and the Containerfile's own `--version`
-    /// is what catches that.
+    /// The installer is another crate's binary, so no parser here answers for
+    /// it. What this holds is that each unit's `ExecStart=` ends at the path
+    /// the `COPY` above writes; a binary that cannot run is caught by the
+    /// Containerfile's own `--version`.
     #[test]
     fn both_installer_units_hand_over_to_the_binary_the_live_environment_stages() {
         // Source and destination both. A `COPY` checked by its destination

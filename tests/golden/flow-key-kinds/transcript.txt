@@ -5,5 +5,5 @@ Which key? [1, 0 for none]: 0
 
 Error: `tect create key <kind>` names which key; this repository declares secureboot.
 
-You can find the available commands by typing 'tect' or 'tect --help'
+Run 'tect --help' to list the commands
 ==== exit 1

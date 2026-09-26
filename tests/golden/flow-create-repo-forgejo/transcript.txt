@@ -9,13 +9,13 @@ Sync this repo to a provider? (Yes/No)
 Yes
 
   1) github.com  Github, and the workflows Tectonic ships
-  2) forgejo  a Forgejo instance, whose address you give
+  2) forgejo  a Forgejo instance, at an address asked next
 Where will the repo be hosted? [1-2, 0 for none]: 2
 
 What is the address of the Forgejo instance?
 forge.example.org
 
-What is your username on forge.example.org?
+Username on forge.example.org?
 forge.example.org/someone
 
 Added forge.example.org/someone/example as the origin repo

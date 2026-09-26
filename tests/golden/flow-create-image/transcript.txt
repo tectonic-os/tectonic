@@ -20,7 +20,7 @@ What is the base image for this image? [1-12, 0 for none]: 12
 example.invalid/collected:1 needs the following modules:
     one/fedora-family
 
-Do you want to add them now? (Yes/No)
+Add them now? (Yes/No)
 Yes
 
 

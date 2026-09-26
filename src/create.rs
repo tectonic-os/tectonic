@@ -442,7 +442,7 @@ fn under(root: &Path, path: &Path) -> PathBuf {
 /// the tool ships know how to run under.
 fn choose_host(current: Option<&str>, prompt: &Prompt) -> Result<String, String> {
     let options = [
-        Choice::new(HOST, copy::HOST_GITHUB),
+        Choice::new(HOST, copy::host_github()),
         Choice::new("forgejo", copy::HOST_FORGEJO),
     ];
     let at = current.map(|held| usize::from(held != HOST));

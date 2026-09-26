@@ -1,10 +1,34 @@
-//! The generated half of docs/schema.md, rendered from the tables the parser
-//! already reads.
+//! The generated half of the schema reference, rendered from the tables the
+//! parser already reads. `docs/schema.md` indexes one file per reader area
+//! under `docs/schema/`.
 
 use crate::parse::schema::{Arg, Kind, Node, Prop};
 use crate::parse::{asset, bases, image, module, options, repo};
 use crate::provenance::{evidence, record};
 use std::fmt::Write as _;
+
+/// A reader area groups the schemas one reader needs onto one page under
+/// `docs/schema/`.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Area {
+    Repo,
+    Image,
+    Module,
+    Bases,
+    Pins,
+}
+
+impl Area {
+    pub fn file(self) -> &'static str {
+        match self {
+            Area::Repo => "repo.md",
+            Area::Image => "image.md",
+            Area::Module => "module.md",
+            Area::Bases => "bases.md",
+            Area::Pins => "pins.md",
+        }
+    }
+}
 
 /// One splice region. `declared` is false for a grammar whose own node is not
 /// written in the file, the file's top-level nodes being its children.
@@ -12,19 +36,20 @@ struct Section {
     name: &'static str,
     node: &'static Node,
     declared: bool,
+    area: Area,
 }
 
 #[rustfmt::skip]
 const SECTIONS: &[Section] = &[
-    Section { name: "repo", node: &repo::REPO, declared: false },
-    Section { name: "image", node: &image::IMAGE, declared: true },
-    Section { name: "bases", node: &bases::BASES, declared: false },
-    Section { name: "module", node: &module::MODULE, declared: false },
-    Section { name: "option", node: &options::OPTION, declared: true },
-    Section { name: "variant", node: &options::VARIANT, declared: true },
-    Section { name: "asset", node: &asset::ASSET, declared: true },
-    Section { name: "pin", node: &evidence::PIN, declared: true },
-    Section { name: "imported", node: &record::IMPORTED, declared: true },
+    Section { name: "repo", node: &repo::REPO, declared: false, area: Area::Repo },
+    Section { name: "image", node: &image::IMAGE, declared: true, area: Area::Image },
+    Section { name: "bases", node: &bases::BASES, declared: false, area: Area::Bases },
+    Section { name: "module", node: &module::MODULE, declared: false, area: Area::Module },
+    Section { name: "option", node: &options::OPTION, declared: true, area: Area::Module },
+    Section { name: "variant", node: &options::VARIANT, declared: true, area: Area::Module },
+    Section { name: "asset", node: &asset::ASSET, declared: true, area: Area::Pins },
+    Section { name: "pin", node: &evidence::PIN, declared: true, area: Area::Pins },
+    Section { name: "imported", node: &record::IMPORTED, declared: true, area: Area::Pins },
 ];
 
 /// A node with a region of its own, which is documented there and linked to
@@ -100,8 +125,17 @@ fn sentence(parts: &[String]) -> String {
     }
 }
 
-/// One node under its own heading, then everything below it.
-fn node(node: &Node, depth: usize, seen: &mut Vec<&'static str>, out: &mut String) {
+/// A link to a section's heading from a page of `from`. The anchor is the
+/// section name, which is also the slug of its node's heading.
+fn link(section: &Section, from: Area) -> String {
+    let file = match section.area == from {
+        true => "",
+        false => section.area.file(),
+    };
+    format!("[`{}`]({file}#{})", section.node.name, section.name)
+}
+
+fn node(node: &Node, depth: usize, from: Area, seen: &mut Vec<&'static str>, out: &mut String) {
     seen.push(node.desc);
     let _ = writeln!(out, "{} {}\n", "#".repeat(depth), named(node));
     let _ = writeln!(out, "{}\n", node.desc);
@@ -124,17 +158,23 @@ fn node(node: &Node, depth: usize, seen: &mut Vec<&'static str>, out: &mut Strin
         out.push('\n');
     }
 
-    children(node, depth, seen, out);
+    children(node, depth, from, seen, out);
 }
 
-/// Every child: the ones documented elsewhere as a link or a back-reference,
-/// the leaves as one table, and the rest under headings of their own.
-fn children(parent: &Node, depth: usize, seen: &mut Vec<&'static str>, out: &mut String) {
+/// Every child: a link to another page, an `as above` repeat, a table row for a
+/// leaf, a heading for a nested block.
+fn children(
+    parent: &Node,
+    depth: usize,
+    from: Area,
+    seen: &mut Vec<&'static str>,
+    out: &mut String,
+) {
     let mut elsewhere: Vec<String> = Vec::new();
     let mut here: Vec<&Node> = Vec::new();
     for child in parent.children {
         match section_of(child) {
-            Some(s) => elsewhere.push(format!("[`{}`](#{})", s.node.name, s.name)),
+            Some(s) => elsewhere.push(link(s, from)),
             None if seen.contains(&child.desc) => {
                 elsewhere.push(format!("{}, as above", named(child)))
             }
@@ -164,7 +204,7 @@ fn children(parent: &Node, depth: usize, seen: &mut Vec<&'static str>, out: &mut
     }
 
     for block in blocks {
-        node(block, depth + 1, seen, out);
+        node(block, depth + 1, from, seen, out);
     }
 }
 
@@ -178,10 +218,11 @@ fn marker<'a>(line: &'a str, tag: &str) -> Option<&'a str> {
         .map(str::trim)
 }
 
-/// The document with every splice region rewritten from the tables. Fails when
-/// a marker names no schema, and when a schema has no marker, so neither half
-/// can be added without the other.
-pub fn render(doc: &str) -> Result<String, String> {
+/// The document with every region named in `names` rewritten by `fill`, which
+/// is given the region's position in `names`. Fails when a marker names no
+/// region, and when a region has no marker, so neither half can be added
+/// without the other.
+fn splice(doc: &str, names: &[&str], fill: impl Fn(usize, &mut String)) -> Result<String, String> {
     let mut out = String::new();
     let mut open: Option<&str> = None;
     let mut spliced: Vec<&str> = Vec::new();
@@ -191,21 +232,16 @@ pub fn render(doc: &str) -> Result<String, String> {
             if let Some(open) = open {
                 return Err(format!("`{open}` is still open at `{name}`"));
             }
-            let Some(section) = SECTIONS.iter().find(|s| s.name == name) else {
-                let known: Vec<&str> = SECTIONS.iter().map(|s| s.name).collect();
+            let Some(at) = names.iter().position(|n| *n == name) else {
                 return Err(format!(
-                    "`{name}` marks no schema; the schemas are {}",
-                    known.join(", ")
+                    "`{name}` marks no schema in this file; the schemas it documents are {}",
+                    names.join(", ")
                 ));
             };
             let _ = writeln!(out, "{line}\n");
-            let seen = &mut Vec::new();
-            match section.declared {
-                true => node(section.node, 3, seen, &mut out),
-                false => children(section.node, 2, seen, &mut out),
-            }
-            open = Some(section.name);
-            spliced.push(section.name);
+            fill(at, &mut out);
+            open = Some(names[at]);
+            spliced.push(names[at]);
             continue;
         }
         if let Some(name) = marker(line, "/schema:") {
@@ -222,14 +258,62 @@ pub fn render(doc: &str) -> Result<String, String> {
     if let Some(open) = open {
         return Err(format!("`{open}` is never closed"));
     }
-    match SECTIONS.iter().find(|s| !spliced.contains(&s.name)) {
+    match names.iter().find(|n| !spliced.contains(n)) {
         Some(missed) => Err(format!(
-            "`{}` has no marker; every schema is documented, so add \
-             `<!-- schema: {} -->` under a heading that says what it is for",
-            missed.name, missed.name
+            "`{missed}` has no marker; every schema is documented, so add \
+             `<!-- schema: {missed} -->` under a heading that says what it is for"
         )),
         None => Ok(out),
     }
+}
+
+/// The areas `SECTIONS` tags, in the order the index lists them. The page set
+/// comes from here, so a schema tagged with an area always has a page.
+pub fn areas() -> Vec<Area> {
+    let mut areas: Vec<Area> = Vec::new();
+    for s in SECTIONS {
+        if !areas.contains(&s.area) {
+            areas.push(s.area);
+        }
+    }
+    areas
+}
+
+pub fn render(area: Area, doc: &str) -> Result<String, String> {
+    let sections: Vec<&Section> = SECTIONS.iter().filter(|s| s.area == area).collect();
+    let names: Vec<&str> = sections.iter().map(|s| s.name).collect();
+    splice(doc, &names, |at, out| {
+        let section = sections[at];
+        let seen = &mut Vec::new();
+        match section.declared {
+            true => node(section.node, 3, area, seen, out),
+            false => children(section.node, 2, area, seen, out),
+        }
+    })
+}
+
+/// The index page with its table of every schema rewritten, so a schema added
+/// to `SECTIONS` is listed with the page that documents it.
+pub fn index(doc: &str) -> Result<String, String> {
+    splice(doc, &["index"], |_, out| {
+        let _ = writeln!(
+            out,
+            "| Schema | Documented in | Meaning |\n| --- | --- | --- |"
+        );
+        for s in SECTIONS {
+            let page = format!("schema/{}", s.area.file());
+            let target = match s.declared {
+                true => format!("{page}#{}", s.name),
+                false => page.clone(),
+            };
+            let _ = writeln!(
+                out,
+                "| `{}` | [`{page}`]({target}) | {} |",
+                s.name, s.node.desc
+            );
+        }
+        out.push('\n');
+    })
 }
 
 #[cfg(test)]
@@ -238,30 +322,57 @@ mod tests {
 
     #[test]
     fn a_marker_naming_no_schema_fails() {
-        let err = render("<!-- schema: colour -->\n<!-- /schema: colour -->\n").unwrap_err();
+        let err = render(
+            Area::Repo,
+            "<!-- schema: colour -->\n<!-- /schema: colour -->\n",
+        )
+        .unwrap_err();
         assert!(err.starts_with("`colour` marks no schema"), "{err}");
     }
 
     #[test]
-    fn a_schema_with_no_marker_fails() {
-        let err = render("nothing here\n").unwrap_err();
-        assert!(err.starts_with("`repo` has no marker"), "{err}");
+    fn a_marker_naming_another_areas_schema_fails() {
+        let err = render(Area::Repo, "<!-- schema: pin -->\n<!-- /schema: pin -->\n").unwrap_err();
+        assert!(
+            err.starts_with("`pin` marks no schema in this file"),
+            "{err}"
+        );
     }
 
     #[test]
-    fn the_generated_half_is_replaced_and_the_rest_is_kept() {
-        let doc: String = SECTIONS
+    fn a_schema_with_no_marker_fails() {
+        let err = render(Area::Repo, "nothing here\n").unwrap_err();
+        assert!(err.starts_with("`repo` has no marker"), "{err}");
+    }
+
+    /// The page for `area` holds a stale region per schema, as the page would
+    /// read before the renderer ran.
+    fn stale(area: Area) -> String {
+        SECTIONS
             .iter()
+            .filter(|s| s.area == area)
             .map(|s| {
                 format!(
                     "## {}\n\n<!-- schema: {0} -->\nstale\n<!-- /schema: {0} -->\n",
                     s.name
                 )
             })
-            .collect();
-        let out = render(&doc).expect("every schema is marked");
+            .collect()
+    }
+
+    #[test]
+    fn the_generated_half_is_replaced_and_the_rest_is_kept() {
+        let out = render(Area::Image, &stale(Area::Image)).expect("every image schema is marked");
         assert!(!out.contains("stale"));
         assert!(out.contains("### `image`"));
-        assert!(out.contains("## repo"));
+        assert!(out.contains("## image"));
+    }
+
+    #[test]
+    fn a_link_names_the_page_only_across_pages() {
+        let out =
+            render(Area::Module, &stale(Area::Module)).expect("every module schema is marked");
+        assert!(out.contains("[`option`](#option)"), "{out}");
+        assert!(out.contains("[`asset`](pins.md#asset)"), "{out}");
     }
 }

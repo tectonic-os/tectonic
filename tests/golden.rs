@@ -2205,20 +2205,71 @@ fn flows() {
     );
 }
 
-/// The reference in docs/schema.md, re-rendered from the tables. The renderer
-/// is what checks that every marker names a schema and every schema is marked.
 #[test]
 fn schema_doc() {
-    let path = crate_dir().join("docs/schema.md");
-    let doc = std::fs::read_to_string(&path).expect("docs/schema.md exists");
-    let rendered = tect::emit::schema_md::render(&doc).unwrap_or_else(|err| panic!("{err}"));
+    use tect::emit::schema_md::{areas, index, render, Area};
+    let mut pages: Vec<(String, Option<Area>)> = vec![("docs/schema.md".to_string(), None)];
+    pages.extend(
+        areas()
+            .into_iter()
+            .map(|area| (format!("docs/schema/{}", area.file()), Some(area))),
+    );
+    for (page, area) in pages {
+        let path = crate_dir().join(&page);
+        let doc = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("{page}: {err}"));
+        let rendered = match area {
+            Some(area) => render(area, &doc),
+            None => index(&doc),
+        }
+        .unwrap_or_else(|err| panic!("{page}: {err}"));
+        if std::env::var_os("UPDATE_GOLDEN").is_some() {
+            std::fs::write(&path, rendered).unwrap();
+            continue;
+        }
+        assert!(
+            doc == rendered,
+            "{page} is stale. Rerun with UPDATE_GOLDEN=1 and read the diff"
+        );
+    }
+
+    let mut on_disk: Vec<String> = std::fs::read_dir(crate_dir().join("docs/schema"))
+        .expect("docs/schema/ exists")
+        .map(|entry| {
+            entry
+                .expect("docs/schema/ lists")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect();
+    on_disk.sort();
+    let mut mapped: Vec<String> = areas().iter().map(|area| area.file().to_string()).collect();
+    mapped.sort();
+    assert_eq!(
+        on_disk, mapped,
+        "docs/schema/ holds exactly the pages the schema map names"
+    );
+}
+
+/// The reference in docs/commands.md, rendered from the clap tree the parser
+/// reads, so the reference and the parser cannot disagree.
+#[test]
+fn commands_doc() {
+    use clap::CommandFactory;
+    let path = crate_dir().join("docs/commands.md");
+    let options = clap_markdown::MarkdownOptions::new()
+        .title("Commands".to_string())
+        .show_footer(false);
+    let rendered =
+        clap_markdown::help_markdown_command_custom(&tect::command::Cli::command(), &options);
     if std::env::var_os("UPDATE_GOLDEN").is_some() {
         std::fs::write(&path, rendered).unwrap();
         return;
     }
+    let doc = std::fs::read_to_string(&path).expect("docs/commands.md exists");
     assert!(
         doc == rendered,
-        "docs/schema.md is stale. Rerun with UPDATE_GOLDEN=1 and read the diff"
+        "docs/commands.md is stale. Rerun with UPDATE_GOLDEN=1 and read the diff"
     );
 }
 

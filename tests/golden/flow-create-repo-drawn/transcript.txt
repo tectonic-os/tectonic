@@ -8,17 +8,17 @@ Creating example...
 [6n
 
 
-[1;1H[1m[38;2;90;86;224;49mWhere will the repo be hosted?[2;1H[38;2;238;111;248;49m> github.com  [2mGithub, and the workflows Tectonic ships[22m[1m                          [3;3H[22m[39;49mforgejo[3;12H[2ma Forgejo instance, whose address you give[4;1Hup and down to move, enter to choose, esc cancels[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hWhere will the repo be hosted?: github.com
+[1;1H[1m[38;2;90;86;224;49mWhere will the repo be hosted?[2;1H[38;2;238;111;248;49m> github.com  [2mGithub, and the workflows Tectonic ships[22m[1m                          [3;3H[22m[39;49mforgejo[3;12H[2ma Forgejo instance, at an address asked next[4;1Hup and down to move, enter to choose, esc cancels[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hWhere will the repo be hosted?: github.com
 
 [6n
 
-[1;1H[1m[38;2;90;86;224;49mWhat is your github username?[2;1H[22m[39;49mgithub.com/[3;1H[2menter confirms[39m[49m[59m[0m[?25l[2;12Hs[39m[49m[59m[0m[?25l[2;13Ho[39m[49m[59m[0m[?25l[2;14Hm[39m[49m[59m[0m[?25l[2;15He[39m[49m[59m[0m[?25l[2;16Ho[39m[49m[59m[0m[?25l[2;17Hn[39m[49m[59m[0m[?25l[2;18He[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hWhat is your github username?: github.com/someone
+[1;1H[1m[38;2;90;86;224;49mGithub username?[2;1H[22m[39;49mgithub.com/[3;1H[2menter confirms[39m[49m[59m[0m[?25l[2;12Hs[39m[49m[59m[0m[?25l[2;13Ho[39m[49m[59m[0m[?25l[2;14Hm[39m[49m[59m[0m[?25l[2;15He[39m[49m[59m[0m[?25l[2;16Ho[39m[49m[59m[0m[?25l[2;17Hn[39m[49m[59m[0m[?25l[2;18He[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hGithub username?: github.com/someone
 
 Added github.com/someone/example as the origin repo
 [6n
 
 
-[1;1H[1m[38;2;90;86;224;49mWould you like to create this repo on Github now?[2;1H[38;2;238;111;248;49m> Yes                                                                           [3;3H[22m[39;49mSkip[4;1H[2mup and down to move, enter to answer[39m[49m[59m[0m[?25l[2;1H  Yes                                                                           [3;1H[1m[38;2;238;111;248;49m> Skip                                                                          [39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hWould you like to create this repo on Github now?: Skip
+[1;1H[1m[38;2;90;86;224;49mCreate this repo on Github now?[2;1H[38;2;238;111;248;49m> Yes                                                                           [3;3H[22m[39;49mSkip[4;1H[2mup and down to move, enter to answer[39m[49m[59m[0m[?25l[2;1H  Yes                                                                           [3;1H[1m[38;2;238;111;248;49m> Skip                                                                          [39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hCreate this repo on Github now?: Skip
 
 [6n
 

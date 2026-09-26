@@ -1,106 +1,13 @@
-# Commands
+//! These constants hold the prose `--help` prints past the usage line. `docs/commands.md` is
+//! rendered from the same strings.
 
-This document contains the help content for the `tect` command-line program.
-
-**Command Overview:**
-
-* [`tect`↴](#tect)
-* [`tect upgrade`↴](#tect-upgrade)
-* [`tect create`↴](#tect-create)
-* [`tect create repo`↴](#tect-create-repo)
-* [`tect create image`↴](#tect-create-image)
-* [`tect create flavour`↴](#tect-create-flavour)
-* [`tect create module`↴](#tect-create-module)
-* [`tect create key`↴](#tect-create-key)
-* [`tect import`↴](#tect-import)
-* [`tect import module`↴](#tect-import-module)
-* [`tect copy`↴](#tect-copy)
-* [`tect copy module`↴](#tect-copy-module)
-* [`tect set`↴](#tect-set)
-* [`tect set workflows`↴](#tect-set-workflows)
-* [`tect set conforms`↴](#tect-set-conforms)
-* [`tect set claims`↴](#tect-set-claims)
-* [`tect set key`↴](#tect-set-key)
-* [`tect check`↴](#tect-check)
-* [`tect generate`↴](#tect-generate)
-* [`tect build`↴](#tect-build)
-* [`tect vm`↴](#tect-vm)
-* [`tect vm build`↴](#tect-vm-build)
-* [`tect vm run`↴](#tect-vm-run)
-* [`tect vm spawn`↴](#tect-vm-spawn)
-* [`tect section`↴](#tect-section)
-* [`tect graph`↴](#tect-graph)
-* [`tect why`↴](#tect-why)
-* [`tect coverage`↴](#tect-coverage)
-* [`tect plan`↴](#tect-plan)
-* [`tect verify`↴](#tect-verify)
-* [`tect summary`↴](#tect-summary)
-* [`tect sbom`↴](#tect-sbom)
-* [`tect scap`↴](#tect-scap)
-* [`tect scap content`↴](#tect-scap-content)
-* [`tect scap tailoring`↴](#tect-scap-tailoring)
-* [`tect scap rules`↴](#tect-scap-rules)
-* [`tect fetch`↴](#tect-fetch)
-* [`tect fetch modules`↴](#tect-fetch-modules)
-* [`tect registry`↴](#tect-registry)
-* [`tect registry namespace`↴](#tect-registry-namespace)
-* [`tect registry ref`↴](#tect-registry-ref)
-* [`tect recipe`↴](#tect-recipe)
-* [`tect os-release`↴](#tect-os-release)
-* [`tect build-record`↴](#tect-build-record)
-* [`tect validate-image`↴](#tect-validate-image)
-
-## `tect`
-
-the build tool for a bootc image repository
-
-**Usage:** `tect [OPTIONS] [COMMAND]`
-
-###### **Subcommands:**
-
-* `upgrade` — replace this tect and its assets with the latest
-* `create` — start a repository, or add an image, flavour, module or key to one
-* `import` — reference a collection module from an image
-* `copy` — copy a collection module into this repository
-* `set` — choose what this repository declares, or record a key
-* `check` — read every manifest and say what is wrong with it
-* `generate` — write the build files, and list what was written
-* `build` — verify the build files, then build the image
-* `vm` — turn the built image into a disk, and boot it
-* `section` — print the Containerfile section an image generates
-* `graph` — print what provides what, and what the base carries
-* `why` — print one module's trust read-out, byte by byte
-* `coverage` — print who claims each rule the image conforms to
-* `plan` — print every fact this repository derives, as json
-* `verify` — byte-compare what is generated against what is committed
-* `summary` — print what one target is made of, as a markdown table
-* `sbom` — print the pinned payloads one target carries, as SPDX
-* `scap` — print what one scan says about the target
-* `fetch` — download one payload, verify it, and place it
-* `registry` — print where images publish, and under what reference
-* `recipe` — print the installer recipe one target installs from
-* `os-release` — write the image identity the build ARGs carry
-* `build-record` — write the record of what the build resolved
-* `validate-image` — run every check a built image has to pass
-
-###### **Options:**
-
-* `--root <dir>` — the repository, else the nearest `repo.kdl` at or above the working directory
-* `--no-tui` — ask nothing, and fail naming the flag a missing answer needs
-
-
-
-## `tect upgrade`
-
-Replaces this `tect`, and the assets it scaffolds from, with the latest
+pub(super) const UPGRADE: &str = r#"Replaces this `tect`, and the assets it scaffolds from, with the latest
 published release. It takes no argument and no flag.
 
 It prints the running version and the latest one, and stops there when they are
-the same or when the running build is ahead of the tag.
+the same or when the running build is ahead of the tag."#;
 
-**Usage:** `tect upgrade`
-
-Notes:
+pub(super) const UPGRADE_NOTES: &str = r#"Notes:
 
 - The binary and the assets move together. A binary that arrived alone would
   leave the host scaffolding from whatever stale `assets/` it already had, with
@@ -122,39 +29,17 @@ Notes:
 - x86_64 and aarch64 Linux are what is published. Anywhere else it refuses by
   name rather than fetching a 404.
 - On a machine with no `tect` yet, the same thing is
-  `curl -fsSL https://raw.githubusercontent.com/tectonic-os/tectonic/main/install.sh | sh`.
+  `curl -fsSL https://raw.githubusercontent.com/tectonic-os/tectonic/main/install.sh | sh`."#;
 
-
-
-## `tect create`
-
-start a repository, or add an image, flavour, module or key to one
-
-**Usage:** `tect create [COMMAND]`
-
-###### **Subcommands:**
-
-* `repo` — start a repository for your own images
-* `image` — add an image: its name, and what it builds on
-* `flavour` — add a gated module set an image also publishes
-* `module` — write a module, and offer to list it in an image
-* `key` — generate a key one of this repository's modules declares
-
-
-
-## `tect create repo`
-
-Writes a new repository with the following into the current directory unless a `--root`
+pub(super) const CREATE_REPO: &str = r#"Writes a new repository with the following into the current directory unless a `--root`
 location is defined in the command:
 
 - A `repo.kdl` file
 - A module directory
 - A `scripts/` directory holding the Containerfile skeleton
-- A `disk_config/` directory
+- A `disk_config/` directory"#;
 
-**Usage:** `tect create repo [OPTIONS] [name]`
-
-Notes:
+pub(super) const CREATE_REPO_NOTES: &str = r#"Notes:
 
 - `--host` and `--owner` compose into the origin every image URL is built from.
   It asks for them only when the images build on a schedule.
@@ -167,24 +52,9 @@ Notes:
   branch head, so every fetch takes whatever the branch holds then and no
   `sha256` checks what arrived. Delete the block or replace it with a tagged and
   hashed pin if that trade is not the trade the user wants.
-- A repository does not nest, and one inside another is refused.
+- A repository does not nest, and one inside another is refused."#;
 
-###### **Arguments:**
-
-* `<name>`
-
-###### **Options:**
-
-* `--host <domain>` — where the repository is hosted; github.com by default
-* `--owner <name>` — your account or org on the repository host
-* `--image <name>` — write a first image too; `create image` adds one later
-* `--base <ref>` — the bootc image the first image is based on
-
-
-
-## `tect create image`
-
-Writes one image file, `<image-id>.image.kdl`, at the repository root. The id
+pub(super) const CREATE_IMAGE: &str = r#"Writes one image file, `<image-id>.image.kdl`, at the repository root. The id
 derives from the name, so "My Desktop" writes `my-desktop.image.kdl`. A root
 `.kdl` is an image only when it is named `image.kdl` or ends in
 `.image.kdl`; anything else is reported rather than read.
@@ -192,11 +62,9 @@ derives from the name, so "My Desktop" writes `my-desktop.image.kdl`. A root
 Prompts for:
 
 - The image name, which defaults to what the repository is called
-- The base it builds on, picked from the catalog or given as any bootc reference
+- The base it builds on, picked from the catalog or given as any bootc reference"#;
 
-**Usage:** `tect create image [OPTIONS] [name]`
-
-Notes:
+pub(super) const CREATE_IMAGE_NOTES: &str = r#"Notes:
 
 - A base from the catalog writes its family and what it already ships into
   `base`. A base from outside the catalog prompts for the family and writes no
@@ -221,33 +89,18 @@ Notes:
   nobody to ask: a `--no-tui` run offers only what is already there. A
   repository that does not exist yet caches that fetch outside itself and
   throws it away, so a run left at the review screen leaves nothing behind.
-  That does mean re-editing the base re-fetches.
+  That does mean re-editing the base re-fetches."#;
 
-###### **Arguments:**
-
-* `<name>`
-
-###### **Options:**
-
-* `--owner <name>` — your account or org, where no image already carries one
-* `--base <ref>` — the bootc image this image is based on; skips the picker
-
-
-
-## `tect create flavour`
-
-Writes one flavour into an image's `flavours` block, creating the block when
+pub(super) const CREATE_FLAVOUR: &str = r#"Writes one flavour into an image's `flavours` block, creating the block when
 the image has none. A flavour is published as `<image>-<flavour>` beside the
 image's ungated build.
 
 Prompts for:
 
 - The flavour name
-- Which image publishes it, when `--image` names none
+- Which image publishes it, when `--image` names none"#;
 
-**Usage:** `tect create flavour [OPTIONS] [name]`
-
-Notes:
+pub(super) const CREATE_FLAVOUR_NOTES: &str = r#"Notes:
 
 - Neither `default` nor `pr-build` is written. Both are edits: `default`
   changes what a bare `--target <image>` builds, and the tool writes no such
@@ -255,32 +108,18 @@ Notes:
 - Listing a module under the flavour is a separate step; the `flavours` block
   declares the flavour, the `modules` block gates the modules.
 - A name the image already declares is refused, as is `none`, which is what the
-  ungated build is called.
+  ungated build is called."#;
 
-###### **Arguments:**
-
-* `<name>`
-
-###### **Options:**
-
-* `--image <name>` — the image that publishes the flavour
-
-
-
-## `tect create module`
-
-Writes one module manifest, `modules/<name>/module.kdl`. The name may be a
+pub(super) const CREATE_MODULE: &str = r#"Writes one module manifest, `modules/<name>/module.kdl`. The name may be a
 path, so `create module apps/firefox` writes
 `modules/apps/firefox/module.kdl`.
 
 Prompts for:
 
 - Whether the module installs packages, and which ones
-- Which images the module is listed in, if any
+- Which images the module is listed in, if any"#;
 
-**Usage:** `tect create module [OPTIONS] [name]`
-
-Notes:
+pub(super) const CREATE_MODULE_NOTES: &str = r#"Notes:
 
 - Packages are scaffolded as one flat `packages` line on every family the
   module supports; a `family` gate is where names that differ go. The generated
@@ -300,34 +139,69 @@ Notes:
   `example/dx` for a flavour of it. A name the repository does not declare is
   refused before the module is written.
 - None is an answer too: having a module and listing it in an image are
-  different decisions. Leaving the picker instead writes nothing at all.
+  different decisions. Leaving the picker instead writes nothing at all."#;
 
-###### **Arguments:**
+pub(super) const IMPORT_MODULE: &str = r#"References modules from a source collection by adding them to an image's
+`source` block. The module stays out of the tracked tree; import populates its
+ignored `modules/.remote/<owner>/<name>` cache, and a build fetches it again
+when the collection pin changes.
 
-* `<name>`
+Prompts for:
 
-###### **Options:**
+- Which modules, listing every one the collections hold with its description and
+  what it requires, when no name is given. Several may be chosen, and they share
+  the one listing answer and one of each offer below
+- Which images or flavours the modules are listed in; an import with none has no
+  repository representation and is refused
+- Whether to bring what they require and nothing in those images provides
+- Whether to generate the CI they make runnable
+- Which profile to be measured against, where they claim benchmark rules a
+  profile selects and an image listing them declares no `conforms`"#;
 
-* `--image <name>` — list the module in this image or flavour; repeatable
-* `--pkg <name>` — a package the module installs; repeatable
-* `--with <verb=value>` — one more line in the manifest, such as `--with provides=browser`; repeatable
+pub(super) const IMPORT_MODULE_NOTES: &str = r#"Notes:
 
+- The argument names one module. The picker is what takes several, since one
+  answer per question is what makes a set cheaper than a module at a time.
+- A bare name is searched for in every collection. `<owner>/<name>` picks
+  between two collections that both have it.
+- A pinned collection member is downloaded and verified once. An `unpinned`
+  member is downloaded unverified each time, and audit enforcement refuses the
+  reference.
+- An image already listing the module is refused here rather than at the next
+  command that reads the file. A module gated to two flavours is listed under
+  each, so only an overlap is a duplicate.
+- The requirements the offer brings in are listed in the same images, ahead of
+  the module itself. Declining leaves a file that is still valid; `check` then
+  names the import that would satisfy what is missing.
+- Both offers default to no where there is nobody to ask, so a scripted import
+  writes exactly what it was told to."#;
 
+pub(super) const COPY_MODULE: &str = r#"Copies modules out of a source collection into `modules/<name>` and records
+each one's source in `provenance.kdl`. The repository owns them from then on:
+nothing fetches over them and no pin moves them.
 
-## `tect create key`
+It is `import module` with a different ending: the same picker, the same
+questions, the same offers, the same flags and the same refusals. It differs
+only in these three ways:
 
-Generates one of the keys the repository's modules declare, and writes:
+- The modules land under `modules/` and are listed by their own names, with no
+  `source` block, so what the requires offer brings is vendored too
+- No image is not a refusal. A copied module is in the repository whether one
+  lists it or not, and the listing offer is the second half of the job rather
+  than the whole of it
+- Something already at `modules/<name>` is refused, and the refusal names the
+  collection the thing there came from"#;
+
+pub(super) const CREATE_KEY: &str = r#"Generates one of the keys the repository's modules declare, and writes:
 
 - The public half, under `keys/public/` at the path it has in the image
 - The private half, under `keys/private/` with the name the declaration gives it
 
 Prompts for:
 
-- Which kind, listing the kinds the modules declare, when no argument is given
+- Which kind, listing the kinds the modules declare, when no argument is given"#;
 
-**Usage:** `tect create key [OPTIONS] [kind]`
-
-Notes:
+pub(super) const CREATE_KEY_NOTES: &str = r#"Notes:
 
 - `keys/private/` is covered by the scaffolded `.gitignore`. A repository
   whose `.gitignore` does not cover one is told rather than edited.
@@ -362,142 +236,34 @@ The generators are closed, and each is one of:
 - `ssh-keygen` writes the keypair the user logs in with, ed25519 and with no
   passphrase. `bits` is an RSA size and means nothing here. Nothing in a build
   reads the private half: it is the user's, and the public half is what the
-  image ships.
+  image ships."#;
 
-###### **Arguments:**
-
-* `<kind>`
-
-###### **Options:**
-
-* `--module <name>` — which module, where two of them declare the same kind
-* `--cn <name>` — the certificate common name; the repository directory name by default
-
-
-
-## `tect import`
-
-reference a collection module from an image
-
-**Usage:** `tect import [COMMAND]`
-
-###### **Subcommands:**
-
-* `module` — reference a module from a collection repo.kdl declares
-
-
-
-## `tect import module`
-
-References modules from a source collection by adding them to an image's
-`source` block. The module stays out of the tracked tree; import populates its
-ignored `modules/.remote/<owner>/<name>` cache, and a build fetches it again
-when the collection pin changes.
+pub(super) const SET_KEY: &str = r#"Records a public half the user already holds, in place of generating one. Where
+`create key` invents a key, this writes down one that exists: a cosign public
+key, a MOK certificate and an authorized key are all things the user may
+already have, and every kind a module declares can be recorded this way.
 
 Prompts for:
 
-- Which modules, listing every one the collections hold with its description and
-  what it requires, when no name is given. Several may be chosen, and they share
-  the one listing answer and one of each offer below
-- Which images or flavours the modules are listed in; an import with none has no
-  repository representation and is refused
-- Whether to bring what they require and nothing in those images provides
-- Whether to generate the CI they make runnable
-- Which profile to be measured against, where they claim benchmark rules a
-  profile selects and an image listing them declares no `conforms`
+- Which kind, listing the kinds the modules declare, when no argument is given
+- The file to read it from, where `--from` did not name one"#;
 
-**Usage:** `tect import module [OPTIONS] [name]`
+pub(super) const SET_KEY_NOTES: &str = r#"Notes:
 
-Notes:
+- The destination is the module's own `public` declaration, so nothing here
+  takes a path to write to.
+- Only the public half. A private half is not the repository's: a cosign key
+  signs in CI, a MOK signs a kernel module, a PCR key signs the machine's TPM
+  unlock policy, and an authorized key logs the user in. None of them wants
+  its private half copied here.
+- The file is read before it is written: a key in the wrong form for the
+  generator that would have made it (a PEM public key for `cosign`, a PEM or
+  DER certificate for `module-signing`, a bare PEM public key for
+  `pcr-signing`, an OpenSSH key line for `ssh-keygen`) is refused here rather
+  than by a build a long way from here.
+- An existing key is never replaced, exactly as with `create key`."#;
 
-- The argument names one module. The picker is what takes several, since one
-  answer per question is what makes a set cheaper than a module at a time.
-- A bare name is searched for in every collection. `<owner>/<name>` picks
-  between two collections that both have it.
-- A pinned collection member is downloaded and verified once. An `unpinned`
-  member is downloaded unverified each time, and audit enforcement refuses the
-  reference.
-- An image already listing the module is refused here rather than at the next
-  command that reads the file. A module gated to two flavours is listed under
-  each, so only an overlap is a duplicate.
-- The requirements the offer brings in are listed in the same images, ahead of
-  the module itself. Declining leaves a file that is still valid; `check` then
-  names the import that would satisfy what is missing.
-- Both offers default to no where there is nobody to ask, so a scripted import
-  writes exactly what it was told to.
-
-###### **Arguments:**
-
-* `<name>`
-
-###### **Options:**
-
-* `--image <name>` — list the module in this image or flavour; repeatable
-* `--datastream <file>` — the SCAP content the profile offer is read out of; the family's installed copy by default, and no content is no offer
-
-
-
-## `tect copy`
-
-copy a collection module into this repository
-
-**Usage:** `tect copy [COMMAND]`
-
-###### **Subcommands:**
-
-* `module` — copy a collection module into this repository
-
-
-
-## `tect copy module`
-
-Copies modules out of a source collection into `modules/<name>` and records
-each one's source in `provenance.kdl`. The repository owns them from then on:
-nothing fetches over them and no pin moves them.
-
-It is `import module` with a different ending: the same picker, the same
-questions, the same offers, the same flags and the same refusals. It differs
-only in these three ways:
-
-- The modules land under `modules/` and are listed by their own names, with no
-  `source` block, so what the requires offer brings is vendored too
-- No image is not a refusal. A copied module is in the repository whether one
-  lists it or not, and the listing offer is the second half of the job rather
-  than the whole of it
-- Something already at `modules/<name>` is refused, and the refusal names the
-  collection the thing there came from
-
-**Usage:** `tect copy module [OPTIONS] [name]`
-
-###### **Arguments:**
-
-* `<name>`
-
-###### **Options:**
-
-* `--image <name>` — list the module in this image or flavour; repeatable
-* `--datastream <file>` — the SCAP content the profile offer is read out of; the family's installed copy by default, and no content is no offer
-
-
-
-## `tect set`
-
-choose what this repository declares, or record a key
-
-**Usage:** `tect set [COMMAND]`
-
-###### **Subcommands:**
-
-* `workflows` — choose the CI this repository generates
-* `conforms` — choose the benchmark profile an image is measured by
-* `claims` — choose the benchmark rules a module claims to cover
-* `key` — record a key you already hold, in place of generating one
-
-
-
-## `tect set workflows`
-
-Chooses the CI this repository generates, and writes the choice into the
+pub(super) const SET_WORKFLOWS: &str = r#"Chooses the CI this repository generates, and writes the choice into the
 `workflows` block of `repo.kdl`. `tect generate` is what then writes the files.
 
 Prompts for:
@@ -506,11 +272,9 @@ Prompts for:
   declared, and drawing what each of them needs where the repository cannot run
   it
 - What time the daily build runs, UTC, where any of the chosen ones has a
-  schedule
+  schedule"#;
 
-**Usage:** `tect set workflows`
-
-Notes:
+pub(super) const SET_WORKFLOWS_NOTES: &str = r#"Notes:
 
 - There are no toggle flags. The declaration file was always the interface, so
   with nobody to ask this says to edit `repo.kdl` rather than naming a flag
@@ -524,13 +288,9 @@ Notes:
 - Every schedule is an offset from the daily build, so moving one value moves
   all of them. A cron is the one value the emitter writes into a workflow file
   rather than putting in `plan.json`, because the forge reads it out of the
-  file before any job exists.
+  file before any job exists."#;
 
-
-
-## `tect set conforms`
-
-Chooses the benchmark profile a scan measures one image against, and writes it
+pub(super) const SET_CONFORMS: &str = r#"Chooses the benchmark profile a scan measures one image against, and writes it
 into that image's `conforms`. Naming no image picks the only one, or asks which.
 
 Prompts for:
@@ -538,11 +298,9 @@ Prompts for:
 - Which profile, out of the ones the datastream carries, with what each is
   called beside it
 - Whether to import the collection modules claiming rules that profile selects
-  and nothing the image installs or builds on claims
+  and nothing the image installs or builds on claims"#;
 
-**Usage:** `tect set conforms [OPTIONS] [image]`
-
-Notes:
+pub(super) const SET_CONFORMS_NOTES: &str = r#"Notes:
 
 - `--datastream <file>` names the content to choose out of. Without it this
   reads the copy installed on this machine for the image's family, and refuses
@@ -559,21 +317,9 @@ Notes:
 - The import offer covers collection members only. A module the repository owns
   needs a line rather than an import, which is what `check` already says.
 - There are no toggle flags, the same way `set workflows` has none: with nobody
-  to ask this says to write the line into the image file.
+  to ask this says to write the line into the image file."#;
 
-###### **Arguments:**
-
-* `<image>`
-
-###### **Options:**
-
-* `--datastream <file>` — the SCAP content the profile is chosen out of; the installed copy for the image's family by default
-
-
-
-## `tect set claims`
-
-Chooses the benchmark rules one module this repository holds claims to cover,
+pub(super) const SET_CLAIMS: &str = r#"Chooses the benchmark rules one module this repository holds claims to cover,
 and writes them into its `satisfies` block as numbers.
 
 Prompts for:
@@ -581,11 +327,9 @@ Prompts for:
 - Which profile the rules are read out of, out of the ones the datastream
   carries
 - Which of that profile's rules the module claims, as a tree grouped by the
-  numbers' own dotted sections, opening on what it already claims
+  numbers' own dotted sections, opening on what it already claims"#;
 
-**Usage:** `tect set claims [OPTIONS] [module]`
-
-Notes:
+pub(super) const SET_CLAIMS_NOTES: &str = r#"Notes:
 
 - `--datastream <file>` names the content, and without it this reads the copy
   installed on this machine for the family the module `supports`, refusing by
@@ -609,67 +353,13 @@ Notes:
 - Claiming nothing takes the block away, the way `set workflows` takes the
   workflow block away. Leaving either picker changes nothing.
 - The benchmark each number is written under is decorative: a number resolves
-  against the datastream, never against the name it was written under.
+  against the datastream, never against the name it was written under."#;
 
-###### **Arguments:**
-
-* `<module>`
-
-###### **Options:**
-
-* `--datastream <file>` — the SCAP content the rules are read out of; the installed copy for the module's family by default
-
-
-
-## `tect set key`
-
-Records a public half the user already holds, in place of generating one. Where
-`create key` invents a key, this writes down one that exists: a cosign public
-key, a MOK certificate and an authorized key are all things the user may
-already have, and every kind a module declares can be recorded this way.
-
-Prompts for:
-
-- Which kind, listing the kinds the modules declare, when no argument is given
-- The file to read it from, where `--from` did not name one
-
-**Usage:** `tect set key [OPTIONS] [kind]`
-
-Notes:
-
-- The destination is the module's own `public` declaration, so nothing here
-  takes a path to write to.
-- Only the public half. A private half is not the repository's: a cosign key
-  signs in CI, a MOK signs a kernel module, a PCR key signs the machine's TPM
-  unlock policy, and an authorized key logs the user in. None of them wants
-  its private half copied here.
-- The file is read before it is written: a key in the wrong form for the
-  generator that would have made it (a PEM public key for `cosign`, a PEM or
-  DER certificate for `module-signing`, a bare PEM public key for
-  `pcr-signing`, an OpenSSH key line for `ssh-keygen`) is refused here rather
-  than by a build a long way from here.
-- An existing key is never replaced, exactly as with `create key`.
-
-###### **Arguments:**
-
-* `<kind>`
-
-###### **Options:**
-
-* `--module <name>` — which module, where two of them declare the same kind
-* `--from <path>` — the public half to record
-
-
-
-## `tect check`
-
-Reads every manifest and reports every problem at the line that caused it, then
+pub(super) const CHECK: &str = r#"Reads every manifest and reports every problem at the line that caused it, then
 the counts on the last line: images, modules, flavours, and how many listed
-modules the base already provides.
+modules the base already provides."#;
 
-**Usage:** `tect check [OPTIONS]`
-
-Notes:
+pub(super) const CHECK_NOTES: &str = r#"Notes:
 
 - Above the counts it names every base a collection describes differently from
   the tool's own entry, every collection declared `unpinned`, every image
@@ -687,17 +377,9 @@ Notes:
   that lists no module declaring `satisfies`. With one it says how many of the
   profile's rules nothing listed claims and which modules would claim them,
   and it names any declared collection nothing read rather than concluding
-  from its silence. `tect scap content` prints the path to pass it.
+  from its silence. `tect scap content` prints the path to pass it."#;
 
-###### **Options:**
-
-* `--datastream <file>` — the SSG content, for the conformance read-out
-
-
-
-## `tect generate`
-
-Writes the build files and draws the tree of what it wrote:
+pub(super) const GENERATE: &str = r#"Writes the build files and draws the tree of what it wrote:
 
 - `generated/<image>/Containerfile`, one per image
 - `generated/<image>/modules/<module>.sh`, the per-module build scripts
@@ -706,11 +388,9 @@ Writes the build files and draws the tree of what it wrote:
   capability graph
 - `generated/plan.json`
 - `generated/seed.kdl`, where `repo.kdl` nominates a seedable image
-- Every workflow the `workflows` block names, under `.github/workflows/`
+- Every workflow the `workflows` block names, under `.github/workflows/`"#;
 
-**Usage:** `tect generate`
-
-Notes:
+pub(super) const GENERATE_NOTES: &str = r#"Notes:
 
 - Everything one image generates lives under a directory named for it, so what
   belongs to the repository and what belongs to one image are not the same
@@ -737,19 +417,13 @@ Notes:
   `BASE` build argument, which the generated `FROM` reads. `$BASE` in the
   environment is taken as already resolved, so CI that stamped
   `org.opencontainers.image.base.digest` and the build record agree rather than
-  resolving a moving tag twice.
+  resolving a moving tag twice."#;
 
-
-
-## `tect build`
-
-Builds one target: runs `verify` as the drift gate, then execs the container
+pub(super) const BUILD: &str = r#"Builds one target: runs `verify` as the drift gate, then execs the container
 backend. A target is `<image>/<flavour>`, and the ungated set is named by the
-bare image id. The default target when none is named.
+bare image id. The default target when none is named."#;
 
-**Usage:** `tect build [OPTIONS] [target]`
-
-Notes:
+pub(super) const BUILD_NOTES: &str = r#"Notes:
 
 - `$LABELS` adds OCI labels the way `$TAGS` adds tags, and `$IMAGE_VERSION` is
   stamped into the image, defaulting to today in UTC.
@@ -769,35 +443,14 @@ Notes:
   requested tags applied, so a failed check leaves nothing published as the
   image that failed it. The skeleton's validation step also runs against the
   sealed image: the seal pass stops at the tail, because a step that runs after
-  the seal writes to the image and moves the digest the UKI embedded.
+  the seal writes to the image and moves the digest the UKI embedded."#;
 
-###### **Arguments:**
-
-* `<target>`
-
-###### **Options:**
-
-* `--target <target>` — the target, where the positional argument is not used
-* `--tag <tag>` — tag the result; repeatable, and $TAGS adds to it
-* `--kernel <name>` — the KERNEL build arg
-* `--backend <name>` — buildx or buildah, else $BUILD_BACKEND, else buildah
-* `--oci-output <path>` — write an OCI archive instead of loading the image
-* `--secret <id=path>` — mount <path> as the build secret <id>; repeatable
-* `--cache-to` — export the layer cache to the registry cache repository
-* `--no-cache-from` — do not import the layer cache
-
-
-
-## `tect vm`
-
-Turns the container image into a disk and boots it. `<type>` is `qcow2`, `raw`
+pub(super) const VM: &str = r#"Turns the container image into a disk and boots it. `<type>` is `qcow2`, `raw`
 or `iso`, asked for where there is a terminal to ask on. `build` converts,
 `run` boots under qemu and converts first where the disk is missing, and
-`spawn` boots it with systemd-vmspawn, which cannot boot an installer iso.
+`spawn` boots it with systemd-vmspawn, which cannot boot an installer iso."#;
 
-**Usage:** `tect vm [COMMAND]`
-
-Notes:
+pub(super) const VM_NOTES: &str = r#"Notes:
 
 - `--rebuild` is the one form of this that changes the repository, and it runs
   the whole chain in the only order it works in: `fetch modules`, then
@@ -859,155 +512,20 @@ Notes:
   `systemd.set_credential_binary=ssh.authorized_keys.root`, which systemd's
   `provision.conf` reads on the installed machine, because a composefs install
   drops `--root-ssh-authorized-keys`. This is separate from the hypervisor
-  credential path.
+  credential path."#;
 
-###### **Subcommands:**
+pub(super) const SECTION: &str = r#"Prints the generated Containerfile module section for one image, the default
+image when none is named."#;
 
-* `build` — convert the built image into a qcow2, raw or iso
-* `run` — boot that disk under qemu, building it if missing
-* `spawn` — boot a qcow2 or raw disk with systemd-vmspawn
+pub(super) const GRAPH: &str = r#"Prints the default image's capability graph: what provides what, what requires
+it, what only orders against it, and what the base already carries."#;
 
-
-
-## `tect vm build`
-
-convert the built image into a qcow2, raw or iso
-
-**Usage:** `tect vm build [OPTIONS] [type]`
-
-###### **Arguments:**
-
-* `<type>`
-
-###### **Options:**
-
-* `--target <target>` — what a rebuild builds, and what an iso installs
-* `--image <ref>` — the container image to convert, without its tag
-* `--tag <tag>` — its tag, else $DEFAULT_TAG, else latest
-* `--ram <size>` — memory for the virtual machine
-* `--rebuild` — fetch, generate and build the container image first
-
-
-
-## `tect vm run`
-
-boot that disk under qemu, building it if missing
-
-**Usage:** `tect vm run [OPTIONS] [type]`
-
-###### **Arguments:**
-
-* `<type>`
-
-###### **Options:**
-
-* `--target <target>` — what a rebuild builds, and what an iso installs
-* `--image <ref>` — the container image to convert, without its tag
-* `--tag <tag>` — its tag, else $DEFAULT_TAG, else latest
-* `--ram <size>` — memory for the virtual machine
-* `--rebuild` — fetch, generate and build the container image first
-
-
-
-## `tect vm spawn`
-
-boot a qcow2 or raw disk with systemd-vmspawn
-
-**Usage:** `tect vm spawn [OPTIONS] [type]`
-
-###### **Arguments:**
-
-* `<type>`
-
-###### **Options:**
-
-* `--target <target>` — what a rebuild builds, and what an iso installs
-* `--image <ref>` — the container image to convert, without its tag
-* `--tag <tag>` — its tag, else $DEFAULT_TAG, else latest
-* `--ram <size>` — memory for the virtual machine
-* `--rebuild` — fetch, generate and build the container image first
-
-
-
-## `tect section`
-
-Prints the generated Containerfile module section for one image, the default
-image when none is named.
-
-**Usage:** `tect section [image]`
-
-###### **Arguments:**
-
-* `<image>`
-
-
-
-## `tect graph`
-
-Prints the default image's capability graph: what provides what, what requires
-it, what only orders against it, and what the base already carries.
-
-**Usage:** `tect graph [OPTIONS]`
-
-###### **Options:**
-
-* `--format <md|json>` — markdown holding a mermaid diagram by default, or json
-
-
-
-## `tect why`
-
-One module's trust read-out: which targets build it, what it provides and who
-requires that, what it requires and what provides it, what it claims to
-harden, and where every byte of it came from: the collection it was imported
-from and at what pin, whether it has been edited since, what it fetches, and
-whether it enables a third-party package repository.
-
-**Usage:** `tect why [OPTIONS] [module]`
-
-Notes:
-
-- It answers two ways from one renderer. In a repository it reads the resolved
-  plan; on a booted image it reads the two baked documents, scoped to the
-  target the record names.
-- On a host, a baked document written against a schema version this binary does
-  not read is refused rather than answered off. The binary in an image is pinned
-  independently of the one that built it, so the two can be a schema apart, and
-  a host is the one place with no repository to check an answer against. The
-  refusal names both numbers and the tool version; `tect plan --json` prints the
-  manifest as it stands and is unaffected, since it reads no field out of it.
-- On a booted image it also prints the repository the image was built from and
-  the commit it was at, with the `git clone` that reaches them. The module tree
-  is deliberately not in the finished image, so comparing this machine against
-  its declarations means fetching them rather than reconstructing them.
-- `why` says plainly when a module was edited since it was imported, and that
-  is not an error. Forking one is legitimate; what the record buys is that the
-  fork is visible rather than silent. `audit { enforce #true }` is what makes it
-  fail.
-- A name nothing declares lists the ones that are declared.
-- There is no grammar for a `repo` file, so this points at it and prints the
-  URLs it found rather than claiming to have understood it.
-
-###### **Arguments:**
-
-* `<module>`
-
-###### **Options:**
-
-* `--format <md|json>` — markdown, the default, or JSON
-
-
-
-## `tect coverage`
-
-Every rule the profile an image declares `conforms` to selects, the number a
+pub(super) const COVERAGE: &str = r#"Every rule the profile an image declares `conforms` to selects, the number a
 claim names it by, which of the image's modules claims it, and which module in
 the repository or its collections would claim one nothing does. The default
-image when none is named, a picker where there is a terminal to pick on.
+image when none is named, a picker where there is a terminal to pick on."#;
 
-**Usage:** `tect coverage [OPTIONS] [image]`
-
-Notes:
+pub(super) const COVERAGE_NOTES: &str = r#"Notes:
 
 - No scan is involved and no report is read. This says what is claimed, not
   what passes; `tect scap` is what measures.
@@ -1019,81 +537,40 @@ Notes:
 - The counts and the collections nothing read go to stderr, since the second
   is about this machine rather than about the image.
 - A rule with no number in the `Number` column is one no `satisfies` can name.
-  It is unclaimable rather than unclaimed.
+  It is unclaimable rather than unclaimed."#;
 
-###### **Arguments:**
-
-* `<image>`
-
-###### **Options:**
-
-* `--format <md|json>` — markdown, the default, or json
-* `--datastream <file>` — the SSG content the profile is read out of
-
-
-
-## `tect plan`
-
-Prints every fact this repository derives, as one JSON document: the images,
+pub(super) const PLAN: &str = r#"Prints every fact this repository derives, as one JSON document: the images,
 each image's targets, and what each target is made of. Read a field out of it
-rather than deriving anything from a name.
+rather than deriving anything from a name."#;
 
-**Usage:** `tect plan [OPTIONS]`
-
-###### **Options:**
-
-* `--json` — the output is JSON with or without it
-
-
-
-## `tect verify`
-
-Re-emits every artifact and byte-compares it against what is committed under
+pub(super) const VERIFY: &str = r#"Re-emits every artifact and byte-compares it against what is committed under
 `generated/`, naming what differs, what is missing, and anything under
-`generated/` that nothing emits. It runs before every build.
+`generated/` that nothing emits. It runs before every build."#;
 
-**Usage:** `tect verify`
-
-
-
-## `tect summary`
-
-Prints what one target is made of, as a markdown table: every module it builds,
+pub(super) const SUMMARY: &str = r#"Prints what one target is made of, as a markdown table: every module it builds,
 with its description and the options it resolved. This is what a build writes
-into its job summary.
+into its job summary."#;
 
-**Usage:** `tect summary [target]`
-
-###### **Arguments:**
-
-* `<target>`
-
-
-
-## `tect sbom`
-
-Prints the pinned payloads one target carries, as SPDX packages and the
+pub(super) const SBOM: &str = r#"Prints the pinned payloads one target carries, as SPDX packages and the
 relationships that describe them. A scan of the built image cannot see where a
-downloaded asset came from, so this is merged into the SBOM the scan produces.
+downloaded asset came from, so this is merged into the SBOM the scan produces."#;
 
-**Usage:** `tect sbom [target]`
+pub(super) const FETCH_MODULES: &str = r#"Fetches every out-of-tree module the images reference, verifies one whose pin
+has a hash, and puts it under `modules/.remote/`."#;
 
-###### **Arguments:**
+pub(super) const FETCH_MODULES_NOTES: &str = r#"Notes:
 
-* `<target>`
+- A tree already at its pin is left alone; one no image references any more is
+  removed.
+- It reads the declarations rather than the resolved plan, so it runs before the
+  modules it fetches can be read."#;
 
-
-
-## `tect scap`
-
-Reads one scan's report against the datastream it was produced with, and prints
+pub(super) const SCAP: &str = r#"Reads one scan's report against the datastream it was produced with, and prints
 what the two of them say about the target, as markdown: what the modules
 claimed and what was measured for each, what the image scores against every
-profile the datastream carries, and what stopped passing since the last scan.
+profile the datastream carries, and what stopped passing since the last scan."#;
 
-**Usage:** `tect scap [OPTIONS] [arf.xml] [COMMAND]`
-
-Notes:
+pub(super) const SCAP_NOTES: &str = r#"Notes:
 
 - The mapping from a benchmark number to a rule is the datastream's own, over
   every `reference`, `ident` and `version` it carries, and the first rule in
@@ -1116,171 +593,37 @@ Notes:
   settings either way. The document records passes only, so a rule missing from
   it is not a rule the base failed.
 - Findings are fatal only under `audit { enforce #true }`, like every other
-  audit fact, and the report goes to stdout either way.
+  audit fact, and the report goes to stdout either way."#;
 
-###### **Subcommands:**
-
-* `content` — print the datastream the target is measured with
-* `tailoring` — print the tailoring the target is scanned with
-* `rules` — print the rule each benchmark number reaches, one per line
-
-###### **Arguments:**
-
-* `<arf.xml>`
-
-###### **Options:**
-
-* `--target <target>` — the target, else the ungated one
-* `--datastream <file>` — the SSG content, else the one `scap content` names
-* `--baseline <file>` — the last scan's pass set, read then rewritten
-* `--base-scan <file>` — what the bare base passed alone, read only
-
-
-
-## `tect scap content`
-
-Prints the datastream the target is measured with, and nothing at all when the
+pub(super) const SCAP_CONTENT: &str = r#"Prints the datastream the target is measured with, and nothing at all when the
 image declares no `conforms`, which is an image asking not to be scanned. This
-is what the scan job gates on, and `tect set conforms` is what opens it.
+is what the scan job gates on, and `tect set conforms` is what opens it."#;
 
-**Usage:** `tect scap content [OPTIONS]`
-
-###### **Options:**
-
-* `--target <target>` — the target, else the ungated one
-
-
-
-## `tect scap tailoring`
-
-Prints the XCCDF tailoring a scan of the target runs, as profile
+pub(super) const SCAP_TAILORING: &str = r#"Prints the XCCDF tailoring a scan of the target runs, as profile
 `xccdf_tect_profile_measured`: the declared profile, with every group and rule
-selected. Nothing at all when the image declares no `conforms`.
+selected. Nothing at all when the image declares no `conforms`."#;
 
-**Usage:** `tect scap tailoring [OPTIONS]`
-
-Notes:
+pub(super) const SCAP_TAILORING_NOTES: &str = r#"Notes:
 
 - `--profile '(all)'` scores every variable at its default, so a rule
   remediated to the profile's value reads as failing. The tailoring keeps the
-  profile's values and still evaluates every claim outside it.
+  profile's values and still evaluates every claim outside it."#;
 
-###### **Options:**
+pub(super) const REGISTRY_NAMESPACE: &str = r#"Prints where images publish: `$IMAGE_REGISTRY`, else `ghcr.io/<owner>` read off
+the github origin remote."#;
 
-* `--target <target>` — the target, else the ungated one
-* `--datastream <file>` — the SSG content, else the one `scap content` names
+pub(super) const REGISTRY_REF: &str = r#"Prints the full reference one target publishes under, joining the namespace to
+the target's name and tag. The ungated target when none is named."#;
 
-
-
-## `tect scap rules`
-
-print the rule each benchmark number reaches, one per line
-
-**Usage:** `tect scap rules [OPTIONS] [number]...`
-
-###### **Arguments:**
-
-* `<number>`
-
-###### **Options:**
-
-* `--datastream <file>` — the SSG content, else the one `scap content` names
-
-
-
-## `tect fetch`
-
-Downloads one payload, verifies it against the hash, and places it by what it
-is:
-
-- `file` keeps it
-- `tree` unpacks it
-- `bin` installs one executable
-- `rpm` installs the package, on an rpm family
-- `deb` installs the package, on a deb family
-
-**Usage:** `tect fetch <what> <url> <sha256> [target] [extra]...
-       fetch [what] [url] [sha256] [target] [extra]... <COMMAND>`
-
-###### **Subcommands:**
-
-* `modules` — fetch every out-of-tree module the images reference
-
-###### **Arguments:**
-
-* `<what>`
-* `<url>`
-* `<sha256>`
-* `<target>`
-* `<extra>`
-
-
-
-## `tect fetch modules`
-
-Fetches every out-of-tree module the images reference, verifies one whose pin
-has a hash, and puts it under `modules/.remote/`.
-
-**Usage:** `tect fetch modules`
-
-Notes:
-
-- A tree already at its pin is left alone; one no image references any more is
-  removed.
-- It reads the declarations rather than the resolved plan, so it runs before the
-  modules it fetches can be read.
-
-
-
-## `tect registry`
-
-print where images publish, and under what reference
-
-**Usage:** `tect registry [COMMAND]`
-
-###### **Subcommands:**
-
-* `namespace` — print where images publish
-* `ref` — print the full reference one target publishes under
-
-
-
-## `tect registry namespace`
-
-Prints where images publish: `$IMAGE_REGISTRY`, else `ghcr.io/<owner>` read off
-the github origin remote.
-
-**Usage:** `tect registry namespace`
-
-
-
-## `tect registry ref`
-
-Prints the full reference one target publishes under, joining the namespace to
-the target's name and tag. The ungated target when none is named.
-
-**Usage:** `tect registry ref [OPTIONS]`
-
-###### **Options:**
-
-* `--target <target>` — the target, else the ungated one
-* `--tag <tag>` — the tag, else $DEFAULT_TAG, else latest
-
-
-
-## `tect recipe`
-
-Prints the half of an installation recipe the declaration answers, as JSON for
+pub(super) const RECIPE: &str = r#"Prints the half of an installation recipe the declaration answers, as JSON for
 `fisherman`: the reference installed and the reference the installed machine
 updates from, plus image properties such as composefs sealing, the boot chain
 and bootloader, the root filesystem and whether the target declares a
 LUKS-capable initramfs. A successful `tect build` validates that last
 declaration against the archive itself. The disk, the account and the encryption
-choice are the person's and are not in it.
+choice are the person's and are not in it."#;
 
-**Usage:** `tect recipe [OPTIONS]`
-
-Notes:
+pub(super) const RECIPE_NOTES: &str = r#"Notes:
 
 - The base family settles every derived value, and a family with no answer is
   refused rather than defaulted: a wrong one here is a disk that is erased and
@@ -1289,27 +632,41 @@ Notes:
   machine's update origin: the bytes come from it, `targetImgref` stays the
   published reference.
 - `hostname` is the published name, and is the one derived value the user is
-  expected to replace.
+  expected to replace."#;
 
-###### **Options:**
+pub(super) const WHY: &str = r#"One module's trust read-out: which targets build it, what it provides and who
+requires that, what it requires and what provides it, what it claims to
+harden, and where every byte of it came from: the collection it was imported
+from and at what pin, whether it has been edited since, what it fetches, and
+whether it enables a third-party package repository."#;
 
-* `--target <target>` — the target, else the ungated one
-* `--tag <tag>` — the tag, else $DEFAULT_TAG, else latest
-* `--image <ref>` — the bytes installed, else the published reference
+pub(super) const WHY_NOTES: &str = r#"Notes:
 
+- It answers two ways from one renderer. In a repository it reads the resolved
+  plan; on a booted image it reads the two baked documents, scoped to the
+  target the record names.
+- On a host, a baked document written against a schema version this binary does
+  not read is refused rather than answered off. The binary in an image is pinned
+  independently of the one that built it, so the two can be a schema apart, and
+  a host is the one place with no repository to check an answer against. The
+  refusal names both numbers and the tool version; `tect plan --json` prints the
+  manifest as it stands and is unaffected, since it reads no field out of it.
+- On a booted image it also prints the repository the image was built from and
+  the commit it was at, with the `git clone` that reaches them. The module tree
+  is deliberately not in the finished image, so comparing this machine against
+  its declarations means fetching them rather than reconstructing them.
+- `why` says plainly when a module was edited since it was imported, and that
+  is not an error. Forking one is legitimate; what the record buys is that the
+  fork is visible rather than silent. `audit { enforce #true }` is what makes it
+  fail.
+- A name nothing declares lists the ones that are declared.
+- There is no grammar for a `repo` file, so this points at it and prints the
+  URLs it found rather than claiming to have understood it."#;
 
+pub(super) const OS_RELEASE: &str =
+    r#"Writes the image identity the build ARGs carry into `/usr/lib/os-release`."#;
 
-## `tect os-release`
-
-Writes the image identity the build ARGs carry into `/usr/lib/os-release`.
-
-**Usage:** `tect os-release`
-
-
-
-## `tect build-record`
-
-Writes `/usr/share/tectonic/build.json`, the record of what the build
+pub(super) const BUILD_RECORD: &str = r#"Writes `/usr/share/tectonic/build.json`, the record of what the build
 **resolved**, where the baked `manifest.json` beside it is what the repository
 **declared**. It carries the digest the base tag resolved to, the commit each
 cloned asset's selector named, the source commit, the tect release, the target,
@@ -1319,18 +676,16 @@ until something has checked the claims.
 Nothing under `generated/` holds it, so `verify` never sees it: a daily
 changing resolution in a committed file would fail the drift gate every
 morning, which is why the resolution is a second document rather than a field
-of the first.
+of the first."#;
 
-**Usage:** `tect build-record`
+pub(super) const FETCH: &str = r#"Downloads one payload, verifies it against the hash, and places it by what it
+is:
 
+- `file` keeps it
+- `tree` unpacks it
+- `bin` installs one executable
+- `rpm` installs the package, on an rpm family
+- `deb` installs the package, on a deb family"#;
 
-
-## `tect validate-image`
-
-Runs every check a built image has to pass. The build passes it the preset files
-the enabled modules' overlays ship, and it fails on any the image does not have.
-
-**Usage:** `tect validate-image`
-
-
-
+pub(super) const VALIDATE_IMAGE: &str = r#"Runs every check a built image has to pass. The build passes it the preset files
+the enabled modules' overlays ship, and it fails on any the image does not have."#;

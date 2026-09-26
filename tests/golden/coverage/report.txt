@@ -95,7 +95,7 @@ Error: example.image.kdl carries no XCCDF rule and no profile, so it is not SCAP
 
 help: use an `ssg-<os>-ds.xml` file; `tect scap content` prints the path a scan uses
 
-You can find the available commands by typing 'tect' or 'tect --help'
+Run 'tect --help' to list the commands
 ==== exit 1
 ==== and with nothing to measure it against
 Tectonic v{version}
@@ -104,5 +104,5 @@ Error: `coverage` reads the profile out of a SCAP datastream, and never probes t
 
 help: `tect scap content` prints the path a scan of this repository uses
 
-You can find the available commands by typing 'tect' or 'tect --help'
+Run 'tect --help' to list the commands
 ==== exit 1
