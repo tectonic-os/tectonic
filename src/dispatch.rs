@@ -629,7 +629,11 @@ pub fn dispatch(
         // the account and the encryption are the user's, and are not here.
         Verb::Recipe => {
             let root = repo_root(here)?;
-            let (list, issues, context) = crate::declarations(&root);
+            // The loaded list, because the recipe carries a module-provided
+            // capability. `List::load` leaves every entry's module empty, and
+            // the media stages this document from a full read.
+            let loaded = crate::load(&root);
+            let (list, issues, context) = (loaded.list, loaded.issues, loaded.context);
             if issues.report(&context) {
                 return Ok(ExitCode::from(REPO_ERROR));
             }

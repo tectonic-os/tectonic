@@ -205,23 +205,6 @@ pub fn build(
     if provides(declared, &entries, LUKS_INITRAMFS) {
         fields.push(("luksInitramfs", Json::Bool(true)));
     }
-    // Both are meaningful for one filesystem each, and fisherman ignores the
-    // other. Emitted only where declared, so a recipe says what the image said.
-    if layout.is_some_and(|l| l.subvolumes) {
-        fields.push(("btrfsSubvolumes", Json::Bool(true)));
-    }
-    if let Some(pool) = layout.map(|l| l.pool.as_str()).filter(|p| !p.is_empty()) {
-        fields.push(("zfsPoolName", Json::string(pool)));
-    }
-    if let Some(var) = layout.and_then(|l| l.var_disk.as_ref()) {
-        fields.push((
-            "varDisk",
-            Json::object([
-                ("disk", Json::string(&var.disk)),
-                ("keepExisting", Json::Bool(var.keep_existing)),
-            ]),
-        ));
-    }
     if !stores.is_empty() {
         fields.push((
             "additionalImageStores",
@@ -232,9 +215,8 @@ pub fn build(
 }
 
 /// Where the media carries the selected image, and where the live environment
-/// registers it as an additional image store. Handed to `bootc install` and
-/// written into the live environment's `storage.conf`: fisherman pulls before
-/// it starts the install container, and that pull knows nothing of the recipe.
+/// registers it as an additional image store. The path reaches both podman and
+/// the bootc install container through the live storage configuration.
 pub const STORE: &str = "/var/lib/tectonic/store";
 
 /// The staging ceiling the media is assembled in, not a cost.
@@ -379,7 +361,7 @@ mod tests {
             Some("{\n  \"groups\": [\n    \"wheel\"\n  ]\n}")
         );
 
-        // A store nothing carries is an absent key, because fisherman
+        // A store nothing carries is an absent key, because the installer
         // bind-mounts every path it is given.
         assert!(field(&deb, "forky", "additionalImageStores").is_none());
     }
@@ -388,7 +370,7 @@ mod tests {
     /// A recipe carrying the family's ext4 under a declared btrfs installs a
     /// disk the image did not ask for and nothing anywhere would say so.
     #[test]
-    fn a_declared_layout_replaces_the_family_filesystem_and_adds_the_var_disk() {
+    fn a_declared_layout_replaces_the_family_filesystem() {
         let deb = fixture("deb-families");
         let recipe = build(&deb, "debian", "image", "imgref", &[]).expect("a debian target");
         let field = |key: &str| match &recipe {
@@ -399,26 +381,15 @@ mod tests {
             _ => None,
         };
         assert_eq!(field("filesystem").as_deref(), Some("\"btrfs\""));
-        assert_eq!(field("btrfsSubvolumes").as_deref(), Some("true"));
         // The base's row lists grub2 first, so this is the image's own pick.
         assert_eq!(field("bootloader").as_deref(), Some("\"systemd\""));
-        assert_eq!(
-            field("varDisk").as_deref(),
-            Some("{\n  \"disk\": \"/dev/sdb\",\n  \"keepExisting\": false\n}")
-        );
         // The family still settles everything the layout does not name.
         assert_eq!(field("composeFsBackend").as_deref(), Some("true"));
 
-        // A target whose image declares no layout carries none of the four
-        // optional fields: fisherman formats every disk it is handed, and its
-        // own defaults are what an absent key means.
         let plain = build(&deb, "forky", "image", "imgref", &[]).expect("a debian target");
         let Json::Object(fields) = plain else {
             panic!("a recipe is an object")
         };
-        for absent in ["varDisk", "btrfsSubvolumes", "zfsPoolName"] {
-            assert!(fields.iter().all(|(had, _)| had != absent), "{absent}");
-        }
         assert!(fields
             .iter()
             .any(|(had, value)| had == "bootloader" && value.render().trim() == "\"grub2\""));
@@ -443,13 +414,10 @@ mod tests {
     fn layout(composefs: Option<bool>) -> crate::model::image::Layout {
         crate::model::image::Layout {
             filesystem: String::new(),
-            subvolumes: false,
-            pool: String::new(),
             bootloader: String::new(),
             composefs,
             generic: None,
             admin_group: String::new(),
-            var_disk: None,
             span: crate::diag::Span::default(),
         }
     }
@@ -537,8 +505,7 @@ mod tests {
             "{\n  \"image\": \"localhost/arch:latest\",\n  \"targetImgref\": \"imgref\",\n  \
              \"composeFsBackend\": true,\n  \"genericImage\": true,\n  \"bootloader\": \
              \"systemd\",\n  \"filesystem\": \"btrfs\",\n  \"hostname\": \"arch\",\n  \
-             \"user\": {\n    \"groups\": [\n      \"wheel\"\n    ]\n  },\n  \
-             \"btrfsSubvolumes\": true\n}\n"
+             \"user\": {\n    \"groups\": [\n      \"wheel\"\n    ]\n  }\n}\n"
         );
         // Both documents on one medium, or the media is assembled around a
         // target no installer on it can install.
@@ -572,6 +539,21 @@ mod tests {
         assert!(media(&deb, "not-a-target", "image", "imgref").is_none());
     }
 
+    #[test]
+    fn the_live_graphroot_is_a_required_native_tmpfs() {
+        assert!(LIVE_ENV
+            .contains("COPY <<'MOUNT' /usr/lib/systemd/system/var-lib-containers-storage.mount"));
+        assert!(LIVE_ENV.contains("What=tmpfs\nWhere=/var/lib/containers/storage"));
+        assert_eq!(
+            LIVE_ENV
+                .lines()
+                .filter(|line| *line == "Requires=var-lib-containers-storage.mount")
+                .count(),
+            2
+        );
+        assert!(!LIVE_ENV.contains("mount_program"));
+    }
+
     /// Both installer units hand over to the binary this file stages, and
     /// they hand over to no other.
     ///
@@ -582,8 +564,7 @@ mod tests {
     #[test]
     fn both_installer_units_hand_over_to_the_binary_the_live_environment_stages() {
         // Source and destination both. A `COPY` checked by its destination
-        // alone still passes when the source becomes another binary, and
-        // fisherman would then draw on tty1.
+        // alone still passes when the source becomes another binary.
         const STAGES: &str = "COPY --from=tools /out/tect-installer /usr/bin/tect-installer";
         const RUNS: &str = "/usr/bin/tect-installer";
         assert!(

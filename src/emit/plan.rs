@@ -135,19 +135,7 @@ fn image(list: &List, image: &Image, resolved: &Resolved) -> Json {
                 None => Json::Null,
                 Some(layout) => Json::object([
                     ("filesystem", Json::string(&layout.filesystem)),
-                    ("subvolumes", Json::Bool(layout.subvolumes)),
-                    ("pool", Json::string(&layout.pool)),
                     ("bootloader", Json::string(&layout.bootloader)),
-                    (
-                        "var_disk",
-                        match &layout.var_disk {
-                            None => Json::Null,
-                            Some(var) => Json::object([
-                                ("disk", Json::string(&var.disk)),
-                                ("keep_existing", Json::Bool(var.keep_existing)),
-                            ]),
-                        },
-                    ),
                 ]),
             },
         ),

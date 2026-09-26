@@ -7,42 +7,18 @@ ARG GO_IMAGE=docker.io/library/golang:1.26
 # renovate: datasource=docker depName=quay.io/fedora/fedora-bootc
 ARG LIVE_BASE=quay.io/fedora/fedora-bootc:44
 
-# Neither project publishes a binary worth pinning, so both are source archives
-# pinned by sha256 and built here.
-#
-# Fisherman is pinned to a fork again since 2026-09-12, for `varDisk.size`,
-# which cuts /var out of the install disk, and since 2026-09-16 for the retag
-# that lets an encrypted root boot under a sealed UKI, the composefs user
-# creation fix (the deploy root's /var is a stateroot symlink, and login.defs
-# makes useradd create the home by default) and the first-boot TPM2 unit going
-# into the deployment's /etc instead of the physical root's, which no boot
-# reads. The branch above those carries the `tpm2-luks-pin` encryption kind,
-# drops the payload's signatures from the OCI export so a signed source can
-# install, and holds every login until the first-boot enrollment finishes,
-# with a 120-second start cap so a hung TPM cannot lock the machine out. The
-# PCR-policy change is stacked
-# on `tectonic-integration`, which holds the other changes. The fork is
-# of `tuna-os` deliberately: that repository's own
-# description reads `MOVED -> github.com/projectbluefin/fisherman`, and that
-# destination is a fork well behind this one. Do not "correct" the base it
-# forks from.
-#
+# Tacklebox publishes no binary worth pinning, so its source archive is pinned
+# by sha256 and built here.
 # CGO_ENABLED=0 because tacklebox's default build links `net` and `os/user`
 # against the builder's libc, and it is copied out of this stage to a host.
-# Fisherman's Go module is at `fisherman/` inside its own repository and not at
-# the root, which is why the two build directories below are not symmetrical.
 FROM ${GO_IMAGE} AS tools
-ARG FISHERMAN_ORG=tectonic-os
-ARG FISHERMAN_COMMIT=2ac6e1850734d82c3a40090d49a7565e02d610ea
-ARG FISHERMAN_SHA256=4ab6984245fd35843e86c7ff762b1672e193d3a2a6b939fada13be44605af933
 # Tacklebox is the other fork: the media needs a change upstream has not got.
-# The pin is `feat/grub-bootloader-support`, which stages the live image's own
-# bootloader, a signed shim and GRUB pair in any of four layouts, the deb
-# families' `/usr/lib/shim` included. It keeps upstream's systemd-boot first,
-# and `vm.sh` asks for the pair with `--media-bootloader grub2`.
+# The pin is `feat/offline-store-format`, stacked on the GRUB support that
+# stages the live image's signed shim and GRUB pair. `vm.sh` asks for GRUB and
+# an OCI store through the two switches carried by the fork.
 ARG TACKLEBOX_ORG=tectonic-os
-ARG TACKLEBOX_COMMIT=da820e5e9ac34c7a851382a9a1c7a4c6bd0c886f
-ARG TACKLEBOX_SHA256=c873e6a102640b2688de126238e2faae3abfd1c40370bf46df2906965d9c0439
+ARG TACKLEBOX_COMMIT=a536788bac2eaeb1403cb2855a7f3b4bc2a1a029
+ARG TACKLEBOX_SHA256=9116d68d4bb2030398a1759ac6c029a0f4d8a2edb513e018a54aeaaf144e5ebc
 # `ExtractEFIBinary` takes an image argument, never reads it, and looks only at
 # two host paths, so a host with no systemd-boot-unsigned is a hard stop and on
 # a cross-distro builder the host is the wrong source. The patch makes
@@ -56,11 +32,9 @@ RUN set -eux; \
         mkdir -p "/src/$2"; \
         tar -xf "/tmp/$2.tar.gz" -C "/src/$2" --strip-components=1; \
     }; \
-    fetch "${FISHERMAN_ORG}" fisherman "${FISHERMAN_COMMIT}" "${FISHERMAN_SHA256}"; \
     fetch "${TACKLEBOX_ORG}" tacklebox "${TACKLEBOX_COMMIT}" "${TACKLEBOX_SHA256}"; \
     git -C /src/tacklebox apply -p1 /tmp/efi-from-image.patch; \
     mkdir -p /out; \
-    cd /src/fisherman/fisherman && CGO_ENABLED=0 go build -trimpath -o /out/fisherman ./cmd/fisherman/; \
     cd /src/tacklebox && CGO_ENABLED=0 go build -trimpath -o /out/tacklebox ./cmd/tacklebox
 
 # The installer does publish a binary worth pinning, so this one is fetched and
@@ -74,16 +48,15 @@ RUN set -eux; \
 # `--strip-components` is passed. Against a single top-level file that flag
 # extracts nothing and still exits 0.
 #
-# These three are bumped by hand, as the fisherman and tacklebox pins above
-# are. A `# renovate:` directive here would do nothing: the dockerfile manager
+# These three are bumped by hand, as the tacklebox pins above are. A
+# `# renovate:` directive here would do nothing: the dockerfile manager
 # supports the apk, deb and docker datasources alone, and it reads an `ARG`
-# only to resolve a variable inside a `FROM`. Checked against
-# `lib/modules/manager/dockerfile/` on 2026-09-21. Tracking these needs a
-# `customManagers` regex in the repository that builds the media. Recheck if
-# that manager gains a releases datasource.
-ARG INSTALLER_VERSION=0.1.3
-ARG INSTALLER_SHA256_X86_64=9fea5189ce22ea53af7ab2804ba7c5221ca9b6438de7db8937d5ef8a728057ff
-ARG INSTALLER_SHA256_AARCH64=360c0dca9cb63d0878a9b313b6fc6aa9b3e9e2c4cb5345d18075db3773364d7c
+# only to resolve a variable inside a `FROM`, as
+# `lib/modules/manager/dockerfile/` shows. Tracking these needs a
+# `customManagers` regex in the repository that builds the media.
+ARG INSTALLER_VERSION=0.1.5
+ARG INSTALLER_SHA256_X86_64=ee8f0548545378e66161f427f514928cf35683b916b591550108f0cb8c42b7e8
+ARG INSTALLER_SHA256_AARCH64=0c2e3f6da8d13579d3d9e2b1c644cbde7611fdc0c28225a727105d336c488b29
 RUN set -eux; \
     arch="$(uname -m)"; \
     case "$arch" in \
@@ -115,18 +88,18 @@ RUN set -eux; \
     done
 
 # podman runs the install container, so the family installing is irrelevant to
-# the family installed and there is one live environment. fuse-overlayfs reads
-# the offline store; systemd-cryptenroll is what fisherman aborts before
-# touching a disk without, and Debian ships it in systemd-cryptsetup and not in
-# systemd. So this asserts the binaries and never the packages.
+# the family installed and there is one live environment. This asserts the
+# binaries the installer runs and never the packages that happen to provide
+# them.
 #
-# openssl is the installer's password hash: fisherman hands the recipe's
-# password to chpasswd, and only a `$`-prefixed crypt string takes the `-e`
-# branch. crypt(3) is not an option — glibc keeps it in libcrypt.
+# openssl makes the password hash before the disk is changed. crypt(3) is not
+# an option because glibc keeps it in libcrypt.
 #
-# The apt arm produces unsigned media. EL packages no kmscon, so it is asked
-# for alone. The assertion below makes a wrong package name a failed ISO build
-# and not a wiped disk.
+# The apt arm produces unsigned media. EL packages no kmscon and no
+# btrfs-progs, so each is asked for alone. The installer refuses a btrfs
+# format before the cut where the live environment has no mkfs.btrfs. The
+# assertion below makes a wrong package name a failed ISO build and not a
+# wiped disk.
 #
 # A UKI payload removes GRUB from the installed chain. The media still boots
 # the vendor-signed shim and GRUB pair, restored only in this wrapper.
@@ -134,14 +107,14 @@ RUN set -eux; \
     if command -v apt-get > /dev/null 2>&1; then \
         apt-get update -y; \
         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            podman fuse-overlayfs systemd-cryptsetup cryptsetup skopeo openssl \
-            fdisk dosfstools e2fsprogs xfsprogs; \
+            podman cryptsetup openssl fdisk util-linux passwd policycoreutils kbd \
+            dosfstools e2fsprogs xfsprogs btrfs-progs; \
         apt-get clean -y; \
         rm -rf /var/lib/apt/lists/*; \
     else \
         dnf install -y --setopt=install_weak_deps=False \
-            podman fuse-overlayfs cryptsetup skopeo openssl \
-            util-linux dosfstools e2fsprogs xfsprogs; \
+            podman cryptsetup openssl util-linux shadow-utils policycoreutils kbd \
+            dosfstools e2fsprogs xfsprogs; \
         if [ -s /usr/share/tectonic/boot-chain ] && [ ! -d /usr/lib/efi/grub2 ]; then \
             if ! dnf reinstall -y --setopt=install_weak_deps=False grub2-efi-x64; then \
                 dnf upgrade -y --setopt=install_weak_deps=False grub2-efi-x64; \
@@ -149,10 +122,11 @@ RUN set -eux; \
             test -d /usr/lib/efi/grub2; \
         fi; \
         dnf install -y --setopt=install_weak_deps=False kmscon || true; \
+        dnf install -y --setopt=install_weak_deps=False btrfs-progs || true; \
         dnf clean all; \
     fi; \
-    for tool in podman fuse-overlayfs skopeo cryptsetup systemd-cryptenroll \
-        openssl sfdisk mkfs.fat mkfs.ext4 mkfs.xfs; do \
+    for tool in podman cryptsetup openssl sfdisk lsblk blkid losetup mount umount mountpoint \
+        chroot useradd setfiles systemctl chvt mkfs.fat mkfs.ext4 mkfs.xfs; do \
         command -v "$tool" > /dev/null 2>&1 \
             || { echo "the live environment has no ${tool}" >&2; exit 1; }; \
     done; \
@@ -177,10 +151,8 @@ RUN set -eux; \
         | xargs -0r sed -i '/TMOUT/d'; \
     systemctl set-default multi-user.target
 
-# Fisherman is the backend and nothing here reimplements partitioning, LUKS or
-# TPM2 enrolment. Its recipe is baked in at a fixed path rather than written
-# onto the media, because this layer is where the recipe is already known.
-COPY --from=tools /out/fisherman /usr/bin/fisherman
+# The recipe is baked in at a fixed path because this layer is where the target
+# is already known.
 COPY recipe.json /usr/share/tectonic/install-recipe.json
 
 # Tacklebox writes the payload to LiveOS/store.squashfs.img and mounts the media
@@ -202,9 +174,23 @@ Options=ro,loop
 WantedBy=multi-user.target
 MOUNT
 
-# Naming the store in the recipe is not enough. `additionalImageStores` is
-# handed to the bootc install container, while fisherman's pull step runs before
-# that and is a plain `podman pull` that knows nothing about it.
+# The live graphroot cannot use overlay on the live image's own overlay root.
+COPY <<'MOUNT' /usr/lib/systemd/system/var-lib-containers-storage.mount
+[Unit]
+Description=Temporary container storage for the installer
+
+[Mount]
+What=tmpfs
+Where=/var/lib/containers/storage
+Type=tmpfs
+Options=mode=0700
+
+[Install]
+WantedBy=multi-user.target
+MOUNT
+
+# The installer bind-mounts this configuration into the payload container, so
+# every configured helper must exist there as well as in the live environment.
 COPY <<'CONF' /etc/containers/storage.conf
 [storage]
 driver = "overlay"
@@ -213,14 +199,11 @@ graphroot = "/var/lib/containers/storage"
 
 [storage.options]
 additionalimagestores = ["/var/lib/tectonic/store"]
-
-[storage.options.overlay]
-mount_program = "/usr/bin/fuse-overlayfs"
 CONF
 
-# Root on the console, without a password, on installer media only. Fisherman
-# partitions disks and calls `bootc install`, so a console that cannot become
-# root cannot install anything. This image is built per target as
+# Root on the console, without a password, on installer media only. The
+# installer partitions disks and calls `bootc install`, so a console that
+# cannot become root cannot install anything. This image is built per target as
 # `<published>-installer`, boots only from the media, and never lands on a disk.
 #
 # Neither of these autostarts the installer any more. The serial console is a
@@ -252,7 +235,7 @@ QUIET
 # `setfont` loads bitmaps, so a TTF is not an answer either. kmscon draws on DRM
 # through pango, and `monospace` already resolves to Adwaita Mono in this base.
 # The installer's own unit below runs it, so no `kmsconvt@` login is involved.
-RUN systemctl enable var-lib-tectonic-store.mount
+RUN systemctl enable var-lib-tectonic-store.mount var-lib-containers-storage.mount
 
 # The frontend the units below start. `--version` runs it here, so a binary
 # that cannot execute in this environment fails the ISO build instead of the
@@ -283,6 +266,9 @@ RUN /usr/bin/tect-installer --version
 # `Restart=always` because leaving the installer on installation media starts it
 # again rather than reaching a shell.
 #
+# kmscon's `--login` starts its command with no `PATH`, and the installer runs
+# `mkfs.*` from `/usr/sbin`, so `env` passes the login PATH a root console has.
+#
 # The path here is the one the `COPY --from=tools` above writes. Nothing else
 # ties a unit's `ExecStart=` to the binary this file stages, so an edit to one
 # and not the other leaves the media booting to a login prompt, a root shell or
@@ -292,7 +278,8 @@ RUN /usr/bin/tect-installer --version
 COPY <<'UNIT' /usr/lib/systemd/system/tect-installer.service
 [Unit]
 Description=Install this image onto a disk
-After=var-lib-tectonic-store.mount systemd-user-sessions.service getty@tty1.service
+Requires=var-lib-containers-storage.mount
+After=var-lib-tectonic-store.mount var-lib-containers-storage.mount systemd-user-sessions.service getty@tty1.service
 Conflicts=getty@tty1.service
 AssertPathExistsGlob=/dev/dri/card*
 OnFailure=tect-installer-vt.service
@@ -301,7 +288,7 @@ StartLimitBurst=10
 
 [Service]
 Type=idle
-ExecStart=/usr/bin/kmscon --vt=1 --no-switchvt --oneshot --login -- /usr/bin/tect-installer
+ExecStart=/usr/bin/kmscon --vt=1 --no-switchvt --oneshot --login -- /usr/bin/env PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin /usr/bin/tect-installer
 Restart=always
 RestartSec=1
 
@@ -331,7 +318,8 @@ UNIT
 COPY <<'UNIT' /usr/lib/systemd/system/tect-installer-vt.service
 [Unit]
 Description=Install this image onto a disk, on the kernel console
-After=var-lib-tectonic-store.mount systemd-user-sessions.service getty@tty1.service
+Requires=var-lib-containers-storage.mount
+After=var-lib-tectonic-store.mount var-lib-containers-storage.mount systemd-user-sessions.service getty@tty1.service
 Conflicts=getty@tty1.service
 StartLimitIntervalSec=0
 

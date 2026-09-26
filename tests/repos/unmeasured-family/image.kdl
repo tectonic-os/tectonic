@@ -8,7 +8,7 @@ image {
     }
 
     layout {
-        filesystem "btrfs" subvolumes=#true
+        filesystem "btrfs"
         composefs #true
         generic-image #true
         admin-group "wheel"

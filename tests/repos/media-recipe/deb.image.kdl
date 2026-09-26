@@ -1,0 +1,15 @@
+image {
+    name "Deb"
+
+    base "docker.io/library/debian:forky" {
+        family "debian"
+    }
+
+    layout {
+        bootloader "grub2"
+    }
+
+    modules {
+        module "core/luks"
+    }
+}

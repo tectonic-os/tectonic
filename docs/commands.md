@@ -818,11 +818,11 @@ Notes:
   target's base, so an `--image` naming a ref this repository does not describe
   is not guessed.
 - An `iso` is converted by neither, on any family. It is a live environment
-  layered on the target's own image, carrying fisherman and the target's bytes,
-  assembled into media by tacklebox, both built from source pins in the same
-  build. `tect vm build iso` stages the two recipes, the live environment's
-  Containerfile and one upstream patch under `out/bootiso/`; they are not
-  generated files, because each depends on `--target`, `--tag` and
+  layered on the target's own image, carrying the installer and the target's
+  bytes, and assembled into media by tacklebox, which is built from a source
+  pin in the same build. `tect vm build iso` stages the two recipes, the live
+  environment's Containerfile and one upstream patch under `out/bootiso/`; they
+  are not generated files, because each depends on `--target`, `--tag` and
   `$IMAGE_REGISTRY`, which are build-time rather than commit-time.
 - The recipe derives `composeFsBackend`, `genericImage`, the boot chain and
   bootloader, `filesystem`, the admin group and the declared
@@ -1271,7 +1271,7 @@ the target's name and tag. The ungated target when none is named.
 ## `tect recipe`
 
 Prints the half of an installation recipe the declaration answers, as JSON for
-`fisherman`: the reference installed and the reference the installed machine
+the installer: the reference installed and the reference the installed machine
 updates from, plus image properties such as composefs sealing, the boot chain
 and bootloader, the root filesystem and whether the target declares a
 LUKS-capable initramfs. A successful `tect build` validates that last

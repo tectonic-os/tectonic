@@ -2,7 +2,7 @@
 
 use crate::diag::{Issue, Issues, Source, Span};
 use crate::model::image::{is_name, Base, Decl, Entry, Flavour, Image};
-use crate::model::image::{Layout, List, VarDisk, NO_FLAVOUR};
+use crate::model::image::{Layout, List, NO_FLAVOUR};
 use crate::model::module::Refusal;
 use crate::model::remote::REMOTE_DIR;
 use crate::parse::prop;
@@ -38,12 +38,10 @@ const SOURCE: Node = Node::new("source", "Modules referenced from one of the col
     .children(&[ENTRY], Say::new("`{}` is not allowed inside a source block",
         "only `module` belongs here", "source blocks do not nest"));
 
-/// The root filesystems fisherman auto-partitions with, which is its whole
-/// list. `zfs` forces the composefs backend on inside fisherman and takes its
-/// pool name from `pool=`.
-const FILESYSTEMS: &[&str] = &["xfs", "ext4", "btrfs", "zfs"];
+/// The root filesystems the installer formats.
+const FILESYSTEMS: &[&str] = &["xfs", "ext4", "btrfs"];
 
-/// The bootloaders fisherman installs.
+/// The bootloaders the installer writes.
 pub(crate) const BOOTLOADERS: &[&str] = &["grub2", "systemd"];
 
 /// The UKI boot chains the image can declare.
@@ -132,19 +130,10 @@ pub const IMAGE: Node = Node::new("image",
                 Node::new("filesystem", "The root filesystem, in place of the one the base family settles.")
                     .arg(Arg::One(FILESYSTEMS), Say::new("`{}` is not a filesystem the installer formats",
                         "not a filesystem",
-                        "the installer auto-partitions `xfs`, `ext4`, `btrfs` and `zfs`"))
+                        "the installer auto-partitions `xfs`, `ext4` and `btrfs`"))
                     .once("")
-                    .props(&[
-                        Prop { name: "subvolumes", kind: Kind::Bool,
-                            desc: "btrfs only: create `@`, `@home` and `@snapshots`.",
-                            say: Say::new("`{}` must be #true or #false", "not a boolean", ""),
-                            missing: Say::NONE },
-                        Prop { name: "pool", kind: Kind::Str,
-                            desc: "zfs only: the pool to create. Fisherman's own default is `rpool`.",
-                            say: Say::new("`{}` must be a pool name", "not a string", ""),
-                            missing: Say::NONE },
-                    ], Say::new("unknown filesystem property `{}`", "not part of the schema",
-                        "`filesystem` accepts `subvolumes` and `pool`")),
+                    .props(&[], Say::new("unknown filesystem property `{}`", "not part of the schema",
+                        "`filesystem` takes only its filesystem name")),
                 Node::new("composefs", "Whether the install seals the deployment, in place of the family's answer.")
                     .arg(Arg::Bool, Say::new("`composefs` needs #true or #false", "not a boolean",
                         "`composefs #true` passes `--composefs-backend`, which needs a \
@@ -166,20 +155,9 @@ pub const IMAGE: Node = Node::new("image",
                         "the installer writes `grub2` or `systemd`; no family answers this, so \
                          an image without it builds no install media"))
                     .once(""),
-                Node::new("var-disk", "A whole disk the installer mounts at `/var`, named by its device.")
-                    .arg(Arg::Str, Say::new("`var-disk` needs a device", "no device given",
-                        "`var-disk \"/dev/sdb\"`, a block device on every machine this image installs onto"))
-                    .once("")
-                    .props(&[
-                        Prop { name: "keep-existing", kind: Kind::Bool,
-                            desc: "Whether the disk is mounted as it is; off formats it.",
-                            say: Say::new("`{}` must be #true or #false", "not a boolean", ""),
-                            missing: Say::NONE },
-                    ], Say::new("unknown var-disk property `{}`", "not part of the schema",
-                        "a var-disk accepts `keep-existing`")),
             ], Say::new("unknown layout property `{}`", "not part of the schema",
-                "a layout accepts `filesystem`, `composefs`, `generic-image`, `admin-group`, \
-                 `bootloader` and `var-disk`")),
+                "a layout accepts `filesystem`, `composefs`, `generic-image`, `admin-group` \
+                 and `bootloader`")),
 
         Node::new("allow-remediation",
             "One rule an installed module refuses that this image lets remediation set anyway.")
@@ -349,7 +327,7 @@ impl List {
             image.parse_base(base, issues);
         }
         if let Some(layout) = child(node, "layout") {
-            image.parse_layout(layout, issues);
+            image.parse_layout(layout);
         }
         if let Some(flavours) = child(node, "flavours") {
             image.parse_flavours(flavours, issues);
@@ -391,46 +369,21 @@ impl Image {
         self.base = Some(base);
     }
 
-    fn parse_layout(&mut self, node: &KdlNode, issues: &mut Issues) {
-        let src = &self.src.clone();
-        let var_disk = child(node, "var-disk").and_then(|disk| {
-            Some(VarDisk {
-                disk: string_arg(disk)?.to_string(),
-                keep_existing: flag(disk, "keep-existing"),
-                span: disk.name().span().into(),
-            })
-        });
-        if let Some(var) = &var_disk {
-            if !var.disk.starts_with("/dev/") {
-                issues.push(
-                    Issue::new(format!("`{}` is not a block device", var.disk), src)
-                        .at(var.span, "`var-disk` names a device under /dev")
-                        .help("the installer formats what this names before bootc runs, and a path that is not a device is a path it would erase something else to reach"),
-                );
-            }
-        }
-        let filesystem = child(node, "filesystem");
+    fn parse_layout(&mut self, node: &KdlNode) {
         self.layout = Some(Layout {
             filesystem: text(node, "filesystem"),
-            subvolumes: filesystem.is_some_and(|fs| flag(fs, "subvolumes")),
-            pool: filesystem
-                .and_then(|fs| prop(fs, "pool"))
-                .unwrap_or_default()
-                .to_string(),
             bootloader: text(node, "bootloader"),
             composefs: child(node, "composefs").and_then(bool_arg),
             generic: child(node, "generic-image").and_then(bool_arg),
             admin_group: text(node, "admin-group"),
-            var_disk,
             span: node.name().span().into(),
         });
     }
 
     /// The two things a declared layout can be wrong about.
     ///
-    /// A sealed deployment needs fs-verity, xfs has none, and fisherman
-    /// rejects the pair in its own validation — after the media is built and
-    /// in front of somebody who is installing.
+    /// A sealed deployment needs fs-verity, and xfs has none. Refusing the
+    /// pair here prevents an install that cannot boot.
     ///
     /// And an image on a family this project has not measured answers for
     /// itself, in full or not at all; on any family it names its bootloader.

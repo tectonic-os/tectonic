@@ -107,31 +107,11 @@ What the installer lays down, where the family's answer is not the one the image
 
 | Node | Takes | Meaning |
 | --- | --- | --- |
+| `filesystem` | `xfs`, `ext4`, `btrfs`, at most one | The root filesystem, in place of the one the base family settles. |
 | `composefs` | `#true` or `#false`, at most one | Whether the install seals the deployment, in place of the family's answer. |
 | `generic-image` | `#true` or `#false`, at most one | Whether the install skips the bootupd check, in place of the family's answer. |
 | `admin-group` | a string, at most one | The group an administrator is created in, in place of the family's. |
 | `bootloader` | `grub2`, `systemd`, at most one | The bootloader the installer installs, one the base's row lists. |
-
-##### `filesystem`
-
-The root filesystem, in place of the one the base family settles.
-
-*`xfs`, `ext4`, `btrfs`, `zfs`, at most one*
-
-| Property | Value | Meaning |
-| --- | --- | --- |
-| `subvolumes=` | `#true` or `#false` | btrfs only: create `@`, `@home` and `@snapshots`. |
-| `pool=` | a string | zfs only: the pool to create. Fisherman's own default is `rpool`. |
-
-##### `var-disk`
-
-A whole disk the installer mounts at `/var`, named by its device.
-
-*a string, at most one*
-
-| Property | Value | Meaning |
-| --- | --- | --- |
-| `keep-existing=` | `#true` or `#false` | Whether the disk is mounted as it is; off formats it. |
 
 #### `allow-remediation`
 

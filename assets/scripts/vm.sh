@@ -243,7 +243,7 @@ install_disk() {
     bootloader="$(jq -r .bootloader <<< "$recipe")"
     local install_args=(--filesystem "$(jq -r .filesystem <<< "$recipe")")
     [ "$(jq -r .composeFsBackend <<< "$recipe")" != true ] || install_args+=(--composefs-backend)
-    # fisherman's reading of the recipe: empty and `grub2` are bootc's default.
+    # bootc takes grub2 by default, so only another bootloader needs a flag.
     case "$bootloader" in
         "" | grub2) ;;
         *) install_args+=(--bootloader "$bootloader") ;;
@@ -357,8 +357,7 @@ finish() {
 }
 trap finish EXIT
 
-# fisherman ships inside the live environment; tacklebox assembles the media
-# around it and runs here, so it is copied out of the same stage.
+# Tacklebox assembles the media here, so it is copied out of its build stage.
 podman build --target tools -t "$TOOLS" "$STAGED"
 cid="$(podman create "$TOOLS")"
 podman cp "${cid}:/out/tacklebox" "$TBX"
@@ -370,7 +369,7 @@ unmount_offline_store
 # The signed pair boots under Secure Boot, so it wins where the live image
 # carries systemd-boot too.
 env HOME=/root "$TBX" build "${STAGED}/media.json" --iso "$ISO" -b "$BUILD" \
-    --media-bootloader grub2
+    --media-bootloader grub2 --offline-store-format oci
 ROOT
 
     mv -f "${image_file}.part" "$image_file"

@@ -43,7 +43,7 @@ args=(
     --karg console=tty0 --karg 'console=ttyS0,115200n8'
     --karg systemd.wants=sshd.service
 )
-# fisherman's reading of the recipe: empty and `grub2` are bootc's default.
+# bootc takes grub2 by default, so only another bootloader needs a flag.
 case "$bootloader" in
     "" | grub2) ;;
     *) args+=(--bootloader "$bootloader") ;;

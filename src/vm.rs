@@ -101,10 +101,9 @@ fn documents(
         ));
     }
     let refuse = || recipe::refusal(list, name);
-    // Both references fisherman is given are the published one: tacklebox
-    // embeds the local bytes under the published name, so asking fisherman for
-    // `localhost/...` would miss the store and reach for a registry. The local
-    // reference is the media recipe's `source`.
+    // The install and update references are both the published one. Tacklebox
+    // embeds the local bytes under that name, while the local reference is the
+    // media recipe's `source`.
     let build = recipe::build(list, name, imgref, imgref, &[recipe::STORE.to_string()])
         .ok_or_else(refuse)?;
     let media = recipe::media(list, name, image, imgref).ok_or_else(refuse)?;
@@ -139,10 +138,18 @@ fn live_env(list: &crate::model::image::List, name: &str, image: &str) -> String
         .collect()
 }
 
-/// Writes them, and answers the live environment's own reference: the script
-/// builds and boots that image and has no JSON reader to find it with.
-fn stage(root: &Path, opts: &Options) -> Result<String, String> {
-    let list = crate::model::image::List::load(root).0;
+/// The loaded list, because a capability a module provides reaches the recipe
+/// through `Entry::module`, which `List::load` leaves empty. An image whose
+/// LUKS support is `deb-family/bootc-base`'s provide would otherwise carry no
+/// `luksInitramfs` and be refused an encrypted install.
+fn staged_list(root: &Path) -> crate::model::image::List {
+    crate::load(root).list
+}
+
+/// The documents a staged medium carries, and the live environment its image
+/// builds. The writes are separate so a test runs the same read the media does.
+fn staged(root: &Path, opts: &Options) -> Result<(String, Vec<(&'static str, String)>), String> {
+    let list = staged_list(root);
     let target = target(&list, opts)
         .ok_or("no target to build an installer iso for; name one with `--target`")?;
     let published = target.published();
@@ -155,10 +162,18 @@ fn stage(root: &Path, opts: &Options) -> Result<String, String> {
         Some(named) => format!("{named}:{tag}"),
         None => crate::registry::at("localhost", &published, &tag),
     };
-    for (name, body) in documents(&list, &target.to_string(), &image, &imgref)? {
+    let documents = documents(&list, &target.to_string(), &image, &imgref)?;
+    Ok((crate::emit::recipe::live(&published), documents))
+}
+
+/// Writes them, and answers the live environment's own reference: the script
+/// builds and boots that image and has no JSON reader to find it with.
+fn stage(root: &Path, opts: &Options) -> Result<String, String> {
+    let (live, documents) = staged(root, opts)?;
+    for (name, body) in documents {
         crate::init::put(&root.join(BOOTISO).join(name), &body)?;
     }
-    Ok(crate::emit::recipe::live(&published))
+    Ok(live)
 }
 
 /// Whether this run would convert the container image into a disk, which is
@@ -262,8 +277,8 @@ fn imports_passwords(root: &Path, module: &str) -> bool {
 
 /// Which installer converts this image, where one would be converted at all.
 /// `None` is the script's own default, `bib`. An `iso` reaches neither
-/// converter — fisherman installs the target through podman — and so names no
-/// installer. Lifted out of `run`, which `exec`s and cannot be tested past it.
+/// converter because its live environment installs the target through podman.
+/// Lifted out of `run`, which `exec`s and cannot be tested past it.
 fn installer(root: &Path, noun: &str, kind: &str, opts: &Options) -> Option<&'static str> {
     if kind == "iso" || !converts(root, noun, kind, opts) {
         return None;
@@ -558,13 +573,12 @@ mod tests {
             ]
         );
         let at = |want| staged.iter().find(|(name, _)| *name == want).unwrap();
-        // The store is named in both halves it has to be named in, and they
-        // are the halves nothing upstream connects: the recipe reaches the
-        // install container, the storage.conf reaches the pull before it.
+        // The recipe names the store to bind into the install container, and
+        // the storage.conf names it to podman. Nothing upstream connects the
+        // two, so both must name it.
         assert!(at("recipe.json").1.contains(crate::emit::recipe::STORE));
-        // What fisherman installs is the name the media holds the bytes under,
-        // which is the published one: the local build appears only as the
-        // media recipe's source, and naming it here reaches for a registry.
+        // The installed name is the name the media holds the bytes under. The
+        // local build appears only as the media recipe's source.
         assert!(at("recipe.json")
             .1
             .contains("\"image\": \"ghcr.io/someone/forky:latest\""));
@@ -595,6 +609,56 @@ mod tests {
         let unknown =
             documents(&list, "not-a-target", "image", "ghcr.io/someone/x:latest").unwrap_err();
         assert!(unknown.contains("not a target"), "{unknown}");
+    }
+
+    /// Staging from `List::load` leaves a module-provided capability out, and
+    /// the installer then refuses an encrypted install.
+    #[test]
+    fn a_module_provided_capability_reaches_the_staged_recipe() {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/repos/media-recipe");
+        let root = std::env::temp_dir().join(format!("tect-media-recipe-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        for file in ["repo.kdl", "deb.image.kdl", "modules/core/luks/module.kdl"] {
+            let body = std::fs::read_to_string(fixture.join(file)).expect("the fixture file reads");
+            crate::init::put(&root.join(file), &body).expect("the fixture file writes");
+        }
+        // The temp copy sits in no repository for a staged reference, and
+        // `IMAGE_REGISTRY` wins over the origin, so pin and restore it.
+        let pinned = std::env::var("IMAGE_REGISTRY").ok();
+        std::env::set_var("IMAGE_REGISTRY", "ghcr.io/example");
+        let opts = Options {
+            target: Some("deb".to_string()),
+            image: None,
+            tag: None,
+            ram: None,
+            rebuild: false,
+        };
+        let answered = staged(&root, &opts);
+        match pinned {
+            Some(previous) => std::env::set_var("IMAGE_REGISTRY", previous),
+            None => std::env::remove_var("IMAGE_REGISTRY"),
+        }
+        let (_, files) = answered.expect("the fixture answers its recipe");
+        let recipe = files
+            .into_iter()
+            .find(|(name, _)| *name == "recipe.json")
+            .expect("recipe.json is staged")
+            .1;
+        assert!(recipe.contains("\"luksInitramfs\": true"), "{recipe}");
+        // What the declarations alone produce, which the installer refused.
+        let bare = documents(
+            &crate::model::image::List::load(&root).0,
+            "deb",
+            "localhost/deb:latest",
+            "ghcr.io/example/deb:latest",
+        )
+        .expect("the fixture answers its recipe")
+        .into_iter()
+        .find(|(name, _)| *name == "recipe.json")
+        .expect("recipe.json is staged")
+        .1;
+        assert!(!bare.contains("luksInitramfs"), "{bare}");
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// A dnf payload is its own live environment; a deb one, whose images

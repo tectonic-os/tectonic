@@ -6,9 +6,8 @@ image {
     }
 
     layout {
-        filesystem "btrfs" subvolumes=#true
+        filesystem "btrfs"
         bootloader "systemd"
-        var-disk "/dev/sdb"
     }
 
     modules {

@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
-  "default_image": "arch",
-  "default_image_name": "Arch",
-  "pr_image": "arch",
-  "default_target": "arch",
-  "default_published": "arch",
-  "pr_target": "arch",
-  "pr_published": "arch",
-  "ungated_target": "arch",
-  "ungated_published": "arch",
-  "cache_image": "arch-cache",
+  "default_image": "deb",
+  "default_image_name": "Deb",
+  "pr_image": "deb",
+  "default_target": "deb",
+  "default_published": "deb",
+  "pr_target": "deb",
+  "pr_published": "deb",
+  "ungated_target": "deb",
+  "ungated_published": "deb",
+  "cache_image": "deb-cache",
   "workflows": [],
   "audit": {
     "enforce": false
@@ -18,10 +18,10 @@
   "assets": [],
   "images": [
     {
-      "id": "arch",
-      "name": "Arch",
+      "id": "deb",
+      "name": "Deb",
       "pretty_name": "",
-      "file": "./image.kdl",
+      "file": "./deb.image.kdl",
       "url": "",
       "issues_url": "",
       "description": "",
@@ -31,12 +31,12 @@
       "boot": "",
       "allows": [],
       "layout": {
-        "filesystem": "btrfs",
-        "bootloader": "systemd"
+        "filesystem": "",
+        "bootloader": "grub2"
       },
       "base": {
-        "image": "ghcr.io/someone/arch-bootc:latest",
-        "family": "arch",
+        "image": "docker.io/library/debian:forky",
+        "family": "debian",
         "signed": false,
         "provides": [],
         "witnesses": {
@@ -72,16 +72,43 @@
       "default_flavour": null,
       "targets": [
         {
-          "name": "arch",
-          "image": "arch",
+          "name": "deb",
+          "image": "deb",
           "flavour": null,
-          "published": "arch",
+          "published": "deb",
           "conforms": "",
           "allows": [],
           "default": true,
           "pr": true,
           "siblings": [],
-          "modules": [],
+          "modules": [
+            {
+              "path": "core/luks",
+              "dir": "core/luks",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "The LUKS initramfs witness, carried by a module and not by the base",
+              "options": {},
+              "provides": [
+                "luks-initramfs"
+              ],
+              "requires": [],
+              "files": {},
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "content": "51e8fc3ca387150053710f3557cfe56ea83da718d70e3a434000491f3c878e43",
+                "repo": false,
+                "source": null,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": [],
+              "refuses": []
+            }
+          ],
           "suppressed": [],
           "secrets": [],
           "contract_files": [],

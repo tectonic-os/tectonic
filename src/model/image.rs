@@ -119,10 +119,6 @@ pub struct Base {
 pub struct Layout {
     /// The root filesystem, empty where the family's answer stands.
     pub filesystem: String,
-    /// btrfs only: `@`, `@home` and `@snapshots`.
-    pub subvolumes: bool,
-    /// zfs only: the pool to create. Empty leaves fisherman's `rpool`.
-    pub pool: String,
     /// `grub2` or `systemd`, empty where the family's answer stands. A family
     /// whose answer is itself empty reads as grub2 in the recipe.
     pub bootloader: String,
@@ -135,16 +131,6 @@ pub struct Layout {
     /// answer stands. `useradd` refuses the whole call when a listed group is
     /// missing, so this names one.
     pub admin_group: String,
-    /// The one separate mount fisherman's recipe can ask for.
-    pub var_disk: Option<VarDisk>,
-    pub span: Span,
-}
-
-/// A whole disk mounted at `/var`.
-pub struct VarDisk {
-    pub disk: String,
-    /// Mount it as it is. Off formats it, which erases a second disk.
-    pub keep_existing: bool,
     pub span: Span,
 }
 

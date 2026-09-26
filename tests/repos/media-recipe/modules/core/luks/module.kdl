@@ -1,0 +1,5 @@
+description "The LUKS initramfs witness, carried by a module and not by the base"
+
+supports "debian"
+
+provides "luks-initramfs"

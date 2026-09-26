@@ -32,13 +32,7 @@
       "allows": [],
       "layout": {
         "filesystem": "xfs",
-        "subvolumes": false,
-        "pool": "",
-        "bootloader": "",
-        "var_disk": {
-          "disk": "sdb",
-          "keep_existing": false
-        }
+        "bootloader": ""
       },
       "base": {
         "image": "docker.io/library/debian:forky",
@@ -114,11 +108,8 @@
       "boot": "",
       "allows": [],
       "layout": {
-        "filesystem": "btrfs",
-        "subvolumes": false,
-        "pool": "",
-        "bootloader": "",
-        "var_disk": null
+        "filesystem": "zfs",
+        "bootloader": ""
       },
       "base": {
         "image": "ghcr.io/someone/arch-bootc:latest",
