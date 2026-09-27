@@ -5,17 +5,23 @@ on:
     tags:
       - 'v*'
 
+# Read only at the workflow level. The build job compiles third-party crates
+# and runs their build scripts, so a write scope or the id-token scope there
+# would give a release credential to them. The release job below grants itself
+# what it needs.
 permissions:
-  contents: write
-  id-token: write
-  attestations: write
+  contents: read
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          # This job pushes nothing, so the job token stays out of
+          # `.git/config`, where a build script would read it.
+          persist-credentials: false
 
       - name: Verify tag matches package version
         run: |
@@ -25,21 +31,29 @@ jobs:
           [ "${GITHUB_REF_NAME}" = "v${version}" ] \
             || { echo "tag ${GITHUB_REF_NAME} does not match package version ${version}" >&2; exit 1; }
 
+      # Each tool is a pinned version, and `--locked` builds it against its own
+      # lockfile. cargo checks every crate against the crates.io index checksum.
+      - name: Install the SBOM tools
+        run: cargo install --locked cargo-auditable@0.7.6 cargo-cyclonedx@0.5.9
+
+      # `cargo auditable` embeds the resolved dependency list in the binary, so
+      # a scanner reads what shipped from the shipped file itself.
       - name: Build
         run: |
           set -euo pipefail
           rustup target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl
-          cargo build --profile dist --locked --target x86_64-unknown-linux-musl
+          cargo auditable build --profile dist --locked --target x86_64-unknown-linux-musl
           # The runner's cc cannot link aarch64; the toolchain carries a linker
           # that can, and the musl target ships its own crt objects and libc.a.
           lld="$(rustc --print sysroot)/lib/rustlib/$(rustc -vV | sed -n 's/^host: //p')/bin/rust-lld"
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="-C linker-flavor=ld.lld -C linker=${lld}" \
-            cargo build --profile dist --locked --target aarch64-unknown-linux-musl
+            cargo auditable build --profile dist --locked --target aarch64-unknown-linux-musl
 
       - name: Package with checksums
         run: |
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
+          epoch="$(git log -1 --format=%ct)"
           for arch in x86_64:x86-64 aarch64:"ARM aarch64"; do
             machine="${arch#*:}"
             arch="${arch%%:*}"
@@ -49,21 +63,93 @@ jobs:
             file "$bin" | grep -q "${machine}"
             file "$bin" | grep -q static
             asset="tect-v${version}-${arch}-linux-musl.tar.gz"
-            # The binary plus the scaffolding `tect init` writes
-            tar -czf "$asset" --transform "s|^${bin%/tect}/||" "$bin" assets
+            # The tarball holds the binary and the scaffolding `tect init`
+            # writes. The file times, order and owners are fixed and gzip
+            # records no time, so two builds of one commit give one tarball.
+            tar --sort=name --mtime="@${epoch}" --owner=0 --group=0 --numeric-owner \
+              --transform "s|^${bin%/tect}/||" -cf - "$bin" assets | gzip -9n > "$asset"
             sha256sum "$asset" | cut -d' ' -f1 > "${asset}.sha256"
+            # The SBOM resolves the dependency graph for the target the
+            # tarball was built for.
+            cargo cyclonedx --format json --spec-version 1.5 \
+              --target "${arch}-unknown-linux-musl" \
+              --override-filename "tect-v${version}-${arch}-linux-musl.cdx"
           done
 
+      - name: Hand the release files to the release job
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release
+          path: |
+            tect-v*-linux-musl.tar.gz
+            tect-v*-linux-musl.tar.gz.sha256
+            tect-v*-linux-musl.cdx.json
+          if-no-files-found: error
+
+  # The scopes live on this job alone. It compiles nothing and runs no
+  # third-party build script.
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Collect the release files
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: release
+
+      # A tarball that lost the embedded list would still pass every check
+      # in the build job, so the list is read back out of a shipped binary.
+      - name: Read the dependency list back
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          tar -xzOf "tect-v${version}-x86_64-linux-musl.tar.gz" tect > shipped
+          objcopy --dump-section .dep-v0=dep-v0.z shipped
+          python3 -c 'import sys, zlib; sys.stdout.buffer.write(zlib.decompress(open("dep-v0.z", "rb").read()))' \
+            | jq -e --arg v "$version" \
+              '.packages | (map(select(.root and .name == "tect" and .version == $v)) | length == 1) and length > 1'
+          rm shipped dep-v0.z
+
       - name: Attest the tarballs
-        uses: actions/attest-build-provenance@bd77c077858b8d561b7a36cbe48ef4cc642ca39d # v2.2.2
+        id: provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: tect-v*-linux-musl.tar.gz
+
+      # Scorecard's Signed-Releases check reads release assets alone, so the
+      # provenance bundle ships as one beside the attestation GitHub stores. The
+      # copy runs before the SBOM attestations, so the asset holds the
+      # provenance bundle alone.
+      - name: Keep the provenance bundle
+        env:
+          BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+        run: cp "$BUNDLE" "tect-${GITHUB_REF_NAME}.sigstore.json"
+
+      - name: Attest the x86_64 SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: tect-${{ github.ref_name }}-x86_64-linux-musl.tar.gz
+          sbom-path: tect-${{ github.ref_name }}-x86_64-linux-musl.cdx.json
+
+      - name: Attest the aarch64 SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: tect-${{ github.ref_name }}-aarch64-linux-musl.tar.gz
+          sbom-path: tect-${{ github.ref_name }}-aarch64-linux-musl.cdx.json
 
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
+          # This job never checks out, so `gh` has no git remote to read the
+          # repository from.
+          GH_REPO: ${{ github.repository }}
         run: |
           gh release create "${GITHUB_REF_NAME}" \
             --title "${GITHUB_REF_NAME}" \
             --generate-notes \
-            tect-v*-linux-musl.tar.gz tect-v*-linux-musl.tar.gz.sha256
+            tect-v*-linux-musl.tar.gz tect-v*-linux-musl.tar.gz.sha256 \
+            tect-v*-linux-musl.cdx.json "tect-${GITHUB_REF_NAME}.sigstore.json"
