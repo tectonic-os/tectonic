@@ -30,3 +30,16 @@ jobs:
 
       - name: Lint
         run: ./lint.sh
+
+  msrv:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Test on rust-version
+        run: |
+          set -euo pipefail
+          msrv="$(cargo metadata --no-deps --format-version 1 | jq -er '.packages[0].rust_version')"
+          rustup toolchain install "$msrv" --profile minimal
+          cargo "+${msrv}" test --locked
