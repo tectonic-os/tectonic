@@ -981,7 +981,7 @@ dependencies = [
 
 [[package]]
 name = "tect"
-version = "0.6.48"
+version = "0.6.49"
 dependencies = [
  "clap",
  "clap-markdown",
