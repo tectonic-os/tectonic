@@ -1,0 +1,3 @@
+description "Ships files and nothing else"
+
+supports "fedora"

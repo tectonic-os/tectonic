@@ -2,7 +2,7 @@
 
 use crate::diag::{Issue, Issues, Source, Span};
 use crate::layout;
-use crate::model::image::{List, Seed, Workflow, SCHEMA_VERSION, TECT_VERSION};
+use crate::model::image::{List, NetRule, Network, Seed, Workflow, SCHEMA_VERSION, TECT_VERSION};
 use crate::parse::image::IMAGE;
 use crate::parse::remote::{parse_collection, COLLECTION};
 use crate::parse::schema::{check_doc, Arg, Kind, Node, Prop, Say};
@@ -11,6 +11,34 @@ use crate::parse::{
 };
 use kdl::{KdlDocument, KdlNode};
 use std::path::Path;
+
+/// What a module layer's steps may reach, under `security-policy`. Lifted out
+/// of `REPO` so the policy block holds it by name.
+#[rustfmt::skip]
+const NETWORK: Node = Node::new("network",
+    "What each step of a module layer may reach. A package step installs the module's \
+     repo files, COPRs and packages. A script step runs its module.sh and finalize \
+     hook. `strict` opens a step only where the module declares it, and a closed step \
+     runs under `--network=none`. Absent, every step keeps the network.")
+    .arg(Arg::MaybeOne(&["allow", "strict"]), Say::new("`{}` is not a network rule",
+        "not a rule",
+        "`network \"strict\"` holds every module to what it declares; a block sets \
+         `packages` and `scripts` one at a time"))
+    .once("a second rule would contradict the first")
+    .children(&[
+        Node::new("packages", "The rule for every package step, over the one the node gives.")
+            .arg(Arg::One(&["allow", "strict", "deny"]), Say::new(
+                "`{}` is not a network rule", "not a rule",
+                "`packages` takes `allow`, `strict` or `deny`"))
+            .once(""),
+        Node::new("scripts", "The rule for every script step, over the one the node gives.")
+            .arg(Arg::One(&["allow", "strict", "deny"]), Say::new(
+                "`{}` is not a network rule", "not a rule",
+                "`scripts` takes `allow`, `strict` or `deny`; under `strict` a module \
+                 opens its script step with `network \"scripts\"`"))
+            .once(""),
+    ], Say::new("unknown node `{}` in network", "not part of the schema",
+        "a network block holds `packages` and `scripts`"));
 
 /// repo.kdl's grammar, and the whole of it.
 #[rustfmt::skip]
@@ -145,12 +173,32 @@ pub const REPO: Node = Node::new("repo",
                     .once(""),
             ], Say::new("unknown node `{}` in audit", "not part of the schema",
                 "an audit block holds `enforce`")),
+        Node::new("security-policy",
+            "The repository's security ground rules, which hold for every image it defines. \
+             An image declares what it is; this declares what the repository requires of it. \
+             Absent, nothing is required and a build runs as it always has.")
+            .once("a second block would contradict the first")
+            .children(&[NETWORK],
+                Say::new("unknown node `{}` in security-policy", "not part of the schema",
+                    "a security-policy block holds a `network` rule")),
     ], Say::new("unknown node `{}` in repo.kdl", "not part of the schema",
         "repo.kdl holds `schema-version`, `tect-version`, `name`, `default-image`, `pr-image`, \
          `seed`, a \
-         `workflows` block, a `sources` block, a `manifest` block and an `audit` block: what is \
-         true of the \
+         `workflows` block, a `sources` block, a `manifest` block, an `audit` block and a \
+         `security-policy` block: what is true of the \
          repository. An image goes in a file of its own"));
+
+/// The node's argument sets both kinds, and a child of its block overrides one
+/// kind. The walker reports a value outside the grammar, so this reader leaves
+/// that kind at its default.
+fn network(node: &KdlNode) -> Network {
+    let both = string_arg(node).and_then(NetRule::of).unwrap_or_default();
+    let kind = |name| child(node, name).and_then(string_arg).and_then(NetRule::of);
+    Network {
+        packages: kind("packages").unwrap_or(both),
+        scripts: kind("scripts").unwrap_or(both),
+    }
+}
 
 /// `image.kdl` or `<name>.image.kdl` at the root, holding whatever images it
 /// likes.
@@ -296,6 +344,7 @@ impl List {
             seed: None,
             manifest_label: false,
             audit_enforce: false,
+            network: Network::default(),
             schema_version: None,
             schema_version_seen: false,
             repo_src: Source::new(root.join(layout::REPO_FILE).display().to_string(), ""),
@@ -423,6 +472,9 @@ impl List {
                 }
                 (true, "audit") => {
                     self.audit_enforce = child(node, "enforce").and_then(bool_arg).unwrap_or(false)
+                }
+                (true, "security-policy") => {
+                    self.network = child(node, "network").map(network).unwrap_or_default()
                 }
                 (true, "manifest") => {
                     self.manifest_label = child(node, "label").and_then(bool_arg).unwrap_or(false);
@@ -911,6 +963,42 @@ colour "blue"
         };
         assert!(!read("schema-version 1\n"));
         assert!(read("schema-version 1\nmanifest {\n    label #true\n}\n"));
+    }
+
+    /// The reader is given the `network` node out of `security-policy`, so
+    /// these texts are that node alone.
+    #[test]
+    fn a_network_block_overrides_the_rule_one_kind_at_a_time() {
+        let read = |text: &str| {
+            let doc: KdlDocument = text.parse().expect("valid KDL");
+            network(&doc.nodes()[0])
+        };
+        assert_eq!(read("network\n"), Network::default());
+        assert_eq!(
+            read("network \"strict\" {\n    packages \"allow\"\n}\n"),
+            Network {
+                packages: NetRule::Allow,
+                scripts: NetRule::Strict,
+            }
+        );
+    }
+
+    #[test]
+    fn a_network_rule_outside_the_set_is_refused() {
+        let found = messages(
+            "schema-version 1\nname \"Tectonic\"\nsecurity-policy {\n    network \"block\"\n}\n",
+        );
+        assert_eq!(found, ["`block` is not a network rule"]);
+    }
+
+    /// `network #false` reads as a closed network to the user, and the reader
+    /// would take it as the allow rule.
+    #[test]
+    fn a_network_rule_that_is_not_a_string_is_refused() {
+        let found = messages(
+            "schema-version 1\nname \"Tectonic\"\nsecurity-policy {\n    network #false\n}\n",
+        );
+        assert_eq!(found, ["`#false` is not a network rule"]);
     }
 
     /// The collection table, which the broken fixture reaches the meaning of

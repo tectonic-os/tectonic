@@ -1,0 +1,7 @@
+description "Installs a package, then configures it with no network"
+
+supports "fedora"
+
+copr "example/tools"
+
+packages "htop"

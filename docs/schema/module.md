@@ -207,6 +207,7 @@ Also holds [`option`](#option), [`variant`](#variant) and [`asset`](pins.md#asse
 | `secret` | one or more strings | A build secret this module's layer mounts. |
 | `arg` | one or more strings | A build argument this module's layer reads. |
 | `helpers` | one or more strings | Files from this module mounted by basename into /ctx/lib in every module layer. |
+| `network` | `scripts`, at most one | Declares that the module's script step reaches the network. Only a `strict` rule in repo.kdl reads it. |
 | `copr` | a string, one per name | A COPR repository this module enables for its own installs, as owner/project. Fedora only. |
 
 ### `provides`

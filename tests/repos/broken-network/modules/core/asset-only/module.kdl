@@ -1,0 +1,12 @@
+description "Fetches a pinned release with nothing opening its script step"
+
+supports "fedora"
+
+asset "tool" {
+    pin {
+        renovate datasource="github-releases" depName="owner/tool"
+        version "1.0.0"
+        url "https://github.com/owner/tool/releases/download/v{version}/tool.tar.gz"
+        sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+    }
+}

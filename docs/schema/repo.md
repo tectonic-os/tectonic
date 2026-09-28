@@ -227,4 +227,21 @@ How strictly the provenance facts are held. Every one of them is recorded either
 | --- | --- | --- |
 | `enforce` | `#true` or `#false`, at most one | Whether a provenance fact that is missing or does not match stops the run. Off, it is reported and the run carries on. |
 
+### `security-policy`
+
+The repository's security ground rules, which hold for every image it defines. An image declares what it is; this declares what the repository requires of it. Absent, nothing is required and a build runs as it always has.
+
+*at most one*
+
+#### `network`
+
+What each step of a module layer may reach. A package step installs the module's repo files, COPRs and packages. A script step runs its module.sh and finalize hook. `strict` opens a step only where the module declares it, and a closed step runs under `--network=none`. Absent, every step keeps the network.
+
+*optionally `allow`, `strict`, at most one*
+
+| Node | Takes | Meaning |
+| --- | --- | --- |
+| `packages` | `allow`, `strict`, `deny`, at most one | The rule for every package step, over the one the node gives. |
+| `scripts` | `allow`, `strict`, `deny`, at most one | The rule for every script step, over the one the node gives. |
+
 <!-- /schema: repo -->

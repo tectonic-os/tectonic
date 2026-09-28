@@ -1,7 +1,7 @@
 //! The image files: one `.kdl` at the repository root per image.
 
 use crate::diag::{Issue, Source, Span};
-use crate::model::module::{Coverage, Module, Refusal};
+use crate::model::module::{Access, Coverage, Module, Refusal};
 use crate::model::options::Value;
 use crate::model::remote::{Collection, REMOTE_DIR};
 use crate::provenance::Evidence;
@@ -263,6 +263,8 @@ pub struct List {
     /// Whether a provenance fact that is missing or does not match is an error.
     /// Every fact is recorded either way.
     pub audit_enforce: bool,
+    /// What repo.kdl lets each step of a module layer reach.
+    pub network: Network,
     /// Where each capability's presence is read, off the catalog.
     pub capabilities: Vec<crate::base::Capability>,
     /// What repo.kdl declares, which is `SCHEMA_VERSION` or the load failed.
@@ -274,6 +276,49 @@ pub struct List {
     pub repo_src: Source,
     /// Every file read, in order, for the count line a failure ends with.
     pub files: Vec<String>,
+}
+
+/// What repo.kdl lets one kind of step reach.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum NetRule {
+    #[default]
+    Allow,
+    /// A step is open only where its module declares the access.
+    Strict,
+    Deny,
+}
+
+impl NetRule {
+    pub fn of(word: &str) -> Option<NetRule> {
+        match word {
+            "allow" => Some(NetRule::Allow),
+            "strict" => Some(NetRule::Strict),
+            "deny" => Some(NetRule::Deny),
+            _ => None,
+        }
+    }
+}
+
+/// The repository holds one network rule per kind of step.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub struct Network {
+    pub packages: NetRule,
+    pub scripts: NetRule,
+}
+
+impl Network {
+    /// A package step exists only where the module declares packages, a COPR
+    /// or a repo file, so `strict` opens it wherever it runs.
+    pub fn access(&self, module: &Module) -> Access {
+        Access {
+            packages: self.packages != NetRule::Deny,
+            scripts: match self.scripts {
+                NetRule::Allow => true,
+                NetRule::Strict => module.network.is_some(),
+                NetRule::Deny => false,
+            },
+        }
+    }
 }
 
 impl Image {

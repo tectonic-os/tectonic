@@ -1,0 +1,50 @@
+  x `core/tools` installs packages, and repo.kdl denies the package step the
+  | network
+  help: set `packages "allow"` in repo.kdl's `security-policy { network }`, or
+        leave this module out of the image
+
+  x `core/fetcher` declares that its scripts reach the network, and repo.kdl
+  | denies it
+   ,-[./modules/core/fetcher/module.kdl:5:1]
+ 4 | 
+ 5 | network "scripts"
+   : ^^^|^^^
+   :    `-- denied by `scripts "deny"`
+ 6 | 
+   `----
+  help: set `scripts "strict"` in repo.kdl's `security-policy { network }` to
+        honour this declaration, or leave this module out of the image
+
+  x `core/asset-only` declares an asset its script step cannot fetch
+   ,-[./modules/core/asset-only/module.kdl:5:1]
+ 4 | 
+ 5 | asset "tool" {
+   : ^^|^^
+   :   `-- fetched with the network closed
+ 6 |     pin {
+   `----
+  help: set `scripts "strict"` in repo.kdl's `security-policy { network }` and
+        declare `network "scripts"`, or leave this module out of the image
+
+  x `core/fragment-only` declares a script step it has not got
+   ,-[./modules/core/fragment-only/module.kdl:5:1]
+ 4 | 
+ 5 | network "scripts"
+   : ^^^|^^^
+   :    `-- no standard layer
+ 6 | 
+   `----
+  help: `standard-layer #false` leaves the fragment the only thing this module
+        emits, and a fragment's own RUN lines are emitted as written
+
+  x `core/installer` installs packages in module.sh, and its script step has
+  | no network
+   ,-[./modules/core/installer/module.kdl:1:1]
+ 1 | description "Installs a package from its own script"
+   : ^
+   : `-- `dnf5` needs the network
+ 2 | 
+   `----
+  help: set `scripts "strict"` in repo.kdl's `security-policy { network }` and
+        declare `network "scripts"`, or leave this module out of the image
+

@@ -26,11 +26,70 @@ pub fn dir(image: &Image) -> PathBuf {
 /// The script for one entry, as the path it is written at. A module listed
 /// both ungated and under a flavour is two entries and two scripts.
 pub fn path(image: &Image, entry: &Entry) -> PathBuf {
-    let name = match &entry.flavour {
+    dir(image).join(file_name(entry))
+}
+
+/// The path of the package step for an entry whose layer splits. It sits
+/// beside `modules/`, so no module path can land on it.
+pub fn packages_path(image: &Image, entry: &Entry) -> PathBuf {
+    layout::generated_image(&image.id)
+        .join("packages")
+        .join(file_name(entry))
+}
+
+fn file_name(entry: &Entry) -> String {
+    match &entry.flavour {
         Some(flavour) => format!("{}@{flavour}.sh", entry.path),
         None => format!("{}.sh", entry.path),
-    };
-    dir(image).join(name)
+    }
+}
+
+/// Whether the layer has a package step at all on this image's base.
+pub fn installs_packages(image: &Image, entry: &Entry, module: &Module, root: &Path) -> bool {
+    let base_family = image.base.as_ref().map_or("", |b| b.family.as_str());
+    !split_packages(entry, module, base_family, &provided(image), root).is_empty()
+}
+
+/// This step is the package step of a split layer. `install_selinux_module`
+/// installs checkpolicy with dnf when the base lacks it, so a split layer
+/// installs it here, where the package manager keeps the network.
+fn split_packages(
+    entry: &Entry,
+    module: &Module,
+    base_family: &str,
+    has: &BTreeSet<&str>,
+    root: &Path,
+) -> String {
+    let mut out = package_step(entry, module, base_family, root);
+    let on_disk = layout::module(root, entry.dir());
+    if has.contains(layout::SELINUX.capability) && !layout::SELINUX.files(&on_disk).is_empty() {
+        out.push_str("\nsource /ctx/lib/selinux-helpers.sh\nensure_checkpolicy\n");
+    }
+    out
+}
+
+/// The script step of a split layer takes these lines from its package step.
+/// The package step and a repo file source the family helpers, and a module.sh
+/// may read a COPR selector. An image that carries no family helpers has no
+/// `family.sh` to source.
+fn carried(module: &Module, base_family: &str) -> String {
+    let mut out =
+        String::from("\nif [ -f /ctx/lib/family.sh ]; then\n    source /ctx/lib/family.sh\nfi\n");
+    for copr in coprs(module, base_family) {
+        let _ = writeln!(
+            out,
+            "export {}={}",
+            copr.env_name(),
+            shell(&copr.selector())
+        );
+    }
+    out
+}
+
+/// Whether the layer runs as a package `RUN` and a script `RUN`. It splits
+/// only where the repository rule gives the two steps different networks.
+pub fn splits(image: &Image, entry: &Entry, module: &Module, root: &Path) -> bool {
+    module.access.packages != module.access.scripts && installs_packages(image, entry, module, root)
 }
 
 /// Every capability the image has, whoever offers it: what a family-shaped
@@ -60,31 +119,27 @@ pub fn scripts(image: &Image, collection: &Collection, root: &Path) -> Vec<(Path
         let Some(module) = entry.module.as_ref().filter(|m| m.standard_layer) else {
             continue;
         };
-        out.push((
-            path(image, entry),
-            script(
-                entry,
-                module,
-                collection,
-                base_family,
-                &image.boot,
-                &has,
-                root,
-            ),
-        ));
+        let prelude = prelude(entry, module, &image.boot);
+        let rest = rest(entry, module, collection, base_family, &has, root);
+        match splits(image, entry, module, root) {
+            true => {
+                let packages = split_packages(entry, module, base_family, &has, root);
+                let carried = carried(module, base_family);
+                out.push((packages_path(image, entry), format!("{prelude}{packages}")));
+                out.push((path(image, entry), format!("{prelude}{carried}{rest}")));
+            }
+            false => {
+                let packages = package_step(entry, module, base_family, root);
+                out.push((path(image, entry), format!("{prelude}{packages}{rest}")));
+            }
+        }
     }
     out
 }
 
-fn script(
-    entry: &Entry,
-    module: &Module,
-    collection: &Collection,
-    base_family: &str,
-    boot: &str,
-    has: &BTreeSet<&str>,
-    root: &Path,
-) -> String {
+/// Both steps of a layer run this setup first. A split layer runs it twice, so
+/// it holds only exports and the flavour guard.
+fn prelude(entry: &Entry, module: &Module, boot: &str) -> String {
     let dir = format!("/ctx/modules/{}", entry.dir());
     let mut out = String::from(HEADER);
     let _ = write!(out, "\nMODDIR={dir}\nexport MODDIR\n");
@@ -125,6 +180,40 @@ fn script(
             let _ = writeln!(out, "export {name}=\"{value}\"");
         }
     }
+    out
+}
+
+/// Returns the line that sources the family helpers if the module's package
+/// step uses them.
+fn family_helpers(module: &Module, base_family: &str) -> &'static str {
+    match !coprs(module, base_family).is_empty() || installs(module, base_family) {
+        true => "\nsource /ctx/lib/family.sh\n",
+        false => "",
+    }
+}
+
+/// COPR is a Fedora build service, so the declaration is only reachable on a
+/// Fedora base.
+fn coprs<'a>(module: &'a Module, base_family: &str) -> Vec<&'a Copr> {
+    match base_family {
+        "fedora" => module.coprs.iter().collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn installs(module: &Module, base_family: &str) -> bool {
+    module
+        .packages
+        .iter()
+        .chain(&module.groups)
+        .any(|group| group.family == base_family)
+}
+
+/// This step configures the repo file and the COPRs and installs the package
+/// batches. It is empty for a module that declares none of them.
+fn package_step(entry: &Entry, module: &Module, base_family: &str, root: &Path) -> String {
+    let dir = format!("/ctx/modules/{}", entry.dir());
+    let mut out = String::new();
 
     // The repo a module declares is sourced before its packages, so an
     // `enablerepo` names a repository that exists by the time it is enabled.
@@ -152,22 +241,9 @@ fn script(
         }
     }
 
-    // COPR is a Fedora build service, so the declaration is only reachable on
-    // a Fedora base. The layer is handed the derived names and derives none.
-    let coprs: Vec<&Copr> = match base_family {
-        "fedora" => module.coprs.iter().collect(),
-        _ => Vec::new(),
-    };
-    if !coprs.is_empty()
-        || module
-            .packages
-            .iter()
-            .chain(&module.groups)
-            .any(|group| group.family == base_family)
-    {
-        out.push_str("\nsource /ctx/lib/family.sh\n");
-    }
-    for copr in coprs {
+    out.push_str(family_helpers(module, base_family));
+    // The layer is handed the derived names and derives none.
+    for copr in coprs(module, base_family) {
         let _ = write!(
             out,
             "\nexport {}={}\nenable_copr {}\n",
@@ -195,6 +271,22 @@ fn script(
             let _ = write!(out, "\n{repo}{helper} {names}\n");
         }
     }
+    out
+}
+
+/// This step places the module's keys, runs its module.sh and installs its
+/// policies, overlays and collected files.
+fn rest(
+    entry: &Entry,
+    module: &Module,
+    collection: &Collection,
+    base_family: &str,
+    has: &BTreeSet<&str>,
+    root: &Path,
+) -> String {
+    let dir = format!("/ctx/modules/{}", entry.dir());
+    let on_disk = layout::module(root, entry.dir());
+    let mut out = String::new();
 
     // Where this module's files are read from: its own directory, then the
     // family subtree. Ungated first, so a family adds to what runs everywhere,

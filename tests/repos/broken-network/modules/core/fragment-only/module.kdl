@@ -1,0 +1,7 @@
+description "Emits its fragment alone"
+
+supports "fedora"
+
+network "scripts"
+
+fragment standard-layer=#false

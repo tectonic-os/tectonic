@@ -223,6 +223,218 @@ pub fn check_fetch(
     }
 }
 
+/// Reports a module whose declarations need a network step that repo.kdl
+/// closes. The build would fail on its first lookup, so the check names the
+/// rule that closed the step.
+pub fn check_network(
+    image: &crate::model::image::Image,
+    scripts_rule: crate::model::image::NetRule,
+    root: &std::path::Path,
+    issues: &mut crate::diag::Issues,
+) {
+    // A `deny` rule closes the step whatever the module declares, so the
+    // declaration is no way out of it.
+    let reopen = match scripts_rule {
+        crate::model::image::NetRule::Deny => {
+            "set `scripts \"strict\"` in repo.kdl's `security-policy { network }` and declare \
+             `network \"scripts\"`, or leave this module out of the image"
+        }
+        crate::model::image::NetRule::Allow | crate::model::image::NetRule::Strict => {
+            "declare `network \"scripts\"`, which a `strict` rule in repo.kdl opens the \
+             script step for"
+        }
+    };
+    let base_family = image.base.as_ref().map_or("", |b| b.family.as_str());
+    use crate::diag::Issue;
+    for entry in &image.entries {
+        let Some(module) = entry.module.as_ref() else {
+            continue;
+        };
+        if !module.standard_layer {
+            if let Some(span) = module.network {
+                issues.push(
+                    Issue::new(
+                        format!("`{}` declares a script step it has not got", module.path),
+                        &module.src,
+                    )
+                    .at(span, "no standard layer")
+                    .help(
+                        "`standard-layer #false` leaves the fragment the only thing this \
+                           module emits, and a fragment's own RUN lines are emitted as written",
+                    ),
+                );
+            }
+            continue;
+        }
+        if !module.access.packages
+            && crate::emit::module_build::installs_packages(image, entry, module, root)
+        {
+            issues.push(
+                Issue::new(
+                    format!(
+                        "`{}` installs packages, and repo.kdl denies the package step the network",
+                        module.path
+                    ),
+                    &module.src,
+                )
+                .help(
+                    "set `packages \"allow\"` in repo.kdl's `security-policy { network }`, or leave this \
+                       module out of the image",
+                ),
+            );
+        }
+        if module.access.scripts {
+            continue;
+        }
+        match module.network {
+            Some(span) => issues.push(
+                Issue::new(
+                    format!(
+                        "`{}` declares that its scripts reach the network, and repo.kdl denies it",
+                        module.path
+                    ),
+                    &module.src,
+                )
+                .at(span, "denied by `scripts \"deny\"`")
+                .help(
+                    "set `scripts \"strict\"` in repo.kdl's `security-policy { network }` to honour this \
+                       declaration, or leave this module out of the image",
+                ),
+            ),
+            None => {
+                for asset in &module.assets {
+                    issues.push(
+                        Issue::new(
+                            format!(
+                                "`{}` declares an asset its script step cannot fetch",
+                                module.path
+                            ),
+                            &module.src,
+                        )
+                        .at(asset.span, "fetched with the network closed")
+                        .help(reopen),
+                    );
+                }
+                let dir = crate::layout::module(root, entry.dir());
+                if let Some((script, verb)) = installer(&dir, base_family) {
+                    issues.push(
+                        Issue::new(
+                            format!(
+                                "`{}` installs packages in {script}, and its script step has \
+                                 no network",
+                                module.path
+                            ),
+                            &module.src,
+                        )
+                        .at(
+                            Span::default(),
+                            format!("`{}` needs the network", verb.trim()),
+                        )
+                        .help(reopen),
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// The package managers. A call to one reaches the network unless its
+/// subcommand works from the installed package database alone.
+const MANAGERS: [&str; 8] = [
+    "dnf ",
+    "dnf5 ",
+    "yum ",
+    "microdnf ",
+    "rpm-ostree ",
+    "apt ",
+    "apt-get ",
+    "zypper ",
+];
+
+/// These subcommands work from the installed package database alone, so they
+/// run under `--network=none`.
+const OFFLINE: [&str; 5] = ["remove", "erase", "purge", "autoremove", "clean"];
+
+/// The layer helpers that call a package manager whatever their arguments.
+const HELPERS: [&str; 6] = [
+    "install_packages ",
+    "install_groups ",
+    "enable_copr ",
+    "add_disabled_repo ",
+    "fetch_install_rpm ",
+    "ensure_checkpolicy",
+];
+
+/// Returns the first script of the module that calls a package manager, and
+/// the call. The family directories this base does not select never run, so
+/// they are not read.
+fn installer(dir: &std::path::Path, base_family: &str) -> Option<(String, &'static str)> {
+    let roots = std::iter::once(String::new()).chain(
+        crate::layout::family_dirs(dir, base_family)
+            .into_iter()
+            .map(|gated| format!("{gated}/")),
+    );
+    for root in roots {
+        for name in SCRIPTS {
+            let script = format!("{root}{name}");
+            let Ok(text) = std::fs::read_to_string(dir.join(&script)) else {
+                continue;
+            };
+            let found = MANAGERS.into_iter().chain(HELPERS).find(|verb| {
+                text.lines()
+                    .map(str::trim_start)
+                    .any(|line| !line.starts_with('#') && reaches(line, verb))
+            });
+            if let Some(verb) = found {
+                return Some((script, verb));
+            }
+        }
+    }
+    None
+}
+
+/// Whether the line calls the verb in a way that reaches the network. The verb
+/// starts a command, so `apt ` inside `adapt ` or `/etc/apt ` is no call.
+fn reaches(line: &str, verb: &str) -> bool {
+    let mut rests = line
+        .match_indices(verb)
+        .filter(|(at, _)| {
+            line[..*at]
+                .chars()
+                .next_back()
+                .is_none_or(|c| c.is_whitespace() || "(;&|`".contains(c))
+        })
+        .map(|(at, _)| &line[at + verb.len()..]);
+    match HELPERS.contains(&verb) {
+        true => rests.next().is_some(),
+        false => rests.any(|rest| {
+            rest.split_whitespace()
+                .find(|word| !word.starts_with('-'))
+                .is_none_or(|subcommand| !OFFLINE.contains(&subcommand))
+        }),
+    }
+}
+
+/// The modules whose Containerfile fragment a closed script rule does not
+/// reach. A fragment's own `RUN` lines are emitted as written, so the rule
+/// cannot govern them. That is a limit, and a silent limit is what makes a
+/// rule read wider than it is, so `check` names each one.
+pub fn ungoverned(
+    image: &crate::model::image::Image,
+    scripts_rule: crate::model::image::NetRule,
+) -> Vec<String> {
+    if scripts_rule == crate::model::image::NetRule::Allow {
+        return Vec::new();
+    }
+    image
+        .entries
+        .iter()
+        .filter_map(|entry| entry.module.as_ref())
+        .filter(|module| module.fragment.is_some())
+        .map(|module| module.path.clone())
+        .collect()
+}
+
 /// What `audit { enforce }` refuses at build time: a record that would not name
 /// the digest it built on, or would not bind the image to a tree anyone can
 /// read. Apart from the build, so the posture is checkable without running one.
@@ -255,6 +467,23 @@ pub fn enforce_build(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_installer_starts_a_command() {
+        assert!(reaches("apt-get install -y vim", "apt-get "));
+        assert!(reaches("x && dnf5 install -y vim", "dnf5 "));
+        assert!(!reaches("we adapt the config", "apt "));
+        assert!(!reaches("mkdir -p /etc/apt tect-build", "apt "));
+        assert!(!reaches("fetch_install_packages foo", "install_packages "));
+    }
+
+    #[test]
+    fn a_removal_needs_no_network() {
+        assert!(!reaches("dnf5 -y remove --noautoremove bootupd", "dnf5 "));
+        assert!(!reaches("dnf -y clean all", "dnf "));
+        assert!(reaches("dnf5 distro-sync -y --repo=x pkg", "dnf5 "));
+        assert!(reaches("install_packages vim", "install_packages "));
+    }
 
     /// Unenforced records whatever it has; enforced refuses what it cannot
     /// record. Same facts, one lever.
