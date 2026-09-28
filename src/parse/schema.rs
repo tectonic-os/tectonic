@@ -53,6 +53,9 @@ pub enum Arg {
     StrPair(&'static str),
     /// One of a closed set of strings.
     One(&'static [&'static str]),
+    /// One of a closed set of strings, or no argument. A node takes it where
+    /// its children can set the same value one part at a time.
+    MaybeOne(&'static [&'static str]),
 }
 
 pub enum Kind {
@@ -215,6 +218,16 @@ pub fn check(node: &KdlNode, schema: &Node, src: &Source, issues: &mut Issues) {
                 schema
                     .arg_say
                     .raise(given.unwrap_or(about), here, src, issues);
+            }
+        }
+        Arg::MaybeOne(set) => {
+            let positional = node.entries().iter().find(|entry| entry.name().is_none());
+            if let Some(entry) = positional {
+                let given = entry.value().to_string();
+                let given = entry.value().as_string().unwrap_or(&given);
+                if !set.contains(&given) {
+                    schema.arg_say.raise(given, here, src, issues);
+                }
             }
         }
     }

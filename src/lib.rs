@@ -86,6 +86,9 @@ pub struct Run {
     /// Imported modules whose content no longer matches the record beside them.
     /// Forking one is legitimate, so this is a read-out; `check`'s alone.
     pub modified: Vec<String>,
+    /// Modules whose Containerfile fragment a closed script rule does not
+    /// reach. The rule is narrower than its name, so `check` says where.
+    pub ungoverned: Vec<String>,
     /// Who provides what, as the run saw it: `check`'s conformance notice
     /// asks it what would claim a rule the image is missing.
     pub(crate) index: provider::Index,
@@ -163,10 +166,14 @@ pub(crate) struct Loaded {
     index: provider::Index,
     issues: Issues,
     context: String,
+    /// Modules a closed script rule does not reach, gathered as each image
+    /// resolved.
+    ungoverned: Vec<String>,
 }
 
 pub(crate) fn load(root: &Path) -> Loaded {
     let (mut list, mut issues) = List::load(root);
+    let mut ungoverned: Vec<String> = Vec::new();
     let context = context(&list, root);
 
     let disk = parse::disk::Disk::scan(root);
@@ -174,12 +181,16 @@ pub(crate) fn load(root: &Path) -> Loaded {
     let index = provider::Index::scan(root, &list.sources, &disk, false);
     parse::module::check_unlisted(&list, root, &disk, &mut issues);
 
+    let network = list.network;
     let mut resolved: Vec<Resolved> = Vec::new();
     for image in &mut list.images {
         // Taken out so a diagnostic can still read the image it was declared in.
         let mut entries = std::mem::take(&mut image.entries);
         for entry in &mut entries {
             entry.module = Module::load(entry, image, root, &mut issues);
+            if let Some(module) = entry.module.as_mut() {
+                module.access = network.access(module);
+            }
         }
         image.entries = entries;
 
@@ -188,12 +199,18 @@ pub(crate) fn load(root: &Path) -> Loaded {
         resolve::order::apply(image, &order);
         resolve::graph::check_graph(image, &index, &mut issues);
         resolve::graph::check_fragments(image, &mut issues);
+        provenance::check_network(image, network.scripts, root, &mut issues);
+        ungoverned.extend(provenance::ungoverned(image, network.scripts));
         let shipped = resolve::overlay::index(image, &disk);
         resolve::overlay::check(image, &shipped, &mut issues);
         let collected = resolve::collect::resolve_collects(image, root, &disk, &mut issues);
 
         resolved.push(Resolved { shipped, collected });
     }
+
+    // A module listed by two images is one module to say this about.
+    ungoverned.sort();
+    ungoverned.dedup();
 
     // After the modules, since what a workflow needs is a fact about them.
     let basis = resolve::workflow::Basis::of(&list);
@@ -208,6 +225,7 @@ pub(crate) fn load(root: &Path) -> Loaded {
         index,
         issues,
         context,
+        ungoverned,
     }
 }
 
@@ -232,6 +250,7 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
         index,
         mut issues,
         context,
+        ungoverned,
     } = loaded;
 
     let (shadowed, unpinned, modified) = match command {
@@ -471,6 +490,7 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
         shadowed,
         unpinned,
         modified,
+        ungoverned,
         index,
         list,
         resolved,

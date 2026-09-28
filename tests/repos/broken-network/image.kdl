@@ -1,0 +1,21 @@
+image {
+    name "Broken network"
+
+    base "quay.io/fedora/fedora-bootc:44" {
+        family "fedora"
+        provides "rechunking"
+    }
+
+    layout {
+        bootloader "grub2"
+    }
+
+    modules {
+        module "fedora-family"
+        module "core/tools"
+        module "core/fetcher"
+        module "core/asset-only"
+        module "core/fragment-only"
+        module "core/installer"
+    }
+}

@@ -183,11 +183,25 @@ pub fn sections(image: &Image, root: &Path) -> (String, String) {
             blocks.push(fragment(entry, body));
         }
         if module.standard_layer {
+            // An unsplit layer has no package step or gives it the script
+            // step's network, so the script step's access is the layer's.
+            if module_build::splits(image, entry, module, root) {
+                let packages = module_build::packages_path(image, entry);
+                blocks.push(standard(
+                    entry,
+                    module,
+                    image,
+                    &packages,
+                    module.access.packages,
+                ));
+            }
+            let script = module_build::path(image, entry);
             blocks.push(standard(
                 entry,
                 module,
                 image,
-                &module_build::path(image, entry),
+                &script,
+                module.access.scripts,
             ));
         }
         if let Some(body) = at(Position::After) {
@@ -254,9 +268,19 @@ pub fn section(image: &Image, root: &Path) -> String {
 fn finalize_layer(image: &Image, identity_env: &str, root: &Path) -> String {
     let hooks = finalize::hooks(image, root);
     let script = finalize::path(image).display().to_string();
+    // Every hook runs in this one layer, so the layer closes only where every
+    // module that ships a hook has its script step closed.
+    let closed = !hooks.is_empty()
+        && hooks
+            .iter()
+            .all(|(entry, _)| entry.module.as_ref().is_some_and(|m| !m.access.scripts));
+    let network = match closed {
+        true => "--network=none ",
+        false => "",
+    };
     let mut out = format!(
         "# ---- finalize ----\n\
-         RUN --mount=type=bind,from=ctx,source=/{script},target=/ctx/finalize.sh \\\n    \
+         RUN {network}--mount=type=bind,from=ctx,source=/{script},target=/ctx/finalize.sh \\\n    \
          --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \\\n    "
     );
 
@@ -290,7 +314,7 @@ fn finalize_layer(image: &Image, identity_env: &str, root: &Path) -> String {
 
 /// The layer is the mounts and the build inputs only a Containerfile can
 /// name; everything the host resolved is in the script it runs.
-fn standard(entry: &Entry, module: &Module, image: &Image, script: &Path) -> String {
+fn standard(entry: &Entry, module: &Module, image: &Image, script: &Path, open: bool) -> String {
     let mut env = String::new();
 
     let mut secrets = String::new();
@@ -329,9 +353,13 @@ fn standard(entry: &Entry, module: &Module, image: &Image, script: &Path) -> Str
         })
         .collect();
     let rw = if helpers.is_empty() { "" } else { ",rw" };
+    let network = match open {
+        true => "",
+        false => "--network=none ",
+    };
     let _ = write!(
         out,
-        "RUN --mount=type=bind,from=ctx,source=/modules/{path},target=/ctx/modules/{path} \\\n    \
+        "RUN {network}--mount=type=bind,from=ctx,source=/modules/{path},target=/ctx/modules/{path} \\\n    \
          --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib{rw} \\\n    \
          {helpers}\
          --mount=type=bind,from=ctx,source=/{script},target=/ctx/module.sh \\\n    \

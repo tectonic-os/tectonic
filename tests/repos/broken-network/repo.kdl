@@ -1,0 +1,8 @@
+schema-version 1
+name "Broken network"
+security-policy {
+    network {
+        packages "deny"
+        scripts "deny"
+    }
+}

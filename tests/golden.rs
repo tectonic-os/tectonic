@@ -2661,3 +2661,23 @@ fn drawn_create_repo() {
     );
     assert!(dir.join("example/repo.kdl").is_file());
 }
+
+/// A fragment's own `RUN` lines are outside the script rule, so `check` names
+/// each module that ships one rather than letting `strict` read wider than it
+/// is. `core/spliced` has a standard layer *and* a fragment, which is the case
+/// the rule closes one half of.
+#[test]
+fn a_strict_script_rule_names_the_fragments_it_does_not_reach() {
+    let root = crate_dir().join("tests/repos/network");
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_tect"))
+        .arg("check")
+        .current_dir(&root)
+        .env("TECT_ASSETS", crate_dir().join("assets"))
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("`core/spliced` ships a Containerfile fragment"),
+        "{stderr}"
+    );
+}

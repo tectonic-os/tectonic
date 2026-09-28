@@ -227,4 +227,26 @@ pub struct Module {
     /// repository inside the layer. There is no grammar for one: it is shell
     /// calling the family's config manager.
     pub repo: bool,
+    /// Where module.kdl declares that its scripts reach the network. A
+    /// `strict` repository rule opens the script step only for a module with
+    /// this declaration.
+    pub network: Option<Span>,
+    /// The network each step of this module's layer runs with, once the
+    /// repository rule is applied.
+    pub access: Access,
+}
+
+/// The network each step of one module layer runs with. A `true` step keeps
+/// the network, and a `false` step runs under `--network=none`.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Access {
+    pub packages: bool,
+    pub scripts: bool,
+}
+
+impl Access {
+    pub const OPEN: Access = Access {
+        packages: true,
+        scripts: true,
+    };
 }

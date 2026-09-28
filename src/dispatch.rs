@@ -958,6 +958,12 @@ fn reading(
         for name in &run.modified {
             eprintln!("tect: `{name}` has been edited since it was imported");
         }
+        for name in &run.ungoverned {
+            eprintln!(
+                "tect: `{name}` ships a Containerfile fragment, and the script rule does not \
+                 reach a fragment's own RUN lines"
+            );
+        }
         for line in crate::init::drifted(&root) {
             eprintln!("tect: {line}");
         }

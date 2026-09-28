@@ -80,6 +80,7 @@ fn shape(node: &Node) -> Vec<String> {
         Arg::Strs => facts.push("one or more strings".into()),
         Arg::StrPair(roles) => facts.push(format!("two strings: {roles}")),
         Arg::One(set) => facts.push(closed(set)),
+        Arg::MaybeOne(set) => facts.push(format!("optionally {}", closed(set))),
     }
     match (!node.missing.text.is_empty(), node.once) {
         (true, true) => facts.push("exactly one".into()),

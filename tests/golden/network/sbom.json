@@ -1,0 +1,29 @@
+{
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package-asset-core-fetcher-tool",
+      "name": "tool",
+      "downloadLocation": "https://github.com/owner/tool/releases/download/v1.0.0/tool.tar.gz",
+      "filesAnalyzed": false,
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "copyrightText": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "comment": "Pinned build input, declared by the core/fetcher module",
+      "versionInfo": "1.0.0"
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-asset-core-fetcher-tool"
+    }
+  ]
+}
