@@ -5,10 +5,11 @@
     :         ^^^|^^
     :            `-- first here
  11 |         module "core/missing"
- 12 |         module "core/nameless"
+ 12 |         module "core/latin"
+ 13 |         module "core/nameless"
     :         ^^^|^^
     :            `-- and again here
- 13 |     }
+ 14 |     }
     `----
   help: a module builds once per flavour it is listed under
 
@@ -60,6 +61,16 @@
  9 | }
    `----
 
+  x this module declares no `supports`
+   ,-[./modules/core/nameless/module.kdl:1:1]
+ 1 | provides "shell-tools"
+   : ^
+   : `-- no families
+ 2 | 
+   `----
+  help: a module has to say which base families it can build on, so a
+        portability gap surfaces at lint, while the build is still cheap
+
   x a benchmark name is required inside `satisfies`
    ,-[./modules/core/nameless/module.kdl:6:5]
  5 |     cis-fedora
@@ -70,25 +81,24 @@
    `----
   help: `satisfies { cis-fedora "1.1.1.1" }`
 
-  x `core/nameless` declares no description
-  help: one line, present tense, no trailing period; it names the module in
-        the resolved build summary
-
-  x `core/nameless` declares no `supports`
-  help: a module has to say which base families it can build on, so a
-        portability gap surfaces at lint, while the build is still cheap
-
-  x `core/missing` has no module.kdl
+  x `core/missing` is not a module
     ,-[./image.kdl:11:9]
  10 |         module "core/nameless"
  11 |         module "core/missing"
     :         ^^^|^^
-    :            `-- every module needs a manifest
- 12 |         module "core/nameless"
+    :            `-- nothing to build
+ 12 |         module "core/latin"
     `----
-  help: create ./modules/core/missing/module.kdl; modules/_template/module-
-        name/module.kdl is a copy-me reference
+  help: give modules/core/missing a module.kdl, a module.sh, a files/
+        directory, a Containerfile.inc or a file that another module collects
 
-  x `core/nameless` does not support the `fedora` base family
-  help: add `supports "fedora"` to the manifest
+  x ./modules/core/latin/module.kdl cannot be read: stream did not contain
+  | valid UTF-8
+    ,-[./image.kdl:12:9]
+ 11 |         module "core/missing"
+ 12 |         module "core/latin"
+    :         ^^^|^^
+    :            `-- module.kdl unreadable
+ 13 |         module "core/nameless"
+    `----
 

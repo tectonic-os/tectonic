@@ -1,428 +1,798 @@
-# Module manifests
+<a id="module.kdl"></a>
 
-`module.kdl` is the module's whole interface: what it builds on, what it needs
-from the rest of the image, and what an image author may set. Everything else
-in the directory is convention.
+# `module.kdl`
 
-| Path | What the build does with it |
-| --- | --- |
-| `repo` | sourced first; on Fedora, unless its `REPO_ID` is already configured |
-| `module.sh` | sourced as the install logic |
-| `selinux/*.te` | compiled and installed, where the image provides `selinux-policy` |
-| `apparmor/*` | validated and placed in `/etc/apparmor.d`, where the image provides `apparmor-policy` |
-| `files/` | copied over `/` |
-| `finalize.sh` | sourced by the finalize phase, in resolved order |
-| `Containerfile.inc` | placed verbatim by `fragment`, with `@MODULE@` replaced by the module's directory in the build context |
-| `<family>/` | `repo`, `module.sh`, `files/`, `finalize.sh` and a collected file under `fedora/`, `rhel/`, `debian/`, `ubuntu/`, `rpm/` or `deb/`, each taken on the families that name is for |
-| a file another module collects | staged for it |
+Location: `modules/<module-name>/module.kdl`, in the directory of the module.
 
-A fragment is inlined verbatim and so cannot name its own directory. `@MODULE@`
-expands to the path the module layer's mounts use, `/modules/<dir>`, which is
-what a `COPY --from=ctx` needs to reach a file the module ships — the way to
-write `/etc/hostname`, `/etc/hosts` or `/etc/resolv.conf`, which are bind-mounted
-over during every `RUN`.
-
-Shipping either policy directory also orders the module: it builds after
-whoever provides that MAC, the way an `after` would, without declaring one. A
-module that ships for both is built for whichever the image carries, so it
-cannot name one — and an image with no MAC at all installs no policy and so
-owes no provider.
-
-```kdl
-description "kvmfr DKMS module for GPU passthrough"
-
-supports "fedora"
-
-requires "kernel-devel"
-after "vfio"
-
-secret "mok_privkey"
-arg "KERNEL"
-```
-
-A module may ship both, and each is taken only where the image has that MAC,
-the way a `packages` batch is taken for the base's family. Neither directory
-declares anything on its own: a module that cannot work without a given MAC
-says so with `requires "selinux-policy"` or `requires "apparmor-policy"`, and
-is refused on an image that has not got it like any other requirement.
-
-Build order is resolved from `requires` and `after`, never from the order of
-the list, which is only a tie-break. A `requires` nothing provides fails the
-check and names every module that would satisfy it, and so does an `after`
-nothing provides — both are edges, and an edge to nothing is a declaration
-about a module that is not there. A `family` gate is how an ordering true on
-one family alone is written without dangling on the others. A capability name is lowercase letters, digits and
-dashes, starting with a letter, since the generated graph writes it into a
-mermaid label and a markdown table cell without quoting it.
-
-### Gating by family
-
-A module that builds on more than one base family usually installs different
-package names on each, and sometimes does something different altogether. Two
-things gate on the family, one for what the manifest declares and one for what
-the directory ships. Both follow the same rule: **outside a gate is every
-family the module supports, inside a gate is the families it names.**
-
-`family` gates declarations. It takes one or more family names, so a list two
-families share is written once rather than twice:
+A module is one reusable part of an image, such as a desktop, a kernel or a set of tools. `module.kdl` declares what the module needs and provides, what it installs and which families it supports, and the files beside it do the work.
 
 ```kdl
 description "Traditional CLI utilities"
-
-supports "fedora" "debian" "ubuntu"
-
-packages "bash-completion" "htop" "rsync" "tmux"
-
-family "fedora" {
-    packages "7zip-standalone" "vim-enhanced"
-    copr "someone/tools"
-}
-
-family "debian" "ubuntu" {
-    packages "7zip" "vim"
-}
+supports "fedora" "debian"
+packages "htop" "tmux"
 ```
 
-`packages`, `package-groups`, `copr`, `requires`, `after` and `satisfies` go
-inside one. The rest of the manifest does not: `description` and `supports` are
-what the module is and what it claims, `option`, `variant` and `asset` are the
-image author's interface and must not change shape underneath them, and `key`,
-`collects`, `contributes` and `helpers` are contracts with other modules.
-`provides` is left out too — a capability offered on one family and not another
-is a module that should have been two.
+| Field | Accepts | Description |
+| --- | --- | --- |
+| [`description`](#description) (optional) | *string* | One line that names the module in the resolved build summary. |
+| [`supports`](#supports) (required,&nbsp;repeatable) | *list of strings* | The base families that this module builds on, which the image's `family` must match. |
+| [`provides`](#provides) (optional,&nbsp;repeatable) | *list of strings* | A capability that this module provides for the modules that require it. |
+| [`requires`](#requires) (optional,&nbsp;repeatable) | *list of strings* | A capability that another module must provide, which also orders the build. |
+| [`after`](#after) (optional,&nbsp;repeatable) | *list of strings* | A capability that this module builds after, which the module does not require. |
+| [`overrides`](#overrides) (optional,&nbsp;repeatable) | *list of strings* | An absolute path that this module replaces on purpose. |
+| [`mode`](#mode) (optional,&nbsp;unique) | *path*, then *octal mode* | The octal file mode that one path in the overlay of this module takes. |
+| [`key`](#key) (optional,&nbsp;unique) | *string*, then {&nbsp;[fields](#key-fields)&nbsp;} | A key that `tect create key` generates for this module. |
+| [`secret`](#secret) (optional,&nbsp;repeatable) | *list of strings* | A build secret that the layer of this module mounts. |
+| [`arg`](#arg) (optional,&nbsp;repeatable) | *list of strings* | A build argument that the layer of this module reads. |
+| [`helpers`](#helpers) (optional,&nbsp;repeatable) | *list of strings* | Files from this module that every module layer mounts by basename into `/ctx/lib`. |
+| [`allow-verify`](#allow-verify) (optional,&nbsp;repeatable) | *string* | One `tect validate-image` diagnostic that the check accepts on one unit, while the check still covers every other diagnostic and unit of the image. |
+| [`refuses`](#refuses) (optional,&nbsp;unique) | *string* | One benchmark rule that this module leaves unsatisfied on purpose. |
+| [`collects`](#collects) (optional,&nbsp;repeatable) | *string* | A filename that this module gathers from every module that ships one. A collector claims one filename across the image. |
+| [`contributes`](#contributes) (optional,&nbsp;repeatable) | *string* | A file that this module ships for another module to collect. |
+| [`fragment`](#fragment) (optional) |  | Where the module's `Containerfile.inc` goes in relation to the generated layer. |
+| [`option`](#option) (optional,&nbsp;unique) | *string*, then {&nbsp;[fields](#option-fields)&nbsp;} | One value that an image can set on this module. |
+| [`variant`](#variant) (optional,&nbsp;unique) | *string*, then optionally {&nbsp;[fields](#variant-fields)&nbsp;} | A named set of option values that an image selects with `variant=`. |
+| [`asset`](#asset) (optional,&nbsp;unique) | *string*, then {&nbsp;[fields](#asset-fields)&nbsp;} | A pinned upstream payload that the module fetches during its own layer. |
+| [`network`](#network) (optional) | `scripts` | The declaration that the script step of this module reaches the network. |
+| [`packages`](#packages) (optional,&nbsp;repeatable) | *list of strings* | The packages that this module installs. |
+| [`package-groups`](#package-groups) (optional,&nbsp;repeatable) | *list of strings* | The package groups that this module installs. Package groups work with dnf only, so an ungated `package-groups` needs a module that supports only `fedora` or `rhel`. |
+| [`copr`](#copr) (optional,&nbsp;unique) | *string* | The `owner/project` name of a COPR repository that this module enables for its own installs. `copr` works on Fedora only. |
+| [`satisfies`](#satisfies) (optional) | optionally {&nbsp;[fields](#satisfies-fields)&nbsp;} | An audit declaration of the benchmarks and rules that this module claims to harden. `tect` records the claim and certifies nothing, and the scan checks it after the build. |
+| [`family`](#family) (optional,&nbsp;repeatable) | *list of strings*, then {&nbsp;[fields](#family-fields)&nbsp;} | The declarations that the build takes only on the named base families. |
 
-A gate is read whether or not the image is built for it, so a manifest is held
-to the same checks on every family it claims rather than only on the one being
-built. What a gate the build does not want declared is then dropped: a
-Fedora-only `after` does not dangle on a Debian image, and a Fedora rule number
-in `satisfies` is not a claim a Debian scan can fail to map.
+> [!NOTE]
+> `requires` and `after` decide the build order. The order of the image list only breaks ties.
+>
+> If nothing provides a `requires` or an `after`, then `tect check` fails and names every module that would satisfy it.
 
-`<family>/` gates files, because `module.sh`, `finalize.sh` and `files/` are
-files and no node names them. A `debian/` directory holding any of the three is
-taken on Debian alone, the way `selinux/` is taken only where the image has
-that MAC:
+<a id="description"></a>
 
-```
-modules/login-access/
-├── module.kdl
-├── files/            # every family
-├── module.sh         # every family
-└── debian/
-    ├── files/        # Debian alone, copied after files/
-    └── module.sh     # Debian alone, sourced after module.sh
-```
+## `description` (optional)
 
-`fedora/`, `rhel/`, `debian/`, `ubuntu/`, `rpm/` and `deb/` are the six names;
-anything else in a module directory is the author's own and is read by
-nothing.
-
-A file another module collects gates too, and is one of the two cases that
-**picks** rather than layers: a collector claims one filename across the image,
-so a module ships at most one copy of it and the most specific directory
-holding one wins — `debian/justfile.inc`, else `deb/justfile.inc`, else the one
-at the root. `contributes` names the file once and says nothing about where it
-came from.
-
-`repo` is the other. An archive is configured once and the two families name
-it at different URLs rather than adding to one another, so `debian/repo` wins
-over `deb/repo` wins over the one at the root, and only the winner is
-sourced.
-
-**The convention is additive and nothing has to be renamed to use it.** An
-ungated `module.sh` and `files/` at the module root mean exactly what they
-always meant: run everywhere. A module with no `<family>/` directory has
-nothing gated, which is the overwhelmingly common case, and a module written
-for one base family writes no gate at all — `packages "htop"` under
-`supports "fedora"` installs on Fedora because that is the only family it
-supports. The convention earns its keep in a collection published for
-consumers whose base its author does not control, where the alternative is
-duplicating every module per family or refusing the family outright.
-
-The gated half runs after the ungated one rather than instead of it: the
-family `files/` is copied over the shared one, so it may replace a shared file,
-and the family `module.sh` is sourced below the shared one. A `<family>/`
-directory or a `family` gate naming a family the module does not `supports` is
-refused, since no image could reach it.
-
-A directory name is one family where a `family` gate takes a list, so `deb/`
-and `rpm/` are the names for the two families each shares a package manager and
-an installer with, which would otherwise hold two copies of one file set. `deb/`
-is taken on Debian and Ubuntu both, `rpm/` on Fedora and RHEL, and a `debian/`
-beside it is Debian alone and is taken after it — widest first, the same order
-as the ungated half and a gate:
-
-```
-modules/login-access/
-├── files/            # every family
-├── deb/files/        # Debian and Ubuntu
-└── debian/files/     # Debian alone, copied after deb/files/
-```
-
-`collects` claims a filename across the whole image and `contributes` says
-this module ships one. Each contribution is staged as
-`<into>.d/NNNN-<module>.part` and the finalize phase assembles them in that
-order, so what the assembled file looks like does not depend on when its
-contributors built.
-
-`satisfies` is a claim, not a measurement. A module knows what it hardens, so
-the claim belongs at the module that makes it true; the scan can only confirm
-it after the fact.
+One line that names the module in the resolved build summary.
 
 ```kdl
-satisfies {
-    cis-fedora "1.1.1.1" "5.2.20"
-    stig "RHEL-09-232010"
+description "Traditional CLI utilities"
+```
+
+Accepts: *string*
+
+<a id="supports"></a>
+
+## `supports` (required, repeatable)
+
+Lists the base families that the module works on. `tect check` refuses the module on an image whose base family is not in the list, so a portability gap shows before the build.
+
+```kdl
+supports "fedora" "debian"
+```
+
+Accepts: *list of strings*
+
+<a id="provides"></a>
+
+## `provides` (optional, repeatable)
+
+Names a capability that this module adds to the image, such as `flatpak`. Another module `requires` it by name, and the build checks the finished image for the file that witnesses it.
+
+```kdl
+provides "flatpak"
+```
+
+Accepts: *list of strings*
+
+| Property | Accepts | Description |
+| --- | --- | --- |
+| `file=` (optional) | *string* | The absolute path that witnesses the one capability that the node names. It is needed only if the witness is neither `/usr/bin/<name>` nor `/usr/sbin/<name>`. |
+| `build-only=` (optional) | *boolean* | Whether the `file` exists only while the build runs. |
+
+> [!NOTE]
+> The build checks the finished image for the witness file.
+>
+> A capability name is lower-case letters, digits and dashes, and starts with a letter. The generated graph writes the name unquoted into a mermaid label and a markdown table cell.
+
+<a id="requires"></a>
+
+## `requires` (optional, repeatable)
+
+Names a capability that the image must have for this module to work. `tect` builds this module after the module that provides it, and `tect check` fails if no module in the image provides it.
+
+```kdl
+requires "kernel-devel"
+```
+
+Accepts: *list of strings*
+
+<a id="after"></a>
+
+## `after` (optional, repeatable)
+
+A capability that this module builds after, which the module does not require.
+
+```kdl
+after "vfio"
+```
+
+Accepts: *list of strings*
+
+<a id="overrides"></a>
+
+## `overrides` (optional, repeatable)
+
+Declares that this module replaces a file that an earlier module also ships. Without it, `tect check` reports the two overlays as a collision. `tect check` also reports an override that no earlier module collides with, so an override cannot outlive its reason.
+
+```kdl
+overrides "/etc/containers/policy.json"
+```
+
+Accepts: *list of strings*
+
+<a id="mode"></a>
+
+## `mode` (optional, unique)
+
+Sets the file mode of one file that the `files/` overlay of the module installs, such as `0600` for a file that only root reads.
+
+```kdl
+mode "/etc/audit/rules.d/audit.rules" "0600"
+```
+
+Accepts: *path*, then *octal mode*
+
+<a id="key"></a>
+
+## `key` (optional, unique)
+
+A module that needs a key declares it here, such as a Secure Boot signing key. `tect create key` generates the key from this declaration. The build installs the public half into the image at the path that `public` names. The private half stays in `keys/private/`, outside the image and outside git.
+
+```kdl
+key "secureboot" {
+    generator "openssl" profile="module-signing"
+    public "/usr/share/secureboot/sb_cert.der" format="der"
+    private "MOK.priv"
 }
 ```
 
-The node name is the benchmark and the strings are its rule numbers. The
-benchmark set is open, because CIS, STIG and whatever a downstream standard is
-called are not a set this tool can close.
+Accepts: *string*, then {&nbsp;[fields](#key-fields)&nbsp;}
 
-`generate` writes every claim into `generated/plan.json`, and the compliance
-job in `.github/workflows/build.yml` reads it back, resolves each number to an
-XCCDF rule id through the SSG datastream, scans the pushed image and compares.
-Three things it distinguishes: a number that maps to no rule is a failure of
-the **declaration**; a rule the image fails is a **false claim**; and a rule
-the image fails where another module's overlay owns the final copy of a file
-this one ships is a **composition** that defeats a claim that was honest. The
-last is why `plan.json` carries `overlay_overridden`.
+<a id="key-fields"></a>
 
-A target whose modules declare nothing is not scanned and says so. Only
-`.modules[]` is read, never `.suppressed[]`: a module the base displaced
-contributes no layer, so its claims are about an image this is not.
-
-<!-- schema: module -->
-
-Also holds [`option`](#option), [`variant`](#variant) and [`asset`](pins.md#asset).
-
-| Node | Takes | Meaning |
+| Field | Accepts | Description |
 | --- | --- | --- |
-| `description` | a string, at most one | One line naming the module in the resolved build summary. |
-| `supports` | one or more strings | The base families this module builds on, matched against the image's `family`. |
-| `requires` | one or more strings | A capability another module has to provide, which also orders the build. |
-| `after` | one or more strings | A module this one builds after without requiring anything of it. |
-| `overrides` | one or more strings | An absolute path this module replaces deliberately. |
-| `mode` | two strings: path, then octal mode, one per name | An octal file mode applied to one path in this module's overlay. |
-| `secret` | one or more strings | A build secret this module's layer mounts. |
-| `arg` | one or more strings | A build argument this module's layer reads. |
-| `helpers` | one or more strings | Files from this module mounted by basename into /ctx/lib in every module layer. |
-| `network` | `scripts`, at most one | Declares that the module's script step reaches the network. Only a `strict` rule in repo.kdl reads it. |
-| `copr` | a string, one per name | A COPR repository this module enables for its own installs, as owner/project. Fedora only. |
+| [`generator`](#key-generator) (required) | `cosign` or `openssl` or `ssh-keygen` | The generator that writes this key. |
+| [`public`](#key-public) (required) | *string* | Where the public half ships, which witnesses the `<kind>-key` capability of this module. |
+| [`private`](#key-private) (required) | *string* | The filename that the private half takes under `keys/private/`. |
 
-### `provides`
+<a id="key-generator"></a>
 
-A capability this module satisfies for the modules that require it.
+### `generator` (required)
 
-*one or more strings*
+`tect create key` offers every key that a module declares. `generator` names the tool that writes this key, and its properties set the key up for what the module uses it for.
 
-| Property | Value | Meaning |
+```kdl
+key "secureboot" {
+    generator "openssl" profile="module-signing"
+}
+```
+
+Accepts: `cosign` or `openssl` or `ssh-keygen`
+
+| Property | Accepts | Description |
 | --- | --- | --- |
-| `file=` | a string | The absolute path that witnesses the one name given, where it is neither `/usr/bin/<name>` nor `/usr/sbin/<name>`; the finished image is checked for it. |
-| `build-only=` | `#true` or `#false` | Whether the `file` exists only while the build runs. |
+| `profile=` (optional) | `module-signing` or `pcr-signing` or `tls-ca` | The purpose that the generator serves, if the generator has more than one purpose. |
+| `bits=` (optional) | *number* from 2048 to 16384 | The RSA key size, which is 4096 by default. |
 
-### `key`
+<a id="key-public"></a>
 
-A key `tect create key` generates for this module, and where each half of it goes.
+### `public` (required)
 
-*a string, one per name*
+Where the build installs the public half in the image. The file also witnesses the `<kind>-key` capability, so another module can `requires` the key.
 
-| Node | Takes | Meaning |
+```kdl
+key "secureboot" {
+    public "/usr/share/secureboot/sb_cert.der" format="der"
+}
+```
+
+Accepts: *string*
+
+| Property | Accepts | Description |
 | --- | --- | --- |
-| `private` | a string, exactly one | What the private half is called under `keys/private/`. |
+| `format=` (optional) | `pem` or `der` | The format of the public half, which is PEM by default. |
 
-#### `generator`
+<a id="key-private"></a>
 
-Which of the generators the tool implements writes this key.
+### `private` (required)
 
-*`cosign`, `openssl`, `ssh-keygen`, exactly one*
+The file name of the private half under `keys/private/`, which git ignores. The build never copies the private half into the image.
 
-| Property | Value | Meaning |
+```kdl
+key "secureboot" {
+    private "MOK.priv"
+}
+```
+
+Accepts: *string*
+
+<a id="secret"></a>
+
+## `secret` (optional, repeatable)
+
+Names a build secret that the layer of this module reads, such as a signing key. The layer mounts it at `/run/secrets/<name>`, so the secret is there while the module builds and never lands in the image.
+
+```kdl
+secret "mok_privkey"
+```
+
+Accepts: *list of strings*
+
+<a id="arg"></a>
+
+## `arg` (optional, repeatable)
+
+Names a build argument that the layer of this module reads as an environment variable, such as the kernel version to install.
+
+```kdl
+arg "KERNEL"
+```
+
+Accepts: *list of strings*
+
+<a id="helpers"></a>
+
+## `helpers` (optional, repeatable)
+
+Shares shell helpers from this module with every other module. The build mounts each listed file by its basename into `/ctx/lib` in every module layer, so another module can source it.
+
+```kdl
+helpers "lib/family.sh"
+```
+
+Accepts: *list of strings*
+
+<a id="allow-verify"></a>
+
+## `allow-verify` (optional, repeatable)
+
+`tect validate-image` checks the systemd units of the finished image. If one unit of this module raises an expected diagnostic, then this accepts that one diagnostic on that one unit. The check still covers every other diagnostic and unit.
+
+```kdl
+allow-verify "man-page-missing" unit="plasmalogin.service"
+```
+
+Accepts: *string*
+
+| Property | Accepts | Description |
 | --- | --- | --- |
-| `profile=` | `module-signing`, `pcr-signing`, `tls-ca` | What the generator is set up for, where it can do more than one thing. |
-| `bits=` | 2048 to 16384 | The RSA key size, 4096 where none is named. |
+| `unit=` (optional) | *string* | The unit the exception applies to. |
 
-#### `public`
+<a id="refuses"></a>
 
-Where the public half is shipped, which witnesses the `<kind>-key` capability this module provides.
+## `refuses` (optional, unique)
 
-*a string, exactly one*
+A hardening rule can break what a module does. This records that the module leaves one rule unsatisfied on purpose, and `because=` says why. Remediation then does not set the rule, and the choice is visible to every image.
 
-| Property | Value | Meaning |
+```kdl
+refuses "grub2_nousb_argument" because="it removes the keyboard"
+```
+
+Accepts: *string*
+
+| Property | Accepts | Description |
 | --- | --- | --- |
-| `format=` | `pem`, `der` | What the public half is written as, PEM where none is named. |
+| `because=` (optional) | *string* | Why the module leaves the rule unsatisfied. |
 
-### `allow-verify`
+> [!NOTE]
+> Remediation does not set a refused rule. If an image declares `allow-remediation` for the rule, then remediation can set it.
 
-One `tect validate-image` diagnostic accepted on one unit, leaving the rest of the image checked.
+<a id="collects"></a>
 
-*a string*
+## `collects` (optional, repeatable)
 
-| Property | Value | Meaning |
+Builds one file from parts that many modules ship, such as a list of Flatpak apps. This module claims the file name, every module that ships a file of that name contributes a part, and the finalize phase assembles the parts at `into=`.
+
+```kdl
+collects "flatpaks.list" into="/usr/share/flatpak-defaults/apps.list" priority=500
+```
+
+Accepts: *string*
+
+| Property | Accepts | Description |
 | --- | --- | --- |
-| `unit=` | a string | The unit the exception applies to. |
+| `into=` (optional) | *string* | The absolute path that receives the assembled file. |
+| `priority=` (optional) | *number* from 0 to 9999 | The position of a contribution that declares no priority. |
 
-### `refuses`
+> [!NOTE]
+> The build stages each contribution as `<into>.d/NNNN-<module>.part`. The finalize phase assembles the parts in that order, so the build order of the contributors does not change the assembled file.
+>
+> A module ships at most one copy of a collected file. The most specific copy wins. The order is `debian/`, then `deb/`, then the module root.
 
-One benchmark rule this module deliberately leaves unsatisfied, which no remediation may set on its behalf.
+<a id="contributes"></a>
 
-*a string, one per name*
+## `contributes` (optional, repeatable)
 
-| Property | Value | Meaning |
+A file that this module ships for another module to collect.
+
+```kdl
+contributes "flatpaks.list"
+```
+
+Accepts: *string*
+
+| Property | Accepts | Description |
 | --- | --- | --- |
-| `because=` | a string | Why the rule is left unsatisfied, which is the whole point of declaring it. |
+| `priority=` (optional) | *number* from 0 to 9999 | The position that this file takes in the assembled file. |
 
-### `collects`
+<a id="fragment"></a>
 
-A filename this module gathers from every module that ships one.
+## `fragment` (optional)
 
-*a string*
+A module whose needs the fields cannot express ships a `Containerfile.inc`, which the build adds verbatim. This places those lines relative to the generated layer.
 
-| Property | Value | Meaning |
+```kdl
+fragment position="after"
+```
+
+| Property | Accepts | Description |
 | --- | --- | --- |
-| `into=` | a string | The absolute path the assembled file is written to. |
-| `priority=` | 0 to 9999 | Where a contribution lands when it declares none. |
+| `position=` (optional) | `before` or `after` or `tail` | Where the fragment goes. `before`, the default, puts it above the generated block. `after` puts it below the block. `tail` puts it below the finalize layer, where the lineage stage has ended and can be named. |
+| `standard-layer=` (optional) | *boolean* | Whether the build emits the generated block. |
 
-### `contributes`
+> [!NOTE]
+> The build places the fragment verbatim and replaces `@MODULE@` with `/modules/<dir>`, the module directory in the build context. The mounts of the module layer use the same path, so a `COPY --from=ctx` needs it to reach a file that the module ships.
+>
+> Every `RUN` bind-mounts over `/etc/hostname`, `/etc/hosts` and `/etc/resolv.conf`. A fragment writes those three files with a `COPY --from=ctx`.
 
-A file this module ships for another module to collect.
+<a id="option"></a>
 
-*a string*
+## `option` (optional, unique)
 
-| Property | Value | Meaning |
+Lets an image change how this module builds, such as which fonts it installs. The module declares the option with a type and a default, and each image can set its own value.
+
+```kdl
+option "fonts" type="list" {
+    default "JetBrainsMono" "FiraCode"
+}
+```
+
+Accepts: *string*, then {&nbsp;[fields](#option-fields)&nbsp;}
+
+| Property | Accepts | Description |
 | --- | --- | --- |
-| `priority=` | 0 to 9999 | Where this file lands in the assembled one. |
+| `type=` (required) | `string` or `bool` or `list` | The type of the value. A `string` arrives verbatim, a `bool` arrives as `1` or `0`, and a `list` arrives as a bash array of its strings. |
 
-### `fragment`
+<a id="option-fields"></a>
 
-Where the module's Containerfile.inc goes relative to the generated layer.
-
-*at most one*
-
-| Property | Value | Meaning |
+| Field | Accepts | Description |
 | --- | --- | --- |
-| `position=` | `before`, `after`, `tail` | Whether the fragment goes above the generated block, below it, or below the finalize layer. |
-| `standard-layer=` | `#true` or `#false` | Whether the generated block is emitted at all. |
+| [`description`](#option-description) (optional) | *string* | What the option does. |
+| [`default`](#option-default) (required) | *list of strings* | The value that the module builds with if no image sets one. |
 
-### `packages`
+> [!NOTE]
+> Every declared option reaches the layer of its module as `OPT_<NAME>`. `<NAME>` is the option name in upper case, and each dash becomes an underscore.
+>
+> A default reaches the layer too, so `module.sh` reads a variable and does not test whether one is set.
 
-The packages this module installs, on every family it supports or, inside a `family` block, on the families that names.
+<a id="option-description"></a>
 
-*one or more strings*
+### `description` (optional)
 
-| Property | Value | Meaning |
-| --- | --- | --- |
-| `enablerepo=` | a string | A repository enabled for this install and disabled otherwise. dnf only, so the batch has to resolve to `fedora` or `rhel` alone. |
-
-### `package-groups`
-
-The package groups this module installs. dnf only, so an ungated one is a module supporting `fedora` or `rhel` alone.
-
-*one or more strings*
-
-| Property | Value | Meaning |
-| --- | --- | --- |
-| `enablerepo=` | a string | A repository enabled for this install and disabled otherwise. |
-
-### `satisfies`
-
-The benchmarks and rules this module claims to harden, as an audit declaration. The tool records it and certifies nothing.
-
-*at most one*
-
-| Node | Takes | Meaning |
-| --- | --- | --- |
-| `<name>` | one or more strings, one per name | One benchmark, and the rule IDs it covers. |
-
-### `family`
-
-The declarations inside taken only on the base families named, everything outside a gate being taken on every family the module supports.
-
-*one or more strings, never empty*
-
-Also holds `packages`, as above, `package-groups`, as above and `satisfies`, as above.
-
-| Node | Takes | Meaning |
-| --- | --- | --- |
-| `copr` | a string, one per name | A COPR repository this module enables for its own installs, as owner/project. Fedora only. |
-| `requires` | one or more strings | A capability another module has to provide, which also orders the build. |
-| `after` | one or more strings | A module this one builds after without requiring anything of it. |
-
-<!-- /schema: module -->
-
-## Options
-
-An option is one value an image may set on the module that declared it. Every
-declared option reaches that module's layer as `OPT_<NAME>`, uppercased with
-dashes as underscores, always, defaults included, so `module.sh` reads a
-variable rather than testing whether one is set. A `list` arrives as a bash
-array, a `string` or a `bool` as a scalar.
+What the option does.
 
 ```kdl
 option "fonts" type="list" {
     description "Nerd Font families to install"
-    default "JetBrainsMono" "FiraCode"
-}
-
-option "starship" type="bool" {
-    description "Install the starship prompt"
-    default #true
 }
 ```
 
-| `type=` | KDL value | Env value |
+Accepts: *string*
+
+<a id="option-default"></a>
+
+### `default` (required)
+
+The value that the module builds with if no image sets one.
+
+```kdl
+option "fonts" type="list" {
+    default "JetBrainsMono" "FiraCode"
+}
+```
+
+Accepts: *list of strings*
+
+<a id="variant"></a>
+
+## `variant` (optional, unique)
+
+Bundles option values under one name, so an image takes a whole configuration of the module with `variant=` in place of setting each option.
+
+```kdl
+variant "wine-only"
+```
+
+Accepts: *string*, then optionally {&nbsp;[fields](#variant-fields)&nbsp;}
+
+<a id="variant-fields"></a>
+
+| Field | Accepts | Description |
 | --- | --- | --- |
-| `string` | `"text"` | verbatim |
-| `bool` | `#true` or `#false` | `1` or `0` |
-| `list` | zero or more strings | space joined |
+| [`description`](#variant-description) (optional) | *string* | What the variant is for. |
+| [`set`](#variant-set) (optional,&nbsp;repeatable) | *string* | One option that this variant sets, where the option value follows the option name. |
 
-<!-- schema: option -->
+> [!NOTE]
+> An image can still set an option on an entry that selects a variant. The option that the image sets wins.
 
-### `option`
+<a id="variant-description"></a>
 
-One value an image may set on this module, reaching the build as OPT_*.
+### `description` (optional)
 
-*a string, one per name*
-
-| Property | Value | Meaning |
-| --- | --- | --- |
-| `type=` | a string | What the option holds: string, bool or list. |
-
-| Node | Takes | Meaning |
-| --- | --- | --- |
-| `description` | a string, at most one | What setting the option does, for the generated reference. |
-| `default` | one or more strings, at most one | What the module builds with when no image sets it. |
-
-<!-- /schema: option -->
-
-## Variants
-
-A variant is a named set of option values, so an image can take a whole
-position on a module with one word instead of setting five options
-consistently.
+What the variant is for.
 
 ```kdl
 variant "wine-only" {
     description "Skip the metadata and .NET payloads"
-    set "dotnet" #false
-    set "winmd" #false
 }
 ```
 
-An image selects one with `variant="wine-only"` on its list entry, and may
-still set an option itself, which wins.
+Accepts: *string*
 
-<!-- schema: variant -->
+<a id="variant-set"></a>
 
-### `variant`
+### `set` (optional, repeatable)
 
-A named set of option values an image selects with `variant=`.
+One option that this variant sets, where the option value follows the option name.
 
-*a string, one per name*
+```kdl
+variant "wine-only" {
+    set "dotnet" #false
+}
+```
 
-| Node | Takes | Meaning |
+Accepts: *string*
+
+<a id="asset"></a>
+
+## `asset` (optional, unique)
+
+Downloads a pinned file from upstream, such as a release binary, while this module builds. The pin fixes the version and the hash, so every build gets the same bytes and Renovate can keep the version current.
+
+```kdl
+asset "starship" {
+    pin {
+        renovate datasource="github-tags" depName="owner/repo"
+        version "v1.0.0"
+        url "https://github.com/owner/repo/archive/refs/tags/{version}.tar.gz"
+        sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+    }
+}
+```
+
+Accepts: *string*, then {&nbsp;[fields](#asset-fields)&nbsp;}
+
+The layer of the module gets three variables, where `<NAME>` is the asset name in upper case with each dash turned into an underscore:
+
+- `ASSET_<NAME>_VERSION`;
+- `ASSET_<NAME>_URL`, with `{version}` already expanded, so no shell code builds a URL;
+- `ASSET_<NAME>_SHA256`.
+
+<a id="asset-fields"></a>
+
+| Field | Accepts | Description |
 | --- | --- | --- |
-| `description` | a string, at most one | What the variant is for. |
-| `set` | a string | One option this variant sets, and what it sets it to. |
+| [`pin`](#asset-pin) (optional) | {&nbsp;[fields](#asset-pin-fields)&nbsp;} | Where content comes from, which version it is, what verifies it, and what keeps the version current. |
 
-<!-- /schema: variant -->
+<a id="asset-pin"></a>
+
+### `pin` (optional)
+
+A pin fixes where a download comes from and which version it is, and says how the version stays current. Unless the pin is `unpinned`, `tect` verifies each download against the pinned hash, so a changed upstream file is caught.
+
+```kdl
+asset "starship" {
+    pin {
+        renovate datasource="github-tags" depName="owner/repo"
+        version "v1.0.0"
+        url "https://github.com/owner/repo/archive/refs/tags/{version}.tar.gz"
+        sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+    }
+}
+```
+
+Accepts: {&nbsp;[fields](#asset-pin-fields)&nbsp;}
+
+A pin holds exactly one of these, so every pin says how it stays current:
+
+- `renovate`, if Renovate keeps the version current;
+- `manual`, if nothing tracks the pin;
+- `unpinned`, if the pin follows a moving ref with no `sha256`.
+
+<a id="asset-pin-fields"></a>
+
+| Field | Accepts | Description |
+| --- | --- | --- |
+| [`renovate`](#asset-pin-renovate) (required) |  | The Renovate custom manager that keeps `version` current. |
+| [`manual`](#asset-pin-manual) (optional) | *string* | Why nothing tracks this pin. |
+| [`unpinned`](#asset-pin-unpinned) (optional) | *string* | Why this pin follows a moving ref with no `sha256`. |
+| [`version`](#asset-pin-version) (required) | *string* | The version, tag or commit that `url` expands and Renovate rewrites. |
+| [`url`](#asset-pin-url) (required) | *string* | Where the content comes from. |
+| [`sha256`](#asset-pin-sha256) (required) | *string* | The hash the fetched content must match. |
+| [`path`](#asset-pin-path) (optional) | *string* | The directory inside the archive that holds the content. |
+
+> [!NOTE]
+> An `asset`, an out-of-tree module and a collection each hold a `pin`.
+>
+> A base holds no `pin`. Its image reference holds the location and the version, and `signed` records whether the base publishes a cosign signature.
+>
+> Renovate matches `renovate` together with the line directly below it. Put `version` on that line.
+
+<a id="asset-pin-renovate"></a>
+
+#### `renovate` (required)
+
+The Renovate custom manager that keeps `version` current.
+
+```kdl
+asset "starship" {
+    pin {
+        renovate datasource="github-tags" depName="owner/repo"
+    }
+}
+```
+
+| Property | Accepts | Description |
+| --- | --- | --- |
+| `datasource=` (required) | `github-releases` or `github-tags` or `git-refs` | The Renovate datasource that tracks the pin. |
+| `depName=` (required) | *string* | The name the datasource knows the dependency by. |
+| `extractVersion=` (optional) | *string* | The pattern that extracts the version from a tag. |
+
+<a id="asset-pin-manual"></a>
+
+#### `manual` (optional)
+
+Why nothing tracks this pin.
+
+```kdl
+asset "starship" {
+    pin {
+        manual "upstream publishes no releases"
+    }
+}
+```
+
+Accepts: *string*
+
+<a id="asset-pin-unpinned"></a>
+
+#### `unpinned` (optional)
+
+Why this pin follows a moving ref with no `sha256`.
+
+```kdl
+asset "starship" {
+    pin {
+        unpinned "followed at its branch head"
+    }
+}
+```
+
+Accepts: *string*
+
+> [!NOTE]
+> Every fetch takes what the ref holds at that moment, and nothing checks what arrived.
+>
+> Only a collection's pin takes `unpinned`. The build runs an out-of-tree module as root, so the pin of an out-of-tree module needs a `sha256`.
+>
+> `unpinned` does not combine with `sha256`, because a moving ref breaks the hash.
+
+<a id="asset-pin-version"></a>
+
+#### `version` (required)
+
+The version, tag or commit that `url` expands and Renovate rewrites.
+
+```kdl
+asset "starship" {
+    pin {
+        version "v1.0.0"
+    }
+}
+```
+
+Accepts: *string*
+
+<a id="asset-pin-url"></a>
+
+#### `url` (required)
+
+Where the content comes from.
+
+```kdl
+asset "starship" {
+    pin {
+        url "https://github.com/owner/repo/archive/refs/tags/{version}.tar.gz"
+    }
+}
+```
+
+Accepts: *string*
+
+<a id="asset-pin-sha256"></a>
+
+#### `sha256` (required)
+
+The hash the fetched content must match.
+
+```kdl
+asset "starship" {
+    pin {
+        sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+    }
+}
+```
+
+Accepts: *string*
+
+| Property | Accepts | Description |
+| --- | --- | --- |
+| `from=` (optional) | `asset` or `sidecar` or `manual` | Where the hash is refreshed from. `asset`, the default, hashes the payload itself. `sidecar` reads the `<url>.sha256` file that upstream publishes. `manual` means nothing recomputes the hash. |
+
+> [!NOTE]
+> If a pin has no `sha256` and no `unpinned`, then `tect check` reports an error.
+
+<a id="asset-pin-path"></a>
+
+#### `path` (optional)
+
+The directory inside the archive that holds the content.
+
+```kdl
+asset "starship" {
+    pin {
+        path "modules/example"
+    }
+}
+```
+
+Accepts: *string*
+
+<a id="network"></a>
+
+## `network` (optional)
+
+Declares that the scripts of this module need the network. A repository with a `strict` script rule opens the network only for the modules that declare it.
+
+```kdl
+network "scripts"
+```
+
+Accepts: `scripts`
+
+> [!NOTE]
+> Only a `strict` script rule in `repo.kdl` reads this node.
+>
+> The package step needs no declaration, because `packages`, `copr` or a repo file already declares it.
+
+<a id="packages"></a>
+
+## `packages` (optional, repeatable)
+
+Lists the distribution packages that this module installs with the package manager of the base family.
+
+```kdl
+packages "htop" "tmux"
+```
+
+Accepts: *list of strings*
+
+| Property | Accepts | Description |
+| --- | --- | --- |
+| `enablerepo=` (optional) | *string* | A repository that is enabled for this install only. It works with dnf only, so the batch must resolve to `fedora` or `rhel` alone. |
+
+<a id="package-groups"></a>
+
+## `package-groups` (optional, repeatable)
+
+The package groups that this module installs. Package groups work with dnf only, so an ungated `package-groups` needs a module that supports only `fedora` or `rhel`.
+
+```kdl
+package-groups "kde-desktop"
+```
+
+Accepts: *list of strings*
+
+| Property | Accepts | Description |
+| --- | --- | --- |
+| `enablerepo=` (optional) | *string* | A repository that is enabled for this install only. |
+
+<a id="copr"></a>
+
+## `copr` (optional, unique)
+
+The `owner/project` name of a COPR repository that this module enables for its own installs. `copr` works on Fedora only.
+
+```kdl
+copr "owner/project"
+```
+
+Accepts: *string*
+
+<a id="satisfies"></a>
+
+## `satisfies` (optional)
+
+Claims that this module meets rules of a hardening benchmark, such as STIG. The compliance scan checks each claim against the built image, so a false claim shows.
+
+```kdl
+satisfies
+```
+
+Accepts: optionally {&nbsp;[fields](#satisfies-fields)&nbsp;}
+
+`tect generate` writes every claim into `generated/plan.json`. The compliance job in `.github/workflows/build.yml` then:
+
+- resolves each number to an XCCDF rule ID through the SSG datastream;
+- scans the pushed image and compares each claim with the scan result;
+- reports a number that maps to no rule as a failed declaration;
+- reports a rule that the image fails as a false claim;
+- reports a failed rule as a composition failure, if the overlay of another module owns the final copy of a file that this module ships. `plan.json` carries `overlay_overridden` for that case;
+- skips a target whose modules declare nothing, and says so;
+- reads `.modules[]` only and never `.suppressed[]`, because a suppressed module adds no layer.
+
+<a id="satisfies-fields"></a>
+
+| Field | Accepts | Description |
+| --- | --- | --- |
+| [`<name>`](#satisfies-name) (optional,&nbsp;unique) | *list of strings* | One benchmark, which the node name names, with the rule numbers that it covers. The set of benchmarks is open. |
+
+<a id="satisfies-name"></a>
+
+### `<name>` (optional, unique)
+
+One benchmark, which the node name names, with the rule numbers that it covers. The set of benchmarks is open.
+
+```kdl
+satisfies {
+    stig "RHEL-09-232010"
+}
+```
+
+Accepts: *list of strings*
+
+<a id="family"></a>
+
+## `family` (optional, repeatable)
+
+Holds the declarations that differ by base family, such as package names that differ between Fedora and Debian. One `module.kdl` can then support several families.
+
+```kdl
+family "debian" "ubuntu" {
+    packages "htop" "tmux"
+}
+```
+
+Accepts: *list of strings*, then {&nbsp;[fields](#family-fields)&nbsp;}
+
+<a id="family-fields"></a>
+
+| Field | Accepts | Description |
+| --- | --- | --- |
+| [`packages`](#packages) (optional,&nbsp;repeatable) | *list of strings* | The packages that this module installs. |
+| [`package-groups`](#package-groups) (optional,&nbsp;repeatable) | *list of strings* | The package groups that this module installs. Package groups work with dnf only, so an ungated `package-groups` needs a module that supports only `fedora` or `rhel`. |
+| [`copr`](#copr) (optional,&nbsp;unique) | *string* | The `owner/project` name of a COPR repository that this module enables for its own installs. `copr` works on Fedora only. |
+| [`requires`](#requires) (optional,&nbsp;repeatable) | *list of strings* | A capability that another module must provide, which also orders the build. |
+| [`after`](#after) (optional,&nbsp;repeatable) | *list of strings* | A capability that this module builds after, which the module does not require. |
+| [`satisfies`](#satisfies) (optional) | optionally {&nbsp;[fields](#satisfies-fields)&nbsp;} | An audit declaration of the benchmarks and rules that this module claims to harden. `tect` records the claim and certifies nothing, and the scan checks it after the build. |
+
+> [!NOTE]
+> A declaration outside a gate applies to every family the module supports. A declaration inside a gate applies to the families that the gate names.
+>
+> One gate takes several family names, so the user writes a list that two families share once.
+>
+> `provides` stays outside a gate. A capability that one family offers and another does not belongs in a second module.
+>
+> `tect` reads every gate whether or not the image builds for it, so the manifest gets the same checks on each family it claims.
+>
+> The build drops each gated declaration for a family that it does not build. A Fedora-only `after` does not dangle on a Debian image, and a Debian scan does not map a Fedora rule number.
+>
+> If a gate names a family that the module does not `supports`, then `tect` refuses the gate.

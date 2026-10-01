@@ -63,13 +63,14 @@
   help: `path "modules/module-name"`, the module's directory inside the
         repository
 
-  x `loose` has no module.kdl
+  x `loose` is not fetched
     ,-[./image.kdl:10:9]
   9 |     modules {
  10 |         module "loose" {
     :         ^^^|^^
-    :            `-- every module needs a manifest
+    :            `-- no module.kdl here yet
  11 |             pin {
     `----
-  help: run ./scripts/tect.sh fetch modules to fetch what the image references
+  help: run ./generated/scripts/tect.sh fetch modules to fetch what the image
+        references
 

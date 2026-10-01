@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# The script runs from scripts/ or from generated/scripts/.
+[ -f repo.kdl ] || cd ..
 
+# scripts/ is absent unless the repository keeps a copy of a script.
+roots=(generated/lib modules)
+for dir in generated/scripts scripts; do
+    [ ! -d "$dir" ] || roots+=("$dir")
+done
 # A helper below is left to the shell it names, so it is not a script here too.
-mapfile -t scripts < <(find scripts generated/lib modules -path modules/.remote -prune -o \
+mapfile -t scripts < <(find "${roots[@]}" -path modules/.remote -prune -o \
     -name '*.sh' -type f ! \( -path '*/files/*' \
     \( -path '*/libexec/*' -o -path '*/system-generators/*' \) \) -print)
 # A `repo` file is shell and carries no extension.

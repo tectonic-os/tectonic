@@ -10,9 +10,9 @@ use std::os::unix::process::CommandExt as _;
 use std::path::Path;
 use std::process::Command;
 
-/// Generated in place by `emit::SCRIPTS`: a scaffolded copy would be the
-/// repository's to edit, and `tect vm` would do whatever that edit says.
-const SCRIPT: &str = "scripts/vm.sh";
+/// `emit::SCRIPTS` holds this script. If the repository keeps its own copy,
+/// then `tect vm` runs that copy.
+const SCRIPT: &str = "vm.sh";
 
 /// Disk images are Fedora's alone: an Ubuntu image dies relabelling its
 /// buildroot in `setfiles`, and a Debian one is refused for omitting
@@ -61,7 +61,7 @@ pub fn run(
         false => None,
     };
     let access = access(root, kind, opts);
-    let script = root.join(SCRIPT);
+    let script = root.join(crate::layout::script(root, SCRIPT));
     if !script.is_file() {
         return Err(format!(
             "{} is not there; `tect generate` writes it",
@@ -380,7 +380,9 @@ mod tests {
 
     #[test]
     fn the_script_it_execs_is_one_the_repository_generates() {
-        assert!(crate::emit::SCRIPTS.iter().any(|(path, _)| *path == SCRIPT));
+        assert!(crate::emit::SCRIPTS
+            .iter()
+            .any(|script| script.name == SCRIPT));
     }
 
     #[test]

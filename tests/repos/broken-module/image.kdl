@@ -9,6 +9,7 @@ image {
     modules {
         module "core/nameless"
         module "core/missing"
+        module "core/latin"
         module "core/nameless"
     }
 }

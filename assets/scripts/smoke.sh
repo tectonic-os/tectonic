@@ -5,6 +5,8 @@ set -euo pipefail
 # says, booted under qemu, and handed back once ssh answers. The smoke test and
 # the collection's machine scan both call it.
 cd "$(dirname "$0")/.."
+# The script runs from scripts/ or from generated/scripts/.
+[ -f repo.kdl ] || cd ..
 
 # The renderer a deb image ships and a fedora one does not.
 RENDERER=/usr/libexec/grub-menu-from-bls

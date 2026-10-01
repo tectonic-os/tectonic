@@ -15,58 +15,106 @@ use std::path::Path;
 /// What a module layer's steps may reach, under `security-policy`. Lifted out
 /// of `REPO` so the policy block holds it by name.
 #[rustfmt::skip]
-const NETWORK: Node = Node::new("network",
-    "What each step of a module layer may reach. A package step installs the module's \
-     repo files, COPRs and packages. A script step runs its module.sh and finalize \
-     hook. `strict` opens a step only where the module declares it, and a closed step \
-     runs under `--network=none`. Absent, every step keeps the network.")
+const NETWORK: Node = Node::new("network", "The rule that decides whether each step of a module layer reaches the network.").about("Controls network access while the image builds. The user can open the network to every step, or with `strict` open it only for the modules that declare a need, so an undeclared download fails the build. `packages` and `scripts` set the rule for one kind of step.").example("\"strict\"")
     .arg(Arg::MaybeOne(&["allow", "strict"]), Say::new("`{}` is not a network rule",
         "not a rule",
         "`network \"strict\"` holds every module to what it declares; a block sets \
          `packages` and `scripts` one at a time"))
     .once("a second rule would contradict the first")
     .children(&[
-        Node::new("packages", "The rule for every package step, over the one the node gives.")
+        Node::new("packages", "The rule that every package step runs under.").example("\"allow\"")
             .arg(Arg::One(&["allow", "strict", "deny"]), Say::new(
                 "`{}` is not a network rule", "not a rule",
                 "`packages` takes `allow`, `strict` or `deny`"))
-            .once(""),
-        Node::new("scripts", "The rule for every script step, over the one the node gives.")
+            .once("")
+            .values(&[
+                ("`allow`", "Every package step reaches the network."),
+                ("`strict`", "Every package step reaches the network, because a package step \
+                  runs only where the module declares packages, a COPR or a repo file."),
+                ("`deny`", "Every package step runs under `--network=none`."),
+            ]),
+        Node::new("scripts", "The rule that every script step runs under.").example("\"strict\"")
             .arg(Arg::One(&["allow", "strict", "deny"]), Say::new(
                 "`{}` is not a network rule", "not a rule",
                 "`scripts` takes `allow`, `strict` or `deny`; under `strict` a module \
                  opens its script step with `network \"scripts\"`"))
-            .once(""),
+            .once("")
+            .values(&[
+                ("`allow`", "Every script step reaches the network."),
+                ("`strict`", "A script step reaches the network only if its module declares \
+                  `network \"scripts\"`."),
+                ("`deny`", "Every script step runs under `--network=none`."),
+            ])
+            .notes(&[
+                "If the rule is `strict` or `deny`, then `tect check` names each module that \
+                 ships a Containerfile fragment. The rule does not reach the `RUN` lines of a \
+                 fragment.",
+            ]),
     ], Say::new("unknown node `{}` in network", "not part of the schema",
-        "a network block holds `packages` and `scripts`"));
+        "a network block holds `packages` and `scripts`"))
+    .lists(&[
+        ("A module layer runs two kinds of step:", &[
+            "A package step installs the repo files, the COPRs and the packages of the module.",
+            "A script step runs the `module.sh` of the module and its finalize hook.",
+        ]),
+    ])
+    .values(&[
+        ("`allow`", "Both kinds of step take `allow`, unless `packages` or `scripts` sets \
+          another rule."),
+        ("`strict`", "Both kinds of step take `strict`, unless `packages` or `scripts` sets \
+          another rule."),
+        ("No value", "Both kinds of step take `allow`, unless `packages` or `scripts` sets \
+          another rule."),
+    ]);
 
 /// repo.kdl's grammar, and the whole of it.
 #[rustfmt::skip]
 pub const REPO: Node = Node::new("repo",
-    "What is true of the repository, leaving each image to say what is true of itself.")
+    "What is true of the repository as a whole, apart from its images.").about("`repo.kdl` sits at the root of the repository and holds what applies to every image in it: which `tect` release builds it, where its modules come from, which CI workflows run and which security rules every image follows. The images themselves live in image files beside it.").scaffolds(&["schema-version", "name", "sources", "workflows"])
     .children(&[
-        Node::new("schema-version",
-            "The schema release this repository is written against, which picks the reader.")
+        Node::new("schema-version", "The schema release that this repository is written against.").about("The schema version tells `tect` which reader to use for the repository. A repository written against an earlier release keeps building, because the version picks the reader. `tect create repo` writes it, and `tect` never changes it.").example("1")
             .arg(Arg::Int, Say::new("`{}` needs a number", "not a version", "`schema-version 1`"))
-            .once(""),
-        Node::new("tect-version",
-            "The tect release this repository is built with, which `scripts/tect.sh` fetches for the build.")
+            .missing(Say::new("repo.kdl declares no `{}`", "no schema version",
+                "`schema-version 1`, so a tool from a different release says so plainly. Without \
+                 it, the tool reports every node it does not recognise"))
+            .once("")
+            .notes(&[
+                "The version picks the reader, so a repository written against an earlier \
+                 release keeps building.",
+                "If `tect` does not read the version, then it says so once and reports no node \
+                 it cannot place.",
+                "`tect` does not move a repository to a newer version. The release that the \
+                 repository pins reads it.",
+            ]),
+        Node::new("tect-version", "The `tect` release that builds this repository.").about("Pins the `tect` release that builds the repository, so every build uses the same tool. `tect.sh` fetches the pinned release, so a build does not depend on the `tect` installed on the machine.").example("\"0.6.49\"")
             .arg(Arg::Str, Say::new("`{}` needs a release", "not a version",
                 concat!("`tect-version \"", env!("CARGO_PKG_VERSION"),
                         "\"`, the release the build fetches; another release reads the \
                          repository and says so")))
             .props(&[
                 Prop { name: "sha256", kind: Kind::Str,
-                    desc: "The release tarball's sha256, which `scripts/tect.sh` holds the \
-                           download to. Absent, the script checks against the checksum fetched \
-                           beside the tarball, which proves the download and nothing more.",
+                    desc: "The sha256 that `tect.sh` holds the release tarball to.",
                     say: Say::new("`{}` must be a hash", "not a string", ""),
                     missing: Say::NONE },
             ], Say::new("unknown tect-version property `{}`", "not part of the schema",
                 "a `tect-version` accepts `sha256`"))
-            .once(""),
-        Node::new("name",
-            "What the repository calls itself, whatever the directory holding it is called.")
+            .once("")
+            .lists(&[
+                ("If a different release of `tect` reads the repository:", &[
+                    "`tect` says once that the pin names a different release.",
+                    "`schema-version` decides whether that release can read the repository.",
+                    "`tect verify` reports the difference as drift.",
+                    "`tect generate` resolves the drift.",
+                ]),
+            ])
+            .notes(&[
+                "`tect.sh` fetches this release, so the build does not use the `tect` \
+                 installed on the machine.",
+                "If `sha256=` is absent, then `tect.sh` checks the checksum published \
+                 beside the tarball. That check proves only that the download is complete.",
+                "If the repository pins no release, then `tect` says nothing about the release.",
+            ]),
+        Node::new("name", "The name of the repository, which can differ from its directory.").about("The name that the repository answers to. It is separate from the directory name, so the user can rename or move the directory without a change to the repository.").example("\"Workstation\"")
             .arg(Arg::Str, Say::new("`{}` needs a name", "no name given",
                 "`name \"Workstation\"`, which the directory is free to disagree with"))
             .once("")
@@ -74,25 +122,23 @@ pub const REPO: Node = Node::new("repo",
                 "no name", "`name \"Workstation\"`, so a rename of the directory changes \
                  nothing about what this repository answers to")),
         Node::new("default-image",
-            "The image a command given no image answers about, and a build with no target builds.")
+            "The image that a command with no image, or a build with no target, uses.").about("If the repository defines more than one image, then this names the image that a command uses when the user names none. If the repository defines one image, then that image is the default and this field is not needed.").example("\"workstation\"")
             .arg(Arg::Str, Say::new("`{}` needs an image name", "no image given",
                 "`default-image \"workstation\"`, naming one of the images declared at the root"))
             .once(""),
-        Node::new("pr-image", "The image a pull request builds.")
+        Node::new("pr-image", "The image a pull request builds.").example("\"workstation\"")
             .arg(Arg::Str, Say::new("`{}` needs an image name", "no image given",
                 "`pr-image \"workstation\"`, since a pull request builds one target"))
             .once(""),
         Node::new("seed",
-            "The image this repository publishes a declaration of, for a new repository to start \
-             from.")
+            "The image that this repository publishes as a starting point for a new repository.").about("A seed lets another user start a new repository from this one. `tect generate` writes the base, the module list and the collections of the named image into the seed, so a new repository starts from the same image.").example("\"workstation\" collection=\"owner\"")
             .arg(Arg::Str, Say::new("`{}` needs an image name", "no image given",
                 "`seed \"workstation\" collection=\"owner\"`, naming one of the images declared \
                  at the root"))
             .once("a repository publishes one seed")
             .props(&[
                 Prop { name: "collection", kind: Kind::Str,
-                    desc: "The collection this repository publishes its own modules as, which is \
-                           what names them in the seed.",
+                    desc: "The collection that this repository publishes its own modules as.",
                     say: Say::new("`{}` must be a collection name", "not a string", ""),
                     missing: Say::new("`{}` says nothing about where its modules are published",
                         "no `collection`",
@@ -100,54 +146,87 @@ pub const REPO: Node = Node::new("repo",
                          module in a seed is fetched through one, so a repository publishing no \
                          collection of its own has nothing a seeded repository can import") },
             ], Say::new("unknown seed property `{}`", "not part of the schema",
-                "a seed accepts `collection`")),
-        Node::new("workflows",
-            "The CI `tect generate` writes into .github/workflows/, named by file stem. One \
-             this does not name is not written.")
+                "a seed accepts `collection`"))
+            .lists(&[
+                ("`tect generate` writes the seed to `generated/seed.kdl`. The seed carries:", &[
+                    "the base of the image;",
+                    "the module list of the image;",
+                    "the collections that those modules come from.",
+                ]),
+            ])
+            .notes(&[
+                "The seed carries no name, URL or owner of this repository.",
+                "The seed names each module through the collection it is fetched from, so \
+                 `collection=` names a collection in `sources`. A repository is seedable only \
+                 if it publishes its own `modules/` as a collection.",
+                "If the seed image lists a module that no collection can import, then `tect` \
+                 reports it, because a new repository could not build that seed.",
+            ]),
+        Node::new("workflows", "The CI workflows that `tect generate` writes into `.github/workflows/`.").about("Names the GitHub Actions workflows that `tect generate` writes and keeps current, and sets when scheduled builds, publishing and scans run. The repository gets only the workflows named here.").scaffolds(&[""]).example("at=\"12:30\"")
             .once("a second block would split one set of workflows in two")
             .empty(Say::new("`workflows` has no workflows in it", "empty block",
                 "omit the block entirely; a repository with nothing here generates no CI"))
             .props(&[
                 Prop { name: "at", kind: Kind::Str,
-                    desc: "The hour and minute the daily build runs, UTC. Every other schedule \
-                           is an offset from it.",
+                    desc: "The hour and minute in UTC that the daily build runs at. Every other \
+                        scheduled workflow runs at its own offset from it.",
                     say: Say::new("`{}` must be a time of day", "not a string", ""),
                      missing: Say::NONE },
-                Prop { name: "publish", kind: Kind::Str,
-                    desc: "When images publish. `scheduled` moves publishing off pushes while \
-                           keeping the daily build.",
-                    say: Say::new("`{}` must be a cadence", "not a string", "`publish=\"scheduled\"`"),
+                Prop { name: "publish", kind: Kind::One(&["scheduled"]),
+                    desc: "If `scheduled`, then images publish from the daily build alone, and \
+                        image scans move off pushes too, because a scan reads a published image. \
+                        If absent, then images also publish on pushes.",
+                    say: Say::new("`{}` is not a publish cadence", "not `scheduled`",
+                        "`workflows publish=\"scheduled\"`, to publish only on the daily build; \
+                         omit `publish` to publish on pushes too"),
                     missing: Say::NONE },
-                Prop { name: "scan", kind: Kind::Str,
-                    desc: "When image scans run. `scheduled` moves them off pushes; scheduled \
-                           publishing does too because scans consume published images.",
-                    say: Say::new("`{}` must be a cadence", "not a string", "`scan=\"scheduled\"`"),
+                Prop { name: "scan", kind: Kind::One(&["scheduled"]),
+                    desc: "If `scheduled`, then image scans run on the daily build alone. If \
+                        absent, then scans run on pushes and on scheduled builds.",
+                    say: Say::new("`{}` is not a scan cadence", "not `scheduled`",
+                        "`workflows scan=\"scheduled\"`, to scan only on the daily build; \
+                         omit `scan` to scan on pushes too"),
                     missing: Say::NONE },
             ], Say::new("unknown workflows property `{}`", "not part of the schema",
                 "a workflows block accepts `at`, `publish` and `scan`"))
             .children(&[
-                Node::new("", "One workflow, named by the node.")
+                Node::new("", "One workflow, which the stem of its file names.").example("build")
                     .arg(Arg::None, Say::new("a workflow takes no arguments", "unexpected value",
                         "the file stem is the node name: `smoke-test`"))
                     .props(&[], Say::new("unknown workflow property `{}`", "not part of the schema",
                         "a workflow is named and nothing else; `at` on the block moves every \
                          schedule at once")),
-            ], Say::NONE),
+            ], Say::NONE)
+            .notes(&[
+                "`tect generate` writes only the workflows named here. After a tool upgrade, it \
+                 rewrites each named workflow.",
+                "`tect set workflows` edits this block.",
+                "The `conforms` of each image decides whether SCAP content exists to scan.",
+            ]),
         Node::new("sources",
-            "The module collections `tect import module` and `tect copy module` resolve against.")
+            "The module collections that `tect import module` and `tect copy module` resolve \
+             against.").about("Lists the module collections that this repository takes modules from. A collection is a shared set of modules, which `tect` fetches as a pinned archive or reads from a directory on this machine. `tect import module` and `tect copy module` look modules up here.").scaffolds(&[""])
             .once("a second block would split one registry in two")
             .empty(Say::new("`sources` has no collections in it", "empty block",
                 "omit the block entirely; a repository with nothing here references or copies from nothing"))
-            .children(&[COLLECTION], Say::NONE),
+            .children(&[COLLECTION], Say::NONE)
+            .lists(&[
+                ("A module from a collection reaches the repository in one of two ways:", &[
+                    "`tect import module` references the module under the name of its \
+                     collection.",
+                    "`tect copy module` puts the module unqualified at `modules/<name>`, and \
+                     `provenance.kdl` records the collection.",
+                ]),
+            ]),
         Node::new("manifest",
-            "Whether a build stamps the generated manifest onto the image as an OCI label.")
+            "Whether a build stamps the generated manifest onto the image as an OCI label.").about("The build writes a manifest of what went into the image into the image itself. This block decides whether the build also stamps an OCI label that points at that file, so a tool that reads image labels can find it.")
             .once("a second block would split one setting in two")
             .empty(Say::new("`manifest` has no `label` in it", "empty block",
                 "omit the block entirely; a build with nothing here stamps no label"))
             .children(&[
                 Node::new("label",
-                    "Whether the build stamps `org.tectonic.manifest` with the path to the \
-                     baked manifest file.")
+                    "Whether the build stamps `org.tectonic.manifest` with the path of the \
+                     baked manifest file.").example("#true")
                     .arg(Arg::Bool, Say::new("`label` needs #true or #false", "not a boolean",
                         "`label #true` stamps the built image with an `org.tectonic.manifest` \
                          label"))
@@ -155,32 +234,57 @@ pub const REPO: Node = Node::new("repo",
             ], Say::new("unknown node `{}` in manifest", "not part of the schema",
                 "a manifest block holds `label`")),
 
-        Node::new("audit",
-            "How strictly the provenance facts are held. Every one of them is recorded either \
-             way; this decides only which of them is fatal.")
+        Node::new("audit", "How the repository treats a provenance check that fails.").about("Every build records where its parts came from. This block decides whether a failed provenance check is only reported or stops the command, so a repository can move from reporting to enforcing when it is ready.")
             .once("a second block would split one posture in two")
             .empty(Say::new("`audit` has no `enforce` in it", "empty block",
                 "omit the block entirely; a repository with nothing here records every \
                  provenance fact and fails on none of them"))
             .children(&[
-                Node::new("enforce",
-                    "Whether a provenance fact that is missing or does not match stops the run. \
-                     Off, it is reported and the run carries on.")
+                Node::new("enforce", "Whether a failed provenance check stops the command that runs it.").example("#true")
                     .arg(Arg::Bool, Say::new("`enforce` needs #true or #false", "not a boolean",
                         "`enforce #true` makes an unverified import, a module edited since \
                          import, a base that will not resolve and an unstamped build into \
                          errors"))
-                    .once(""),
+                    .once("")
+                    .values(&[
+                        ("`#true`", "A failed check is an error, and the command stops."),
+                        ("`#false`, or no `enforce`", "`tect` reports a failed check, and the \
+                          command continues."),
+                    ])
+                    .lists(&[
+                        ("Each check runs in the command named before it:", &[
+                            "`tect import module` and `tect copy module`: the collection is \
+                             pinned to a tag and its hash.",
+                            "`tect check`: each imported module still matches its import record.",
+                            "`tect build`: the base tag resolves to a manifest digest.",
+                            "`tect build`: the repository is at a commit.",
+                            "`tect scap`: the scan report passes every rule of the profile.",
+                        ]),
+                    ])
+                    .notes(&[
+                        "`tect` also reports a `module.sh` or `finalize.sh` that reaches the \
+                         network with no `asset` that declares the download. This report does \
+                         not depend on `enforce`.",
+                    ]),
             ], Say::new("unknown node `{}` in audit", "not part of the schema",
-                "an audit block holds `enforce`")),
+                "an audit block holds `enforce`"))
+            .lists(&[
+                ("`tect` records these provenance facts whether or not this block exists:", &[
+                    "the hash of each module;",
+                    "the source of each import;",
+                    "the digest of the base tag;",
+                    "the commit of each cloned asset.",
+                ]),
+            ]),
         Node::new("security-policy",
-            "The repository's security ground rules, which hold for every image it defines. \
-             An image declares what it is; this declares what the repository requires of it. \
-             Absent, nothing is required and a build runs as it always has.")
+            "The security rules that the repository sets for every image it defines.").about("Sets the security rules that every image in the repository follows, whatever each image declares. It holds one rule: what each build step can reach on the network.")
             .once("a second block would contradict the first")
             .children(&[NETWORK],
                 Say::new("unknown node `{}` in security-policy", "not part of the schema",
-                    "a security-policy block holds a `network` rule")),
+                    "a security-policy block holds a `network` rule"))
+            .notes(&[
+                "If the `security-policy` block is absent, then every step keeps the network.",
+            ]),
     ], Say::new("unknown node `{}` in repo.kdl", "not part of the schema",
         "repo.kdl holds `schema-version`, `tect-version`, `name`, `default-image`, `pr-image`, \
          `seed`, a \
@@ -203,12 +307,18 @@ fn network(node: &KdlNode) -> Network {
 /// `image.kdl` or `<name>.image.kdl` at the root, holding whatever images it
 /// likes.
 #[rustfmt::skip]
-const IMAGE_FILE: Node = Node::new("image file",
-    "Images, in a file named `image.kdl` or `<name>.image.kdl`. The name in front is decorative: \
-     an image is called what it declares, so one file may hold as many as suit the repository.")
+pub(crate) const IMAGE_FILE: Node = Node::new("image file",
+    "The images that a file named `image.kdl` or `<name>.image.kdl` holds.").about("An image file holds one or more images. Each image says what it is called, which base it builds on and which modules it is made of.").scaffolds(&["image"])
     .children(&[IMAGE], Say::new("unknown top-level node `{}`", "not part of the schema",
         "an image file holds `image` nodes and nothing else; `base`, `flavours` and `modules` are \
-         declared inside one, because they are what the image is"));
+         declared inside one, because they are what the image is"))
+    .notes(&[
+        "A root `.kdl` file is an image file only if it is named `image.kdl` or ends in \
+         `.image.kdl`. `tect` reports each other root `.kdl` file and does not read it.",
+        "The part of the file name in front of `.image.kdl` does not name the image. An image is \
+         called what it declares, so one file can hold as many images as suit the repository. \
+         `plan.json` records the file name only to say where each image is declared.",
+    ]);
 
 /// What repo.kdl declares about which tool reads it.
 struct Pins {
@@ -263,13 +373,13 @@ pub fn compatible(root: &Path) -> Issues {
             .at(span, format!("this tool knows {SCHEMA_VERSION}"))
             .help(match ahead {
                 true => "the repository is ahead of the tool; `tect-version` names the release \
-                         that reads it, and `scripts/tect.sh` fetches that one"
+                         that reads it, and `tect.sh` fetches that one"
                     .to_string(),
                 false => format!(
                     "nothing here moves a repository to schema {SCHEMA_VERSION}, and nothing \
                      else in it is read either, because every diagnostic under a grammar this \
                      release does not have would be noise; run the release `tect-version` names, \
-                     which `scripts/tect.sh` fetches"
+                     which `tect.sh` fetches"
                 ),
             }),
         );
@@ -290,7 +400,7 @@ pub fn pinned_elsewhere(root: &Path) -> Option<String> {
     (version != TECT_VERSION).then_some(version)
 }
 
-/// A release pinned with no declared sha256, which `scripts/tect.sh` then
+/// A release pinned with no declared sha256, which `tect.sh` then
 /// holds to the checksum fetched beside the tarball. `check` reports it;
 /// nothing refuses, since a repository predating the first release that carries
 /// one declares none.
@@ -346,7 +456,6 @@ impl List {
             audit_enforce: false,
             network: Network::default(),
             schema_version: None,
-            schema_version_seen: false,
             repo_src: Source::new(root.join(layout::REPO_FILE).display().to_string(), ""),
             files: Vec::new(),
             capabilities: Vec::new(),
@@ -452,7 +561,6 @@ impl List {
                     });
                 }
                 (true, "schema-version") => {
-                    self.schema_version_seen = true;
                     self.schema_version = int_arg(node).map(|_| SCHEMA_VERSION);
                 }
                 (true, "tect-version") => {
@@ -568,19 +676,6 @@ impl List {
                     }
                 }
             }
-        }
-
-        if !self.schema_version_seen {
-            issues.push(
-                Issue::new(
-                    format!("{} declares no `schema-version`", layout::REPO_FILE),
-                    &self.repo_src,
-                )
-                .help(format!(
-                    "`schema-version {SCHEMA_VERSION}`, so a tool from a different release \
-                     says so plainly. Without it, it reports every node it does not recognise"
-                )),
-            );
         }
 
         if let Some(id) = &self.default_image_id {
@@ -699,38 +794,9 @@ impl List {
                 ),
             }
         }
-        if let Some(publish) = prop(block, "publish") {
-            match publish {
-                "scheduled" => self.publishes_scheduled = true,
-                _ => issues.push(
-                    Issue::new(format!("`{publish}` is not a publish cadence"), src)
-                        .at(
-                            prop_span(block, "publish").unwrap_or_default(),
-                            "not `scheduled`",
-                        )
-                        .help(
-                            "`workflows publish=\"scheduled\"`, to publish only on the daily \
-                             build; omit `publish` to publish on pushes too",
-                        ),
-                ),
-            }
-        }
-        if let Some(scan) = prop(block, "scan") {
-            match scan {
-                "scheduled" => self.scans_scheduled = true,
-                _ => issues.push(
-                    Issue::new(format!("`{scan}` is not a scan cadence"), src)
-                        .at(
-                            prop_span(block, "scan").unwrap_or_default(),
-                            "not `scheduled`",
-                        )
-                        .help(
-                            "`workflows scan=\"scheduled\"`, to scan only on the daily build; \
-                               omit `scan` to scan on pushes too",
-                        ),
-                ),
-            }
-        }
+        // The grammar reports a cadence other than `scheduled`.
+        self.publishes_scheduled = prop(block, "publish") == Some("scheduled");
+        self.scans_scheduled = prop(block, "scan") == Some("scheduled");
         for node in kids(block) {
             let name = node.name().value().to_string();
             let span: Span = node.name().span().into();
@@ -799,6 +865,19 @@ pub fn at_text((hour, minute): (u32, u32)) -> String {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_cadence_other_than_scheduled_is_refused() {
+        let text = "workflows publish=\"weekly\" scan=\"daily\" {\n    build\n}\n";
+        let issues = crate::parse::schema::check_text(text, &REPO, false)
+            .expect("the text is KDL")
+            .plain();
+        assert!(
+            issues.contains("`weekly` is not a publish cadence"),
+            "{issues}"
+        );
+        assert!(issues.contains("`daily` is not a scan cadence"), "{issues}");
+    }
     use super::*;
 
     /// A repo.kdl holding `text` and nothing else, since both readers under

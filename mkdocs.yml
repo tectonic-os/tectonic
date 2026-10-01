@@ -1,0 +1,59 @@
+site_name: tect
+site_description: The build tool for a bootc image repository
+site_url: https://tectonic-os.github.io/tectonic/
+repo_url: https://github.com/tectonic-os/tectonic
+# The pages under docs/ are generated, so an edit link would open a file that the next build overwrites.
+edit_uri: ""
+
+theme:
+  name: shadcn
+  custom_dir: .github/pages/theme
+  show_stargazers: false
+  pygments_style:
+    light: shadcn-light
+    dark: github-dark
+
+extra_css:
+  - tect.css
+
+hooks:
+  - .github/pages/hooks.py
+
+# The theme draws top-level pages above the groups, and the page footer follows this list, so
+# every top-level page comes first.
+nav:
+  - Home: index.md
+  - CLI: cli.md
+  - Schema:
+      - KDL: kdl.md
+      - Repository:
+          - Layout: schema/repository.md
+          - repo.kdl: schema/repo.md
+          - image.kdl: schema/image.md
+      - Modules:
+          - Layout: schema/modules.md
+          - module.kdl: schema/module.md
+          - provenance.kdl: schema/provenance.md
+      - Assets:
+          - bases.kdl: schema/bases.md
+  - Project:
+      - Changelog: changelog.md
+      - Contributing: contributing.md
+
+# A strict build fails on these warnings, so a new generated page must join the nav and every anchor must resolve.
+validation:
+  nav:
+    omitted_files: warn
+  links:
+    anchors: warn
+    unrecognized_links: warn
+
+markdown_extensions:
+  admonition:
+  # A guessed language colours a block by chance, so a fence without a known language stays plain.
+  codehilite:
+    guess_lang: false
+  fenced_code:
+  tables:
+  toc:
+    permalink: true

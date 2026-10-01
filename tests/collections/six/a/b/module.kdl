@@ -1,3 +1,0 @@
-description "A member nested inside another member, which no walk reaches"
-
-supports "fedora"

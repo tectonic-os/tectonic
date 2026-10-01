@@ -26,81 +26,86 @@ impl Disk {
         self.overlays.keys()
     }
 
+    /// Whether the directory under `modules/` is a module.
+    pub fn is_module(&self, dir: &str) -> bool {
+        self.overlays.contains_key(dir)
+    }
+
+    /// A module may ship only a file that another module collects, and the
+    /// collected names come from the manifests. If any module collects a file,
+    /// then a second walk counts that file as the mark of a module.
     pub fn scan(root: &Path) -> Self {
+        let first = Self::walk(root, &[]);
+        if first.collectors.is_empty() {
+            return first;
+        }
+        let collected: Vec<String> = first.collectors.keys().cloned().collect();
+        Self::walk(root, &collected)
+    }
+
+    fn walk(root: &Path, collected: &[String]) -> Self {
         let mut out = Disk::default();
 
         let modules = layout::modules(root);
-        let mut dirs = vec![modules.clone()];
-        while let Some(dir) = dirs.pop() {
-            let Ok(entries) = std::fs::read_dir(&dir) else {
+        let found = layout::module_dirs(
+            &modules,
+            |path| {
+                layout::is_module(path) || collected.iter().any(|file| path.join(file).is_file())
+            },
+            |name| name == "_template",
+        );
+        for path in found {
+            let manifest = path.join(layout::MODULE_FILE);
+            let name = path
+                .strip_prefix(&modules)
+                .unwrap_or(&path)
+                .display()
+                .to_string();
+            // A family overlay puts paths in the image too, so an override
+            // one module gates and another does not is still two modules
+            // writing one path.
+            let mut paths = overlay_paths(&path.join(layout::OVERLAY));
+            for (gated, _) in layout::FAMILY_DIRS {
+                paths.extend(overlay_paths(&path.join(gated).join(layout::OVERLAY)));
+            }
+            out.overlays.insert(name.clone(), paths);
+
+            let Ok(text) = std::fs::read_to_string(&manifest) else {
                 continue;
             };
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if !path.is_dir() || path.file_name().is_some_and(|n| n == "_template") {
-                    continue;
-                }
-                let manifest = path.join(layout::MODULE_FILE);
-                if !manifest.is_file() {
-                    dirs.push(path);
-                    continue;
-                }
-                let name = path
-                    .strip_prefix(&modules)
-                    .unwrap_or(&path)
-                    .display()
-                    .to_string();
-                // A family overlay puts paths in the image too, so an override
-                // one module gates and another does not is still two modules
-                // writing one path.
-                let mut paths = overlay_paths(&path.join(layout::OVERLAY));
-                for (gated, _) in layout::FAMILY_DIRS {
-                    paths.extend(overlay_paths(&path.join(gated).join(layout::OVERLAY)));
-                }
-                out.overlays.insert(name.clone(), paths);
-
-                let Ok(text) = std::fs::read_to_string(&manifest) else {
-                    continue;
+            let Ok(doc) = text.parse::<KdlDocument>() else {
+                continue;
+            };
+            for node in doc.nodes() {
+                let args = || {
+                    node.entries()
+                        .iter()
+                        .filter(|e| e.name().is_none())
+                        .filter_map(|e| e.value().as_string())
                 };
-                let Ok(doc) = text.parse::<KdlDocument>() else {
-                    continue;
-                };
-                for node in doc.nodes() {
-                    let args = || {
-                        node.entries()
-                            .iter()
-                            .filter(|e| e.name().is_none())
-                            .filter_map(|e| e.value().as_string())
-                    };
-                    match node.name().value() {
-                        "collects" => {
-                            if let Some(file) = args().next() {
-                                out.collectors.insert(file.to_string(), name.clone());
-                            }
+                match node.name().value() {
+                    "collects" => {
+                        if let Some(file) = args().next() {
+                            out.collectors.insert(file.to_string(), name.clone());
                         }
-                        // A malformed one is reported where the manifest is
-                        // checked, not here.
-                        "key" => {
-                            let src = Source::new(manifest.display().to_string(), text.clone());
-                            let Some(key) =
-                                crate::parse::module::parse_key(node, &src, &mut Issues::default())
-                            else {
-                                continue;
-                            };
-                            out.keys
-                                .entry(key.kind.clone())
-                                .or_default()
-                                .push((name.clone(), key));
-                        }
-                        _ => {}
                     }
+                    // A malformed one is reported where the manifest is
+                    // checked, not here.
+                    "key" => {
+                        let src = Source::new(manifest.display().to_string(), text.clone());
+                        let Some(key) =
+                            crate::parse::module::parse_key(node, &src, &mut Issues::default())
+                        else {
+                            continue;
+                        };
+                        out.keys
+                            .entry(key.kind.clone())
+                            .or_default()
+                            .push((name.clone(), key));
+                    }
+                    _ => {}
                 }
             }
-        }
-
-        // read_dir order is the filesystem's, and a help line lists these.
-        for declaring in out.keys.values_mut() {
-            declaring.sort_by(|a, b| a.0.cmp(&b.0));
         }
         out
     }

@@ -213,8 +213,9 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
         let Some(base_family) = base_family else {
             break;
         };
-        if !module.supports.iter().any(|f| f == base_family) {
-            let supported = module.supports.join(", ");
+        // A module with no module.kdl declares no families, so the user owns
+        // how it builds on the image's base.
+        if !module.supports.is_empty() && !module.supports.iter().any(|f| f == base_family) {
             issues.push(
                 Issue::new(
                     format!(
@@ -223,11 +224,10 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
                     ),
                     &module.src,
                 )
-                .help(if supported.is_empty() {
-                    "add `supports \"fedora\"` to the manifest".to_string()
-                } else {
-                    format!("it declares support for: {supported}")
-                }),
+                .help(format!(
+                    "it declares support for: {}",
+                    module.supports.join(", ")
+                )),
             );
         }
     }

@@ -42,13 +42,14 @@ impl Provider {
 
     /// What a picker shows beside the name.
     pub fn about(&self) -> String {
-        match self.declares.requires.is_empty() {
-            true => self.declares.description.clone(),
-            false => format!(
-                "{} (requires {})",
-                self.declares.description,
-                self.declares.requires.join(", ")
-            ),
+        let requires = format!("(requires {})", self.declares.requires.join(", "));
+        match (
+            self.declares.description.is_empty(),
+            self.declares.requires.is_empty(),
+        ) {
+            (_, true) => self.declares.description.clone(),
+            (true, false) => requires,
+            (false, false) => format!("{} {requires}", self.declares.description),
         }
     }
 }
@@ -64,9 +65,6 @@ pub struct Index {
     unread: Vec<String>,
     /// Whether the repository declares any collections at all.
     sourced: bool,
-    /// A member nested inside another member, which the walk stops short of and
-    /// nothing else would ever mention.
-    hidden: Vec<String>,
     /// Why a fetching scan fell back to what was already here. `None` where it
     /// did not fetch, or where the fetch worked.
     unreached: Option<String>,
@@ -92,7 +90,7 @@ impl Index {
         let fetched = crate::import::catalog(root, sources, fetch);
         let unreached = fetched.as_ref().err().cloned();
         let reached = fetched.is_ok();
-        let (found, hidden) = fetched
+        let found = fetched
             .or_else(|_| crate::import::catalog(root, sources, false))
             .unwrap_or_default();
         for module in found {
@@ -102,7 +100,6 @@ impl Index {
         }
         Self {
             held: out,
-            hidden,
             unreached,
             // The collections `catalog` just skipped: `cached` is the same
             // question it asked, and on `fetch` there is nothing to skip.
@@ -136,13 +133,6 @@ impl Index {
     /// empty `unread` is told from having nowhere else to look.
     pub fn sourced(&self) -> bool {
         self.sourced
-    }
-
-    /// The members no walk of a declared collection can reach. Nothing else
-    /// names them: they are absent from the catalog, from `find` and from the
-    /// picker alike, and absence is exactly what a silent one looks like.
-    pub fn hidden(&self) -> &[String] {
-        &self.hidden
     }
 
     /// The same thing as a sentence, so every diagnostic concluding from

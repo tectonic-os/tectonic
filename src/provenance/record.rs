@@ -21,26 +21,43 @@ pub const RECORD: &str = "provenance.kdl";
 /// The record's grammar, and the whole of the file.
 #[rustfmt::skip]
 pub const IMPORTED: Node = Node::new("imported",
-    "Where this module was copied from, and what its content hashed to then. Written by \
-     `tect copy module`; the module's author does not maintain it.")
+    "Where this module was copied from, and what its content hashed to then.").example("\"tectonic-os\"")
     .arg(Arg::Str, Say::new("`imported` needs a collection name", "no collection given",
         "`imported \"tectonic-os\"`, the name the collection is declared under in `sources`"))
     .once("")
     .missing(Say::new("`{}` declares no `imported`", "nothing recorded",
         "the file records one import; delete it if the module was not imported"))
     .children(&[
-        Node::new("content",
-            "What the module directory hashed to when it was imported, every file in it except \
-             this one.")
+        Node::new("content", "The hash that the module directory had at import, which excludes `provenance.kdl`.").example("\"b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3\"")
             .arg(Arg::Str, NEEDS_VALUE).once("")
             .missing(Say::new("`{}` records no `content` hash", "nothing to compare against",
                 "the sha256 of the imported directory, which is what makes a later edit visible")),
         PIN,
     ], Say::new("unknown node `{}` in an import record", "not part of the schema",
-        "an import record holds `content` and the `pin` the collection was fetched at"));
+        "an import record holds `content` and the `pin` the collection was fetched at"))
+    .notes(&[
+        "`tect copy module` writes this record to `provenance.kdl` beside the module's \
+         `module.kdl`. The module's author does not maintain it.",
+        "The record stays out of `module.kdl`. A rewrite of the author's file would fork it from \
+         upstream and break the hash comparison.",
+        "`plan.json` carries the same hash for each module, so `tect verify` fails on a module \
+         edited without a new `tect generate`.",
+        "If a module's content no longer matches its record, then `tect check` names the module. \
+         The mismatch is an error only under `audit { enforce #true }`, because a fork of an \
+         imported module is otherwise allowed.",
+    ]);
 
 /// The file, whose one top-level node is the record.
-const RECORD_FILE: Node = Node::new("", "").children(&[IMPORTED], Say::NONE);
+pub(crate) const RECORD_FILE: Node = Node::new(
+    "provenance file",
+    "The import record that `tect copy module` writes beside a copied module.",
+)
+.about(
+    "When `tect copy module` copies a module into this repository, it writes this record beside \
+     the module. The record keeps where the module came from and what its content hashed to, so \
+     `tect check` can show whether the copy has changed since.",
+)
+.children(&[IMPORTED], Say::NONE);
 
 /// One module's import record.
 pub struct Record {
@@ -149,7 +166,12 @@ pub fn hash(dir: &Path) -> Option<String> {
 /// the fork is visible.
 pub fn modified(root: &Path) -> Vec<String> {
     let mut out = Vec::new();
-    for dir in dirs(&layout::modules(root)) {
+    let found = layout::module_dirs(
+        &layout::modules(root),
+        |path| path.join(layout::MODULE_FILE).is_file(),
+        |name| name == crate::model::remote::REMOTE_DIR,
+    );
+    for dir in found {
         let Ok(raw) = std::fs::read_to_string(dir.join(RECORD)) else {
             continue;
         };
@@ -168,27 +190,6 @@ pub fn modified(root: &Path) -> Vec<String> {
         }
     }
     out.sort();
-    out
-}
-
-/// Every module directory under `modules/`, at whatever depth an owner puts it.
-fn dirs(from: &Path) -> Vec<std::path::PathBuf> {
-    let Ok(entries) = std::fs::read_dir(from) else {
-        return Vec::new();
-    };
-    let mut out = Vec::new();
-    for path in entries.flatten().map(|e| e.path()).filter(|p| p.is_dir()) {
-        if path
-            .file_name()
-            .is_some_and(|name| name == crate::model::remote::REMOTE_DIR)
-        {
-            continue;
-        }
-        match path.join(layout::MODULE_FILE).is_file() {
-            true => out.push(path),
-            false => out.extend(dirs(&path)),
-        }
-    }
     out
 }
 

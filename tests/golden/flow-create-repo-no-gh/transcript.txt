@@ -58,6 +58,13 @@ No
 
 what time the daily build runs, UTC [12:30]: 12:30
 
+  1) [x] Containerfile.skeleton  the Containerfile around the generated module layers
+  2) [ ] lint.sh  the repository's lint, as CI runs it
+  3) [ ] tect.sh  fetches and runs the tect release that repo.kdl pins
+  4) [ ] smoke.sh  boots a built image under qemu and waits for ssh
+  5) [ ] vm.sh  builds a disk image and boots it
+Which files to keep in scripts/? [1-5, several, 0 for none]: 1
+
 initialised a git repository in example
 
 example/

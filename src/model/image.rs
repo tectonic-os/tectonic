@@ -269,9 +269,6 @@ pub struct List {
     pub capabilities: Vec<crate::base::Capability>,
     /// What repo.kdl declares, which is `SCHEMA_VERSION` or the load failed.
     pub schema_version: Option<u32>,
-    /// Whether the node was there at all, so a malformed one is reported once.
-    /// Without it, the same node is both wrong and missing.
-    pub(crate) schema_version_seen: bool,
     /// repo.kdl, for a diagnostic about either of the two above.
     pub repo_src: Source,
     /// Every file read, in order, for the count line a failure ends with.
