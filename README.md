@@ -40,12 +40,14 @@ dotfiles and the Containerfile skeleton it scaffolds. `tect generate`, the step
 it prints next, writes the build scripts, the shell helpers and the workflows,
 which the tool ships and a repository does not carry.
 
-See [the schema](docs/schema.md), which indexes
+The schema reference starts at
+[the repository layout](docs/schema/repository.md), and covers
 [the repository file](docs/schema/repo.md),
 [image files](docs/schema/image.md),
+[the module layout](docs/schema/modules.md),
 [module manifests](docs/schema/module.md),
-[the base catalog](docs/schema/bases.md) and
-[pins](docs/schema/pins.md). Its reference tables are
+[the import record](docs/schema/provenance.md) and
+[the base catalog](docs/schema/bases.md). Its reference tables are
 generated from the tables the parser reads, so they cannot drift from what the
 tool accepts.
 
@@ -57,17 +59,17 @@ command a person runs and groups them by where they run. A verb with no noun,
 such as `tect create` or `tect vm`, opens a picker of its nouns. Leaving a
 picker is not an error: it exits 0 having done nothing.
 
-[The commands](docs/commands.md) documents every command with its flags. It is
+[The CLI reference](docs/cli.md) documents every command with its flags. It is
 generated from the definition the parser reads, and `tect <command> --help`
 prints the same prose. The reference lists the global flags once, under `tect`.
 
-The help a person reads names the commands that run anywhere or in a
-repository. The build's own commands are the `Script` family — `plan`,
-`verify`, `summary`, `sbom`, `fetch modules`, `scap` and its nouns, `registry`
-and its nouns, and `recipe` — which is the contract the build runs against.
-The `Layer` family — `os-release`, `build-record`, `fetch` and
-`validate-image` — reads the image around them, and runs only where the binary
-is mounted into a build layer.
+The help the user reads names the commands that run anywhere or in a
+repository. The build runs its own commands, the `Script` family, which is the
+contract the build runs against. That family holds `plan`, `verify`, `summary`,
+`sbom`, `fetch modules`, `scap` and its nouns, `registry` and its nouns, and
+`recipe`. The `Layer` family holds `os-release`, `build-record`, `fetch` and
+`validate-image`. Those commands read the image around them, and run only where
+the binary is mounted into a build layer.
 
 The repository is the nearest directory at or above the working directory
 holding a `repo.kdl`, or `--root <dir>`. Data goes to stdout and diagnostics to
@@ -140,8 +142,7 @@ run one, and aim it at a repository elsewhere with `--root`.
 
 The tests are goldens: every command, over this repository's fixtures, is
 compared byte for byte against a committed file, and so are
-`docs/commands.md` and the generated half of `docs/schema.md` and
-`docs/schema/`.
+`docs/cli.md` and `docs/schema/`.
 `UPDATE_GOLDEN=1 cargo test` regenerates them, and the diff is the review.
 
 ## Releases

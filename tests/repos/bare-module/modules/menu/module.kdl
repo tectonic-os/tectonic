@@ -1,0 +1,3 @@
+supports "fedora"
+
+collects "justfile.inc" into="/usr/share/menu/justfile.apps" priority=500

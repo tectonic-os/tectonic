@@ -67,14 +67,14 @@ const PRIORITY: Say = Say::new(
 
 #[rustfmt::skip]
 const KEY: Node = Node::new("key",
-    "A key `tect create key` generates for this module, and where each half of it goes.")
+    "A key that `tect create key` generates for this module.").about("A module that needs a key declares it here, such as a Secure Boot signing key. `tect create key` generates the key from this declaration. The build installs the public half into the image at the path that `public` names. The private half stays in `keys/private/`, outside the image and outside git.").example("\"secureboot\"")
     .arg(Arg::Str, Say::new("`key` needs a kind", "no kind given",
         "`key \"cosign\" { ... }`, the kind being what `tect create key` names"))
     .unique(Say::new("key `{}` is declared twice", "already declared above", ""))
     .props(&[], Say::new("unknown key property `{}`", "not part of the schema",
         "a key carries its kind, and everything else as child nodes"))
     .children(&[
-        Node::new("generator", "Which of the generators the tool implements writes this key.")
+        Node::new("generator", "The generator that writes this key.").about("`tect create key` offers every key that a module declares. `generator` names the tool that writes this key, and its properties set the key up for what the module uses it for.").example("\"openssl\" profile=\"module-signing\"")
             .arg(Arg::One(&GENERATORS), Say::new("`{}` is not a generator the tool has",
                 "not a generator",
                 "the generators are `cosign`, `openssl` and `ssh-keygen`; a manifest picks one \
@@ -83,29 +83,29 @@ const KEY: Node = Node::new("key",
             .missing(NEEDED)
             .props(&[
                 Prop { name: "profile", kind: Kind::One(&["module-signing", "pcr-signing", "tls-ca"]),
-                    desc: "What the generator is set up for, where it can do more than one thing.",
+                    desc: "The purpose that the generator serves, if the generator has more than one purpose.",
                     say: Say::new("`profile` must be \"module-signing\", \"pcr-signing\" or \"tls-ca\"", "not a profile", ""),
                     missing: Say::NONE },
                 Prop { name: "bits", kind: Kind::Int(2048, 16384),
-                    desc: "The RSA key size, 4096 where none is named.",
+                    desc: "The RSA key size, which is 4096 by default.",
                     say: Say::new("`bits` is a number from 2048 to 16384", "not a key size", ""),
                     missing: Say::NONE },
             ], Say::new("unknown `generator` property `{}`", "not part of the schema",
                 "`generator` accepts `profile` and `bits`")),
         Node::new("public",
-            "Where the public half is shipped, which witnesses the `<kind>-key` capability this \
-             module provides.")
+            "Where the public half ships, which witnesses the `<kind>-key` capability of this \
+             module.").about("Where the build installs the public half in the image. The file also witnesses the `<kind>-key` capability, so another module can `requires` the key.").example("\"/usr/share/secureboot/sb_cert.der\" format=\"der\"")
             .arg(Arg::Str, Say::new("`public` needs an absolute path", "no path given", ""))
             .once("")
             .missing(NEEDED)
             .props(&[
                 Prop { name: "format", kind: Kind::One(&["pem", "der"]),
-                    desc: "What the public half is written as, PEM where none is named.",
+                    desc: "The format of the public half, which is PEM by default.",
                     say: Say::new("`format` must be \"pem\" or \"der\"", "not a format", ""),
                     missing: Say::NONE },
             ], Say::new("unknown `public` property `{}`", "not part of the schema",
                 "`public` accepts `format`")),
-        Node::new("private", "What the private half is called under `keys/private/`.")
+        Node::new("private", "The filename that the private half takes under `keys/private/`.").about("The file name of the private half under `keys/private/`, which git ignores. The build never copies the private half into the image.").example("\"MOK.priv\"")
             .arg(Arg::Str, Say::new("`private` needs a filename", "no filename given", ""))
             .once("")
             .missing(NEEDED),
@@ -121,25 +121,23 @@ const GATED: &[Node] = &[PACKAGES, PACKAGE_GROUPS, COPR, REQUIRES, AFTER, SATISF
 
 #[rustfmt::skip]
 const REQUIRES: Node = Node::new("requires",
-    "A capability another module has to provide, which also orders the build.")
+    "A capability that another module must provide, which also orders the build.").about("Names a capability that the image must have for this module to work. `tect` builds this module after the module that provides it, and `tect check` fails if no module in the image provides it.").example("\"kernel-devel\"")
     .arg(Arg::Strs, Say::new("`{}` needs a capability name", "nothing named", ""));
 
 #[rustfmt::skip]
 const AFTER: Node = Node::new("after",
-    "A module this one builds after without requiring anything of it.")
+    "A capability that this module builds after, which the module does not require.").example("\"vfio\"")
     .arg(Arg::Strs, Say::new("`{}` needs a capability name", "nothing named", ""));
 
 #[rustfmt::skip]
-const PACKAGES: Node = Node::new("packages",
-    "The packages this module installs, on every family it supports or, inside a `family` block, \
-     on the families that names.")
+const PACKAGES: Node = Node::new("packages", "The packages that this module installs.").about("Lists the distribution packages that this module installs with the package manager of the base family.").example("\"htop\" \"tmux\"")
     .arg(Arg::Strs, Say::new("`packages` needs at least one name", "nothing to install",
         "`packages \"htop\" \"tmux\"`, or `family \"fedora\" { packages \"vim-enhanced\" }` where \
          the names differ by family"))
     .props(&[
         Prop { name: "enablerepo", kind: Kind::Str,
-            desc: "A repository enabled for this install and disabled otherwise. dnf only, so the \
-                   batch has to resolve to `fedora` or `rhel` alone.",
+            desc: "A repository that is enabled for this install only. It works with dnf only, \
+                so the batch must resolve to `fedora` or `rhel` alone.",
             say: Say::NONE,
             missing: Say::NONE },
     ], Say::new("unknown `packages` property `{}`", "not part of the schema",
@@ -147,13 +145,13 @@ const PACKAGES: Node = Node::new("packages",
 
 #[rustfmt::skip]
 const PACKAGE_GROUPS: Node = Node::new("package-groups",
-    "The package groups this module installs. dnf only, so an ungated one is a module \
-     supporting `fedora` or `rhel` alone.")
+    "The package groups that this module installs. Package groups work with dnf only, so an \
+     ungated `package-groups` needs a module that supports only `fedora` or `rhel`.").example("\"kde-desktop\"")
     .arg(Arg::Strs, Say::new("`package-groups` needs at least one name", "nothing to install",
         "`package-groups \"kde-desktop\"`"))
     .props(&[
         Prop { name: "enablerepo", kind: Kind::Str,
-            desc: "A repository enabled for this install and disabled otherwise.",
+            desc: "A repository that is enabled for this install only.",
             say: Say::NONE,
             missing: Say::NONE },
     ], Say::new("unknown `package-groups` property `{}`", "not part of the schema",
@@ -161,7 +159,8 @@ const PACKAGE_GROUPS: Node = Node::new("package-groups",
 
 #[rustfmt::skip]
 const COPR: Node = Node::new("copr",
-    "A COPR repository this module enables for its own installs, as owner/project. Fedora only.")
+    "The `owner/project` name of a COPR repository that this module enables for its own installs. \
+     `copr` works on Fedora only.").example("\"owner/project\"")
     .arg(Arg::Str, Say::new("`copr` needs one owner/project string", "nothing named",
         "`copr \"owner/project\"`"))
     .unique(Say::new("copr `{}` is declared twice", "already declared above", ""))
@@ -170,16 +169,31 @@ const COPR: Node = Node::new("copr",
 
 #[rustfmt::skip]
 const SATISFIES: Node = Node::new("satisfies",
-    "The benchmarks and rules this module claims to harden, as an audit declaration. The tool \
-     records it and certifies nothing.")
+    "An audit declaration of the benchmarks and rules that this module claims to harden. `tect` \
+     records the claim and certifies nothing, and the scan checks it after the build.").about("Claims that this module meets rules of a hardening benchmark, such as STIG. The compliance scan checks each claim against the built image, so a false claim shows.")
     .once("a module makes one claim set per gate; two blocks in one place split it")
-    .children(BENCHMARKS, Say::NONE);
+    .children(BENCHMARKS, Say::NONE)
+    .lists(&[
+        ("`tect generate` writes every claim into `generated/plan.json`. The compliance job in \
+          `.github/workflows/build.yml` then:", &[
+            "resolves each number to an XCCDF rule ID through the SSG datastream;",
+            "scans the pushed image and compares each claim with the scan result;",
+            "reports a number that maps to no rule as a failed declaration;",
+            "reports a rule that the image fails as a false claim;",
+            "reports a failed rule as a composition failure, if the overlay of another module \
+             owns the final copy of a file that this module ships. `plan.json` carries \
+             `overlay_overridden` for that case;",
+            "skips a target whose modules declare nothing, and says so;",
+            "reads `.modules[]` only and never `.suppressed[]`, because a suppressed module adds \
+             no layer.",
+        ]),
+    ]);
 
 /// The rows inside a `satisfies` block, which read the same wherever the block
 /// is declared: a module gates one, an image's base declares one flat.
 #[rustfmt::skip]
 pub(crate) const BENCHMARKS: &[Node] = &[
-    Node::new("", "One benchmark, and the rule IDs it covers.")
+    Node::new("", "One benchmark, which the node name names, with the rule numbers that it covers. The set of benchmarks is open.").example("stig \"RHEL-09-232010\"")
         .arg(Arg::Strs, Say::new("`{}` has no rules listed", "nothing to cover", ""))
         .unique(Say::new("benchmark `{}` is declared twice", "already declared above", "")),
 ];
@@ -190,8 +204,7 @@ pub(crate) const BENCHMARKS: &[Node] = &[
 /// never by a node here.
 #[rustfmt::skip]
 const FAMILY: Node = Node::new("family",
-    "The declarations inside taken only on the base families named, everything outside a gate \
-     being taken on every family the module supports.")
+    "The declarations that the build takes only on the named base families.").about("Holds the declarations that differ by base family, such as package names that differ between Fedora and Debian. One `module.kdl` can then support several families.").example("\"debian\" \"ubuntu\"")
     .arg(Arg::Strs, Say::new("`family` needs at least one family name", "nothing named",
         "`family \"debian\" \"ubuntu\" { packages \"vim\" }`; one gate takes as many families as \
          share the declaration"))
@@ -201,27 +214,46 @@ const FAMILY: Node = Node::new("family",
     .children(GATED, Say::new("`{}` is not gated by family", "not allowed in a `family` block",
         "a `family` block holds `packages`, `package-groups`, `copr`, `requires`, `after` and \
          `satisfies`; `module.sh`, `finalize.sh` and `files/` are gated by putting them in a \
-         `<family>/` directory, and everything else a manifest declares is family-neutral"));
+         `<family>/` directory, and everything else a manifest declares is family-neutral"))
+    .notes(&[
+        "A declaration outside a gate applies to every family the module supports. A \
+         declaration inside a gate applies to the families that the gate names.",
+        "One gate takes several family names, so the user writes a list that two families share \
+         once.",
+        "`provides` stays outside a gate. A capability that one family offers and another does \
+         not belongs in a second module.",
+        "`tect` reads every gate whether or not the image builds for it, so the manifest gets \
+         the same checks on each family it claims.",
+        "The build drops each gated declaration for a family that it does not build. A \
+         Fedora-only `after` does not dangle on a Debian image, and a Debian scan does not map \
+         a Fedora rule number.",
+        "If a gate names a family that the module does not `supports`, then `tect` refuses the \
+         gate.",
+    ]);
 
 /// The manifest's grammar, and the whole of it.
 #[rustfmt::skip]
 pub const MODULE: Node = Node::new("module",
-    "One module: what it builds on, what it needs from the rest, and what it installs.")
+    "One module, which declares what it builds on, what it needs and what it installs.").about("A module is one reusable part of an image, such as a desktop, a kernel or a set of tools. `module.kdl` declares what the module needs and provides, what it installs and which families it supports, and the files beside it do the work.").scaffolds(&["description", "supports", "packages"])
     .children(&[
-        Node::new("description", "One line naming the module in the resolved build summary.")
+        Node::new("description", "One line that names the module in the resolved build summary.").example("\"Traditional CLI utilities\"")
             .arg(Arg::Str, Say::new("`description` needs a string", "no description given", ""))
             .once(""),
-        Node::new("supports", "The base families this module builds on, matched against the \
-             image's `family`.")
-            .arg(Arg::Strs, Say::NONE),
+        Node::new("supports",
+            "The base families that this module builds on, which the image's `family` must match.").about("Lists the base families that the module works on. `tect check` refuses the module on an image whose base family is not in the list, so a portability gap shows before the build.").example("\"fedora\" \"debian\"")
+            .arg(Arg::Strs, Say::new("`{}` needs at least one family", "nothing named",
+                "`supports \"fedora\"`, one name for each base family the module builds on"))
+            .missing(Say::new("this module declares no `{}`", "no families",
+                "a module has to say which base families it can build on, so a portability gap \
+                 surfaces at lint, while the build is still cheap")),
 
-        Node::new("provides", "A capability this module satisfies for the modules that require it.")
+        Node::new("provides", "A capability that this module provides for the modules that require it.").about("Names a capability that this module adds to the image, such as `flatpak`. Another module `requires` it by name, and the build checks the finished image for the file that witnesses it.").example("\"flatpak\"")
             .arg(Arg::Strs, Say::new("`{}` needs a capability name", "nothing named", ""))
             .props(&[
                 Prop { name: "file", kind: Kind::Str,
-                    desc: "The absolute path that witnesses the one name given, where it is \
-                           neither `/usr/bin/<name>` nor `/usr/sbin/<name>`; the finished image \
-                           is checked for it.",
+                    desc: "The absolute path that witnesses the one capability that the node names. \
+                        It is needed only if the witness is neither `/usr/bin/<name>` nor \
+                        `/usr/sbin/<name>`.",
                     say: Say::new("`file` must be a string", "not a path", ""),
                     missing: Say::NONE },
                 Prop { name: "build-only", kind: Kind::Bool,
@@ -229,16 +261,22 @@ pub const MODULE: Node = Node::new("module",
                     say: Say::new("`build-only` takes #true or #false", "not a boolean", ""),
                     missing: Say::NONE },
             ], Say::new("unknown `provides` property `{}`", "not part of the schema",
-                "`provides` accepts `file` and `build-only`")),
+                "`provides` accepts `file` and `build-only`"))
+            .notes(&[
+                "The build checks the finished image for the witness file.",
+                "A capability name is lower-case letters, digits and dashes, and starts with a \
+                 letter. The generated graph writes the name unquoted into a mermaid label and a \
+                 markdown table cell.",
+            ]),
         REQUIRES,
         AFTER,
 
-        Node::new("overrides", "An absolute path this module replaces deliberately.")
+        Node::new("overrides", "An absolute path that this module replaces on purpose.").about("Declares that this module replaces a file that an earlier module also ships. Without it, `tect check` reports the two overlays as a collision. `tect check` also reports an override that no earlier module collides with, so an override cannot outlive its reason.").example("\"/etc/containers/policy.json\"")
             .arg(Arg::Strs, Say::NONE)
             .props(&[], Say::new("`{}` is not an `overrides` property", "not part of the schema",
                 "")),
-        Node::new("mode", "An octal file mode applied to one path in this module's overlay.")
-            .arg(Arg::StrPair("path, then octal mode"),
+        Node::new("mode", "The octal file mode that one path in the overlay of this module takes.").about("Sets the file mode of one file that the `files/` overlay of the module installs, such as `0600` for a file that only root reads.").example("\"/etc/audit/rules.d/audit.rules\" \"0600\"")
+            .arg(Arg::StrPair("path", "octal mode"),
                 Say::new("`mode` needs one path and one octal file mode", "incomplete",
                     "`mode \"/etc/example.conf\" \"0644\"`"))
             .unique(Say::new("mode for `{}` is declared twice", "already declared above", ""))
@@ -247,15 +285,15 @@ pub const MODULE: Node = Node::new("module",
 
         KEY,
 
-        Node::new("secret", "A build secret this module's layer mounts.")
+        Node::new("secret", "A build secret that the layer of this module mounts.").about("Names a build secret that the layer of this module reads, such as a signing key. The layer mounts it at `/run/secrets/<name>`, so the secret is there while the module builds and never lands in the image.").example("\"mok_privkey\"")
             .arg(Arg::Strs, Say::new("`{}` needs a name", "nothing named", "")),
-        Node::new("arg", "A build argument this module's layer reads.")
+        Node::new("arg", "A build argument that the layer of this module reads.").about("Names a build argument that the layer of this module reads as an environment variable, such as the kernel version to install.").example("\"KERNEL\"")
             .arg(Arg::Strs, Say::new("`{}` needs a name", "nothing named", "")),
-        Node::new("helpers", "Files from this module mounted by basename into /ctx/lib in every module layer.")
+        Node::new("helpers", "Files from this module that every module layer mounts by basename into `/ctx/lib`.").about("Shares shell helpers from this module with every other module. The build mounts each listed file by its basename into `/ctx/lib` in every module layer, so another module can source it.").example("\"lib/family.sh\"")
             .arg(Arg::Strs, Say::new("`helpers` needs a path", "nothing named", "")),
 
         Node::new("allow-verify",
-            "One `tect validate-image` diagnostic accepted on one unit, leaving the rest of the image checked.")
+            "One `tect validate-image` diagnostic that the check accepts on one unit, while the check still covers every other diagnostic and unit of the image.").about("`tect validate-image` checks the systemd units of the finished image. If one unit of this module raises an expected diagnostic, then this accepts that one diagnostic on that one unit. The check still covers every other diagnostic and unit.").example("\"man-page-missing\" unit=\"plasmalogin.service\"")
             .arg(Arg::Str, Say::NONE)
             .props(&[
                 Prop { name: "unit", kind: Kind::Str,
@@ -266,71 +304,96 @@ pub const MODULE: Node = Node::new("module",
                 "`allow-verify` accepts `unit`")),
 
         Node::new("refuses",
-            "One benchmark rule this module deliberately leaves unsatisfied, which no remediation may set on its behalf.")
+            "One benchmark rule that this module leaves unsatisfied on purpose.").about("A hardening rule can break what a module does. This records that the module leaves one rule unsatisfied on purpose, and `because=` says why. Remediation then does not set the rule, and the choice is visible to every image.").example("\"grub2_nousb_argument\" because=\"it removes the keyboard\"")
             .arg(Arg::Str, Say::new("`refuses` needs a rule ID", "nothing named",
                 "`refuses \"grub2_nousb_argument\" because=\"it removes the keyboard\"`"))
             .unique(Say::new("`{}` is refused twice", "already refused above", ""))
             .props(&[
                 Prop { name: "because", kind: Kind::Str,
-                    desc: "Why the rule is left unsatisfied, which is the whole point of declaring it.",
+                    desc: "Why the module leaves the rule unsatisfied.",
                     say: Say::new("`because` must be a string", "not a string", ""),
                     missing: Say::NONE },
             ], Say::new("unknown `refuses` property `{}`", "not part of the schema",
-                "`refuses` accepts `because`")),
+                "`refuses` accepts `because`"))
+            .notes(&[
+                "Remediation does not set a refused rule. If an image declares \
+                 `allow-remediation` for the rule, then remediation can set it.",
+            ]),
 
-        Node::new("collects", "A filename this module gathers from every module that ships one.")
+        Node::new("collects", "A filename that this module gathers from every module that ships one. A collector claims one filename across the image.").about("Builds one file from parts that many modules ship, such as a list of Flatpak apps. This module claims the file name, every module that ships a file of that name contributes a part, and the finalize phase assembles the parts at `into=`.").example("\"flatpaks.list\" into=\"/usr/share/flatpak-defaults/apps.list\" priority=500")
             .arg(Arg::Str, Say::NONE)
             .props(&[
                 Prop { name: "into", kind: Kind::Str,
-                    desc: "The absolute path the assembled file is written to.",
+                    desc: "The absolute path that receives the assembled file.",
                     say: Say::NONE,
                     missing: Say::NONE },
                 Prop { name: "priority", kind: Kind::Int(0, 9999),
-                    desc: "Where a contribution lands when it declares none.",
+                    desc: "The position of a contribution that declares no priority.",
                     say: PRIORITY,
                     missing: Say::NONE },
             ], Say::new("unknown `collects` property `{}`", "not part of the schema",
-                "`collects` accepts `into` and `priority`")),
-        Node::new("contributes", "A file this module ships for another module to collect.")
+                "`collects` accepts `into` and `priority`"))
+            .notes(&[
+                "The build stages each contribution as `<into>.d/NNNN-<module>.part`. The \
+                 finalize phase assembles the parts in that order, so the build order of the \
+                 contributors does not change the assembled file.",
+                "A module ships at most one copy of a collected file. The most specific copy \
+                 wins. The order is `debian/`, then `deb/`, then the module root.",
+            ]),
+        Node::new("contributes", "A file that this module ships for another module to collect.").example("\"flatpaks.list\"")
             .arg(Arg::Str, Say::NONE)
             .props(&[
                 Prop { name: "priority", kind: Kind::Int(0, 9999),
-                    desc: "Where this file lands in the assembled one.",
+                    desc: "The position that this file takes in the assembled file.",
                     say: PRIORITY,
                     missing: Say::NONE },
             ], Say::new("unknown `contributes` property `{}`", "not part of the schema",
                 "`contributes` accepts `priority`")),
 
         Node::new("fragment",
-            "Where the module's Containerfile.inc goes relative to the generated layer.")
+            "Where the module's `Containerfile.inc` goes in relation to the generated layer.").about("A module whose needs the fields cannot express ships a `Containerfile.inc`, which the build adds verbatim. This places those lines relative to the generated layer.").example("position=\"after\"")
             .arg(Arg::None, Say::new("`fragment` takes no arguments", "unexpected value",
                 "`fragment position=\"after\"`"))
             .once("")
             .props(&[
                 Prop { name: "position", kind: Kind::One(&["before", "after", "tail"]),
-                    desc: "Whether the fragment goes above the generated block, below it, or below the finalize layer.",
+                    desc: "Where the fragment goes. `before`, the default, puts it above the \
+                        generated block. `after` puts it below the block. `tail` puts it below the \
+                        finalize layer, where the lineage stage has ended and can be named.",
                     say: Say::new("`position` must be \"before\", \"after\" or \"tail\"", "not a position",
                         "before, the default, puts the fragment above the generated block; after \
                          puts it below; tail puts it below the finalize layer, where the lineage \
                          stage has ended and can be named"),
                     missing: Say::NONE },
                 Prop { name: "standard-layer", kind: Kind::Bool,
-                    desc: "Whether the generated block is emitted at all.",
+                    desc: "Whether the build emits the generated block.",
                     say: Say::new("`standard-layer` must be #true or #false", "not a boolean", ""),
                     missing: Say::NONE },
             ], Say::new("unknown fragment property `{}`", "not part of the schema",
-                "a fragment accepts `position` and `standard-layer`")),
+                "a fragment accepts `position` and `standard-layer`"))
+            .notes(&[
+                "The build places the fragment verbatim and replaces `@MODULE@` with \
+                 `/modules/<dir>`, the module directory in the build context. The mounts of the \
+                 module layer use the same path, so a `COPY --from=ctx` needs it to reach a file \
+                 that the module ships.",
+                "Every `RUN` bind-mounts over `/etc/hostname`, `/etc/hosts` and \
+                 `/etc/resolv.conf`. A fragment writes those three files with a `COPY --from=ctx`.",
+            ]),
 
         options::OPTION,
         options::VARIANT,
         asset::ASSET,
-        Node::new("network", "Declares that the module's script step reaches the network. \
-             Only a `strict` rule in repo.kdl reads it.")
+        Node::new("network", "The declaration that the script step of this module reaches the network.").about("Declares that the scripts of this module need the network. A repository with a `strict` script rule opens the network only for the modules that declare it.").example("\"scripts\"")
             .arg(Arg::One(&["scripts"]), Say::new("`{}` is not a step this module declares",
                 "not a step",
                 "`network \"scripts\"`; a `packages`, `copr` or repo file already declares the \
                  package step"))
-            .once(""),
+            .once("")
+            .notes(&[
+                "Only a `strict` script rule in `repo.kdl` reads this node.",
+                "The package step needs no declaration, because `packages`, `copr` or a repo \
+                 file already declares it.",
+            ]),
 
         PACKAGES,
         PACKAGE_GROUPS,
@@ -339,7 +402,13 @@ pub const MODULE: Node = Node::new("module",
 
         FAMILY,
     ], Say::new("unknown node `{}`", "not part of the schema",
-        "docs/schema/module.md documents every node a manifest may hold"));
+        "docs/schema/module.md documents every node a manifest may hold"))
+    .notes(&[
+        "`requires` and `after` decide the build order. The order of the image list only breaks \
+         ties.",
+        "If nothing provides a `requires` or an `after`, then `tect check` fails and names every \
+         module that would satisfy it.",
+    ]);
 
 /// `owner/project` split into its two segments, or None when it is not that.
 /// The one place a COPR name is read, so `copr` and an `enablerepo` naming one
@@ -543,7 +612,13 @@ fn regular_overlay_file(root: &Path, path: &str) -> bool {
 }
 
 impl Module {
-    pub fn load(entry: &Entry, image: &Image, root: &Path, issues: &mut Issues) -> Option<Self> {
+    pub fn load(
+        entry: &Entry,
+        image: &Image,
+        root: &Path,
+        disk: &Disk,
+        issues: &mut Issues,
+    ) -> Option<Self> {
         if (entry.remote.is_some() || entry.source.is_some())
             && layout::module(root, &entry.path).is_dir()
         {
@@ -568,32 +643,50 @@ impl Module {
             .display()
             .to_string();
 
-        let Ok(text) = std::fs::read_to_string(&file) else {
-            issues.push(
-                Issue::new(
-                    format!("`{}` has no module.kdl", entry.path),
-                    &image.src,
-                )
-                .at(entry.span, "every module needs a manifest")
-                .help(match (&entry.source, &entry.remote) {
-                    (Some(_), _) | (_, Some(_)) => "run ./scripts/tect.sh fetch modules to fetch what the image references"
-                        .to_string(),
-                    (None, None) => format!(
-                        "create {file}; modules/_template/module-name/module.kdl is a copy-me reference"
-                    ),
-                }),
-            );
-            return None;
+        let local = entry.source.is_none() && entry.remote.is_none();
+        let mut module = match std::fs::read_to_string(&file) {
+            Ok(text) => Self::parse(
+                &entry.path,
+                &dir_rel,
+                root,
+                text,
+                image.base.as_ref().map(|base| base.family.as_str()),
+                issues,
+            )?,
+            Err(err) if err.kind() != std::io::ErrorKind::NotFound => {
+                issues.push(
+                    Issue::new(format!("{file} cannot be read: {err}"), &image.src)
+                        .at(entry.span, "module.kdl unreadable"),
+                );
+                return None;
+            }
+            Err(_) if local && disk.is_module(&dir_rel) => {
+                Self::bare(&entry.path, &dir_rel, root, issues)?
+            }
+            Err(_) if local => {
+                issues.push(
+                    Issue::new(format!("`{}` is not a module", entry.path), &image.src)
+                        .at(entry.span, "nothing to build")
+                        .help(format!(
+                            "give modules/{dir_rel} a module.kdl, a module.sh, a files/ \
+                             directory, a Containerfile.inc or a file that another module \
+                             collects"
+                        )),
+                );
+                return None;
+            }
+            Err(_) => {
+                issues.push(
+                    Issue::new(format!("`{}` is not fetched", entry.path), &image.src)
+                        .at(entry.span, "no module.kdl here yet")
+                        .help(format!(
+                            "run ./{} fetch modules to fetch what the image references",
+                            layout::script(root, "tect.sh")
+                        )),
+                );
+                return None;
+            }
         };
-
-        let mut module = Self::parse(
-            &entry.path,
-            &dir_rel,
-            root,
-            text,
-            image.base.as_ref().map(|base| base.family.as_str()),
-            issues,
-        )?;
         module.flavour = entry.flavour.clone();
         let src = &module.src.clone();
         module.resolved =
@@ -601,29 +694,18 @@ impl Module {
         Some(module)
     }
 
-    /// Everything a manifest says on its own, so a module no image lists is
-    /// still held to the schema.
-    fn parse(
-        path: &str,
-        dir_rel: &str,
-        root: &Path,
-        text: String,
-        family: Option<&str>,
-        issues: &mut Issues,
-    ) -> Option<Self> {
+    /// Builds a module that has no module.kdl. It declares no family, so the
+    /// family gate does not apply to it.
+    fn bare(path: &str, dir_rel: &str, root: &Path, issues: &mut Issues) -> Option<Self> {
         let dir = layout::module(root, dir_rel);
-        let file = dir.join(layout::MODULE_FILE).display().to_string();
+        let src = Source::new(dir.display().to_string(), String::new());
+        let module = Self::empty(path, dir_rel, &dir, &src, issues);
+        Self::rest(module, path, root, &dir, &[], &src, issues)
+    }
 
-        let src = &Source::new(&file, text.clone());
-        let doc: KdlDocument = match text.parse() {
-            Ok(doc) => doc,
-            Err(err) => {
-                issues.push(syntax_issue(&err, &file, src));
-                return None;
-            }
-        };
-
-        let mut module = Module {
+    /// A module that declares nothing, with what its directory holds.
+    fn empty(path: &str, dir_rel: &str, dir: &Path, src: &Source, issues: &mut Issues) -> Module {
+        Module {
             path: path.to_string(),
             dir: dir_rel.to_string(),
             description: String::new(),
@@ -633,7 +715,7 @@ impl Module {
             after: Vec::new(),
             policies: [layout::SELINUX, layout::APPARMOR]
                 .iter()
-                .filter(|policy| !policy.files(&dir).is_empty())
+                .filter(|policy| !policy.files(dir).is_empty())
                 .map(|policy| policy.capability)
                 .collect(),
             files: Vec::new(),
@@ -659,8 +741,8 @@ impl Module {
             fragment: std::fs::read_to_string(dir.join("Containerfile.inc")).ok(),
             fragment_position: Position::default(),
             standard_layer: true,
-            content: crate::provenance::record::hash(&dir),
-            imported: crate::provenance::record::read(&dir, issues),
+            content: crate::provenance::record::hash(dir),
+            imported: crate::provenance::record::read(dir, issues),
             // Every family, since a manifest is read without one: a `repo`
             // gated to a family this build is not for is still an archive the
             // module configures somewhere.
@@ -672,7 +754,32 @@ impl Module {
             network: None,
             access: Access::OPEN,
             src: src.clone(),
+        }
+    }
+
+    /// Everything a manifest says on its own, so a module no image lists is
+    /// still held to the schema.
+    fn parse(
+        path: &str,
+        dir_rel: &str,
+        root: &Path,
+        text: String,
+        family: Option<&str>,
+        issues: &mut Issues,
+    ) -> Option<Self> {
+        let dir = layout::module(root, dir_rel);
+        let file = dir.join(layout::MODULE_FILE).display().to_string();
+
+        let src = &Source::new(&file, text.clone());
+        let doc: KdlDocument = match text.parse() {
+            Ok(doc) => doc,
+            Err(err) => {
+                issues.push(syntax_issue(&err, &file, src));
+                return None;
+            }
         };
+
+        let mut module = Self::empty(path, dir_rel, &dir, src, issues);
 
         check_doc(&doc, &MODULE, src, issues);
 
@@ -947,12 +1054,6 @@ impl Module {
             }
         }
 
-        if module.description.is_empty() {
-            issues.push(
-                Issue::new(format!("`{}` declares no description", path), src)
-                    .help("one line, present tense, no trailing period; it names the module in the resolved build summary"),
-            );
-        }
         if !module.standard_layer {
             let dropped = module
                 .secrets
@@ -997,7 +1098,8 @@ impl Module {
         }
 
         for (gated, taken_on) in layout::FAMILY_DIRS {
-            if !dir.join(gated).is_dir()
+            if module.supports.is_empty()
+                || !dir.join(gated).is_dir()
                 || taken_on
                     .iter()
                     .any(|family| module.supports.iter().any(|claimed| claimed == family))
@@ -1031,13 +1133,6 @@ impl Module {
                     "a gate narrows what a module already builds on: add `{family}` to \
                          `supports`, or drop the block"
                 )),
-            );
-        }
-
-        if module.supports.is_empty() {
-            issues.push(
-                Issue::new(format!("`{}` declares no `supports`", path), src)
-                    .help("a module has to say which base families it can build on, so a portability gap surfaces at lint, while the build is still cheap"),
             );
         }
 
@@ -1885,6 +1980,7 @@ family "fedora" {
     fn the_table_catches_what_the_corpus_does_not() {
         let found = messages(
             r#"
+supports "fedora"
 description
 description "twice"
 provides
@@ -2273,6 +2369,7 @@ family "debian" "ubuntu" { packages "curl" enablerepo="backports" }
     fn the_table_holds_the_option_variant_and_asset_grammars() {
         let found = messages(
             r#"
+supports "fedora"
 option "fonts" type="list" scope="image" {
     default "A"
     default "B"

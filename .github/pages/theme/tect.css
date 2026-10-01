@@ -1,0 +1,32 @@
+/* A schema table's meaning column holds a full sentence, so its cells wrap where the theme keeps every cell on one line. */
+.typography td {
+    white-space: normal;
+}
+
+.typography td code {
+    white-space: nowrap;
+}
+
+/* A heading that sits directly on a table labels that table, so it draws at body size close above it. */
+.typography h3:has(+ .table-wrapper) {
+    margin-top: calc(var(--spacing) * 6);
+    margin-bottom: calc(var(--spacing) * -2);
+    font-size: var(--text-base);
+    line-height: var(--tw-leading, var(--text-base--line-height));
+}
+
+/* The theme draws a note on its surface colour, which sits too close to the light background to show, so a note takes the muted gray in both modes. */
+.admonition.note {
+    border-color: var(--color-muted);
+    background-color: var(--color-muted);
+}
+
+/* The theme runs a callout title into its first paragraph, so the title takes its own line above the body. */
+article .admonition > p.admonition-title,
+article .admonition > p:nth-child(2) {
+    display: block;
+}
+
+article .admonition > p.admonition-title {
+    margin-bottom: calc(var(--spacing) * 1) !important;
+}

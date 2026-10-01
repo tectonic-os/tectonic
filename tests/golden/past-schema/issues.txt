@@ -8,5 +8,5 @@
   help: nothing here moves a repository to schema 1, and nothing else in it is
         read either, because every diagnostic under a grammar this release
         does not have would be noise; run the release `tect-version` names,
-        which `scripts/tect.sh` fetches
+        which `tect.sh` fetches
 

@@ -4,6 +4,8 @@ set -euo pipefail
 # The renderer a deb image ships and a fedora one does not.
 RENDERER=/usr/libexec/grub-menu-from-bls
 cd "$(dirname "$0")/.."
+# The script runs from scripts/ or from generated/scripts/.
+[ -f repo.kdl ] || cd ..
 
 die() {
     echo "vm: $*" >&2

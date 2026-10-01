@@ -1,0 +1,19 @@
+image {
+    name "Bare Module"
+
+    base "quay.io/fedora/fedora-bootc:44" {
+        family "fedora"
+        provides "rechunking"
+    }
+
+    layout {
+        bootloader "grub2"
+    }
+
+    modules {
+        module "hello"
+        module "menu"
+        module "apps"
+        module "apps/editor"
+    }
+}

@@ -37,7 +37,7 @@
   },
 
   // Each of these matches a `renovate` node and the tracked line directly
-  // below it. `scripts/lint.sh` fails a pin these cannot match.
+  // below it. The repository's `lint.sh` fails a pin these cannot match.
   "customManagers": [
     {
       "customType": "regex",

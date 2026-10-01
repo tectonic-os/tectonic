@@ -217,7 +217,12 @@ fn run() -> Result<ExitCode, Error> {
             if prompt.draws() && !kept.is_empty() {
                 banner(false);
                 match common::ui::select(copy::WHICH_COMMAND, &options)? {
-                    Some(at) => (kept[at].verb, kept[at].path.clone()),
+                    Some(at) => {
+                        let row = kept[at]
+                            .as_ref()
+                            .expect("the picker never answers with a heading row");
+                        (row.verb, row.path.clone())
+                    }
                     None => return Ok(ExitCode::SUCCESS),
                 }
             } else if path.is_empty() {
@@ -250,6 +255,7 @@ fn run() -> Result<ExitCode, Error> {
             | Verb::CreateFlavour
             | Verb::CreateModule
             | Verb::CreateKey
+            | Verb::CreateScripts
             | Verb::SetKey
             | Verb::ImportModule
             | Verb::CopyModule

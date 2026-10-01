@@ -17,32 +17,32 @@ const ARCHIVES: [&str; 5] = [".tar.gz", ".tgz", ".tar.xz", ".tar.zst", ".tar.bz2
 /// The annotation Renovate matches, declared as data so this can check it.
 #[rustfmt::skip]
 const RENOVATE: Node = Node::new("renovate",
-    "The custom manager Renovate matches to keep the selector current.")
+    "The Renovate custom manager that keeps `version` current.").example("datasource=\"github-tags\" depName=\"owner/repo\"").minimal()
     .arg(Arg::None, Say::new("`renovate` takes no arguments", "unexpected value",
         "`renovate datasource=\"github-releases\" depName=\"owner/repo\"`"))
     .once("")
     .props(&[
         Prop { name: "datasource", kind: Kind::One(&DATASOURCES),
-            desc: "Which Renovate datasource the pin is tracked through.",
+            desc: "The Renovate datasource that tracks the pin.",
             say: Say::new("unsupported datasource `{}`", "no custom manager matches it",
                 "the managers in .github/renovate.json5 cover github-releases, github-tags, \
                  git-refs; a fourth would leave this pin unmanaged without saying so"),
             missing: Say::new("`{}` declares no datasource", "datasource= is required",
                 "one of: github-releases, github-tags, git-refs") },
         Prop { name: "depName", kind: Kind::Str,
-            desc: "What that datasource calls the thing being tracked.",
+            desc: "The name the datasource knows the dependency by.",
             say: Say::new("`{}` must be a string", "not a string", ""),
             missing: Say::new("`{}` declares no depName", "depName= is required",
                 "`owner/repo` for the github datasources, the clone URL for git-refs") },
         Prop { name: "extractVersion", kind: Kind::Str,
-            desc: "The pattern Renovate pulls the version out of the tag with.",
+            desc: "The pattern that extracts the version from a tag.",
             say: Say::NONE, missing: Say::NONE },
     ], Say::new("unknown renovate property `{}`", "not part of the schema",
         "datasource, depName and extractVersion, spelled as Renovate spells them"));
 
 /// The second answer: nothing tracks it, and why.
 #[rustfmt::skip]
-const MANUAL: Node = Node::new("manual", "Why nothing tracks this pin.")
+const MANUAL: Node = Node::new("manual", "Why nothing tracks this pin.").example("\"upstream publishes no releases\"")
     .arg(Arg::Str, Say::new("`{}` needs a reason", "no reason given",
         "say why nothing tracks this pin, or the next reader takes the absence for an \
          oversight"))
@@ -51,21 +51,26 @@ const MANUAL: Node = Node::new("manual", "Why nothing tracks this pin.")
 /// The third, and the only one that leaves the content unverified. A
 /// collection's alone: everything else is fetched and run.
 #[rustfmt::skip]
-const UNPINNED: Node = Node::new("unpinned",
-    "Why this follows a moving ref with no `sha256`, so every fetch takes whatever the ref \
-     holds then and nothing checks what arrived.")
+const UNPINNED: Node = Node::new("unpinned", "Why this pin follows a moving ref with no `sha256`.").example("\"followed at its branch head\"")
     .arg(Arg::Str, Say::new("`{}` needs a reason", "no reason given",
         "say why this is trusted enough to fetch unverified; with no `sha256` a mistaken or \
          compromised commit lands with nothing to catch it"))
-    .once("");
+    .once("")
+    .notes(&[
+        "Every fetch takes what the ref holds at that moment, and nothing checks what arrived.",
+        "Only a collection's pin takes `unpinned`. The build runs an out-of-tree module as \
+         root, so the pin of an out-of-tree module needs a `sha256`.",
+        "`unpinned` does not combine with `sha256`, because a moving ref breaks the hash.",
+    ]);
 
 /// One table for the four slots, held by `asset`, an out-of-tree module and a
 /// collection. Which of the trackers and which of the trailing nodes say
 /// anything is meaning, so the reader answers it.
 #[rustfmt::skip]
 pub const PIN: Node = Node::new("pin",
-    "Where this comes from, which version of it, what proves you got that one, and what keeps \
-     the selector current.")
+    "Where content comes from, which version it is, what verifies it, and what keeps the \
+     version current.").about("A pin fixes where a download comes from and which version it is, and says how the version stays current. Unless the pin is `unpinned`, `tect` verifies each download against the pinned hash, so a changed upstream file is caught.")
+    .scaffolds(&["unpinned", "version", "url"])
     .arg(Arg::None, Say::new("`pin` takes no arguments", "unexpected value",
         "a pin carries its slots as child nodes: `pin { url \"...\"; version \"...\" }`"))
     .once("")
@@ -75,28 +80,45 @@ pub const PIN: Node = Node::new("pin",
         RENOVATE,
         MANUAL,
         UNPINNED,
-        Node::new("version",
-            "The selector: the version, tag or commit this is taken at, which the URL expands \
-             and Renovate rewrites.")
+        Node::new("version", "The version, tag or commit that `url` expands and Renovate rewrites.").example("\"v1.0.0\"").minimal()
             .arg(Arg::Str, NEEDS_VALUE).once(""),
-        Node::new("url", "The locator: where the content comes from.")
+        Node::new("url", "Where the content comes from.").example("\"https://github.com/owner/repo/archive/refs/tags/{version}.tar.gz\"").minimal()
             .arg(Arg::Str, NEEDS_VALUE).once(""),
-        Node::new("sha256", "The verifier: what the fetched content is held to.")
+        Node::new("sha256", "The hash the fetched content must match.").example("\"b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3\"").minimal()
             .arg(Arg::Str, NEEDS_VALUE).once("")
             .props(&[
                 Prop { name: "from", kind: Kind::One(&["asset", "sidecar", "manual"]),
-                    desc: "Where the hash is refreshed from.",
+                    desc: "Where the hash is refreshed from. `asset`, the default, hashes the \
+                        payload itself. `sidecar` reads the `<url>.sha256` file that upstream \
+                        publishes. `manual` means nothing recomputes the hash.",
                     say: Say::new("`from` must be asset, sidecar or manual", "not a source",
                         "asset, the default, hashes the payload itself; sidecar reads the \
                          <url>.sha256 upstream publishes; manual means nothing recomputes it"),
                     missing: Say::NONE },
             ], Say::new("unknown sha256 property `{}`", "not part of the schema",
-                "`sha256` accepts `from`")),
-        Node::new("path", "The directory inside the archive the content sits in.")
+                "`sha256` accepts `from`"))
+            .notes(&[
+                "If a pin has no `sha256` and no `unpinned`, then `tect check` reports an error.",
+            ]),
+        Node::new("path", "The directory inside the archive that holds the content.").example("\"modules/example\"")
             .arg(Arg::Str, NEEDS_VALUE).once(""),
     ], Say::new("unknown node `{}` in a pin", "not part of the schema",
         "a pin holds one of `renovate`, `manual` and `unpinned`, then `url`, `version`, \
-         `sha256` and `path`"));
+         `sha256` and `path`"))
+    .lists(&[
+        ("A pin holds exactly one of these, so every pin says how it stays current:", &[
+            "`renovate`, if Renovate keeps the version current;",
+            "`manual`, if nothing tracks the pin;",
+            "`unpinned`, if the pin follows a moving ref with no `sha256`.",
+        ]),
+    ])
+    .notes(&[
+        "An `asset`, an out-of-tree module and a collection each hold a `pin`.",
+        "A base holds no `pin`. Its image reference holds the location and the version, and \
+         `signed` records whether the base publishes a cosign signature.",
+        "Renovate matches `renovate` together with the line directly below it. Put `version` on \
+         that line.",
+    ]);
 
 /// What a pin is on, which is what decides which of its slots say anything.
 #[derive(Clone, Copy, PartialEq)]

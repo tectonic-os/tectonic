@@ -15,7 +15,7 @@ use kdl::{KdlDocument, KdlNode};
 
 /// A list entry, which is the same node ungated and inside a flavour block.
 #[rustfmt::skip]
-const ENTRY: Node = Node::new("module", "One module the image is made of, named by its path under `modules/`.")
+const ENTRY: Node = Node::new("module", "One module of the image, which the list entry names by its path under `modules/`.").about("Adds one module to the image. The entry can also set the options that the module declares, or select one of its variants.").example("\"core/bootloader\"").minimal()
     .arg(Arg::Str, Say::new("`module` needs a path", "no path given",
         "`module \"core/flatpak\"`, the path relative to modules/"))
     .props(&[
@@ -28,11 +28,26 @@ const ENTRY: Node = Node::new("module", "One module the image is made of, named 
     .children(&[
         PIN,
         Node::new("",
-            "An option the module declares, set for this image by the node's name."),
-    ], Say::NONE);
+            "An option that the module declares, which this image sets in a child node named after the option.").example("fonts \"JetBrainsMono\" \"FiraCode\""),
+    ], Say::NONE)
+    .lists(&[
+        ("A list entry with a `pin` names a module in another repository:", &[
+            "`tect` fetches the module, verifies it against the hash and unpacks it under \
+             `modules/.remote/`.",
+            "The URL of the pin is `https` or `file`, and it points at a tar archive. It expands \
+             `{version}` and no other placeholder.",
+            "The fetched module ships a `module.kdl` that the same schema holds.",
+            "`tect` fetches nothing that the fetched module requires. If the module needs another \
+             module, then the image lists that module too.",
+        ]),
+    ])
+    .notes(&[
+        "A nested name such as `hardening/coredumps` names the directories that the collection \
+         groups its members in. Each part of the name is a name in its own right.",
+    ]);
 
 #[rustfmt::skip]
-const SOURCE: Node = Node::new("source", "Modules referenced from one of the collections in `sources`.")
+const SOURCE: Node = Node::new("source", "The modules that the image references from one of the collections in `sources`.").about("Groups the modules that come from one collection in `sources`. Each entry inside names a module by its path within that collection.").example("\"tectonic-os\"")
     .arg(Arg::Str, Say::new("`source` needs a collection name", "no collection given",
         "`source \"collection\" { module \"name\" }`"))
     .children(&[ENTRY], Say::new("`{}` is not allowed inside a source block",
@@ -50,42 +65,56 @@ pub(crate) const BOOT_CHAINS: &[&str] = &["uki-shim", "uki-db"];
 /// The image file's grammar, and the whole of it.
 #[rustfmt::skip]
 pub const IMAGE: Node = Node::new("image",
-    "One image: what it calls itself, what it builds on, and everything it is made of.")
+    "One image, which declares its names, its base and every module that it is made of.").about("Declares one bootable operating system image: its names, the base it builds on, how the installer lays it down and the modules that make it up. The build publishes the image under its `id`.").scaffolds(&["name", "url", "issues-url", "base", "layout", "modules"])
+    .minimal()
     .arg(Arg::None, Say::new("`image` takes no argument", "the name belongs in the block",
         "`image { id \"{}\" }` is the machine name, and `name` is the human one it derives from \
          when absent"))
     .children(&[
-        Node::new("id",
-            "The machine name: published image, build target, cache tag, os-release \
-             DEFAULT_HOSTNAME. Derived from `name` when it is not declared.")
-            .arg(Arg::Str, NEEDS_VALUE).once(""),
-        Node::new("name", "os-release NAME, which the boot menu and the desktop read.")
+        Node::new("id", "os-release `DEFAULT_HOSTNAME`. The machine name of the image.").example("\"workstation\"")
             .arg(Arg::Str, NEEDS_VALUE).once("")
+            .lists(&[
+                ("The `id` names:", &[
+                    "the published image;",
+                    "the build target;",
+                    "the cache tag;",
+                    "the os-release `DEFAULT_HOSTNAME`.",
+                ]),
+            ])
+            .notes(&[
+                "If `id` is absent, then `tect` derives it from `name` in lower case and turns \
+                 each space into a dash.",
+            ]),
+        Node::new("name", "os-release `NAME`. The name that the boot menu and the desktop read.").example("\"Workstation\"")
+            .arg(Arg::Str, NEEDS_VALUE).once("")
+            .notes(&["If `pretty-name` is absent, then `PRETTY_NAME` is `name` followed by the image version."])
             .missing(Say::new("`image` declares no `name`", "no name",
                 "`name \"Tectonic\"` is os-release NAME, which the boot menu and the desktop read")),
-        Node::new("pretty-name", "os-release PRETTY_NAME, the full name a user is shown.")
+        Node::new("pretty-name", "os-release `PRETTY_NAME`. The full name that the user sees.").example("\"Workstation 44\"")
             .arg(Arg::Str, NEEDS_VALUE).once(""),
-        Node::new("url", "The project's home page, in os-release and the image labels.")
+        Node::new("url", "os-release `HOME_URL` and `DOCUMENTATION_URL`. The URL that serves the home page of the project.").example("\"https://github.com/owner/workstation\"")
             .arg(Arg::Str, NEEDS_VALUE).once(""),
-        Node::new("issues-url", "Where a user reports a problem with the image.")
+        Node::new("issues-url", "os-release `SUPPORT_URL` and `BUG_REPORT_URL`. Where the user reports a problem with the image.").example("\"https://github.com/owner/workstation/issues\"")
             .arg(Arg::Str, NEEDS_VALUE).once(""),
-        Node::new("description", "A one-line summary of the image, in its OCI labels and not in os-release.")
+        Node::new("description", "OCI label `org.opencontainers.image.description`. One line that summarises the image.").example("\"A KDE desktop for daily work\"")
             .arg(Arg::Str, NEEDS_VALUE).once(""),
-        Node::new("keywords", "Keywords for the image's OCI labels, comma-joined into one label.")
+        Node::new("keywords", "OCI label `io.artifacthub.package.keywords`. The keywords of the image, which the build joins with commas.").example("\"desktop\" \"kde\"")
             .arg(Arg::Strs, Say::NONE),
-        Node::new("logo-url", "A URL to the image's logo, in its OCI labels.")
+        Node::new("logo-url", "OCI label `io.artifacthub.package.logo-url`. The URL that points at the logo of the image.").example("\"https://github.com/owner/workstation/raw/main/logo.svg\"")
             .arg(Arg::Str, NEEDS_VALUE).once(""),
-        Node::new("conforms", "The benchmark profile a scan measures the ungated target against. A scan reports it and enforces nothing.")
-            .arg(Arg::Str, NEEDS_VALUE).once(""),
+        Node::new("conforms", "The benchmark profile that a scan measures the ungated target against.").about("Names the benchmark profile that a scan measures the image against. Setting it turns the scan on: every build measures the image against the profile and publishes the score.").example("\"standard\"")
+            .arg(Arg::Str, NEEDS_VALUE).once("")
+            .notes(&["A scan reports the result. A failed rule fails `tect scap` only if \
+                `audit { enforce #true }` is set."]),
 
-        Node::new("boot", "The UKI boot chain: owner-signed through shim, or through direct Secure Boot enrollment.")
+        Node::new("boot", "The UKI boot chain, which is owner-signed through shim or enrolled directly into Secure Boot.").about("Builds the image to boot as a unified kernel image (UKI) under Secure Boot. `uki-shim` boots through shim with a key the owner signs, and `uki-db` enrolls the key directly into the firmware key database.").example("\"uki-shim\"")
             .arg(Arg::One(BOOT_CHAINS), Say::new("`{}` is not a boot chain",
                 "not a boot chain",
                 "`boot \"uki-shim\"` for owner-signed through shim, or `boot \"uki-db\"` for direct \
                  enrollment into the firmware key database"))
             .once(""),
 
-        Node::new("base", "The image every layer builds on, and what building on it may assume.")
+        Node::new("base", "The Linux image that every layer builds on. Its block declares what a build on the base can assume.").about("The base is the upstream bootc image that the custom image starts from. Its block tells `tect` what the base already has, so `tect` checks each module against it and skips a module that the base already covers.").scaffolds(&["family", "provides", "signed"]).example("\"quay.io/fedora/fedora-bootc:44\"")
             .arg(Arg::Str, Say::new("`base` needs an image reference", "no image given",
                 "`base \"quay.io/fedora/fedora-bootc:44\"`, emitted verbatim as the generated FROM"))
             .once("an image builds on one base; a second family is a second image")
@@ -93,63 +122,95 @@ pub const IMAGE: Node = Node::new("image",
                 "`base \"quay.io/fedora/fedora-bootc:44\" { family \"fedora\" }`, naming the image \
                  every layer builds on"))
             .children(&[
-                Node::new("family", "The base's family, matched against every module's `supports`.")
+                Node::new("family", "The family of the base, which each module's `supports` must match.").about("The family, such as `fedora` or `debian`, decides which family variant of each module the build takes. Every module lists the families that it `supports`, and `tect` checks each one against this.").example("\"fedora\"")
                     .arg(Arg::Str, Say::new("`family` needs a name", "no family given",
                         "`family \"fedora\"`, matched against each module's `supports`"))
                     .once("")
                     .missing(Say::new("`base` declares no `family`", "no family",
                         "every module declares which families it `supports`, and the two are \
                          checked against each other")),
-                Node::new("provides",
-                    "Capabilities the upstream image already ships, by name; a module providing \
-                     only these is suppressed, and the finished image is checked for each.")
-                    .arg(Arg::Strs, Say::NONE),
+                Node::new("provides", "The capabilities that the upstream image already ships, which the build checks the finished image for.").about("Lists what the base image already ships, such as `bootc`. `tect` skips a module that provides only what the base already has, and the build checks the finished image for each name.").example("\"rechunking\" \"bootc\"")
+                    .arg(Arg::Strs, Say::NONE)
+                    .lists(&[
+                        ("If the base provides every capability that a listed module provides, \
+                          then `tect` suppresses the module:", &[
+                            "The module is not ordered or built, and nothing it ships reaches the \
+                             image.",
+                            "The generated graph lists the module, and `plan.json` carries it \
+                             beside the modules that did build.",
+                            "The options and variants of the module still resolve. `tect` checks \
+                             a value set on one and puts it in the plan, but the value reaches no \
+                             layer.",
+                        ]),
+                    ])
+                    .notes(&[
+                        "A module that the base covers only in part still builds. If that module \
+                         declares a capability that the base already provides, then `tect` \
+                         reports an error.",
+                    ]),
                 Node::new("requires",
-                    "Capabilities the base is unusable without, which an enabled module must provide.")
+                    "The capabilities that an enabled module must provide before the base is usable.").example("\"bootc-base\"")
                     .arg(Arg::Strs, Say::NONE),
                 Node::new("satisfies",
-                    "Benchmarks and rules the base image already satisfies, as an audit \
-                     declaration. The tool records it and certifies nothing.")
+                    "An audit declaration of the benchmarks and rules that the base image \
+                     already satisfies. `tect` records it and certifies nothing.")
                     .once("a base makes one claim set; a second block splits it")
                     .children(crate::parse::module::BENCHMARKS, Say::NONE),
-                Node::new("signed", "Whether the base publishes a cosign signature.")
+                Node::new("signed", "Whether the base publishes a cosign signature.").about("Records whether the publisher of the base signs it with cosign. The build does not verify the signature. The `base-sig-probe` workflow keeps the value current.").example("#true")
                     .arg(Arg::Bool, Say::new("`signed` needs #true or #false", "not a boolean",
                         "`signed #false` records that this base publishes no cosign signature; \
                          base-sig-probe.yml keeps it current"))
                     .once(""),
             ], Say::new("unknown base property `{}`", "not part of the schema",
-                "a base accepts `family`, `provides`, `requires`, `satisfies` and `signed`")),
+                "a base accepts `family`, `provides`, `requires`, `satisfies` and `signed`"))
+            .lists(&[
+                ("The reference can carry a digest after its tag:", &[
+                    "`tect` strips the digest before it looks up the catalog, so a pinned base is \
+                     still the base of the catalog.",
+                    "`tect create image --base` writes the same `family`, `provides` and \
+                     `requires` for a tag with a digest and for a tag without one. Renovate bumps \
+                     the half that the image file writes.",
+                    "`tect build` records a declared digest verbatim. It records a bare tag as the \
+                     digest that the registry answers with.",
+                    "If the base is `signed #false`, then the digest is the strongest trust root on \
+                     offer.",
+                ]),
+            ])
+            .notes(&[
+                "The build record says what one build got. Only a digest in the image file says \
+                 what the next build gets.",
+            ]),
 
-        Node::new("layout", "What the installer lays down, where the family's answer is not the one the image wants.")
+        Node::new("layout", "What the installer lays down if the answer of the base family is not the one that the image wants.").about("Each base family comes with installer defaults for the filesystem, composefs, the generic image and the administrator group. This block replaces those defaults for this image, so the installer lays the image down the way it needs. No family supplies a bootloader, so a declared `layout` names `bootloader`.").scaffolds(&["bootloader"])
             .arg(Arg::None, Say::new("`layout` takes no argument", "the declarations belong in the block",
                 "`layout { filesystem \"btrfs\" }`"))
             .once("an image is installed one way")
             .empty(Say::new("`layout` declares nothing", "empty block",
                 "omit the block to take the family's filesystem and no separate `/var`"))
             .children(&[
-                Node::new("filesystem", "The root filesystem, in place of the one the base family settles.")
+                Node::new("filesystem", "The root filesystem that the installer formats in place of the one that the base family settles.").example("\"btrfs\"")
                     .arg(Arg::One(FILESYSTEMS), Say::new("`{}` is not a filesystem the installer formats",
                         "not a filesystem",
                         "the installer auto-partitions `xfs`, `ext4` and `btrfs`"))
                     .once("")
                     .props(&[], Say::new("unknown filesystem property `{}`", "not part of the schema",
                         "`filesystem` takes only its filesystem name")),
-                Node::new("composefs", "Whether the install seals the deployment, in place of the family's answer.")
+                Node::new("composefs", "Whether the install seals the deployment, which replaces the answer of the base family.").example("#true")
                     .arg(Arg::Bool, Say::new("`composefs` needs #true or #false", "not a boolean",
                         "`composefs #true` passes `--composefs-backend`, which needs a \
                          filesystem with fs-verity"))
                     .once(""),
-                Node::new("generic-image", "Whether the install skips the bootupd check, in place of the family's answer.")
+                Node::new("generic-image", "Whether the install skips the bootupd check, which replaces the answer of the base family.").example("#false")
                     .arg(Arg::Bool, Say::new("`generic-image` needs #true or #false", "not a boolean",
                         "`generic-image #true` passes `--generic-image`, which a base packaging \
                          no bootupd needs or the install aborts"))
                     .once(""),
-                Node::new("admin-group", "The group an administrator is created in, in place of the family's.")
+                Node::new("admin-group", "The group that the installer creates an administrator in, which replaces the group of the base family.").example("\"wheel\"")
                     .arg(Arg::Str, Say::new("`admin-group` needs a group name", "no group given",
                         "`admin-group \"wheel\"`; `useradd` refuses the whole call when a listed \
                          group is missing on the target, so this names one"))
                     .once(""),
-                Node::new("bootloader", "The bootloader the installer installs, one the base's row lists.")
+                Node::new("bootloader", "The bootloader that the installer installs. The catalog entry of the base lists the bootloaders that the base carries.").about("The bootloader that the installer writes to the disk. No base family supplies a default, so `tect check` fails a `layout` without one. If `boot` is set, then the bootloader is `systemd`. If neither is set, then the image builds no install media.").example("\"grub2\"")
                     .arg(Arg::One(BOOTLOADERS), Say::new("`{}` is not a bootloader the installer installs",
                         "not a bootloader",
                         "the installer writes `grub2` or `systemd`; no family answers this, so \
@@ -160,7 +221,7 @@ pub const IMAGE: Node = Node::new("image",
                  and `bootloader`")),
 
         Node::new("allow-remediation",
-            "One rule an installed module refuses that this image lets remediation set anyway.")
+            "One rule an installed module refuses that this image lets remediation set anyway.").about("A module can refuse a hardening rule because the rule breaks what the module does. This lets one image accept that rule anyway, for a machine where the reason of the module does not apply. `because=` records why.").example("\"grub2_nousb_argument\" because=\"this machine has no USB keyboard\"")
             .arg(Arg::Str, Say::new("`allow-remediation` needs a rule ID", "nothing named",
                 "`allow-remediation \"grub2_nousb_argument\" because=\"this machine has no USB \
                  keyboard\"`"))
@@ -173,14 +234,14 @@ pub const IMAGE: Node = Node::new("image",
             ], Say::new("unknown `allow-remediation` property `{}`", "not part of the schema",
                 "`allow-remediation` accepts `because`")),
 
-        Node::new("flavours", "The flavours this image publishes beside its ungated build.")
+        Node::new("flavours", "The flavours that this image publishes beside its ungated build.").about("A flavour builds a variant of the same image with extra modules, such as a `dev` build with developer tools, and publishes it as `<id>-<flavour>`. Flavours suit two builds that share almost every module.")
             .once("a second block would split one set of flavours in two")
             .empty(Say::new("`flavours` has no flavours in it", "empty block",
                 "omit the block entirely to build one unnamed image"))
             .children(&[
                 Node::new("",
-                    "One flavour, named by the node: a gated module set published as \
-                     `<image>-<flavour>`.")
+                    "One flavour that publishes a gated module set as `<id>-<flavour>`, where \
+                     `<flavour>` is the node name.").example("dev")
                     .arg(Arg::None, Say::new("a flavour takes no arguments", "unexpected value",
                         "the flavour's name is the node name: `desktop default=#true`"))
                     .props(&[
@@ -194,17 +255,23 @@ pub const IMAGE: Node = Node::new("image",
                             say: Say::new("`{}` must be #true or #false", "not a boolean", ""),
                             missing: Say::NONE },
                         Prop { name: "conforms", kind: Kind::Str,
-                            desc: "The benchmark profile a scan measures this flavour against; \
-                                   the image's `conforms` measures the ungated target alone.",
+                            desc: "The benchmark profile that a scan measures this flavour against.",
                             say: Say::new("`{}` must be a profile name", "not a string", ""),
                             missing: Say::NONE },
                     ], Say::new("unknown flavour property `{}`", "not part of the schema",
                         "a flavour accepts `default`, `pr-build` and `conforms`")),
-            ], Say::NONE),
+            ], Say::NONE)
+            .notes(&[
+                "An image builds one target for its ungated module set and one more for each \
+                 flavour. The targets publish as `<id>` and `<id>-<flavour>`.",
+                "A flavour gates modules inside one image. A module listed inside \
+                 `flavour \"dev\"` builds only for that target, and each other module builds for \
+                 every target.",
+                "The `conforms=` of a flavour measures that flavour. The `conforms` of the image \
+                 measures the ungated target only.",
+            ]),
 
-        Node::new("modules",
-            "Every module the image is made of: ungated entries, and the flavours that gate \
-             the rest.")
+        Node::new("modules", "Every module that the image is made of, whether a flavour gates it or not.").about("Lists every module that the image is made of. A module comes from `modules/` in this repository, from a collection in `sources`, or from another repository through a `pin`.")
             .once("a second block would split one list in two")
             .missing(Say::new("`image` has no `modules` block", "nothing in it",
                 "an image with no modules is almost certainly a mistake; the block is required \
@@ -212,7 +279,7 @@ pub const IMAGE: Node = Node::new("image",
             .children(&[
                 ENTRY,
                 SOURCE,
-                Node::new("flavour", "The modules one flavour adds, which build only for that flavour.")
+                Node::new("flavour", "The modules one flavour adds, which build only for that flavour.").about("Lists the modules that build only for one flavour. Every module outside a `flavour` block builds for every target.").example("\"dev\"")
                     .arg(Arg::Str, Say::new("`flavour` needs a flavour name", "no name given",
                         "`flavour \"desktop\" { module \"...\" }`"))
                     .children(&[ENTRY, SOURCE],

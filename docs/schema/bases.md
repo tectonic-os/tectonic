@@ -1,98 +1,193 @@
-# The base catalog
+<a id="bases.kdl"></a>
 
-`tect create image` offers the bases it knows: what family each belongs to and
-what it already ships, so an image scaffolded on one lists no module the base
-already carries. The tool compiles one `bases.kdl` into the binary as a
-fallback, and the release ships that same file for runtime replacement: a
-runtime `bases.kdl` beside the binary, when present, replaces the compiled-in
-catalog entirely rather than merging with it; a present but unreadable or
-malformed runtime file is diagnosed by its exact path instead of silently
-falling back to the compiled-in one. A collection then extends the selected
-catalog with a `bases.kdl` at its root, beside the modules.
+# `bases.kdl`
+
+Location: Compiled into `tect`. A `bases.kdl` beside the `tect` binary replaces it, and one at the root of a collection extends it.
+
+The base catalog lists the upstream images that `tect` knows, and what each one ships. `tect create image` offers these bases and writes what each ships into the new image.
 
 ```kdl
-base "ghcr.io/ublue-os/bazzite:stable" {
-    about "KDE, gaming and hardware support over kinoite-main"
+base "quay.io/fedora/fedora-bootc:44" {
+    about "Fedora bootc, the upstream base image"
     family "fedora"
-    provides "rechunking" "flatpak"
+    bootloader "grub2"
+}
+```
+
+| Field | Accepts | Description |
+| --- | --- | --- |
+| [`base`](#base) (required,&nbsp;unique) | *string*, then {&nbsp;[fields](#base-fields)&nbsp;} | One base that an image builds on, which the catalog entry names by its image reference. |
+| [`capability`](#capability) (optional,&nbsp;unique) | *list of strings* | Where the presence of a capability is read, which is the path that witnesses it. |
+
+`tect` selects one catalog:
+
+- Each `tect` release compiles one `bases.kdl` into the binary, and the release ships the same file for replacement at runtime.
+- If a `bases.kdl` sits beside the binary, then it replaces the compiled-in catalog completely. The two do not merge.
+- If the runtime `bases.kdl` is unreadable or malformed, then `tect` reports its exact path. It does not fall back to the compiled-in catalog.
+
+A collection extends the selected catalog with a `bases.kdl` at its root, beside its modules:
+
+- A collection entry replaces the catalog entry for the same reference. `tect check` names the collection wherever the two entries differ.
+- If two collections describe one base, then `tect` reports an error.
+- `tect` fetches nothing to read a catalog. A collection that is not on this machine extends nothing.
+
+> [!NOTE]
+> `tect create image` offers the bases it knows, with the family of each and what each ships. An image scaffolded on a base lists no module that the base already carries.
+
+<a id="base"></a>
+
+## `base` (required, unique)
+
+One entry describes one upstream base image: what it is, which family it belongs to, what it ships and what it still needs. `tect create image` copies these facts into each image that it scaffolds on the base.
+
+```kdl
+base "quay.io/fedora/fedora-bootc:44" {
+    about "Fedora bootc, the upstream base image"
+    family "fedora"
+    bootloader "grub2"
+}
+```
+
+Accepts: *string*, then {&nbsp;[fields](#base-fields)&nbsp;}
+
+<a id="base-fields"></a>
+
+| Field | Accepts | Description |
+| --- | --- | --- |
+| [`about`](#base-about) (required) | *string* | The line that the base picker shows beside the reference. |
+| [`family`](#base-family) (required) | *string* | The family that an image on this base declares, which each module's `supports` must match. |
+| [`provides`](#base-provides) (optional,&nbsp;repeatable) | *list of strings* | The capabilities that this base already ships. |
+| [`requires`](#base-requires) (optional,&nbsp;repeatable) | *list of strings* | The capabilities that an enabled module must provide before this base is usable. |
+| [`signed`](#base-signed) (optional) | *boolean* | Whether this base publishes a cosign signature. |
+| [`scap-content`](#base-scap-content) (optional) | *string* | The bare filename of the SSG datastream that measures this base. |
+| [`bootloader`](#base-bootloader) (required) | *list of strings* | The bootloaders that an image on this base can install, with the default first. |
+
+> [!NOTE]
+> `tect create image` writes `family`, `provides`, `requires`, `signed` and `bootloader` into each image it scaffolds on this base.
+>
+> No catalog row carries a digest, because a digest in the catalog changes only with a tool release. The image file that builds on the base holds the digest.
+
+<a id="base-about"></a>
+
+### `about` (required)
+
+The line that the base picker shows beside the reference.
+
+```kdl
+base "quay.io/fedora/fedora-bootc:44" {
+    about "Fedora bootc, the upstream base image"
+}
+```
+
+Accepts: *string*
+
+<a id="base-family"></a>
+
+### `family` (required)
+
+The family that an image on this base declares, which each module's `supports` must match.
+
+```kdl
+base "quay.io/fedora/fedora-bootc:44" {
+    family "fedora"
+}
+```
+
+Accepts: *string*
+
+<a id="base-provides"></a>
+
+### `provides` (optional, repeatable)
+
+The capabilities that this base already ships.
+
+```kdl
+base "quay.io/fedora/fedora-bootc:44" {
+    provides "rechunking" "bootc"
+}
+```
+
+Accepts: *list of strings*
+
+<a id="base-requires"></a>
+
+### `requires` (optional, repeatable)
+
+The capabilities that an enabled module must provide before this base is usable.
+
+```kdl
+base "quay.io/fedora/fedora-bootc:44" {
+    requires "bootc-base"
+}
+```
+
+Accepts: *list of strings*
+
+<a id="base-signed"></a>
+
+### `signed` (optional)
+
+Whether this base publishes a cosign signature.
+
+```kdl
+base "quay.io/fedora/fedora-bootc:44" {
     signed #true
 }
-
-capability "ssh" "/usr/sbin/sshd"
-capability "rechunking"
 ```
 
-A name is witnessed by a path: a module's `provides "<name>" file="<path>"`,
-then a `capability` row, then `/usr/bin/<name>` or `/usr/sbin/<name>`. A row
-with no path names a capability nothing witnesses. `validate-image` checks the
-finished image for every name the base claims and every name a module or a row
-locates, and `base-sig-probe` reads the same witnesses when it measures a base.
-`luks-initramfs` is the exception because its witness is inside an archive:
-declaring it opts a target into `lsinitrd` validation during the build, and
-omitting it keeps root encryption unavailable in the installer. A custom base
-or module should declare it only when its initramfs is intended to unlock LUKS;
-`tect build` then proves the binary is present before installation can offer it.
+Accepts: *boolean*
 
-A collection entry wins over the selected catalog's entry of the same
-reference, which is how a stale one is corrected without a tool release, and
-`check` names the collection wherever the two differ. A base two collections
-describe is an error, the way a collection declared twice is. Nothing is
-fetched to read one: a collection that is not on this machine already extends
-nothing, and the selected catalog is what the picker offers.
+<a id="base-scap-content"></a>
 
-**No row carries a digest, and that is deliberate.** A base reference joins the
-locator and the selector, so a digest could be written here — but a digest in
-the catalog is a digest only a tool release can roll, and a row that goes stale
-between releases is one nobody can fix without waiting for the next one. Worse,
-a registry that retires the digest leaves a catalog pin that no longer resolves
-at all. So the catalog offers the tag, and the digest belongs in the image file
-built on it, where the repository taking the risk takes the decision:
+### `scap-content` (optional)
+
+The bare filename of the SSG datastream that measures this base.
 
 ```kdl
-image {
-    name "Ubuntu"
-
-    base "docker.io/library/ubuntu:26.04@sha256:889d056d5c6c…" {
-        family "ubuntu"
-        requires "bootc-base"
-        signed #false
-    }
+base "quay.io/fedora/fedora-bootc:44" {
+    scap-content "ssg-fedora-ds.xml"
 }
 ```
 
-The digest is matched off before a reference is looked up, so a pinned base is
-still the catalog's base: `tect create image --base` writes the same `family`,
-`provides` and `requires` for both spellings, and Renovate's image-file manager
-bumps whichever half is written. A row carrying `signed #false` is where this
-matters most: with nothing to attribute a signature to, the digest is the
-strongest trust root on offer.
+Accepts: *string*
 
-`tect build` records the base either way, but it records two different things:
-a tag is resolved against the registry and the record says what answered, while
-a declared digest is already the answer and is recorded verbatim. Recording is
-not pinning — the record says what one build got, and only a digest in the
-image file says what the next one will.
+<a id="base-bootloader"></a>
 
-<!-- schema: bases -->
+### `bootloader` (required)
 
-| Node | Takes | Meaning |
-| --- | --- | --- |
-| `capability` | one or more strings, one per name | Where a capability's presence is read: the path that witnesses it, or none for a capability nothing witnesses. |
+The bootloaders that an image on this base can install, with the default first.
 
-### `base`
+```kdl
+base "quay.io/fedora/fedora-bootc:44" {
+    bootloader "grub2"
+}
+```
 
-One base a collection describes, named by the reference an image builds on.
+Accepts: *list of strings*
 
-*a string, one per name*
+<a id="capability"></a>
 
-| Node | Takes | Meaning |
-| --- | --- | --- |
-| `about` | a string, exactly one | The line a base picker shows beside the reference. |
-| `family` | a string, exactly one | The family an image built on this base declares, matched against every module's `supports`. |
-| `provides` | one or more strings | Capabilities this base already ships, by name, written into every image scaffolded on it. |
-| `requires` | one or more strings | Capabilities this base is unusable without, which an enabled module must provide. |
-| `signed` | `#true` or `#false`, at most one | Whether this base publishes a cosign signature, which a scaffolded image records. |
-| `scap-content` | a string, at most one | The SSG datastream this base is measured against, named as a bare filename. |
-| `bootloader` | one or more strings, exactly one | The bootloaders an image on this base can install, the one it boots by default first. |
+## `capability` (optional, unique)
 
-<!-- /schema: bases -->
+Tells `tect` how to prove that a capability is in a finished image: the path of a file that witnesses it. A row is needed only where the witness is not `/usr/bin/<name>` or `/usr/sbin/<name>`.
+
+```kdl
+capability "ssh" "/usr/sbin/sshd"
+```
+
+Accepts: *list of strings*
+
+A path witnesses a capability name. `tect` reads the first of these that names one:
+
+- the `file=` of a module's `provides "<name>"`;
+- a `capability` row;
+- `/usr/bin/<name>` or `/usr/sbin/<name>`.
+
+> [!NOTE]
+> A row with no path names a capability that nothing witnesses.
+>
+> `tect validate-image` checks the finished image for each name that the base claims, and for each name that a module or a row locates. `base-sig-probe` reads the same witnesses when it measures a base.
+>
+> The witness of `luks-initramfs` is inside an archive. If a target declares it, then the build validates the initramfs with `lsinitrd`. If no target declares it, then the installer does not offer root encryption.
+>
+> Declare `luks-initramfs` in a custom base or module only if its initramfs unlocks LUKS. `tect build` then proves that the binary is present before the installer offers it.

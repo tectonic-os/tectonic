@@ -14,7 +14,7 @@ const INSTALLED: [&str; 2] = [
 
 /// What `create repo` copies once and `generate` never writes again, as this
 /// release ships it.
-const SCAFFOLDED: [(&str, &str); 7] = [
+const SCAFFOLDED: [(&str, &str); 6] = [
     (".dockerignore", include_str!("../assets/.dockerignore")),
     (".gitattributes", include_str!("../assets/.gitattributes")),
     (".gitignore", include_str!("../assets/.gitignore")),
@@ -27,27 +27,51 @@ const SCAFFOLDED: [(&str, &str); 7] = [
         "disk_config/disk.toml",
         include_str!("../assets/disk_config/disk.toml"),
     ),
-    (
-        "scripts/Containerfile.skeleton",
-        include_str!("../assets/scripts/Containerfile.skeleton"),
-    ),
 ];
 
-/// Each scaffolded file that is not what this release scaffolds. A repository
-/// may keep its own, so this is said and never refused.
+/// This release ships this Containerfile skeleton.
+pub(crate) const SKELETON: &str = include_str!("../assets/scripts/Containerfile.skeleton");
+
+/// Each scaffolded or kept file that is not what this release supplies. A
+/// repository may keep its own, so this is said and never refused.
 pub fn drifted(root: &Path) -> Vec<String> {
-    SCAFFOLDED
+    let differs = |path: &str, shipped: &str| {
+        fs::read_to_string(root.join(path)).is_ok_and(|held| held != shipped)
+    };
+    let version = env!("CARGO_PKG_VERSION");
+    let scaffolded = SCAFFOLDED
         .iter()
-        .filter(|(path, shipped)| {
-            fs::read_to_string(root.join(path)).is_ok_and(|held| held != *shipped)
-        })
+        .filter(|(path, shipped)| differs(path, shipped))
         .map(|(path, _)| {
             format!(
-                "`{path}` is not what tectonic v{} scaffolds, and nothing rewrites it; the \
-                 current one is assets/{path} in that release",
-                env!("CARGO_PKG_VERSION")
+                "`{path}` is not what tectonic v{version} scaffolds, and nothing rewrites it; \
+                 the current one is assets/{path} in that release"
             )
-        })
+        });
+    // `create scripts` writes these, and a kept script calls the other scripts
+    // where they live.
+    let skeleton = crate::emit::containerfile::SKELETON;
+    let kept_skeleton = differs(skeleton, SKELETON).then(|| {
+        format!(
+            "`{skeleton}` is not what tectonic v{version} supplies; if it is deleted, then \
+             `generate` uses the one tect supplies"
+        )
+    });
+    let kept_scripts = crate::emit::SCRIPTS
+        .iter()
+        .map(|script| (format!("{}/{}", layout::SCRIPTS, script.name), script))
+        .filter(|(path, script)| differs(path, &crate::emit::located(root, script.body)))
+        .map(|(path, script)| {
+            format!(
+                "`{path}` is not what tectonic v{version} supplies, and `generate` does not \
+                 replace it; if it is deleted, then `generate` writes the current one to \
+                 generated/scripts/{}",
+                script.name
+            )
+        });
+    scaffolded
+        .chain(kept_skeleton)
+        .chain(kept_scripts)
         .collect()
 }
 
@@ -122,33 +146,25 @@ pub fn write(root: &Path, name: &str, assets: &Path) -> Result<Vec<PathBuf>, Str
         return Err(format!("{} is already a repository", root.display()));
     }
 
-    let mut wrote = copy_tree_except(assets, root, Some("lib"))?;
-    // These generate in place, so their shipped copies are not scaffolded.
-    for (path, _) in crate::emit::SCRIPTS {
-        wrote.retain(|written| written != Path::new(path));
-        let at = root.join(path);
-        if at.exists() {
-            fs::remove_file(&at).map_err(|err| format!("{}: {err}", at.display()))?;
-        }
-    }
-    // The workflows are generated from the declaration, not scaffolded.
-    let shipped = root.join(layout::WORKFLOW_DIR);
-    if shipped.is_dir() {
-        fs::remove_dir_all(&shipped).map_err(|err| format!("{}: {err}", shipped.display()))?;
-    }
-    wrote.retain(|path| !path.starts_with(layout::WORKFLOW_DIR));
+    // `create scripts` writes the scripts the user keeps, and `generate`
+    // writes the declared workflows. The sources block is spliced into
+    // repo.kdl, and the base catalog is read from the assets in place.
+    let mut wrote = copy_tree_except(
+        assets,
+        root,
+        &[
+            "lib",
+            layout::SCRIPTS,
+            layout::WORKFLOW_DIR,
+            SOURCES_FILE,
+            crate::base::BASES_FILE,
+        ],
+    )?;
 
-    let scaffold = root.join(SOURCES_FILE);
     let sources = match sources(assets) {
         block if block.is_empty() => block,
         block => format!("\n{block}"),
     };
-    for control in [scaffold.as_path(), &root.join(crate::base::BASES_FILE)] {
-        if control.is_file() {
-            fs::remove_file(control).map_err(|err| format!("{}: {err}", control.display()))?;
-        }
-        wrote.retain(|path| root.join(path) != control);
-    }
     put(
         &root.join(layout::REPO_FILE),
         &format!(
@@ -173,31 +189,34 @@ pub(crate) fn put(path: &Path, text: &str) -> Result<(), String> {
 
 /// Answers every file it copied, relative to `to`.
 pub(crate) fn copy_tree(from: &Path, to: &Path) -> Result<Vec<PathBuf>, String> {
-    copy_tree_except(from, to, None)
+    copy_tree_except(from, to, &[])
 }
 
-/// Copies a tree without one top-level entry.
-fn copy_tree_except(from: &Path, to: &Path, skip: Option<&str>) -> Result<Vec<PathBuf>, String> {
-    fs::create_dir_all(to).map_err(|err| format!("{}: {err}", to.display()))?;
-    let entries = fs::read_dir(from).map_err(|err| format!("{}: {err}", from.display()))?;
+/// Copies a tree without the paths in `skip`, which are relative to `from`.
+/// Answers every file it copied, relative to `to`.
+fn copy_tree_except(from: &Path, to: &Path, skip: &[&str]) -> Result<Vec<PathBuf>, String> {
+    copy_below(from, to, Path::new(""), skip)
+}
+
+fn copy_below(from: &Path, to: &Path, under: &Path, skip: &[&str]) -> Result<Vec<PathBuf>, String> {
+    let dest_dir = to.join(under);
+    fs::create_dir_all(&dest_dir).map_err(|err| format!("{}: {err}", dest_dir.display()))?;
+    let dir = from.join(under);
+    let entries = fs::read_dir(&dir).map_err(|err| format!("{}: {err}", dir.display()))?;
     let mut wrote = Vec::new();
     for entry in entries {
-        let entry = entry.map_err(|err| format!("{}: {err}", from.display()))?;
-        let source = entry.path();
-        let name = entry.file_name();
-        if skip.is_some_and(|skip| name == skip) {
+        let entry = entry.map_err(|err| format!("{}: {err}", dir.display()))?;
+        let rel = under.join(entry.file_name());
+        if skip.iter().any(|skip| rel == Path::new(skip)) {
             continue;
         }
-        let dest = to.join(&name);
+        let source = entry.path();
         if source.is_dir() {
-            wrote.extend(
-                copy_tree(&source, &dest)?
-                    .into_iter()
-                    .map(|under| Path::new(&name).join(under)),
-            );
+            wrote.extend(copy_below(from, to, &rel, skip)?);
         } else {
+            let dest = to.join(&rel);
             fs::copy(&source, &dest).map_err(|err| format!("{}: {err}", dest.display()))?;
-            wrote.push(PathBuf::from(name));
+            wrote.push(rel);
         }
     }
     Ok(wrote)
@@ -232,6 +251,34 @@ mod tests {
         let said = drifted(&root);
         assert_eq!(said.len(), 1, "{said:?}");
         assert!(said[0].starts_with("`.gitignore`"), "{said:?}");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    /// `create repo --root` accepts a directory that holds files already, and
+    /// those files are the user's.
+    #[test]
+    fn a_repository_written_into_a_full_directory_keeps_the_users_files() {
+        let root = std::env::temp_dir().join(format!("tect-keep-{}", std::process::id()));
+        if root.exists() {
+            fs::remove_dir_all(&root).unwrap();
+        }
+        let mine = [
+            "scripts/deploy.sh",
+            ".github/workflows/mine.yml",
+            "bases.kdl",
+        ];
+        for path in mine {
+            put(&root.join(path), "mine\n").unwrap();
+        }
+        let assets = Path::new(env!("CARGO_MANIFEST_DIR")).join("assets");
+        write(&root, "Example", &assets).unwrap();
+        for path in mine {
+            assert_eq!(
+                fs::read_to_string(root.join(path)).unwrap(),
+                "mine\n",
+                "{path}"
+            );
+        }
         fs::remove_dir_all(root).unwrap();
     }
 }

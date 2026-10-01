@@ -147,6 +147,30 @@
               },
               "satisfies": [],
               "refuses": []
+            },
+            {
+              "path": "core/latin",
+              "dir": "core/latin",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "files": {},
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "content": null,
+                "repo": false,
+                "source": null,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": [],
+              "refuses": []
             }
           ],
           "suppressed": [],

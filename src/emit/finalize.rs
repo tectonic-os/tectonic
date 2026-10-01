@@ -89,7 +89,7 @@ rm -rf {dest}.d
     }
 
     // The tail interpolates nothing, so it lives beside this file where
-    // `./lint.sh` reads it. Compiled in, never read at runtime: `scripts/tect.sh`
+    // `./lint.sh` reads it. Compiled in, never read at runtime: `tect.sh`
     // unpacks the binary alone.
     out.push('\n');
     out.push_str(include_str!("finalize.sh"));

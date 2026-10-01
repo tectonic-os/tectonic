@@ -1,0 +1,5 @@
+# `uv pip compile --python-version 3.12 --generate-hashes --no-header requirements.in -o requirements.txt` regenerates the pinned file.
+mkdocs
+mkdocs-shadcn
+pymdown-extensions
+pygments

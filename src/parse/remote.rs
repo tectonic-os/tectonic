@@ -12,13 +12,38 @@ use kdl::KdlNode;
 /// name is empty.
 #[rustfmt::skip]
 pub const COLLECTION: Node = Node::new("",
-    "One module collection, named by the owner its references use.")
+    "One module collection, where the node name is the owner that its references use.").about("A collection is a set of modules that another repository publishes. The node name is the owner name that module references use. A `pin` or a location says where the collection comes from.").scaffolds(&["pin"]).example("tectonic-os")
     .arg(Arg::Str, Say::NONE)
     .props(&[], Say::new("unknown collection property `{}`", "not part of the schema",
         "a collection carries its fields as child nodes, not properties"))
     .children(&[PIN], Say::new("unknown node `{}` in a collection", "not part of the schema",
         "a collection is either a directory on this machine, `{} \"../modules\"`, or a `pin` \
-         naming the archive it is fetched from"));
+         naming the archive it is fetched from"))
+    .lists(&[
+        ("A collection is one of two kinds:", &[
+            "An archive, if the collection holds a `pin`. `tect` fetches and verifies it like an \
+             out-of-tree module.",
+            "A directory on this machine, if the collection has a location argument. The location \
+             is relative to the repository root. `tect` reads it in place, and nothing is \
+             downloaded, pinned or hashed. The user can change the collection with no new archive \
+             for each edit.",
+        ]),
+        ("If the pin of a collection carries `unpinned`, then the collection follows a branch:", &[
+            "`tect create repo` scaffolds the collection that way.",
+            "Every import or copy downloads the branch again, and nothing checks what arrived.",
+            "Under `audit { enforce #true }`, an import or a copy is an error.",
+            "Without enforcement, an import runs the unverified content, and a copy lands in the \
+             tracked tree for review.",
+            "`tect check` names the collection above its counts and does not treat it as an \
+             error.",
+        ]),
+    ])
+    .notes(&[
+        "`tect` checks a collection location when a command reads the collection. A check of \
+         the repository does not check it, because a directory can exist on one machine only.",
+        "A tagged collection verifies every fetch, and every module in it shares the one \
+         version.",
+    ]);
 
 /// `sources { tectonic-os { pin { url "https://host/{version}.tar.gz" ... } };
 /// scratch "../modules" }` The node's name is the owner. An argument is a

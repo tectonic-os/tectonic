@@ -1,0 +1,2 @@
+apps:
+    @just --list

@@ -1,0 +1,8 @@
+4 modules, the ungated set.
+
+| Module | Description | Options | Satisfies | Refuses |
+| --- | --- | --- | --- | --- |
+| `hello` |  |  |  |  |
+| `menu` |  |  |  |  |
+| `apps` |  |  |  |  |
+| `apps/editor` |  |  |  |  |

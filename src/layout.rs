@@ -16,6 +16,11 @@ pub const KEYS: &str = "keys";
 const PUBLIC_KEYS: &str = "public";
 const PRIVATE_KEYS: &str = "private";
 
+/// The install logic of a module, which the build sources in its layer.
+pub const SCRIPT: &str = "module.sh";
+/// Containerfile lines that a module ships for the build to add verbatim.
+pub const FRAGMENT: &str = "Containerfile.inc";
+
 /// A module's overlay tree, staged into the image by the collector.
 pub const OVERLAY: &str = "files";
 
@@ -114,6 +119,71 @@ pub fn family_dirs(module_dir: &Path, family: &str) -> Vec<&'static str> {
         .collect()
 }
 
+/// Whether a directory inside a module is one that the module's own build
+/// reads. The walk for nested modules passes over it.
+pub fn module_owned(name: &str) -> bool {
+    name == OVERLAY
+        || name == SELINUX.dir
+        || name == APPARMOR.dir
+        || FAMILY_DIRS.iter().any(|(dir, _)| *dir == name)
+}
+
+/// Every module directory below `tree`, sorted. `marks` decides whether a
+/// directory is a module. The walk never enters a directory that `skip` names,
+/// and inside a module it passes over what `module_owned` names, because a
+/// module may hold modules of its own. A link to a directory is read as a
+/// module and never entered, so a link back to a parent cannot loop.
+pub fn module_dirs(
+    tree: &Path,
+    marks: impl Fn(&Path) -> bool,
+    skip: impl Fn(&str) -> bool,
+) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    // Each directory is paired with whether it is a module.
+    let mut dirs = vec![(tree.to_path_buf(), false)];
+    while let Some((dir, in_module)) = dirs.pop() {
+        for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            let path = entry.path();
+            if !path.is_dir() || skip(&name) || (in_module && module_owned(&name)) {
+                continue;
+            }
+            let module = marks(&path);
+            if module {
+                out.push(path.clone());
+            }
+            if !entry.file_type().is_ok_and(|kind| kind.is_symlink()) {
+                dirs.push((path, module));
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// The scripts that a repository keeps in place of the ones `generate` writes.
+pub const SCRIPTS: &str = "scripts";
+
+/// Where a tool-owned script lives, relative to the root. If the repository
+/// keeps its own copy in `scripts/`, then `generate` writes none.
+pub fn script(root: &Path, name: &str) -> String {
+    match root.join(SCRIPTS).join(name).is_file() {
+        true => format!("{SCRIPTS}/{name}"),
+        false => format!("{GENERATED}/{SCRIPTS}/{name}"),
+    }
+}
+
+/// Whether a directory under `modules/` is a module. A module may ship no
+/// module.kdl, so the files that a build reads at its root also mark it. A
+/// family directory does not, because a group of modules may carry a family's
+/// name.
+pub fn is_module(dir: &Path) -> bool {
+    dir.join(MODULE_FILE).is_file()
+        || dir.join(SCRIPT).is_file()
+        || dir.join(FRAGMENT).is_file()
+        || dir.join(OVERLAY).is_dir()
+}
+
 /// GitHub's path, not this repository's choice, which is why it is written
 /// here.
 pub const WORKFLOW_DIR: &str = ".github/workflows";
@@ -202,9 +272,174 @@ pub fn out(root: &Path) -> PathBuf {
     root.join(OUT)
 }
 
+/// One path that the schema reference lists. `path` is joined with nothing
+/// between the parts, so a part carries its own `/`.
+pub struct Place {
+    pub path: &'static [&'static str],
+    /// The command or the person that writes the path. If it is empty, then
+    /// the reference leaves the column out.
+    pub writer: &'static str,
+    /// Whether git tracks the path in a repository that `tect create repo`
+    /// scaffolds.
+    pub tracked: bool,
+    pub what: &'static str,
+}
+
+/// A page of the schema reference that describes where things sit, and not
+/// the grammar of one file.
+pub struct Tree {
+    /// The directory that the drawn tree hangs off.
+    pub root: &'static str,
+    pub intro: &'static str,
+    pub places: &'static [Place],
+    pub lists: &'static [(&'static str, &'static [&'static str])],
+    pub notes: &'static [&'static str],
+}
+
+/// Where everything sits in a repository.
+#[rustfmt::skip]
+pub const REPOSITORY: Tree = Tree {
+    root: "<repository>/",
+    intro: "A repository is a git repository with `repo.kdl` at its root, which is how `tect` \
+        finds the root. `tect create repo` scaffolds the layout below. Every path that `tect` \
+        reads or writes has a fixed place, so every repository looks alike.",
+    places: &[
+        Place { path: &[REPO_FILE], writer: "`tect create repo`, then the user", tracked: true,
+            what: "The settings of the whole repository. See [`repo.kdl`](repo.md)." },
+        Place { path: &[IMAGE_FILE], writer: "`tect create image`, then the user", tracked: true,
+            what: "The images of the repository. See [`image.kdl`](image.md)." },
+        Place { path: &["<name>", IMAGE_SUFFIX], writer: "`tect create image`, then the user", tracked: true,
+            what: "More images. The name in front of the suffix is decorative." },
+        Place { path: &[MODULES, "/"], writer: "the user, `tect create module` or `tect copy module`", tracked: true,
+            what: "The modules of the repository, one directory each. See [Modules](modules.md)." },
+        Place { path: &[MODULES, "/", crate::model::remote::REMOTE_DIR, "/"], writer: "`tect`", tracked: false,
+            what: "The modules that an image pins from another repository, fetched and verified \
+                against their hash." },
+        Place { path: &[KEYS, "/", PUBLIC_KEYS, "/"], writer: "`tect create key` or `tect set key`", tracked: true,
+            what: "The public half of each key, at the path it has in the image." },
+        Place { path: &[KEYS, "/", PRIVATE_KEYS, "/"], writer: "`tect create key`", tracked: false,
+            what: "The private half of each key. The build never copies it into the image." },
+        Place { path: &[GENERATED, "/"], writer: "`tect generate`", tracked: true,
+            what: "Everything that `tect generate` writes. `tect verify` compares it byte for \
+                byte, so the user does not edit it." },
+        Place { path: &[SCRIPTS, "/"], writer: "`tect create scripts`, then the user", tracked: true,
+            what: "The scripts that the repository keeps in place of the ones `tect generate` \
+                writes into `generated/scripts/`." },
+        Place { path: &[WORKFLOW_DIR, "/"], writer: "`tect generate`", tracked: true,
+            what: "The CI workflows that `workflows` in `repo.kdl` names." },
+        Place { path: &[OUT, "/"], writer: "`tect`", tracked: false,
+            what: "Local exports, caches and scratch. `tect` reads nothing here as a declaration." },
+        Place { path: &[SOURCES_CACHE, "/"], writer: "`tect`", tracked: false,
+            what: "The collections that `tect` fetches. An imported module is read from here." },
+        Place { path: &[".gitignore"], writer: "`tect create repo`", tracked: true,
+            what: "Keeps `keys/private/`, `out/` and `modules/.remote/` out of git." },
+    ],
+    lists: &[],
+    notes: &[],
+};
+
+/// Where everything sits in one module directory.
+#[rustfmt::skip]
+pub const MODULE_DIR: Tree = Tree {
+    root: "modules/<module-name>/",
+    intro: "A module is a directory under `modules/`, at whatever depth groups it, and its path \
+        names the module. The build reads the files below by convention, so a module can be as \
+        small as one `module.sh`. A module can also hold other modules. The walk that finds \
+        modules passes over the directories that the build of a module reads.",
+    places: &[
+        Place { path: &[MODULE_FILE], writer: "", tracked: true,
+            what: "What the module declares about itself. A module with only a script and \
+                `files/` can leave it out. A module fetched from another repository needs one. \
+                See [`module.kdl`](module.md)." },
+        Place { path: &[SCRIPT], writer: "", tracked: true,
+            what: "The install logic. The build sources it in the layer of the module." },
+        Place { path: &["finalize.sh"], writer: "", tracked: true,
+            what: "The finalize phase sources it, in resolved order." },
+        Place { path: &[OVERLAY, "/"], writer: "", tracked: true,
+            what: "An overlay that the build copies over `/`." },
+        Place { path: &["repo"], writer: "", tracked: true,
+            what: "A package repository file. The build sources it first. On Fedora, if the \
+                `REPO_ID` of `repo` is already configured, then the build skips it." },
+        Place { path: &[FRAGMENT], writer: "", tracked: true,
+            what: "Containerfile lines that the build adds verbatim, for a need that the \
+                fields cannot express. `fragment` in `module.kdl` places them." },
+        Place { path: &[SELINUX.dir, "/*.te"], writer: "", tracked: true,
+            what: "SELinux policy. If the image provides `selinux-policy`, then the build \
+                compiles and installs it." },
+        Place { path: &[APPARMOR.dir, "/"], writer: "", tracked: true,
+            what: "AppArmor profiles. If the image provides `apparmor-policy`, then the build \
+                validates them and places them in `/etc/apparmor.d`." },
+        Place { path: &["<family>/"], writer: "", tracked: true,
+            what: "The files of the module that apply to one base family." },
+        Place { path: &["<collected file>"], writer: "", tracked: true,
+            what: "A part of a file that another module collects. The build stages it for that \
+                module." },
+        Place { path: &[RECORD_FILE], writer: "", tracked: true,
+            what: "Where a copied module came from, which `tect copy module` writes. See \
+                [`provenance.kdl`](provenance.md)." },
+    ],
+    lists: &[
+        ("A policy directory follows these rules:", &[
+            "A module that ships `selinux/` or `apparmor/` builds after the module that provides \
+             that MAC, as if it declared `after`.",
+            "A module can ship both policy directories. The build takes each directory only where \
+             the image has that MAC. An image with no MAC installs no policy and needs no provider.",
+            "A policy directory declares no requirement. A module that needs a MAC declares \
+             `requires \"selinux-policy\"` or `requires \"apparmor-policy\"`, and `tect` refuses \
+             it on an image without that MAC.",
+        ]),
+        ("A `<family>/` directory gates `module.sh`, `finalize.sh`, `files/`, `repo` and a \
+          collected file:", &[
+            "The six directory names are `fedora/`, `rhel/`, `debian/`, `ubuntu/`, `rpm/` and \
+             `deb/`. The build reads no other directory in a module.",
+            "The build takes `deb/` on Debian and Ubuntu, and `rpm/` on Fedora and RHEL. It takes \
+             `debian/` on Debian only, after `deb/`.",
+            "A gated half runs after the ungated half. The family `files/` is copied over the \
+             shared `files/`, and the family `module.sh` is sourced after the shared `module.sh`.",
+            "A family `repo` replaces the other copies. `debian/repo` wins over `deb/repo`, which \
+             wins over the `repo` at the module root, and the build sources only the winner.",
+            "If the directory names a family that the module does not `supports`, then `tect` \
+             refuses it.",
+        ]),
+    ],
+    notes: &[
+        "A module with no `<family>/` directory gates nothing. Its `module.sh` and `files/` run on \
+         every family it supports.",
+    ],
+};
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A link back to a parent would loop, and a module's `files/` could hold a
+    /// file named module.kdl that is overlay content and not a module. A link
+    /// to a module is how a user shares one module between two trees.
+    #[test]
+    fn the_walk_finds_nested_modules_and_passes_over_module_content() {
+        let root = std::env::temp_dir().join(format!("tect-module-dirs-{}", std::process::id()));
+        if root.exists() {
+            std::fs::remove_dir_all(&root).unwrap();
+        }
+        for dir in ["a/b", "a/files/c", "a/fedora/d", ".git/e", "group/f"] {
+            std::fs::create_dir_all(root.join(dir)).unwrap();
+            std::fs::write(root.join(dir).join(MODULE_FILE), "").unwrap();
+        }
+        std::fs::write(root.join("a").join(MODULE_FILE), "").unwrap();
+        std::os::unix::fs::symlink(&root, root.join("a/b/loop")).unwrap();
+        std::os::unix::fs::symlink(root.join("group/f"), root.join("linked")).unwrap();
+
+        let found: Vec<String> = module_dirs(
+            &root,
+            |path| path.join(MODULE_FILE).is_file(),
+            |name| name.starts_with('.'),
+        )
+        .iter()
+        .map(|path| path.strip_prefix(&root).unwrap().display().to_string())
+        .collect();
+        assert_eq!(found, ["a", "a/b", "group/f", "linked"]);
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     /// The shared directory is taken before the family's own, so a `rhel/`
     /// file lands over the `rpm/` one it replaces.

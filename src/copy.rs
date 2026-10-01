@@ -86,6 +86,12 @@ pub const PUBLISH_SCHEDULED: &str = "Publish images only on scheduled builds?";
 pub const SCAN_SCHEDULED: &str = "Run image scans only on scheduled builds?";
 pub const DAILY_AT: &str = "what time the daily build runs, UTC";
 
+// The scripts a repository keeps
+
+pub const SCRIPTS: &str = "Which files to keep in scripts/?";
+pub const SCRIPTS_NEXT: &str =
+    "run `tect generate` so the generated scripts and workflows call the copies in scripts/";
+
 // What is measured, and what claims it
 
 pub const WHICH_IMAGE: &str = "Which image?";
@@ -160,6 +166,7 @@ pub const ROW_WORKFLOWS: &str = "workflows";
 pub const ROW_PUBLISH: &str = "publish";
 pub const ROW_SCANS: &str = "image scans";
 pub const ROW_DAILY: &str = "daily build";
+pub const ROW_SCRIPTS: &str = "scripts kept";
 pub const REMOTE_MADE: &str = "created on push";
 pub const REMOTE_NOT: &str = "not created";
 pub const ON_EVERY_PUSH: &str = "on every push";

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# The script runs from scripts/ or from generated/scripts/.
+[ -f repo.kdl ] || cd ..
 
 die() {
     echo "tect: $*" >&2

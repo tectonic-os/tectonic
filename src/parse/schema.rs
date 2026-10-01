@@ -49,8 +49,8 @@ pub enum Arg {
     Int,
     /// Every positional string, as the list it looks like.
     Strs,
-    /// Exactly two positional strings, described by their roles.
-    StrPair(&'static str),
+    /// Exactly two positional strings, named by their roles in order.
+    StrPair(&'static str, &'static str),
     /// One of a closed set of strings.
     One(&'static [&'static str]),
     /// One of a closed set of strings, or no argument. A node takes it where
@@ -83,6 +83,9 @@ pub struct Prop {
 pub struct Node {
     pub name: &'static str,
     pub desc: &'static str,
+    /// The section intro of the schema reference, which says what the node is
+    /// for and why the user writes it. A table row keeps the one-line `desc`.
+    pub about: &'static str,
     pub arg: Arg,
     /// A missing argument, or one given to a node that takes none.
     pub arg_say: Say,
@@ -101,6 +104,27 @@ pub struct Node {
     pub children: &'static [Node],
     /// A child not in `children`.
     pub child_say: Say,
+    /// Behaviour the schema reference states after its tables, one sentence
+    /// or two per note.
+    pub notes: &'static [&'static str],
+    /// What each value of the node does, as a Markdown label and its effect.
+    /// The schema reference tabulates them under the value the node accepts.
+    pub values: &'static [(&'static str, &'static str)],
+    /// A lead sentence and the items it introduces, which the schema reference
+    /// renders as a list. A list holds cases that a note would chain in one
+    /// sentence.
+    pub lists: &'static [(&'static str, &'static [&'static str])],
+    /// What the schema reference writes after the node name in an example.
+    /// An author-named node writes its name here too.
+    pub example: &'static str,
+    /// Whether the minimal example shows the node although the walker does
+    /// not require it. A check outside the walker requires it, or a choice of
+    /// one among its siblings does.
+    pub minimal: bool,
+    /// The children that `tect create` writes into this block, by name. A
+    /// shared node sits in several blocks, so the block names it, and the node
+    /// does not flag itself.
+    pub scaffolds: &'static [&'static str],
 }
 
 impl Node {
@@ -108,6 +132,7 @@ impl Node {
         Node {
             name,
             desc,
+            about: "",
             arg: Arg::None,
             arg_say: Say::NONE,
             missing: Say::NONE,
@@ -119,7 +144,51 @@ impl Node {
             prop_say: Say::NONE,
             children: &[],
             child_say: Say::NONE,
+            notes: &[],
+            values: &[],
+            lists: &[],
+            example: "",
+            minimal: false,
+            scaffolds: &[],
         }
+    }
+
+    pub const fn scaffolds(mut self, names: &'static [&'static str]) -> Node {
+        self.scaffolds = names;
+        self
+    }
+
+    pub const fn about(mut self, about: &'static str) -> Node {
+        self.about = about;
+        self
+    }
+
+    pub const fn example(mut self, example: &'static str) -> Node {
+        self.example = example;
+        self
+    }
+
+    pub const fn minimal(mut self) -> Node {
+        self.minimal = true;
+        self
+    }
+
+    pub const fn notes(mut self, notes: &'static [&'static str]) -> Node {
+        self.notes = notes;
+        self
+    }
+
+    pub const fn values(mut self, values: &'static [(&'static str, &'static str)]) -> Node {
+        self.values = values;
+        self
+    }
+
+    pub const fn lists(
+        mut self,
+        lists: &'static [(&'static str, &'static [&'static str])],
+    ) -> Node {
+        self.lists = lists;
+        self
     }
 
     pub const fn arg(mut self, arg: Arg, say: Say) -> Node {
@@ -164,6 +233,22 @@ impl Node {
 
 /// A document whose top-level nodes are the schema's children, which is what a
 /// file with no one node wrapping it looks like.
+/// The walker's findings on `text`. If `declared` is true, then the text
+/// writes `schema` itself, and otherwise it writes the children of `schema`.
+/// A text that is not KDL fails with the parser's message.
+#[cfg(test)]
+pub fn check_text(text: &str, schema: &Node, declared: bool) -> Result<Issues, String> {
+    let doc: KdlDocument = text.parse().map_err(|err| format!("{err}"))?;
+    let src = Source::new(schema.name, text);
+    let mut issues = Issues::default();
+    match (declared, doc.nodes().first()) {
+        (true, Some(node)) => check(node, schema, &src, &mut issues),
+        (true, None) => return Err(format!("`{}` writes no node", schema.name)),
+        (false, _) => check_doc(&doc, schema, &src, &mut issues),
+    }
+    Ok(issues)
+}
+
 pub fn check_doc(doc: &KdlDocument, schema: &Node, src: &Source, issues: &mut Issues) {
     walk(doc.nodes(), schema, Span::default(), src, issues);
 }
@@ -202,7 +287,7 @@ pub fn check(node: &KdlNode, schema: &Node, src: &Source, issues: &mut Issues) {
                 schema.arg_say.raise(about, here, src, issues);
             }
         }
-        Arg::StrPair(_) => {
+        Arg::StrPair(..) => {
             let args: Vec<_> = node
                 .entries()
                 .iter()

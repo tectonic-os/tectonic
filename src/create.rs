@@ -1,5 +1,6 @@
-//! `create repo`, `create image` and `create module`. Every step of a chain is
-//! also a command: `create repo` calls `create image` in place.
+//! `create repo`, `create image`, `create module` and `create scripts`. Every
+//! step of a chain is also a command: `create repo` calls `create image` and
+//! `create scripts` in place.
 //!
 //! Each of them collects every answer first and writes afterwards, which is why
 //! no `apply` takes a `Prompt`.
@@ -9,7 +10,7 @@ use crate::diag::Issues;
 use crate::layout;
 use common::prompt::Prompt;
 pub use common::ui::tree::Change;
-use common::ui::Choice;
+use common::ui::{Answer, Choice};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -54,6 +55,7 @@ pub enum Field {
     Publish,
     Scans,
     Daily,
+    Scripts,
 }
 
 /// What the flags gave, which only the first pass reads. A field asked again
@@ -84,6 +86,7 @@ pub struct Repo {
     /// The CI to generate, asked through the struct `set workflows` uses so the
     /// two cannot drift. Absent where there is no origin to run it on.
     workflows: Option<crate::set::Workflows>,
+    scripts: Scripts,
     remote: bool,
     install_gh: bool,
 }
@@ -307,6 +310,13 @@ impl Repo {
                 }
             }
         };
+        let scripts = match prev {
+            Some(prev) if from > Field::Scripts => prev.scripts.clone(),
+            _ => {
+                let held = prev.map_or(&[SKELETON_FILE][..], |prev| &prev.scripts.chosen[..]);
+                Scripts::collect(&root, &[], held, prompt)?.unwrap_or_default()
+            }
+        };
         Ok(Self {
             name,
             id,
@@ -316,6 +326,7 @@ impl Repo {
             assets,
             image,
             workflows,
+            scripts,
             remote,
             install_gh,
         })
@@ -365,6 +376,7 @@ impl Repo {
             )),
             (None, false) => {}
         }
+        rows.push(self.scripts.row());
         rows
     }
 
@@ -383,6 +395,7 @@ impl Repo {
             // repo.kdl is already in `wrote`, as the file this run created.
             workflows.apply(&self.root)?;
         }
+        wrote.extend(self.scripts.apply(&self.root)?);
         if let (true, Some(owner)) = (self.remote, &self.owner) {
             create_remote(owner, &self.id)?;
             println!("created {}/{} on github", owner, self.id);
@@ -413,6 +426,131 @@ impl Repo {
         let next: Vec<String> = next.iter().map(|line| format!("\x20 {line}")).collect();
         println!("\nnext:\n{}\n", next.join("\n"));
         Ok(())
+    }
+}
+
+/// The skeleton takes this file name in `scripts/`.
+const SKELETON_FILE: &str = "Containerfile.skeleton";
+
+/// Every file a repository may keep in `scripts/`, with what it does. If the
+/// repository keeps one, then `tect` uses that copy in place of its own.
+fn offered() -> Vec<(&'static str, &'static str, &'static str)> {
+    std::iter::once((
+        SKELETON_FILE,
+        "the Containerfile around the generated module layers",
+        crate::init::SKELETON,
+    ))
+    .chain(
+        crate::emit::SCRIPTS
+            .iter()
+            .map(|script| (script.name, script.about, script.body)),
+    )
+    .collect()
+}
+
+/// `create scripts` copies the chosen files into `scripts/`.
+#[derive(Clone, Default)]
+pub struct Scripts {
+    chosen: Vec<&'static str>,
+}
+
+impl Scripts {
+    /// `names` skips the picker. The picker offers only the files that
+    /// `scripts/` does not hold yet, and opens on `held`.
+    pub fn collect(
+        root: &Path,
+        names: &[&str],
+        held: &[&str],
+        prompt: &Prompt,
+    ) -> Result<Option<Self>, String> {
+        let open: Vec<_> = offered()
+            .into_iter()
+            .filter(|(name, _, _)| !root.join(layout::SCRIPTS).join(name).exists())
+            .collect();
+        if !names.is_empty() {
+            let chosen = names
+                .iter()
+                .map(|name| match open.iter().find(|(open, _, _)| open == name) {
+                    Some((open, _, _)) => Ok(*open),
+                    None if root.join(layout::SCRIPTS).join(name).exists() => {
+                        Err(format!("scripts/{name} is already the repository's own"))
+                    }
+                    None => Err(format!(
+                        "`{name}` is not a file tect supplies; it supplies {}",
+                        offered()
+                            .iter()
+                            .map(|(name, _, _)| *name)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )),
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            return Ok(Some(Self { chosen }));
+        }
+        let options: Vec<Choice> = open
+            .iter()
+            .map(|(name, about, _)| Choice::new(*name, *about))
+            .collect();
+        let on: Vec<usize> = open
+            .iter()
+            .enumerate()
+            .filter(|(_, (name, _, _))| held.contains(name))
+            .map(|(at, _)| at)
+            .collect();
+        let Answer::Chosen(chosen) = prompt.choose_many(copy::SCRIPTS, &options, &on)? else {
+            return Ok(None);
+        };
+        Ok(Some(Self {
+            chosen: chosen.iter().map(|at| open[*at].0).collect(),
+        }))
+    }
+
+    fn row(&self) -> (Field, &'static str, String) {
+        (
+            Field::Scripts,
+            copy::ROW_SCRIPTS,
+            match self.chosen.is_empty() {
+                true => copy::NONE.to_string(),
+                false => self.chosen.join(", "),
+            },
+        )
+    }
+
+    /// Writes each chosen file, then points every copied script at the other
+    /// scripts where they now live. A script that the repository already keeps
+    /// moves with them if it still matches what tect supplied, because the
+    /// user has not changed it.
+    pub fn apply(&self, root: &Path) -> Result<Vec<(PathBuf, Change)>, String> {
+        let kept = |name: &str| root.join(layout::SCRIPTS).join(name);
+        let unchanged: Vec<_> = crate::emit::SCRIPTS
+            .iter()
+            .filter(|script| {
+                !self.chosen.contains(&script.name)
+                    && std::fs::read_to_string(kept(script.name))
+                        .is_ok_and(|held| held == crate::emit::located(root, script.body))
+            })
+            .map(|script| (script.name, script.body, Change::Updated(String::new())))
+            .collect();
+        let chosen: Vec<_> = offered()
+            .into_iter()
+            .filter(|(name, _, _)| self.chosen.contains(name))
+            .map(|(name, _, body)| (name, body, Change::Created))
+            .collect();
+        for (name, body, _) in &chosen {
+            crate::init::put(&kept(name), body)?;
+        }
+        let mut wrote = Vec::new();
+        for (name, body, change) in chosen.into_iter().chain(unchanged) {
+            let at = kept(name);
+            crate::init::put(&at, &crate::emit::located(root, body))?;
+            if name.ends_with(".sh") {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&at, std::fs::Permissions::from_mode(0o755))
+                    .map_err(|err| format!("{}: {err}", at.display()))?;
+            }
+            wrote.push((PathBuf::from(layout::SCRIPTS).join(name), change));
+        }
+        Ok(wrote)
     }
 }
 
@@ -1548,6 +1686,34 @@ fn create_remote(owner: &str, id: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A kept script calls the other scripts by path, so a second copy moves
+    /// the calls in a kept script the user left as it was, and only in that one.
+    #[test]
+    fn a_second_kept_script_moves_the_calls_of_an_unchanged_one() {
+        let root = std::env::temp_dir().join(format!("tect-kept-{}", std::process::id()));
+        if root.exists() {
+            std::fs::remove_dir_all(&root).unwrap();
+        }
+        let keep = |names: &[&'static str]| {
+            Scripts {
+                chosen: names.to_vec(),
+            }
+            .apply(&root)
+            .unwrap()
+        };
+        keep(&["lint.sh", "smoke.sh"]);
+        let smoke = root.join("scripts/smoke.sh");
+        let edited = std::fs::read_to_string(&smoke).unwrap() + "# reviewed\n";
+        std::fs::write(&smoke, &edited).unwrap();
+
+        keep(&["tect.sh"]);
+        let lint = std::fs::read_to_string(root.join("scripts/lint.sh")).unwrap();
+        assert!(lint.contains("\n./scripts/tect.sh check\n"), "{lint}");
+        assert!(!lint.contains("generated/scripts/tect.sh"), "{lint}");
+        assert_eq!(std::fs::read_to_string(&smoke).unwrap(), edited);
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     /// Two collections' worth and two of one collection's, so the block a fresh
     /// image opens with is one `source` per collection.

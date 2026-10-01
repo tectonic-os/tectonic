@@ -131,7 +131,7 @@ fn note_pin(root: &Path) {
         eprintln!(
             "tect: this repository pins tect {version} and this is {}, so what it generates may \
              differ; `tect generate` writes this release's output, `tect-version` moves the pin, \
-             and `scripts/tect.sh` fetches the pinned release",
+             and `tect.sh` fetches the pinned release",
             crate::model::image::TECT_VERSION
         );
     }
@@ -453,6 +453,19 @@ pub fn dispatch(
                 return Ok(ExitCode::from(REPO_ERROR));
             };
             crate::key::Key::collect(&root, kind, module_arg, cn, prompt)?.apply(&root)?;
+            Ok(ExitCode::SUCCESS)
+        }
+        Verb::CreateScripts => {
+            let Some(root) = open(here)? else {
+                return Ok(ExitCode::from(REPO_ERROR));
+            };
+            if let Some(scripts) = crate::create::Scripts::collect(&root, rest, &[], prompt)? {
+                let wrote = scripts.apply(&root)?;
+                crate::create::report(&root, &wrote);
+                if !wrote.is_empty() {
+                    println!("{}", crate::copy::SCRIPTS_NEXT);
+                }
+            }
             Ok(ExitCode::SUCCESS)
         }
         Verb::SetKey => {
@@ -967,12 +980,8 @@ fn reading(
         for line in crate::init::drifted(&root) {
             eprintln!("tect: {line}");
         }
-        for line in run.index.hidden() {
-            eprintln!("tect: {line}");
-        }
-        // `hidden` concludes from silence the same way `coverage` does: a
-        // collection that is declared and not on this machine is not walked, so
-        // a clean `check` on a fresh clone would read as one that looked.
+        // A collection that is declared and not on this machine is not walked,
+        // so a clean `check` on a fresh clone would read as one that looked.
         match run.index.unsearched() {
             clause if clause.is_empty() => {}
             clause => eprintln!("tect: {clause}"),
