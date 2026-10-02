@@ -2,6 +2,17 @@
 
 Each release's section is written from the typed subjects on `main`.
 
+## 0.6.50 (2026-10-02)
+
+### Features
+
+- add a security-policy network rule (#7)
+- nested modules, generated scripts and a docs site (#8)
+
+### Fixes
+
+- bump common, pin choices read optional (#9)
+
 ## 0.6.49 (2026-09-27)
 
 ### Features
