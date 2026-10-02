@@ -118,9 +118,11 @@ pub struct Node {
     /// An author-named node writes its name here too.
     pub example: &'static str,
     /// Whether the minimal example shows the node although the walker does
-    /// not require it. A check outside the walker requires it, or a choice of
-    /// one among its siblings does.
+    /// not require it. A check outside the walker requires it.
     pub minimal: bool,
+    /// Whether the minimal example shows the node as its pick among siblings
+    /// of which the file writes one. The schema reference marks it optional.
+    pub pick: bool,
     /// The children that `tect create` writes into this block, by name. A
     /// shared node sits in several blocks, so the block names it, and the node
     /// does not flag itself.
@@ -149,6 +151,7 @@ impl Node {
             lists: &[],
             example: "",
             minimal: false,
+            pick: false,
             scaffolds: &[],
         }
     }
@@ -170,6 +173,12 @@ impl Node {
 
     pub const fn minimal(mut self) -> Node {
         self.minimal = true;
+        self
+    }
+
+    pub const fn pick(mut self) -> Node {
+        self.minimal = true;
+        self.pick = true;
         self
     }
 

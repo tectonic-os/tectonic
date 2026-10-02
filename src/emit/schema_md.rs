@@ -124,7 +124,7 @@ fn block_required(node: &Node) -> bool {
 /// Whether the file must write the field, and whether the field can be
 /// written again.
 fn presence(node: &Node) -> String {
-    let need = match is_minimal(node) {
+    let need = match is_minimal(node) && !node.pick {
         true => "required",
         false => "optional",
     };

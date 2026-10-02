@@ -17,7 +17,7 @@ const ARCHIVES: [&str; 5] = [".tar.gz", ".tgz", ".tar.xz", ".tar.zst", ".tar.bz2
 /// The annotation Renovate matches, declared as data so this can check it.
 #[rustfmt::skip]
 const RENOVATE: Node = Node::new("renovate",
-    "The Renovate custom manager that keeps `version` current.").example("datasource=\"github-tags\" depName=\"owner/repo\"").minimal()
+    "The Renovate custom manager that keeps `version` current.").example("datasource=\"github-tags\" depName=\"owner/repo\"").pick()
     .arg(Arg::None, Say::new("`renovate` takes no arguments", "unexpected value",
         "`renovate datasource=\"github-releases\" depName=\"owner/repo\"`"))
     .once("")
@@ -84,7 +84,7 @@ pub const PIN: Node = Node::new("pin",
             .arg(Arg::Str, NEEDS_VALUE).once(""),
         Node::new("url", "Where the content comes from.").example("\"https://github.com/owner/repo/archive/refs/tags/{version}.tar.gz\"").minimal()
             .arg(Arg::Str, NEEDS_VALUE).once(""),
-        Node::new("sha256", "The hash the fetched content must match.").example("\"b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3\"").minimal()
+        Node::new("sha256", "The hash the fetched content must match.").example("\"b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3\"").pick()
             .arg(Arg::Str, NEEDS_VALUE).once("")
             .props(&[
                 Prop { name: "from", kind: Kind::One(&["asset", "sidecar", "manual"]),

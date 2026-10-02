@@ -290,12 +290,12 @@ A pin holds exactly one of these, so every pin says how it stays current:
 
 | Field | Accepts | Description |
 | --- | --- | --- |
-| [`renovate`](#sources-name-pin-renovate) (required) |  | The Renovate custom manager that keeps `version` current. |
+| [`renovate`](#sources-name-pin-renovate) (optional) |  | The Renovate custom manager that keeps `version` current. |
 | [`manual`](#sources-name-pin-manual) (optional) | *string* | Why nothing tracks this pin. |
 | [`unpinned`](#sources-name-pin-unpinned) (optional) | *string* | Why this pin follows a moving ref with no `sha256`. |
 | [`version`](#sources-name-pin-version) (required) | *string* | The version, tag or commit that `url` expands and Renovate rewrites. |
 | [`url`](#sources-name-pin-url) (required) | *string* | Where the content comes from. |
-| [`sha256`](#sources-name-pin-sha256) (required) | *string* | The hash the fetched content must match. |
+| [`sha256`](#sources-name-pin-sha256) (optional) | *string* | The hash the fetched content must match. |
 | [`path`](#sources-name-pin-path) (optional) | *string* | The directory inside the archive that holds the content. |
 
 > [!NOTE]
@@ -307,7 +307,7 @@ A pin holds exactly one of these, so every pin says how it stays current:
 
 <a id="sources-name-pin-renovate"></a>
 
-##### `renovate` (required)
+##### `renovate` (optional)
 
 The Renovate custom manager that keeps `version` current.
 
@@ -408,7 +408,7 @@ Accepts: *string*
 
 <a id="sources-name-pin-sha256"></a>
 
-##### `sha256` (required)
+##### `sha256` (optional)
 
 The hash the fetched content must match.
 

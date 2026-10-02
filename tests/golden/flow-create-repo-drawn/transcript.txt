@@ -32,7 +32,7 @@ Added github.com/someone/example as the origin repo
 
 
 
-[1;1H[1m[38;2;90;86;224;49mWhich workflows?[2;1H[38;2;238;111;248;49m> [x] build  [2mbuilds, scans, signs and publishes every image[22m[1m                     [3;3H[22m[2m[39;49m[ ] build-disk[3;19Hneeds a fedora or rhel image[4;3H[22m[x][4;7Hbase-sig-probe[4;23H[2mmeasures what each base signs and ships, and fixes it[5;3H[22m[x][5;7Hcleanup-registry[5;25H[2mprunes old versions of the images off the registry[6;3H[ ] kernel-freshness[6;25Hneeds a module taking a KERNEL arg[7;3H[22m[x][7;7Hsmoke-test[7;19H[2minstalls the image to a disk and boots it under qemu[8;1Hspace toggles, enter confirms, esc cancels[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hWhich workflows?: build, base-sig-probe, cleanup-registry, smoke-test
+[1;1H[1m[38;2;90;86;224;49mWhich workflows?[2;1H[38;2;238;111;248;49m> [x] build  [2mbuilds, scans, signs and publishes every image[22m[1m                     [3;1H[22m[2m[39;49m  [ ] build-disk[3;19Hneeds a fedora or rhel image[4;3H[22m[x][4;7Hbase-sig-probe[4;23H[2mmeasures what each base signs and ships, and fixes it[5;3H[22m[x][5;7Hcleanup-registry[5;25H[2mprunes old versions of the images off the registry[6;1H  [ ] kernel-freshness[6;25Hneeds a module taking a KERNEL arg[7;3H[22m[x][7;7Hsmoke-test[7;19H[2minstalls the image to a disk and boots it under qemu[8;1Hspace toggles, enter confirms, esc cancels[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hWhich workflows?: build, base-sig-probe, cleanup-registry, smoke-test
 
 [6n
 
