@@ -646,12 +646,12 @@ A pin holds exactly one of these, so every pin says how it stays current:
 
 | Field | Accepts | Description |
 | --- | --- | --- |
-| [`renovate`](#image-modules-module-pin-renovate) (required) |  | The Renovate custom manager that keeps `version` current. |
+| [`renovate`](#image-modules-module-pin-renovate) (optional) |  | The Renovate custom manager that keeps `version` current. |
 | [`manual`](#image-modules-module-pin-manual) (optional) | *string* | Why nothing tracks this pin. |
 | [`unpinned`](#image-modules-module-pin-unpinned) (optional) | *string* | Why this pin follows a moving ref with no `sha256`. |
 | [`version`](#image-modules-module-pin-version) (required) | *string* | The version, tag or commit that `url` expands and Renovate rewrites. |
 | [`url`](#image-modules-module-pin-url) (required) | *string* | Where the content comes from. |
-| [`sha256`](#image-modules-module-pin-sha256) (required) | *string* | The hash the fetched content must match. |
+| [`sha256`](#image-modules-module-pin-sha256) (optional) | *string* | The hash the fetched content must match. |
 | [`path`](#image-modules-module-pin-path) (optional) | *string* | The directory inside the archive that holds the content. |
 
 > [!NOTE]
@@ -663,7 +663,7 @@ A pin holds exactly one of these, so every pin says how it stays current:
 
 <a id="image-modules-module-pin-renovate"></a>
 
-###### `renovate` (required)
+###### `renovate` (optional)
 
 The Renovate custom manager that keeps `version` current.
 
@@ -774,7 +774,7 @@ Accepts: *string*
 
 <a id="image-modules-module-pin-sha256"></a>
 
-###### `sha256` (required)
+###### `sha256` (optional)
 
 The hash the fetched content must match.
 

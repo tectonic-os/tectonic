@@ -129,7 +129,8 @@ pub fn os_release() -> Result<(), String> {
     let name = env("IMAGE_NAME").ok_or("IMAGE_NAME is unset: the image declares no name")?;
     let version = env("IMAGE_VERSION").unwrap_or_else(|| "dev".to_string());
     let pretty = env("IMAGE_PRETTY_NAME").unwrap_or_else(|| format!("{name} {version}"));
-    let hostname = env("IMAGE_ID").unwrap_or_else(|| name.to_lowercase());
+    let hostname =
+        env("IMAGE_ID").ok_or("IMAGE_ID is unset: the generated Containerfile passes it")?;
 
     let mut set: Vec<(&str, String)> = vec![
         ("NAME", name),

@@ -511,12 +511,12 @@ A pin holds exactly one of these, so every pin says how it stays current:
 
 | Field | Accepts | Description |
 | --- | --- | --- |
-| [`renovate`](#asset-pin-renovate) (required) |  | The Renovate custom manager that keeps `version` current. |
+| [`renovate`](#asset-pin-renovate) (optional) |  | The Renovate custom manager that keeps `version` current. |
 | [`manual`](#asset-pin-manual) (optional) | *string* | Why nothing tracks this pin. |
 | [`unpinned`](#asset-pin-unpinned) (optional) | *string* | Why this pin follows a moving ref with no `sha256`. |
 | [`version`](#asset-pin-version) (required) | *string* | The version, tag or commit that `url` expands and Renovate rewrites. |
 | [`url`](#asset-pin-url) (required) | *string* | Where the content comes from. |
-| [`sha256`](#asset-pin-sha256) (required) | *string* | The hash the fetched content must match. |
+| [`sha256`](#asset-pin-sha256) (optional) | *string* | The hash the fetched content must match. |
 | [`path`](#asset-pin-path) (optional) | *string* | The directory inside the archive that holds the content. |
 
 > [!NOTE]
@@ -528,7 +528,7 @@ A pin holds exactly one of these, so every pin says how it stays current:
 
 <a id="asset-pin-renovate"></a>
 
-#### `renovate` (required)
+#### `renovate` (optional)
 
 The Renovate custom manager that keeps `version` current.
 
@@ -619,7 +619,7 @@ Accepts: *string*
 
 <a id="asset-pin-sha256"></a>
 
-#### `sha256` (required)
+#### `sha256` (optional)
 
 The hash the fetched content must match.
 
