@@ -1,163 +1,181 @@
-# tect
+# Tectonic
 
-`tect` is the build tool for a bootc image repository. The repository declares
-what its images are made of, in KDL, and `tect` resolves that into everything
-the build needs: the order the modules layer in, the options each one is given,
-the capabilities they satisfy for each other, and the generated Containerfile
-section that comes out of it.
+Tectonic is a framework for building bootc Linux images. It consists of a
+repository schema and `tect`, the command-line tool that turns image
+declarations into reproducible local and CI build workflows.
 
-Nothing in the build derives a name, a target, a tag or an order. The tool
-does, once, and the shell that runs inside a layer is handed the result.
+A Tectonic repository declares its images, modules, inputs, and policies.
+`tect` checks their composition, resolves them into an inspectable build plan,
+generates reviewable build files and workflows, builds the images, and records
+what each build resolved.
 
-## Installing it
+> [!NOTE]
+> Tectonic is in active development. The schema and command line may change
+> between minor releases. Only the latest release is supported.
 
-    curl -fsSL https://raw.githubusercontent.com/tectonic-os/tectonic/main/install.sh | sh
+## Why Tectonic
 
-That places the binary and the scaffolding it copies, together:
-`~/.local/bin/tect` with `~/.local/share/tectonic/assets`, or both under
-`/usr/local` when it is run as root. A `tect` that arrives without a matching
-`assets/` scaffolds from whatever stale copy the host already has, silently, so
-the two halves are never moved apart. `tect upgrade` does the same afterwards
-without needing the URL again: it says what is running and what the latest
-release is, moves both halves, and says so instead when there is nothing to
-move.
+- **From declaration to installed system.** Build images locally or in CI,
+  boot them in local virtual machines, and create installation media from the
+  same declarations.
+- **Ready-to-build defaults.** A scaffolded repository contains an image that
+  can be generated and built immediately, and adapted as its requirements
+  grow.
+- **Reusable and extensible modules.** Modules can add image features or
+  provide build capabilities for other modules. They can assemble one file
+  from contributions across the image or request purpose-specific keys that
+  `tect` generates and places safely.
+- **Use only the abstraction you need.** A local module can use plain shell
+  scripts, file-tree overlays, or verbatim Containerfile fragments. A module
+  manifest adds quality-of-life declarations for packages, options,
+  capabilities, family differences, assets, and other common needs. A module
+  can mix these forms.
+- **Capability-based composition.** Modules declare what they provide and
+  require. `tect` resolves those declarations into a capability graph and
+  catches missing requirements and incompatible combinations before the build
+  starts.
+- **One reviewable build plan.** Containerfiles, module scripts, capability
+  graphs, workflows, and summaries derive from the same resolved plan. Every
+  build verifies generated files byte for byte before using them.
+- **Inspectable images.** Built images retain both the repository manifest and
+  a record of what the build resolved, so their composition remains available
+  after deployment.
+- **Repository-wide control.** `repo.kdl` provides one place for rules and
+  requirements that apply across the repository. Modules declare what they
+  need, while the repository owner decides what the build permits. Defaults
+  remain permissive unless the owner opts into stricter policy.
+- **Verifiable provenance.** Imported and copied modules retain their origin
+  and content hash. Declared downloads add relationships to CI-generated SBOMs
+  that ordinary image scanners cannot infer.
+- **Audit support.** Modules can map SCAP claims to the features that implement
+  them. Generated reports keep declared coverage separate from results
+  verified by a scan.
 
-x86_64 and aarch64 Linux are what is published. Anywhere else, build it.
+## Install
 
-Both resolve the latest release at run time, so what arrives is what is tagged
-rather than what is on `main`.
+```sh
+curl -fsSL https://raw.githubusercontent.com/tectonic-os/tectonic/main/install.sh | sh
+```
 
-## What a repository looks like
+The installer places `tect` and its matching scaffolding assets under
+`~/.local` by default, or under `/usr/local` when run as root. Upgrade both
+together with:
 
-    repo.kdl              the repository: schema version, tool pin, default
-                          image, workflows
-    workstation.image.kdl one image; a root .kdl is an image only if it is
-                          named image.kdl or ends .image.kdl
-    modules/<path>/       one module apiece, each with a module.kdl
+```sh
+tect upgrade
+```
 
-`tect create repo` writes that tree along with the disk config, the root
-dotfiles and the Containerfile skeleton it scaffolds. `tect generate`, the step
-it prints next, writes the build scripts, the shell helpers and the workflows,
-which the tool ships and a repository does not carry.
+Prebuilt releases are available for x86_64 and aarch64 Linux. On other
+platforms, build `tect` from source.
 
-The schema reference starts at
-[the repository layout](docs/schema/repository.md), and covers
-[the repository file](docs/schema/repo.md),
-[image files](docs/schema/image.md),
-[the module layout](docs/schema/modules.md),
-[module manifests](docs/schema/module.md),
-[the import record](docs/schema/provenance.md) and
-[the base catalog](docs/schema/bases.md). Its reference tables are
-generated from the tables the parser reads, so they cannot drift from what the
-tool accepts.
+## Start a repository
 
-## Commands
+Create the repository and choose its first image:
 
-`tect` with nothing after it opens a picker of what runs here where the output
-is a terminal, and prints the list where it is not. `tect --help` keeps every
-command a person runs and groups them by where they run. A verb with no noun,
-such as `tect create` or `tect vm`, opens a picker of its nouns. Leaving a
-picker is not an error: it exits 0 having done nothing.
+```sh
+tect create repo workstation
+cd workstation
+```
 
-[The CLI reference](docs/cli.md) documents every command with its flags. It is
-generated from the definition the parser reads, and `tect <command> --help`
-prints the same prose. The reference lists the global flags once, under `tect`.
+`tect create repo` gathers its answers before writing anything, so cancelling
+leaves no partial repository behind. A repository whose first image is also
+named `workstation` starts with these key files:
 
-The help the user reads names the commands that run anywhere or in a
-repository. The build runs its own commands, the `Script` family, which is the
-contract the build runs against. That family holds `plan`, `verify`, `summary`,
-`sbom`, `fetch modules`, `scap` and its nouns, `registry` and its nouns, and
-`recipe`. The `Layer` family holds `os-release`, `build-record`, `fetch` and
-`validate-image`. Those commands read the image around them, and run only where
-the binary is mounted into a build layer.
+```text
+workstation/
+├── .github/
+│   └── renovate.json5
+├── disk_config/
+│   └── disk.toml
+├── modules/
+├── scripts/
+│   └── Containerfile.skeleton
+├── repo.kdl
+└── workstation.image.kdl
+```
 
-The repository is the nearest directory at or above the working directory
-holding a `repo.kdl`, or `--root <dir>`. Data goes to stdout and diagnostics to
-stderr. Exit 1 is the invocation, exit 2 the repository.
+Optionally import a module from a collection declared by the repository:
 
-### Flags and prompts
+```sh
+tect import module
+```
 
-Every command takes a flag for everything it needs.
+Generate the build files and configured CI workflows:
 
-- All of them supplied: nothing is asked, and nothing opens.
-- One missing, and stdin is a terminal: it is asked for.
-- One missing, and stdin is not a terminal: the command fails naming the flag.
+```sh
+tect generate
+```
 
-`--no-tui` forces the third case, so a script behaves the same whether or not
-it has a terminal.
+The generated tree includes:
 
-A yes or no step has no flag of its own. The flag that answers it is the
-answer: `--image desktop` on `create repo` means yes and names the image, and
-its absence under `--no-tui` means no. A repeatable flag answers a step that
-takes several values.
+```text
+generated/
+├── workstation/
+│   ├── modules/
+│   ├── Containerfile
+│   ├── finalize.sh
+│   ├── graph.md
+│   └── graph.json
+├── scripts/
+└── plan.json
+```
 
-Every question is asked before anything is written, so a name already taken or
-an image that is not declared is refused with nothing left behind. A step that
-fails stops the command: what earlier steps wrote stays, and each of those
-steps is a command of its own to finish the run with.
+The generated Containerfile and capability graph can be reviewed before the
+build. Generated files are committed but not edited by hand; `tect` verifies
+them against the declarations before every build.
 
-`create repo`, `create image`, `create flavour`, `create module`, `import
-module`, `copy module` and `generate` end with a tree of the files they wrote,
-rooted at the repository, and a leaf a later step took further carries a phrase
-saying what it added. `create key` names its two halves instead: one of them is
-private and ignored, so a tracked-file tree omits it.
+Build the default image:
 
-`--root` and `--no-tui` are accepted by every command. A flag a command does
-not take is refused rather than ignored, including the switches: `--cache-to`
-and `--no-cache-from` belong to `build`, and `--rebuild` to the three `vm`
-nouns.
+```sh
+tect build
+```
 
-### On a booted image
+With `--no-tui`, the same workflow runs in a script: a missing answer comes
+from its flag, else from its default, else the command fails and names the
+flag.
 
-A built image carries `/usr/share/tectonic/manifest.json`, what it declares it
-is made of, and `/usr/share/tectonic/build.json`, what the build resolved. With
-no `repo.kdl` anywhere above, `why`, `summary`, `scap content` and `plan`
-answer off those two and need no checkout. A repository wins whenever there is
-one, because it is the more specific answer and it has the source.
+## Documentation
 
-Everything else needs the source tree and says so, naming what does answer here.
+The full documentation is at
+<https://tectonic-os.github.io/tectonic/>.
 
-**Every host answer is scoped to the target the record says this image was
-built as.** The manifest holds every target the repository declares, so an
-unscoped answer would describe an image that is not this one; a `summary` or
-`scap content` naming a different target is refused. If the record names no
-target, a one-target manifest is that target; with more than one, `why` reads
-across all of them and says so, and `summary` and `scap content` are refused
-because no honest answer exists.
+- [CLI reference](docs/cli.md)
+- [KDL syntax](docs/kdl.md)
+- [Repository layout](docs/schema/repository.md)
+- [Repository schema](docs/schema/repo.md)
+- [Image schema](docs/schema/image.md)
+- [Module layout](docs/schema/modules.md)
+- [Module schema](docs/schema/module.md)
+- [Provenance schema](docs/schema/provenance.md)
+- [Base catalog schema](docs/schema/bases.md)
 
-## Building it
-
-    cargo build --release
-
-A local build is not an install, and running one is where the assets bite:
-`tect` looks for an `assets` directory beside the binary and then at the
-installed paths, so a binary out of `target/` scaffolds from whatever copy the
-host has, silently. Point `TECT_ASSETS` at this repository's `assets/` when you
-run one, and aim it at a repository elsewhere with `--root`.
-
-## Developing
-
-    ./lint.sh             shellcheck, shfmt, rustfmt and the tests, as CI runs it
-    ./lint.sh --fix       rewrite everything into the format it gates on
-
-The tests are goldens: every command, over this repository's fixtures, is
-compared byte for byte against a committed file, and so are
-`docs/cli.md` and `docs/schema/`.
-`UPDATE_GOLDEN=1 cargo test` regenerates them, and the diff is the review.
+The schema references are generated from the same definitions that `tect`
+uses to validate repositories.
 
 ## Releases
 
-`tect` is before 1.0. A minor version may break what the one before it
-accepted, and only the latest release is supported. `CHANGELOG.md` lists what
-each release changed.
+[CHANGELOG.md](CHANGELOG.md) lists the changes in each release.
 
-Each architecture's tarball ships with its `.sha256` and a CycloneDX SBOM,
-`.cdx.json`. The binary carries its own dependency list, embedded by `cargo
-auditable`, which `cargo audit bin` and other scanners read. GitHub holds a
-build provenance attestation and an SBOM attestation for each tarball, and the
-provenance bundle also ships as `tect-v<version>.sigstore.json`:
+Each release tarball has an accompanying SHA-256 checksum and CycloneDX SBOM.
+The binary embeds dependency metadata for scanners, and GitHub publishes build
+provenance attestations:
 
-    gh attestation verify tect-v<version>-x86_64-linux-musl.tar.gz -R tectonic-os/tectonic
+```sh
+gh attestation verify tect-v<version>-x86_64-linux-musl.tar.gz \
+    -R tectonic-os/tectonic
+```
+
+## Building from source
+
+```sh
+cargo build --release
+```
+
+A local build is not an installation. Set `TECT_ASSETS` to this repository's
+`assets/` directory when running it, or `tect` may use assets already installed
+on the host.
+
+[CONTRIBUTING.md](CONTRIBUTING.md) documents the development checks.
 
 ## Licence
 
