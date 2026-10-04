@@ -370,8 +370,10 @@ image. The name can be a path, so `apps/firefox` writes
 It asks, in order:
 
 1. Name the module.
-2. Choose whether it installs packages, then name them.
-3. Choose the images and flavours that list it.
+2. Optionally describe it.
+3. Optionally restrict it to named base families.
+4. Choose whether it installs packages, then name them.
+5. Choose the images and flavours that list it.
 
 **Usage:** `tect create module [OPTIONS] [name]`
 
@@ -398,8 +400,9 @@ example/
 ```
 
 > [!NOTE]
-> It writes the packages as one `packages` line for each family that the module
-> supports. A package name that differs by family goes in a `family` block.
+> With no `supports` declaration, a module supports every base family. It
+> writes packages outside a family gate so every supported family installs
+> them. A package name that differs by family goes in a `family` block.
 > The build installs them through the family adapter, with `dnf install -y` on
 > Fedora and RHEL, and with `apt-get update`, `apt-get install -y` and
 > `apt-get clean` on Debian and Ubuntu.
@@ -690,7 +693,7 @@ It asks, in order:
 
 | Option | Description |
 | --- | --- |
-| `--datastream <file>` | the SCAP content the rules are read out of; the installed copy for the module's family by default |
+| `--datastream <file>` | the SCAP content the rules are read out of; the installed copy for the module's first declared family by default, and required when the module declares no family restriction |
 
 **Schema:** [`module.kdl`&nbsp;›&nbsp;`satisfies`](schema/module.md#satisfies)
 
@@ -715,8 +718,10 @@ example/
 >
 > No rule removes the `satisfies` block. Leaving the picker changes nothing.
 >
-> If no `--datastream` is given and no SCAP content is installed for the
-> module's family, then it stops and names `scap-security-guide`.
+> A module that declares `supports` uses the installed content for its first
+> named family by default. A module with no `supports` declaration has no
+> single default, so name `--datastream`. If that content is not installed, the
+> command stops and names `scap-security-guide`.
 >
 > The benchmark node that holds the numbers does not change what they mean. A
 > number resolves against the datastream, never against the benchmark name.

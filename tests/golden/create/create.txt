@@ -1,14 +1,8 @@
 ==== modules/my-editor/module.kdl
-description "My Editor"
-
-supports "fedora"
 provides "editor"
 
 packages "nano"
 ==== modules/plain/module.kdl
-description "plain"
-
-supports "fedora"
 ==== example.image.kdl
 image {
     name "Example"

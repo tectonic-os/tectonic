@@ -122,13 +122,13 @@ pub const IMAGE: Node = Node::new("image",
                 "`base \"quay.io/fedora/fedora-bootc:44\" { family \"fedora\" }`, naming the image \
                  every layer builds on"))
             .children(&[
-                Node::new("family", "The family of the base, which each module's `supports` must match.").about("The family, such as `fedora` or `debian`, decides which family variant of each module the build takes. Every module lists the families that it `supports`, and `tect` checks each one against this.").example("\"fedora\"")
+                Node::new("family", "The family of the base, which an explicit module `supports` restriction must match.").about("The family, such as `fedora` or `debian`, decides which family variant of each module the build takes. `tect` checks it against every module that restricts its supported families; a module with no `supports` declaration supports them all.").example("\"fedora\"")
                     .arg(Arg::Str, Say::new("`family` needs a name", "no family given",
-                        "`family \"fedora\"`, matched against each module's `supports`"))
+                        "`family \"fedora\"`, matched against each explicit module `supports` restriction"))
                     .once("")
                     .missing(Say::new("`base` declares no `family`", "no family",
-                        "every module declares which families it `supports`, and the two are \
-                         checked against each other")),
+                        "the base family chooses each module's family-specific content and is \
+                         checked against every explicit `supports` restriction")),
                 Node::new("provides", "The capabilities that the upstream image already ships, which the build checks the finished image for.").about("Lists what the base image already ships, such as `bootc`. `tect` skips a module that provides only what the base already has, and the build checks the finished image for each name.").example("\"rechunking\" \"bootc\"")
                     .arg(Arg::Strs, Say::NONE)
                     .lists(&[

@@ -61,16 +61,6 @@
  9 | }
    `----
 
-  x this module declares no `supports`
-   ,-[./modules/core/nameless/module.kdl:1:1]
- 1 | provides "shell-tools"
-   : ^
-   : `-- no families
- 2 | 
-   `----
-  help: a module has to say which base families it can build on, so a
-        portability gap surfaces at lint, while the build is still cheap
-
   x a benchmark name is required inside `satisfies`
    ,-[./modules/core/nameless/module.kdl:6:5]
  5 |     cis-fedora

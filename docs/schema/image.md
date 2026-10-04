@@ -257,7 +257,7 @@ The reference can carry a digest after its tag:
 
 | Field | Accepts | Description |
 | --- | --- | --- |
-| [`family`](#image-base-family) (required) | *string* | The family of the base, which each module's `supports` must match. |
+| [`family`](#image-base-family) (required) | *string* | The family of the base, which an explicit module `supports` restriction must match. |
 | [`provides`](#image-base-provides) (optional,&nbsp;repeatable) | *list of strings* | The capabilities that the upstream image already ships, which the build checks the finished image for. |
 | [`requires`](#image-base-requires) (optional,&nbsp;repeatable) | *list of strings* | The capabilities that an enabled module must provide before the base is usable. |
 | [`satisfies`](#image-base-satisfies) (optional) | optionally {&nbsp;[fields](#image-base-satisfies-fields)&nbsp;} | An audit declaration of the benchmarks and rules that the base image already satisfies. `tect` records it and certifies nothing. |
@@ -270,7 +270,7 @@ The reference can carry a digest after its tag:
 
 #### `family` (required)
 
-The family, such as `fedora` or `debian`, decides which family variant of each module the build takes. Every module lists the families that it `supports`, and `tect` checks each one against this.
+The family, such as `fedora` or `debian`, decides which family variant of each module the build takes. `tect` checks it against every module that restricts its supported families; a module with no `supports` declaration supports them all.
 
 ```kdl
 image {

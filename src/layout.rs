@@ -404,13 +404,13 @@ pub const MODULE_DIR: Tree = Tree {
              shared `files/`, and the family `module.sh` is sourced after the shared `module.sh`.",
             "A family `repo` replaces the other copies. `debian/repo` wins over `deb/repo`, which \
              wins over the `repo` at the module root, and the build sources only the winner.",
-            "If the directory names a family that the module does not `supports`, then `tect` \
-             refuses it.",
+            "If `supports` is declared and the directory names no supported family, then `tect` \
+             refuses it. With no `supports` declaration, every family is supported.",
         ]),
     ],
     notes: &[
         "A module with no `<family>/` directory gates nothing. Its `module.sh` and `files/` run on \
-         every family it supports.",
+         every family it supports; with no `supports` declaration, that is every family.",
     ],
 };
 
