@@ -1,3 +1,5 @@
 dev-tools
+A set of developer tools
+fedora
 No
 2

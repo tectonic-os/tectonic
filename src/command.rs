@@ -809,7 +809,8 @@ pub enum SetWhat {
         #[arg(value_name = "module")]
         module: Option<String>,
         /// the SCAP content the rules are read out of; the installed copy for
-        /// the module's family by default
+        /// the module's first declared family by default, and required when
+        /// the module declares no family restriction
         #[arg(long, value_name = "file")]
         datastream: Option<PathBuf>,
     },

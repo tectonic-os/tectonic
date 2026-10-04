@@ -15,7 +15,7 @@ packages "htop" "tmux"
 | Field | Accepts | Description |
 | --- | --- | --- |
 | [`description`](#description) (optional) | *string* | One line that names the module in the resolved build summary. |
-| [`supports`](#supports) (required,&nbsp;repeatable) | *list of strings* | The base families that this module builds on, which the image's `family` must match. |
+| [`supports`](#supports) (optional,&nbsp;repeatable) | *list of strings* | The base families that this module builds on, which the image's `family` must match. Omit it to support every family. |
 | [`provides`](#provides) (optional,&nbsp;repeatable) | *list of strings* | A capability that this module provides for the modules that require it. |
 | [`requires`](#requires) (optional,&nbsp;repeatable) | *list of strings* | A capability that another module must provide, which also orders the build. |
 | [`after`](#after) (optional,&nbsp;repeatable) | *list of strings* | A capability that this module builds after, which the module does not require. |
@@ -59,9 +59,9 @@ Accepts: *string*
 
 <a id="supports"></a>
 
-## `supports` (required, repeatable)
+## `supports` (optional, repeatable)
 
-Lists the base families that the module works on. `tect check` refuses the module on an image whose base family is not in the list, so a portability gap shows before the build.
+Lists the base families that the module works on. `tect check` refuses the module on an image whose base family is not in the list, so a portability gap shows before the build. A module with no `supports` declaration is base-agnostic and supports every family.
 
 ```kdl
 supports "fedora" "debian"

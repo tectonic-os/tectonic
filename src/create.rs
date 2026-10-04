@@ -982,6 +982,28 @@ impl Module {
             return Err(format!("modules/{path} is already there"));
         }
 
+        let description = match with.iter().any(|(verb, _)| verb == "description") {
+            true => String::new(),
+            false => prompt.text(
+                None,
+                copy::MODULE_DESCRIPTION,
+                "`--with description=...`",
+                Some(""),
+            )?,
+        };
+        let supports: Vec<String> = match with.iter().any(|(verb, _)| verb == "supports") {
+            true => Vec::new(),
+            false => prompt
+                .text(
+                    None,
+                    copy::MODULE_SUPPORTS,
+                    "`--with supports=...`",
+                    Some(""),
+                )?
+                .split_whitespace()
+                .map(str::to_string)
+                .collect(),
+        };
         let pkgs =
             match pkgs.is_empty() && prompt.confirm(copy::MODULE_PACKAGES, copy::YES, copy::NO)? {
                 true => prompt
@@ -992,7 +1014,7 @@ impl Module {
                 false => pkgs,
             };
 
-        let text = module_kdl(&name, &family(root)?, &pkgs, &with)?;
+        let text = module_kdl(&description, &supports, &pkgs, &with)?;
         let listing = Listing::collect(root, images, prompt)?;
         listing.refuse_duplicate(&crate::model::image::List::load(root).0, &path, None)?;
         Ok(Self {
@@ -1015,50 +1037,43 @@ impl Module {
     }
 }
 
-/// The family the repository already builds on.
-fn family(root: &Path) -> Result<String, String> {
-    let (list, _) = crate::model::image::List::load(root);
-    if let Some(family) = list
-        .images
-        .iter()
-        .find_map(|image| image.base.as_ref().map(|base| base.family.clone()))
-    {
-        return Ok(family);
-    }
-    let mut issues = Issues::default();
-    let bases = crate::base::catalog(root, &list.sources, &mut issues).0;
-    if !issues.is_empty() {
-        return Err(issues.plain());
-    }
-    bases
-        .first()
-        .map(|base| base.family.clone())
-        .ok_or_else(|| "no base in the catalog to derive a module family from".to_string())
-}
-
 fn module_kdl(
-    name: &str,
-    family: &str,
+    description: &str,
+    supports: &[String],
     pkgs: &[String],
     with: &[(String, String)],
 ) -> Result<String, String> {
-    let mut text = format!(
-        "description \"{}\"\n\nsupports \"{family}\"\n",
-        quotable(name)?
-    );
+    let mut sections: Vec<String> = Vec::new();
+    if !description.is_empty() {
+        sections.push(format!("description \"{}\"", quotable(description)?));
+    }
+    let mut declarations: Vec<String> = Vec::new();
+    if !supports.is_empty() {
+        let families = supports
+            .iter()
+            .map(|family| Ok(format!("\"{}\"", quotable(family)?)))
+            .collect::<Result<Vec<_>, String>>()?
+            .join(" ");
+        declarations.push(format!("supports {families}"));
+    }
     for (verb, value) in with {
-        text.push_str(&format!("{} \"{}\"\n", quotable(verb)?, quotable(value)?));
+        declarations.push(format!("{} \"{}\"", quotable(verb)?, quotable(value)?));
+    }
+    if !declarations.is_empty() {
+        sections.push(declarations.join("\n"));
     }
     if !pkgs.is_empty() {
-        let mut listed = String::new();
-        for pkg in pkgs {
-            listed.push_str(&format!(" \"{}\"", quotable(pkg)?));
-        }
-        // A scaffolded module supports one family, so the list needs no gate:
-        // outside a gate is every family the module supports, which is this one.
-        text.push_str(&format!("\npackages{listed}\n"));
+        let listed = pkgs
+            .iter()
+            .map(|pkg| Ok(format!("\"{}\"", quotable(pkg)?)))
+            .collect::<Result<Vec<_>, String>>()?
+            .join(" ");
+        sections.push(format!("packages {listed}"));
     }
-    Ok(text)
+    Ok(match sections.is_empty() {
+        true => String::new(),
+        false => format!("{}\n", sections.join("\n\n")),
+    })
 }
 
 /// A value that would have to be escaped to survive being written into KDL.

@@ -2,6 +2,10 @@ Tectonic v{version}
 
 module name: dev-tools
 
+description (optional) []: A set of developer tools
+
+supported base families, separated by spaces (optional) []: fedora
+
 Does this module install packages? (Yes/No)
 No
 

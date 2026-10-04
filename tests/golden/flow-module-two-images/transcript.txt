@@ -2,6 +2,10 @@ Tectonic v{version}
 
 module name: My Editor
 
+description (optional) []: A graphical editor
+
+supported base families, separated by spaces (optional) []: fedora
+
 Does this module install packages? (Yes/No)
 yes
 

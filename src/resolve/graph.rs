@@ -192,9 +192,10 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
                     .any(|group| group.family == base_family)
         });
         let has_adapter = offered.get("build-environment").is_some_and(|providers| {
-            providers
-                .iter()
-                .any(|module| module.supports.iter().any(|family| family == base_family))
+            providers.iter().any(|module| {
+                module.supports.is_empty()
+                    || module.supports.iter().any(|family| family == base_family)
+            })
         });
         if needs_adapter && !has_adapter {
             issues.push(
@@ -213,8 +214,8 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
         let Some(base_family) = base_family else {
             break;
         };
-        // A module with no module.kdl declares no families, so the user owns
-        // how it builds on the image's base.
+        // An absent declaration is the opt-out from family compatibility
+        // checks, whether the module has no manifest or omits `supports`.
         if !module.supports.is_empty() && !module.supports.iter().any(|f| f == base_family) {
             issues.push(
                 Issue::new(

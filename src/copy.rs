@@ -44,6 +44,8 @@ pub const FLAVOUR_IMAGE: &str = "Which image publishes it?";
 // The modules
 
 pub const MODULE_NAME: &str = "module name";
+pub const MODULE_DESCRIPTION: &str = "description (optional)";
+pub const MODULE_SUPPORTS: &str = "supported base families, separated by spaces (optional)";
 pub const MODULE_PACKAGES: &str = "Does this module install packages?";
 pub const PACKAGE_NAMES: &str = "package names, separated by spaces";
 pub const WHICH_MODULE: &str = "Which module?";

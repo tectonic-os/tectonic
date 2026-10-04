@@ -539,7 +539,16 @@ impl Claims {
             )));
         }
         let summary = parse::module::summary(&root.join(&file));
-        let family = summary.supports.first().map_or("", String::as_str);
+        let family = match summary.supports.first() {
+            Some(family) => family.as_str(),
+            None if datastream.is_some() => "",
+            None => {
+                return Err(Error::Invocation(format!(
+                    "`{named}` declares no `supports` restriction, so it has no default SCAP \
+                     content; give `--datastream <file>`"
+                )))
+            }
+        };
         let path = crate::scap::content_path(family, datastream.as_deref())?;
         let content = crate::scap::content_of(&path)?;
         if content.profiles.is_empty() {
@@ -762,6 +771,28 @@ mod tests {
             numbers: numbers.iter().map(|n| n.to_string()).collect(),
             claimed: numbers.len(),
         }
+    }
+
+    /// SCAP content is family-specific, so a base-agnostic module has no
+    /// installed default.
+    #[test]
+    fn base_agnostic_claims_need_a_datastream() {
+        let root = std::env::temp_dir().join(format!("tect-claims-any-{}", std::process::id()));
+        let module = root.join("modules/editor");
+        std::fs::create_dir_all(&module).unwrap();
+        std::fs::write(module.join(layout::MODULE_FILE), "packages \"nano\"\n").unwrap();
+
+        let result = Claims::collect(&root, "editor", None, &Prompt::silent());
+        let Err(err) = result else {
+            panic!("base-agnostic claims unexpectedly chose content");
+        };
+        assert!(
+            err.message().contains("has no default SCAP content")
+                && err.message().contains("--datastream <file>"),
+            "{}",
+            err.message()
+        );
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     /// The block replaces the one that was there, and every number goes on its
