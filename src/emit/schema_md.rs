@@ -735,7 +735,15 @@ mod tests {
         for s in SECTIONS {
             for show in [Show::Minimal, Show::Scaffold, Show::All] {
                 let text = file(s, show);
-                assert!(!text.trim().is_empty(), "{} has an empty example", s.name);
+                if text.trim().is_empty() {
+                    assert!(
+                        show == Show::Minimal
+                            && !s.declared
+                            && s.node.children.iter().all(|node| !is_minimal(node)),
+                        "{} has an empty example despite requiring a node",
+                        s.name
+                    );
+                }
                 let issues = check_text(&text, s.node, s.declared)
                     .unwrap_or_else(|err| panic!("{}: {err}\n{text}", s.name));
                 assert!(issues.is_empty(), "{}:\n{}\n{text}", s.name, issues.plain());

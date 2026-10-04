@@ -240,12 +240,9 @@ pub const MODULE: Node = Node::new("module",
             .arg(Arg::Str, Say::new("`description` needs a string", "no description given", ""))
             .once(""),
         Node::new("supports",
-            "The base families that this module builds on, which the image's `family` must match.").about("Lists the base families that the module works on. `tect check` refuses the module on an image whose base family is not in the list, so a portability gap shows before the build.").example("\"fedora\" \"debian\"")
+            "The base families that this module builds on, which the image's `family` must match. Omit it to support every family.").about("Lists the base families that the module works on. `tect check` refuses the module on an image whose base family is not in the list, so a portability gap shows before the build. A module with no `supports` declaration is base-agnostic and supports every family.").example("\"fedora\" \"debian\"")
             .arg(Arg::Strs, Say::new("`{}` needs at least one family", "nothing named",
-                "`supports \"fedora\"`, one name for each base family the module builds on"))
-            .missing(Say::new("this module declares no `{}`", "no families",
-                "a module has to say which base families it can build on, so a portability gap \
-                 surfaces at lint, while the build is still cheap")),
+                "`supports \"fedora\"`, one name for each base family the module builds on")),
 
         Node::new("provides", "A capability that this module provides for the modules that require it.").about("Names a capability that this module adds to the image, such as `flatpak`. Another module `requires` it by name, and the build checks the finished image for the file that witnesses it.").example("\"flatpak\"")
             .arg(Arg::Strs, Say::new("`{}` needs a capability name", "nothing named", ""))
@@ -509,9 +506,13 @@ fn spread(
     // said about it is said once, against the node.
     let mut said: Option<Span> = None;
     for mut batch in std::mem::take(batches) {
-        let families: Vec<String> = match batch.family.is_empty() {
-            false => vec![std::mem::take(&mut batch.family)],
-            true => supports.to_vec(),
+        let families: Vec<String> = match (batch.family.is_empty(), supports.is_empty()) {
+            (false, _) => vec![std::mem::take(&mut batch.family)],
+            (true, false) => supports.to_vec(),
+            (true, true) => FAMILIES
+                .iter()
+                .map(|family| (*family).to_string())
+                .collect(),
         };
         let first = said.replace(batch.span) != Some(batch.span);
         if let Some(stray) = families.iter().find(|family| !rpm(family)) {
@@ -1007,11 +1008,12 @@ impl Module {
         // anywhere else it would be skipped and its installs would fail.
         let supports = module.supports.clone();
         for copr in &module.coprs {
-            let reach = match copr.family.is_empty() {
-                true => &supports,
-                false => &copr.family,
+            let reach: Vec<&str> = match (copr.family.is_empty(), supports.is_empty()) {
+                (false, _) => copr.family.iter().map(String::as_str).collect(),
+                (true, false) => supports.iter().map(String::as_str).collect(),
+                (true, true) => FAMILIES.to_vec(),
             };
-            if let Some(stray) = reach.iter().find(|family| *family != "fedora") {
+            if let Some(stray) = reach.iter().find(|family| **family != "fedora") {
                 issues.push(
                     Issue::new(
                         format!("`copr` is Fedora's, and this one covers `{stray}`"),
@@ -1120,7 +1122,8 @@ impl Module {
             );
         }
         for (family, span) in gated {
-            if module.supports.iter().any(|claimed| claimed == family) {
+            if module.supports.is_empty() || module.supports.iter().any(|claimed| claimed == family)
+            {
                 continue;
             }
             issues.push(
@@ -1833,6 +1836,34 @@ mod tests {
             &mut issues,
         );
         issues.findings()
+    }
+
+    /// Omitting the compatibility gate makes an ordinary declaration apply
+    /// to every family, just as a module without a manifest does.
+    #[test]
+    fn no_supports_declaration_means_every_family() {
+        let text = "packages \"nano\"\n";
+        let mut issues = Issues::default();
+        let module = Module::parse(
+            "editor",
+            "editor",
+            Path::new("."),
+            text.to_string(),
+            None,
+            &mut issues,
+        )
+        .expect("a module");
+
+        assert!(issues.is_empty(), "{}", issues.plain());
+        assert!(module.supports.is_empty());
+        assert_eq!(
+            module
+                .packages
+                .iter()
+                .map(|batch| batch.family.as_str())
+                .collect::<Vec<_>>(),
+            FAMILIES
+        );
     }
 
     /// A `file` witnesses one name, `build-only` describes a `file`, and a path

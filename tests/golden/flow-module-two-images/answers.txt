@@ -1,4 +1,6 @@
 My Editor
+A graphical editor
+fedora
 yes
 nano vim
 1 2
