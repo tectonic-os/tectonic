@@ -331,6 +331,12 @@ pub const REPOSITORY: Tree = Tree {
             what: "Local exports, caches and scratch. `tect` reads nothing here as a declaration." },
         Place { path: &[SOURCES_CACHE, "/"], writer: "`tect`", tracked: false,
             what: "The collections that `tect` fetches. An imported module is read from here." },
+        Place { path: &["disk_config/"], writer: "`tect create repo`, then the user", tracked: true,
+            what: "The settings that bootc-image-builder reads when it builds a Fedora or RHEL disk \
+                image. `disk.toml` sets the smallest size of `/`." },
+        Place { path: &[".github/renovate.json5"], writer: "`tect create repo`, then the user", tracked: true,
+            what: "The Renovate settings. Its custom managers keep the `tect` release in `repo.kdl` \
+                and each pin that declares `renovate` current." },
         Place { path: &[".gitignore"], writer: "`tect create repo`", tracked: true,
             what: "Keeps `keys/private/`, `out/` and `modules/.remote/` out of git." },
     ],
