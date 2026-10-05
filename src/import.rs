@@ -39,6 +39,20 @@ fn names(sources: &[Collection]) -> String {
         .join(", ")
 }
 
+/// Adds the default sources block to a repository that declared none.
+pub(crate) fn declare_sources(root: &Path, block: &str) -> Result<(), String> {
+    let path = root.join(layout::REPO_FILE);
+    let mut text =
+        std::fs::read_to_string(&path).map_err(|err| format!("{}: {err}", path.display()))?;
+    match text.ends_with('\n') {
+        true if !text.ends_with("\n\n") => text.push('\n'),
+        true => {}
+        false => text.push_str("\n\n"),
+    }
+    text.push_str(block);
+    crate::init::put(&path, &text)
+}
+
 /// Every collection that has `name`. Never the first of them: which one an
 /// ambiguous name comes from is the caller's to settle. `enforce` refuses an
 /// unpinned collection before it is used.
@@ -579,6 +593,17 @@ impl Module {
         root: &Path,
         sources: &[Collection],
     ) -> Result<Vec<(PathBuf, Change)>, String> {
+        self.write_with_sources(root, sources, None)
+    }
+
+    /// Writes an import or copy, declaring the sources it resolved against
+    /// when the repository had none of its own.
+    pub(crate) fn write_with_sources(
+        &self,
+        root: &Path,
+        sources: &[Collection],
+        sources_block: Option<&str>,
+    ) -> Result<Vec<(PathBuf, Change)>, String> {
         match self.listing {
             Listing::Cancelled => return Ok(Vec::new()),
             // A copy is a module in the repository whether an image lists it
@@ -604,6 +629,13 @@ impl Module {
             Listing::In(_) => {}
         }
         let mut wrote: Vec<(PathBuf, Change)> = Vec::new();
+        if let Some(block) = sources_block {
+            declare_sources(root, block)?;
+            wrote.push((
+                PathBuf::from(layout::REPO_FILE),
+                Change::Updated("the default module collection".into()),
+            ));
+        }
         for member in &self.members {
             match self.place {
                 // Whatever the pin fetches next replaces it, so the tree is
@@ -962,6 +994,21 @@ mod tests {
     }
 
     #[test]
+    fn default_sources_are_added_after_existing_repo_declarations() {
+        let root =
+            std::env::temp_dir().join(format!("tect-default-sources-{}", std::process::id()));
+        crate::init::put(&root.join(layout::REPO_FILE), "schema-version 1").unwrap();
+
+        declare_sources(&root, "sources {\n    one \"collection\"\n}\n").unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(root.join(layout::REPO_FILE)).unwrap(),
+            "schema-version 1\n\nsources {\n    one \"collection\"\n}\n"
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn a_provider_in_one_flavour_does_not_cover_its_sibling() {
         let root =
             std::env::temp_dir().join(format!("tect-flavour-provider-{}", std::process::id()));
@@ -1014,6 +1061,7 @@ mod tests {
     fn a_cancelled_listing_writes_nothing() {
         let root = std::env::temp_dir().join(format!("tect-cancel-import-{}", std::process::id()));
         let from = root.join("collection/module");
+        crate::init::put(&root.join(layout::REPO_FILE), "schema-version 1\n").unwrap();
         crate::init::put(&from.join(layout::MODULE_FILE), "description \"x\"\n").unwrap();
 
         for place in [Place::Reference, Place::Vendored] {
@@ -1034,10 +1082,14 @@ mod tests {
                 workflows: None,
                 conforms: Vec::new(),
             }
-            .apply(&root, &[])
+            .write_with_sources(&root, &[], Some("sources { one \"collection\" }\n"))
             .unwrap();
             assert!(!root.join(&dest).exists());
         }
+        assert_eq!(
+            std::fs::read_to_string(root.join(layout::REPO_FILE)).unwrap(),
+            "schema-version 1\n"
+        );
         let _ = std::fs::remove_dir_all(root);
     }
 

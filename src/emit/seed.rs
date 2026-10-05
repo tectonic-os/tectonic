@@ -24,11 +24,15 @@ pub fn file(list: &List) -> Option<(PathBuf, String)> {
         "// GENERATED FILE, do not edit. Produced by `tect generate` from the\n\
          // {} image definition.\n\n\
          schema-version {SCHEMA_VERSION}\n\n\
-         base \"{}\" {{\n\
-         \x20   family \"{}\"\n\
-         }}\n",
-        image.id, base.image, base.family
+         base \"{}\"",
+        image.id, base.image
     );
+    match base.family.is_empty() {
+        true => out.push('\n'),
+        false => {
+            let _ = writeln!(out, " {{\n    family {:?}\n}}", base.family);
+        }
+    }
 
     let owners: Vec<&str> = modules
         .iter()

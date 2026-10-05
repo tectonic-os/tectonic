@@ -122,13 +122,10 @@ pub const IMAGE: Node = Node::new("image",
                 "`base \"quay.io/fedora/fedora-bootc:44\" { family \"fedora\" }`, naming the image \
                  every layer builds on"))
             .children(&[
-                Node::new("family", "The family of the base, which an explicit module `supports` restriction must match.").about("The family, such as `fedora` or `debian`, decides which family variant of each module the build takes. `tect` checks it against every module that restricts its supported families; a module with no `supports` declaration supports them all.").example("\"fedora\"")
+                Node::new("family", "The optional family used for family-specific module content and compatibility checks.").about("The family, such as `fedora` or `debian`, selects family-specific module content and is checked against every module that restricts its supported families. When it is omitted, `tect` takes only ungated module content and skips family compatibility checks.").example("\"fedora\"")
                     .arg(Arg::Str, Say::new("`family` needs a name", "no family given",
                         "`family \"fedora\"`, matched against each explicit module `supports` restriction"))
-                    .once("")
-                    .missing(Say::new("`base` declares no `family`", "no family",
-                        "the base family chooses each module's family-specific content and is \
-                         checked against every explicit `supports` restriction")),
+                    .once(""),
                 Node::new("provides", "The capabilities that the upstream image already ships, which the build checks the finished image for.").about("Lists what the base image already ships, such as `bootc`. `tect` skips a module that provides only what the base already has, and the build checks the finished image for each name.").example("\"rechunking\" \"bootc\"")
                     .arg(Arg::Strs, Say::NONE)
                     .lists(&[
@@ -857,7 +854,6 @@ image "stray" {
                 "`id` needs a value",
                 "`signed` needs #true or #false",
                 "unknown base property `colour`",
-                "`base` declares no `family`",
                 "`base` is declared twice",
                 "unknown flavour property `sparkle`",
                 "`default` must be #true or #false",
@@ -870,6 +866,13 @@ image "stray" {
                 "`image` declares no `name`",
             ]
         );
+    }
+
+    #[test]
+    fn a_base_family_is_optional() {
+        let found =
+            messages("image {\n    name \"Example\"\n    base \"example\"\n    modules { }\n}\n");
+        assert!(found.is_empty(), "{found:?}");
     }
 
     #[test]
