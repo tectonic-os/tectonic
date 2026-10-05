@@ -233,9 +233,9 @@ pub struct Seed {
 /// The repository's declarations: every image in it, and the handful of
 /// decisions that are about the repository.
 pub struct List {
-    /// What repo.kdl calls the repository, shown as the name of a tree.
+    /// The optional label repo.kdl gives the repository.
     pub name: String,
-    /// The machine name `name` derives, which a tree reads as its root.
+    /// The machine form of `name`, used as the heading of change trees.
     pub id: String,
     /// Every image, ordered by the file it was declared in, so the build
     /// matrix and every list this produces are the same on every machine

@@ -51,6 +51,7 @@ pub struct Issue {
     src: Source,
     labels: Vec<LabeledSpan>,
     help: Option<String>,
+    blocks_edit: bool,
 }
 
 impl Issue {
@@ -60,6 +61,7 @@ impl Issue {
             src: src.clone(),
             labels: Vec::new(),
             help: None,
+            blocks_edit: false,
         }
     }
 
@@ -72,6 +74,11 @@ impl Issue {
 
     pub fn help(mut self, help: impl Into<String>) -> Self {
         self.help = Some(help.into());
+        self
+    }
+
+    pub(crate) fn blocks_edit(mut self) -> Self {
+        self.blocks_edit = true;
         self
     }
 }
@@ -121,6 +128,15 @@ impl Issues {
 
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    pub(crate) fn blocking_edits(self) -> Self {
+        Self(
+            self.0
+                .into_iter()
+                .filter(|issue| issue.blocks_edit)
+                .collect(),
+        )
     }
 
     /// Every issue rendered without colour or hyperlinks, at a fixed width, so

@@ -580,6 +580,18 @@ fn walk(dir: &Path) -> Vec<PathBuf> {
     out
 }
 
+fn contents(dir: &Path) -> Vec<(PathBuf, Vec<u8>)> {
+    let mut files: Vec<(PathBuf, Vec<u8>)> = walk(dir)
+        .into_iter()
+        .map(|path| {
+            let name = path.strip_prefix(dir).unwrap().to_path_buf();
+            (name, std::fs::read(path).unwrap())
+        })
+        .collect();
+    files.sort_by(|left, right| left.0.cmp(&right.0));
+    files
+}
+
 /// Which commands the missing default belongs to: the ones that had to pick an
 /// image with nothing naming one, and no others.
 fn no_default(root: &Path) {
@@ -657,11 +669,16 @@ fn sealed<'a>(
 /// merged into the order a person reads them, byte-compared against the
 /// transcript the fixture holds beside its answers.
 fn flow(name: &str, dir: &Path, gh: Option<&str>, args: &[&str]) {
+    flow_with_assets(name, dir, gh, args, &crate_dir().join("assets"));
+}
+
+fn flow_with_assets(name: &str, dir: &Path, gh: Option<&str>, args: &[&str], assets: &Path) {
     let fixture = crate_dir().join("tests/golden").join(name);
     let log = tmp().join(format!("{name}.log"));
     let file = std::fs::File::create(&log).unwrap();
     let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_tect"));
     let status = sealed(&mut command, &bin(name, gh))
+        .env("TECT_ASSETS", assets)
         .args(args)
         .current_dir(dir)
         .env("TECT_ANSWERS", fixture.join("answers.txt"))
@@ -791,11 +808,12 @@ fn flow_offering(name: &str, dir: &Path) {
     );
 }
 
-/// One real terminal picker. `script` supplies the pty, a reader answers every
-/// cursor-position query a widget opens with, and each step types after the
-/// draw has settled. What is compared is the tail from `after`, since a redraw
-/// is not byte-stable across terminal sizes and the echo of the answer is.
-fn drawn_flow(name: &str, dir: &Path, command: &str, after: &str, steps: &[&[u8]]) {
+/// A real terminal is required because scripted answers cannot exercise Escape.
+fn drawn_run(
+    dir: &Path,
+    command: &str,
+    steps: &[&[u8]],
+) -> (std::process::ExitStatus, String, Vec<u8>) {
     use std::io::{Read, Write};
     use std::process::Stdio;
     use std::sync::{Arc, Mutex};
@@ -850,6 +868,13 @@ fn drawn_flow(name: &str, dir: &Path, command: &str, after: &str, steps: &[&[u8]
         .read_to_string(&mut errors)
         .unwrap();
     let raw = raw.lock().unwrap();
+    (status, errors, raw.clone())
+}
+
+/// The helper compares only the tail because redraw bytes vary with terminal
+/// size.
+fn drawn_flow(name: &str, dir: &Path, command: &str, after: &str, steps: &[&[u8]]) {
+    let (status, errors, raw) = drawn_run(dir, command, steps);
     assert!(
         status.success(),
         "{errors}{}",
@@ -1906,6 +1931,214 @@ fn flows() {
         .is_file());
     assert!(!root.join("modules/browser").exists());
 
+    let defaulted = flow_repo("flow-import-default-in");
+    let repo = defaulted.join("repo.kdl");
+    let text = std::fs::read_to_string(&repo)
+        .unwrap()
+        .replace(&tect::init::sources(&crate_dir().join("assets")), "")
+        + "unfinished-repo-property \"kept for tect check\"\n";
+    std::fs::write(&repo, text).unwrap();
+    let image_file = defaulted.join("example.image.kdl");
+    let image = std::fs::read_to_string(&image_file).unwrap().replace(
+        "    modules {",
+        "    unfinished-image-property \"kept for tect check\"\n    modules {",
+    );
+    std::fs::write(&image_file, image).unwrap();
+    let (_, issues, _) = tect::declarations(&defaulted);
+    assert!(
+        !issues.is_empty(),
+        "the fixture must prove edits do not depend on a clean check"
+    );
+    let assets = tmp().join("flow-import-default-assets");
+    let _ = std::fs::remove_dir_all(&assets);
+    std::fs::create_dir_all(&assets).unwrap();
+    std::fs::write(
+        assets.join(tect::init::SOURCES_FILE),
+        format!(
+            "sources {{\n    one {:?}\n}}\n",
+            crate_dir().join("tests/collections/one").display()
+        ),
+    )
+    .unwrap();
+    flow_with_assets(
+        "flow-import-default",
+        &defaulted,
+        None,
+        &[
+            "--no-tui",
+            "--root",
+            ".",
+            "import",
+            "module",
+            "one/browser",
+            "--image",
+            "example",
+        ],
+        &assets,
+    );
+    let declared = std::fs::read_to_string(&repo).unwrap();
+    let image = std::fs::read_to_string(defaulted.join("example.image.kdl")).unwrap();
+    assert!(
+        declared.contains("sources {\n    one ")
+            && image.contains("source \"one\" {\n            module \"browser\""),
+        "{declared}\n{image}"
+    );
+    flow(
+        "flow-copy-with-schema-issues",
+        &defaulted,
+        None,
+        &[
+            "--no-tui",
+            "--root",
+            ".",
+            "copy",
+            "module",
+            "one/flatpak",
+            "--image",
+            "example",
+        ],
+    );
+    flow(
+        "flow-create-module-with-schema-issues",
+        &defaulted,
+        None,
+        &[
+            "--no-tui",
+            "--root",
+            ".",
+            "create",
+            "module",
+            "local-tool",
+            "--pkg",
+            "hello",
+            "--with",
+            "description=",
+            "--with",
+            "supports=",
+            "--image",
+            "example",
+        ],
+    );
+    let image = std::fs::read_to_string(&image_file).unwrap();
+    assert!(
+        image.contains("module \"flatpak\"") && image.contains("module \"local-tool\""),
+        "{image}"
+    );
+
+    let malformed = flow_repo_sourced("flow-malformed-edit-in");
+    let image_file = malformed.join("example.image.kdl");
+    let mut image = std::fs::read_to_string(&image_file).unwrap();
+    image.push_str("image {\n");
+    std::fs::write(&image_file, image).unwrap();
+    let before = contents(&malformed);
+    for args in [
+        vec![
+            "--no-tui",
+            "--root",
+            ".",
+            "import",
+            "module",
+            "one/browser",
+            "--image",
+            "example",
+        ],
+        vec![
+            "--no-tui",
+            "--root",
+            ".",
+            "copy",
+            "module",
+            "one/flatpak",
+            "--image",
+            "example",
+        ],
+        vec![
+            "--no-tui",
+            "--root",
+            ".",
+            "create",
+            "module",
+            "local-tool",
+            "--with",
+            "description=",
+            "--with",
+            "supports=",
+            "--image",
+            "example",
+        ],
+    ] {
+        let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_tect"));
+        let out = sealed(&mut command, &bin("malformed-edit", None))
+            .args(args)
+            .current_dir(&malformed)
+            .output()
+            .unwrap();
+        assert!(!out.status.success(), "malformed KDL was accepted");
+        let error = String::from_utf8_lossy(&out.stderr);
+        assert!(error.contains("is not valid KDL"), "{error}");
+        assert_eq!(contents(&malformed), before, "a refused edit wrote files");
+    }
+
+    for (name, args, declaration) in [
+        (
+            "flow-import-without-modules",
+            vec![
+                "--no-tui",
+                "--root",
+                ".",
+                "import",
+                "module",
+                "one/browser",
+                "--image",
+                "example",
+            ],
+            "source \"one\" {\n            module \"browser\"",
+        ),
+        (
+            "flow-copy-without-modules",
+            vec![
+                "--no-tui",
+                "--root",
+                ".",
+                "copy",
+                "module",
+                "one/flatpak",
+                "--image",
+                "example",
+            ],
+            "modules {\n        module \"flatpak\"",
+        ),
+        (
+            "flow-create-without-modules",
+            vec![
+                "--no-tui",
+                "--root",
+                ".",
+                "create",
+                "module",
+                "local-tool",
+                "--with",
+                "description=",
+                "--with",
+                "supports=",
+                "--image",
+                "example",
+            ],
+            "modules {\n        module \"local-tool\"",
+        ),
+    ] {
+        let root = flow_repo_sourced(name);
+        let image_file = root.join("example.image.kdl");
+        let image = std::fs::read_to_string(&image_file)
+            .unwrap()
+            .replace("    modules {\n    }\n", "");
+        assert!(!image.contains("modules {"), "fixture still has modules");
+        std::fs::write(&image_file, image).unwrap();
+        tect(&root, &args);
+        let image = std::fs::read_to_string(&image_file).unwrap();
+        assert!(image.contains(declaration), "{image}");
+    }
+
     let (list, issues, _) = tect::declarations(&root);
     assert!(issues.is_empty(), "{}", issues.plain());
     let declined = tect::import::Module::collect(
@@ -2895,6 +3128,45 @@ fn drawn_create_repo() {
         ],
     );
     assert!(dir.join("example/repo.kdl").is_file());
+}
+
+#[test]
+fn escape_cancels_create_image_at_each_prompt() {
+    let made = flow_repo_sourced("flow-create-image-cancel-in");
+    let root = made.parent().unwrap().join("cancel-default");
+    std::fs::rename(&made, &root).unwrap();
+    let binary = env!("CARGO_BIN_EXE_tect");
+    for (command, steps, absent) in [
+        (
+            format!("'{binary}' --root . create image"),
+            vec![b"\x1b".as_slice()],
+            "cancel-default.image.kdl",
+        ),
+        (
+            format!("'{binary}' --root . create image"),
+            vec![b"Beta\r".as_slice(), b"\x1b".as_slice()],
+            "beta.image.kdl",
+        ),
+        (
+            format!("'{binary}' --root . create image Gamma --base example.invalid/collected:1"),
+            vec![b"\x1b".as_slice()],
+            "gamma.image.kdl",
+        ),
+    ] {
+        let before = std::fs::read_to_string(root.join("repo.kdl")).unwrap();
+        let (status, errors, raw) = drawn_run(&root, &command, &steps);
+        assert!(
+            status.success(),
+            "{errors}{}",
+            String::from_utf8_lossy(&raw)
+        );
+        assert!(!root.join(absent).exists(), "Escape wrote {absent}");
+        assert_eq!(
+            std::fs::read_to_string(root.join("repo.kdl")).unwrap(),
+            before,
+            "Escape edited repo.kdl"
+        );
+    }
 }
 
 /// A fragment's own `RUN` lines are outside the script rule, so `check` names

@@ -17,7 +17,7 @@ miette = { version = "7.6.0", features = ["fancy"] }
 # a bump here, which keeps the rev that was built with visible in `Cargo.lock`.
 # To work on both trees at once, put a `paths` override in `.cargo/config.toml`,
 # which redirects a git dependency and leaves `Cargo.lock` alone.
-common = { git = "https://github.com/tectonic-os/common", rev = "851048b74a0332ecd7abe9ce70f3a728137a8ecc" }
+common = { git = "https://github.com/tectonic-os/common", rev = "054a99bfcd6e94c2400fe85d09ea6a8b0931decb" }
 
 [profile.release]
 opt-level = 1

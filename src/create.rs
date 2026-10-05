@@ -554,10 +554,14 @@ impl Scripts {
     }
 }
 
-/// The tree a create, import or copy wrote, hung off what the repository calls
-/// itself.
+/// The tree a create, import or copy wrote, labelled by repo.kdl where it is
+/// declared and by the repository directory otherwise.
 pub fn report(root: &Path, wrote: &[(PathBuf, Change)]) {
-    let id = crate::model::image::List::load(root).0.id;
+    let declared = crate::model::image::List::load(root).0.id;
+    let id = match declared.is_empty() {
+        true => named_after_root(root).unwrap_or_default(),
+        false => declared,
+    };
     common::ui::tree::print(&id, wrote, describe);
 }
 
@@ -739,7 +743,11 @@ impl Image {
             wanted = self::wanted(&fetched, &family, &roles);
             let _ = std::fs::remove_dir_all(&scratch);
         }
-        let seed = match wanted.is_empty() || offer(&base, &wanted, prompt, took)? {
+        let take_wanted = match wanted.is_empty() {
+            true => true,
+            false => offer(&base, &wanted, prompt, took)?,
+        };
+        let seed = match take_wanted {
             true => seeded(&wanted),
             false => String::new(),
         };
@@ -911,11 +919,24 @@ fn choose_base(
     current: Option<&str>,
     prompt: &Prompt,
 ) -> Result<String, String> {
-    let options: Vec<Choice> = bases
+    let mut options: Vec<Choice> = bases
         .iter()
         .map(|base| Choice::new(&base.image, &base.about))
         .collect();
     let at = current.and_then(|held| bases.iter().position(|base| base.image == held));
+    if prompt.draws() && !options.is_empty() {
+        options.push(Choice::new(copy::OTHER_BASE, copy::OTHER_BASE_ABOUT));
+        return match ask_one(prompt, copy::IMAGE_BASE, &options, at)? {
+            Some(chosen) if chosen < bases.len() => Ok(bases[chosen].image.clone()),
+            Some(_) => prompt.text(
+                None,
+                copy::BASE_IMAGE,
+                "`--base`",
+                bases.first().map(|base| base.image.as_str()),
+            ),
+            None => unreachable!("a drawn picker either chooses or cancels"),
+        };
+    }
     match ask_one(prompt, copy::IMAGE_BASE, &options, at)? {
         Some(chosen) => Ok(bases[chosen].image.clone()),
         None => prompt.text(
@@ -971,6 +992,7 @@ impl Module {
         images: Vec<String>,
         prompt: &Prompt,
     ) -> Result<Self, String> {
+        let list = crate::model::image::List::editable(root).map_err(|issues| issues.plain())?;
         let name = prompt.text(name, copy::MODULE_NAME, "a name argument", None)?;
         let path = name
             .split('/')
@@ -1015,8 +1037,8 @@ impl Module {
             };
 
         let text = module_kdl(&description, &supports, &pkgs, &with)?;
-        let listing = Listing::collect(root, images, prompt)?;
-        listing.refuse_duplicate(&crate::model::image::List::load(root).0, &path, None)?;
+        let listing = Listing::collect_from(&list, images, prompt)?;
+        listing.refuse_duplicate(&list, &path, None)?;
         Ok(Self {
             path,
             file,
@@ -1029,9 +1051,10 @@ impl Module {
         if self.listing.cancelled() {
             return Ok(Vec::new());
         }
+        self.listing.validate()?;
+        let list = crate::model::image::List::editable(root).map_err(|issues| issues.plain())?;
         crate::init::put(&self.file, &self.text)?;
         let mut wrote = vec![(under(root, &self.file), Change::Created)];
-        let (list, _) = crate::model::image::List::load(root);
         wrote.extend(self.listing.apply(&list, &self.path)?);
         Ok(wrote)
     }
@@ -1115,7 +1138,15 @@ impl Listing {
     /// What one answer writes into each is checked per module by
     /// `refuse_duplicate`, since one answer covers a set.
     pub fn collect(root: &Path, given: Vec<String>, prompt: &Prompt) -> Result<Self, String> {
-        let (list, _) = crate::model::image::List::load(root);
+        let list = crate::model::image::List::editable(root).map_err(|issues| issues.plain())?;
+        Self::collect_from(&list, given, prompt)
+    }
+
+    fn collect_from(
+        list: &crate::model::image::List,
+        given: Vec<String>,
+        prompt: &Prompt,
+    ) -> Result<Self, String> {
         if list.images.is_empty() {
             return Ok(Self::NoImage);
         }
@@ -1249,6 +1280,24 @@ impl Listing {
 
     pub fn cancelled(&self) -> bool {
         matches!(self, Self::Cancelled)
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        let Self::In(listed) = self else {
+            return Ok(());
+        };
+        for target in listed {
+            let text = std::fs::read_to_string(&target.file)
+                .map_err(|err| format!("{}: {err}", target.file.display()))?;
+            if crate::parse::image::block_close(&text, &target.image, &[]).is_none() {
+                return Err(format!(
+                    "{} declares no image `{}`",
+                    target.file.display(),
+                    target.image
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// The images the answer writes into, by `name`, which is what a check

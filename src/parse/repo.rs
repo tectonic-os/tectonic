@@ -114,13 +114,10 @@ pub const REPO: Node = Node::new("repo",
                  beside the tarball. That check proves only that the download is complete.",
                 "If the repository pins no release, then `tect` says nothing about the release.",
             ]),
-        Node::new("name", "The name of the repository, which can differ from its directory.").about("The name that the repository answers to. It is separate from the directory name, so the user can rename or move the directory without a change to the repository.").example("\"Workstation\"")
+        Node::new("name", "An optional human-readable label for the repository.").about("A human-readable label for the repository. It labels the result tree printed by commands that add or change files, and does not affect generation or builds. When it is omitted, that tree uses the repository directory name.").example("\"Workstation\"")
             .arg(Arg::Str, Say::new("`{}` needs a name", "no name given",
                 "`name \"Workstation\"`, which the directory is free to disagree with"))
-            .once("")
-            .missing(Say::new("repo.kdl says nothing about what this repository is called",
-                "no name", "`name \"Workstation\"`, so a rename of the directory changes \
-                 nothing about what this repository answers to")),
+            .once(""),
         Node::new("default-image",
             "The image that a command with no image, or a build with no target, uses.").about("If the repository defines more than one image, then this names the image that a command uses when the user names none. If the repository defines one image, then that image is the default and this field is not needed.").example("\"workstation\"")
             .arg(Arg::Str, Say::new("`{}` needs an image name", "no image given",
@@ -381,7 +378,8 @@ pub fn compatible(root: &Path) -> Issues {
                      release does not have would be noise; run the release `tect-version` names, \
                      which `tect.sh` fetches"
                 ),
-            }),
+            })
+            .blocks_edit(),
         );
         return issues;
     }
@@ -439,6 +437,15 @@ impl List {
         }
     }
 
+    pub(crate) fn editable(root: &Path) -> Result<Self, Issues> {
+        let (list, issues) = Self::load(root);
+        let blocking = issues.blocking_edits();
+        match blocking.is_empty() {
+            true => Ok(list),
+            false => Err(blocking),
+        }
+    }
+
     pub(super) fn empty(root: &Path) -> Self {
         List {
             name: String::new(),
@@ -482,10 +489,13 @@ impl List {
                 }
             }
             Err(err) => {
-                issues.push(Issue::new(
-                    format!("cannot read {}: {err}", root.display()),
-                    &list.repo_src,
-                ));
+                issues.push(
+                    Issue::new(
+                        format!("cannot read {}: {err}", root.display()),
+                        &list.repo_src,
+                    )
+                    .blocks_edit(),
+                );
                 return (list, issues);
             }
         }
@@ -510,10 +520,13 @@ impl List {
             let text = match std::fs::read_to_string(root.join(name)) {
                 Ok(text) => text,
                 Err(err) => {
-                    issues.push(Issue::new(
-                        format!("cannot read {path}: {err}"),
-                        &Source::new(&path, ""),
-                    ));
+                    issues.push(
+                        Issue::new(
+                            format!("cannot read {path}: {err}"),
+                            &Source::new(&path, ""),
+                        )
+                        .blocks_edit(),
+                    );
                     continue;
                 }
             };
@@ -994,6 +1007,11 @@ colour "blue"
                 "unknown node `colour` in repo.kdl",
             ]
         );
+    }
+
+    #[test]
+    fn a_repository_name_is_optional() {
+        assert!(messages("schema-version 1\n").is_empty());
     }
 
     #[test]

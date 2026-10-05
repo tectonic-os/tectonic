@@ -43,9 +43,7 @@ Declares one bootable operating system image: its names, the base it builds on, 
 ```kdl
 image {
     name "Workstation"
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-    }
+    base "quay.io/fedora/fedora-bootc:44"
     modules {
         module "core/bootloader"
     }
@@ -68,7 +66,7 @@ Accepts: {&nbsp;[fields](#image-fields)&nbsp;}
 | [`logo-url`](#image-logo-url) (optional) | *string* | OCI label `io.artifacthub.package.logo-url`. The URL that points at the logo of the image. |
 | [`conforms`](#image-conforms) (optional) | *string* | The benchmark profile that a scan measures the ungated target against. |
 | [`boot`](#image-boot) (optional) | `uki-shim` or `uki-db` | The UKI boot chain, which is owner-signed through shim or enrolled directly into Secure Boot. |
-| [`base`](#image-base) (required) | *string*, then {&nbsp;[fields](#image-base-fields)&nbsp;} | The Linux image that every layer builds on. Its block declares what a build on the base can assume. |
+| [`base`](#image-base) (required) | *string*, then optionally {&nbsp;[fields](#image-base-fields)&nbsp;} | The Linux image that every layer builds on. Its block declares what a build on the base can assume. |
 | [`layout`](#image-layout) (optional) | {&nbsp;[fields](#image-layout-fields)&nbsp;} | What the installer lays down if the answer of the base family is not the one that the image wants. |
 | [`allow-remediation`](#image-allow-remediation) (optional,&nbsp;unique) | *string* | One rule an installed module refuses that this image lets remediation set anyway. |
 | [`flavours`](#image-flavours) (optional) | {&nbsp;[fields](#image-flavours-fields)&nbsp;} | The flavours that this image publishes beside its ungated build. |
@@ -238,13 +236,11 @@ The base is the upstream bootc image that the custom image starts from. Its bloc
 
 ```kdl
 image {
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-    }
+    base "quay.io/fedora/fedora-bootc:44"
 }
 ```
 
-Accepts: *string*, then {&nbsp;[fields](#image-base-fields)&nbsp;}
+Accepts: *string*, then optionally {&nbsp;[fields](#image-base-fields)&nbsp;}
 
 The reference can carry a digest after its tag:
 
@@ -257,7 +253,7 @@ The reference can carry a digest after its tag:
 
 | Field | Accepts | Description |
 | --- | --- | --- |
-| [`family`](#image-base-family) (required) | *string* | The family of the base, which an explicit module `supports` restriction must match. |
+| [`family`](#image-base-family) (optional) | *string* | The optional family used for family-specific module content and compatibility checks. |
 | [`provides`](#image-base-provides) (optional,&nbsp;repeatable) | *list of strings* | The capabilities that the upstream image already ships, which the build checks the finished image for. |
 | [`requires`](#image-base-requires) (optional,&nbsp;repeatable) | *list of strings* | The capabilities that an enabled module must provide before the base is usable. |
 | [`satisfies`](#image-base-satisfies) (optional) | optionally {&nbsp;[fields](#image-base-satisfies-fields)&nbsp;} | An audit declaration of the benchmarks and rules that the base image already satisfies. `tect` records it and certifies nothing. |
@@ -268,9 +264,9 @@ The reference can carry a digest after its tag:
 
 <a id="image-base-family"></a>
 
-#### `family` (required)
+#### `family` (optional)
 
-The family, such as `fedora` or `debian`, decides which family variant of each module the build takes. `tect` checks it against every module that restricts its supported families; a module with no `supports` declaration supports them all.
+The family, such as `fedora` or `debian`, selects family-specific module content and is checked against every module that restricts its supported families. When it is omitted, `tect` takes only ungated module content and skips family compatibility checks.
 
 ```kdl
 image {

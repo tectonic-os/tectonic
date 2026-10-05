@@ -27,7 +27,7 @@ sources {
 | --- | --- | --- |
 | [`schema-version`](#schema-version) (required) | *number* | The schema release that this repository is written against. |
 | [`tect-version`](#tect-version) (optional) | *string* | The `tect` release that builds this repository. |
-| [`name`](#name) (required) | *string* | The name of the repository, which can differ from its directory. |
+| [`name`](#name) (optional) | *string* | An optional human-readable label for the repository. |
 | [`default-image`](#default-image) (optional) | *string* | The image that a command with no image, or a build with no target, uses. |
 | [`pr-image`](#pr-image) (optional) | *string* | The image a pull request builds. |
 | [`seed`](#seed) (optional) | *string* | The image that this repository publishes as a starting point for a new repository. |
@@ -88,9 +88,9 @@ If a different release of `tect` reads the repository:
 
 <a id="name"></a>
 
-## `name` (required)
+## `name` (optional)
 
-The name that the repository answers to. It is separate from the directory name, so the user can rename or move the directory without a change to the repository.
+A human-readable label for the repository. It labels the result tree printed by commands that add or change files, and does not affect generation or builds. When it is omitted, that tree uses the repository directory name.
 
 ```kdl
 name "Workstation"

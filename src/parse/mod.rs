@@ -107,10 +107,11 @@ pub(crate) fn syntax_issue(err: &kdl::KdlError, file: &str, src: &Source) -> Iss
             .unwrap_or_else(|| "here".into());
         issue = issue.at(found.span, label);
     }
-    match err.diagnostics.iter().find_map(|d| d.help.clone()) {
+    let issue = match err.diagnostics.iter().find_map(|d| d.help.clone()) {
         Some(help) => issue.help(help),
         None => issue,
-    }
+    };
+    issue.blocks_edit()
 }
 
 /// The first unnamed entry of a node, as a string.

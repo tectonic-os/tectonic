@@ -546,6 +546,9 @@ example/
 > `audit { enforce #true }` refuses it.
 
 > [!NOTE]
+> If `repo.kdl` declares no `sources`, the command uses the default module
+> collection supplied with `tect` and adds that declaration to `repo.kdl`.
+>
 > A bare name is searched for in every collection. `<owner>/<name>` picks
 > between two collections that both hold it.
 >
@@ -587,6 +590,9 @@ example/
 ```
 
 > [!NOTE]
+> If `repo.kdl` declares no `sources`, the command uses the default module
+> collection supplied with `tect` and adds that declaration to `repo.kdl`.
+>
 > A required module that it brings in is copied too.
 >
 > No image is an answer. The copy is in the repository whether an image lists

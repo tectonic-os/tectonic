@@ -3,7 +3,7 @@ Creating example...
 [6n
 
 
-[1;1H[1m[38;2;90;86;224;49mSync this repo to a provider?[2;1H[38;2;238;111;248;49m> Yes                                                                           [3;3H[22m[39;49mNo[4;1H[2mup and down to move, enter to answer[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hSync this repo to a provider?: Yes
+[1;1H[1m[38;2;90;86;224;49mSync this repo to a provider?[2;1H[38;2;238;111;248;49m> Yes                                                                           [3;3H[22m[39;49mNo[4;1H[2mup and down to move, enter to answer, esc cancels[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hSync this repo to a provider?: Yes
 
 [6n
 
@@ -12,18 +12,18 @@ Creating example...
 
 [6n
 
-[1;1H[1m[38;2;90;86;224;49mGithub username?[2;1H[22m[39;49mgithub.com/[3;1H[2menter confirms[39m[49m[59m[0m[?25l[2;12Hs[39m[49m[59m[0m[?25l[2;13Ho[39m[49m[59m[0m[?25l[2;14Hm[39m[49m[59m[0m[?25l[2;15He[39m[49m[59m[0m[?25l[2;16Ho[39m[49m[59m[0m[?25l[2;17Hn[39m[49m[59m[0m[?25l[2;18He[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hGithub username?: github.com/someone
+[1;1H[1m[38;2;90;86;224;49mGithub username?[2;1H[22m[39;49mgithub.com/[3;1H[2menter confirms, esc cancels[39m[49m[59m[0m[?25l[2;12Hs[39m[49m[59m[0m[?25l[2;13Ho[39m[49m[59m[0m[?25l[2;14Hm[39m[49m[59m[0m[?25l[2;15He[39m[49m[59m[0m[?25l[2;16Ho[39m[49m[59m[0m[?25l[2;17Hn[39m[49m[59m[0m[?25l[2;18He[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hGithub username?: github.com/someone
 
 Added github.com/someone/example as the origin repo
 [6n
 
 
-[1;1H[1m[38;2;90;86;224;49mCreate this repo on Github now?[2;1H[38;2;238;111;248;49m> Yes                                                                           [3;3H[22m[39;49mSkip[4;1H[2mup and down to move, enter to answer[39m[49m[59m[0m[?25l[2;1H  Yes                                                                           [3;1H[1m[38;2;238;111;248;49m> Skip                                                                          [39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hCreate this repo on Github now?: Skip
+[1;1H[1m[38;2;90;86;224;49mCreate this repo on Github now?[2;1H[38;2;238;111;248;49m> Yes                                                                           [3;3H[22m[39;49mSkip[4;1H[2mup and down to move, enter to answer, esc cancels[39m[49m[59m[0m[?25l[2;1H  Yes                                                                           [3;1H[1m[38;2;238;111;248;49m> Skip                                                                          [39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hCreate this repo on Github now?: Skip
 
 [6n
 
 
-[1;1H[1m[38;2;90;86;224;49mDefine an image now?[2;1H[38;2;238;111;248;49m> Yes                                                                           [3;3H[22m[39;49mNo[4;1H[2mup and down to move, enter to answer[39m[49m[59m[0m[?25l[2;1H  Yes                                                                           [3;1H[1m[38;2;238;111;248;49m> No                                                                            [39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hDefine an image now?: No
+[1;1H[1m[38;2;90;86;224;49mDefine an image now?[2;1H[38;2;238;111;248;49m> Yes                                                                           [3;3H[22m[39;49mNo[4;1H[2mup and down to move, enter to answer, esc cancels[39m[49m[59m[0m[?25l[2;1H  Yes                                                                           [3;1H[1m[38;2;238;111;248;49m> No                                                                            [39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hDefine an image now?: No
 
 [6n
 
@@ -37,16 +37,16 @@ Added github.com/someone/example as the origin repo
 [6n
 
 
-[1;1H[1m[38;2;90;86;224;49mPublish images only on scheduled builds?[2;3H[22m[39;49mYes[3;1H[1m[38;2;238;111;248;49m> No                                                                            [4;1H[22m[2m[39;49mup and down to move, enter to answer[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hPublish images only on scheduled builds?: No
+[1;1H[1m[38;2;90;86;224;49mPublish images only on scheduled builds?[2;3H[22m[39;49mYes[3;1H[1m[38;2;238;111;248;49m> No                                                                            [4;1H[22m[2m[39;49mup and down to move, enter to answer, esc cancels[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hPublish images only on scheduled builds?: No
 
 [6n
 
 
-[1;1H[1m[38;2;90;86;224;49mRun image scans only on scheduled builds?[2;3H[22m[39;49mYes[3;1H[1m[38;2;238;111;248;49m> No                                                                            [4;1H[22m[2m[39;49mup and down to move, enter to answer[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hRun image scans only on scheduled builds?: No
+[1;1H[1m[38;2;90;86;224;49mRun image scans only on scheduled builds?[2;3H[22m[39;49mYes[3;1H[1m[38;2;238;111;248;49m> No                                                                            [4;1H[22m[2m[39;49mup and down to move, enter to answer, esc cancels[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hRun image scans only on scheduled builds?: No
 
 [6n
 
-[1;1H[1m[38;2;90;86;224;49mwhat time the daily build runs, UTC[2;1H[22m[2m[39;49m12:30[3;1Henter confirms[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hwhat time the daily build runs, UTC: 12:30
+[1;1H[1m[38;2;90;86;224;49mwhat time the daily build runs, UTC[2;1H[22m[2m[39;49m12:30[3;1Henter confirms, esc cancels[39m[49m[59m[0m[?25l[6n[1;1H[J[1;1H[1;1H[?25hwhat time the daily build runs, UTC: 12:30
 
 [6n
 
