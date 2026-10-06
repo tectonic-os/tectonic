@@ -1,0 +1,13 @@
+---
+source: tests/golden.rs
+---
+  x `core/hello` is not a module
+    ,-[tests/repos/wrong-pin/image.kdl:10:9]
+  9 |     modules {
+ 10 |         module "core/hello"
+    :         ^^^|^^
+    :            `-- nothing to build
+ 11 |     }
+    `----
+  help: give modules/core/hello a module.kdl, a module.sh, a files/ directory,
+        a Containerfile.inc or a file that another module collects
