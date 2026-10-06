@@ -1,0 +1,18 @@
+---
+source: tests/golden.rs
+---
+Tectonic v{version}
+
+
+example/
+├── modules/
+│   └── flatpak/
+│       ├── files/
+│       │   └── usr/
+│       │       └── share/
+│       │           └── example/
+│       │               └── + remotes.list
+│       ├── + module.kdl
+│       └── + provenance.kdl
+└── ~ example.image.kdl  flatpak added to modules
+==== exit 0

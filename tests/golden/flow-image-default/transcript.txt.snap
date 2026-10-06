@@ -1,0 +1,65 @@
+---
+source: tests/golden.rs
+---
+Tectonic v{version}
+
+What will the repo be called?
+Example
+
+Creating example...
+
+Sync this repo to a provider? (Yes/No)
+No
+
+Define an image now? (Yes/No)
+Yes
+
+What will the image be called? [Example]
+
+
+  1) quay.io/fedora/fedora-bootc:44  Fedora 44, nothing above the base system
+  2) quay.io/centos-bootc/centos-bootc:stream10  CentOS Stream 10, the EL base a stated claim can be measured against
+  3) registry.redhat.io/rhel10/rhel-bootc:latest  RHEL 10, the supported EL base, behind a Red Hat login
+  4) quay.io/almalinuxorg/almalinux-bootc:10  AlmaLinux 10, the RHEL rebuild, whose benchmark needs no entitlement
+  5) ghcr.io/ublue-os/bazzite:stable  KDE, gaming and hardware support over kinoite-main
+  6) ghcr.io/ublue-os/aurora:stable  KDE developer workstation over kinoite-main
+  7) ghcr.io/ublue-os/bluefin:stable  GNOME developer workstation over silverblue-main
+  8) ghcr.io/ublue-os/kinoite-main:44  Fedora Kinoite with the ublue additions, what bazzite builds on
+  9) quay.io/rockylinux/rockylinux:10  Rocky Linux 10, which a module set has to turn into a bootc image
+  10) docker.io/library/debian:forky  Debian 14, which a module set has to turn into a bootc image
+  11) docker.io/library/ubuntu:26.04  Ubuntu 26.04 LTS, which a module set has to turn into a bootc image
+What is the base image for this image? [1-11, 0 for none]: 1
+
+tect: `tectonic-os`: curl: No such file or directory (os error 2); what is offered below is only what is already on this machine
+  1) [x] Containerfile.skeleton  the Containerfile around the generated module layers
+  2) [ ] lint.sh  the repository's lint, as CI runs it
+  3) [ ] tect.sh  fetches and runs the tect release that repo.kdl pins
+  4) [ ] smoke.sh  boots a built image under qemu and waits for ssh
+  5) [ ] vm.sh  builds a disk image and boots it
+Which files to keep in scripts/? [1-5, several, 0 for none]: 1
+
+initialised a git repository in example
+
+example/
+├── .github/
+│   └── + renovate.json5
+├── disk_config/
+│   └── + disk.toml
+├── modules/
+│   └── + .gitkeep
+├── scripts/
+│   └── + Containerfile.skeleton
+├── + .dockerignore
+├── + .gitattributes
+├── + .gitignore
+├── + .shellcheckrc
+├── + README.md
+├── + example.image.kdl
+└── + repo.kdl
+
+next:
+  cd example
+  tect generate
+  git add -A && git commit
+
+==== exit 0

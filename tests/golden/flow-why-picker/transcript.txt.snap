@@ -1,0 +1,39 @@
+---
+source: tests/golden.rs
+---
+Which module?: one
+
+[1mcore/one[0m
+
+Builds things
+
+[1mWhere it is built[0m
+
+example
+
+[1mWhat it exchanges[0m
+
+Nothing: it neither provides nor requires.
+
+[1mWhat it claims[0m
+
+Nothing. It declares no `satisfies`.
+
+[1mWhere it came from[0m
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│[1mContent  Hash                                                              [0m│
+│declared `71cf98d5efb9a591512bd530eb250ccaed9451bfff685cfd1166d092666198b2`│
+└───────────────────────────────────────────────────────────────────────────┘
+
+It was written in this repository rather than imported, so nothing upstream to
+compare it against.
+
+[1mWhat it pulls in[0m
+
+Nothing. It declares no `asset`.
+
+[1mThird-party repositories[0m
+
+None. It declares no `copr` and ships no `repo` file.
+==== exit 0

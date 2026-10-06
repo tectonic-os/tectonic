@@ -1,0 +1,13 @@
+---
+source: tests/golden.rs
+---
+A `conforms` turns the scan on: every build measures `example` against the profile and publishes the score.
+
+  1) standard  Standard System Security Profile for Fedora
+  2) ospp  Protection Profile for General Purpose Operating Systems
+Which profile? [1-2, 0 for none]: 2
+
+
+example/
+└── ~ example.image.kdl  measured against `ospp`
+==== exit 0

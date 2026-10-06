@@ -1,9 +1,0 @@
-Tectonic v{version}
-
-List it in example? (Yes/No)
-Yes
-
-Error: no-such-datastream.xml: No such file or directory (os error 2).
-
-Run 'tect --help' to list the commands
-==== exit 1

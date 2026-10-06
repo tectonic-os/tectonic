@@ -1,0 +1,1139 @@
+---
+source: tests/golden.rs
+---
+==== generated/lib/apparmor-helpers.sh
+==== generated/lib/dkms-helpers.sh
+==== generated/lib/fetch-helpers.sh
+==== generated/lib/kernel-helpers.sh
+==== generated/lib/selinux-helpers.sh
+==== generated/lib/sign-helpers.sh
+==== generated/lib/wrap-helpers.sh
+==== generated/scripts/lint.sh
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+# The script runs from scripts/ or from generated/scripts/.
+[ -f repo.kdl ] || cd ..
+
+# scripts/ is absent unless the repository keeps a copy of a script.
+roots=(generated/lib modules)
+for dir in generated/scripts scripts; do
+    [ ! -d "$dir" ] || roots+=("$dir")
+done
+# A helper below is left to the shell it names, so it is not a script here too.
+mapfile -t scripts < <(find "${roots[@]}" -path modules/.remote -prune -o \
+    -name '*.sh' -type f ! \( -path '*/files/*' \
+    \( -path '*/libexec/*' -o -path '*/system-generators/*' \) \) -print)
+# A `repo` file is shell and carries no extension.
+mapfile -t repos < <(find modules -path modules/.remote -prune -o -name repo -type f -print)
+# What a module ships to run on the machine, and each names its shell.
+mapfile -t helpers < <(find modules -path modules/.remote -prune -o -path '*/files/*' -type f \
+    \( -path '*/libexec/*' -o -path '*/system-generators/*' \) -print)
+shfmt=(shfmt -i 4 -ci -bn -sr)
+counted="${#scripts[@]} scripts, ${#repos[@]} repo files and ${#helpers[@]} helpers"
+
+if [ "${1:-}" = "--fix" ]; then
+    "${shfmt[@]}" -w "${scripts[@]}" "${repos[@]}" "${helpers[@]}"
+    echo "lint: formatted ${counted}"
+    exit
+fi
+
+for tool in shellcheck shfmt; do
+    command -v "$tool" > /dev/null 2>&1 || {
+        echo "lint: $tool not found, install it first" >&2
+        exit 1
+    }
+done
+
+shellcheck -s bash "${scripts[@]}"
+# `REPO_ID` is a `repo` file's interface: the helper and the emitter read it,
+# and shellcheck sees neither.
+[ "${#repos[@]}" -eq 0 ] || shellcheck -s bash -e SC2034 "${repos[@]}"
+[ "${#helpers[@]}" -eq 0 ] || shellcheck "${helpers[@]}"
+"${shfmt[@]}" -d "${scripts[@]}" "${repos[@]}" "${helpers[@]}" || {
+    echo "lint: unformatted, run ./generated/scripts/lint.sh --fix" >&2
+    exit 1
+}
+echo "lint: ${counted} pass shellcheck and shfmt"
+
+./generated/scripts/tect.sh fetch modules
+
+./generated/scripts/tect.sh check
+
+./generated/scripts/tect.sh verify
+==== generated/scripts/tect.sh
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+# The script runs from scripts/ or from generated/scripts/.
+[ -f repo.kdl ] || cd ..
+
+die() {
+    echo "tect: $*" >&2
+    exit 1
+}
+
+REPO="tectonic-os/tectonic"
+
+# One declared value out of the manifest, and nothing derived from it. A
+# repository that declares no `tect-version` is not pinned and takes the latest
+# release, resolved through the redirect `releases/latest` answers with. The API
+# rate-limits unauthenticated callers.
+line="$(sed -n '/^[[:space:]]*tect-version[[:space:]]/p' repo.kdl)"
+if [[ "$line" =~ ^[[:space:]]*tect-version[[:space:]]+\"([^\"]+)\"(.*)$ ]]; then
+    version="${BASH_REMATCH[1]}"
+    rest="${BASH_REMATCH[2]%%//*}"
+elif [ -n "$line" ]; then
+    die "repo.kdl declares no readable tect-version"
+else
+    latest="$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
+        "https://github.com/${REPO}/releases/latest")" \
+        || die "cannot resolve the latest release of ${REPO}"
+    [[ "$latest" =~ /tag/v([^/]+)$ ]] \
+        || die "cannot read a release out of ${latest}"
+    version="${BASH_REMATCH[1]}"
+    rest=""
+    echo "tect: repo.kdl pins no release, using the latest, ${version}" >&2
+fi
+
+sha256=""
+if [[ "$rest" =~ (^|[[:space:]])sha256[[:space:]]*= ]]; then
+    if [[ "$rest" =~ (^|[[:space:]])sha256[[:space:]]*=[[:space:]]*\"([^\"]*)\" ]]; then
+        sha256="${BASH_REMATCH[2]}"
+    else
+        die "repo.kdl declares no readable sha256 for tect-version"
+    fi
+    [[ "$sha256" =~ ^[0-9a-f]{64}$ ]] \
+        || die "repo.kdl declares a malformed sha256 for tect-version"
+fi
+
+case "$(uname -m)" in
+    x86_64 | aarch64) arch="$(uname -m)" ;;
+    *) die "Linux is published for x86_64 and aarch64, and this is $(uname -m)" ;;
+esac
+
+# One pin, one architecture: the sha256 repo.kdl declares is the x86_64
+# asset's, so it cannot verify another architecture's download.
+if [ -n "$sha256" ] && [ "$arch" != "x86_64" ]; then
+    die "repo.kdl pins the sha256 of the x86_64 release, and this is ${arch}"
+fi
+
+bin="${TECT_BIN:-out/tect-${version}${sha256:+-${sha256}}}"
+
+if [ ! -x "$bin" ]; then
+    asset="tect-v${version}-${arch}-linux-musl.tar.gz"
+    url="https://github.com/${REPO}/releases/download/v${version}/${asset}"
+
+    mkdir -p out
+    tmp="$(mktemp -d -p out download.XXXXXXXX)"
+    trap 'rm -rf "$tmp"' EXIT
+
+    curl -fsSL --retry 3 --retry-all-errors -o "${tmp}/${asset}" "$url" \
+        || die "cannot fetch ${url}"
+    # A declared sha256 is the verifier; the checksum fetched beside the
+    # tarball is the fallback for a repository declaring none, and proves
+    # the download and nothing more.
+    if [ -n "$sha256" ]; then
+        (cd "$tmp" && printf '%s  %s\n' "$sha256" "$asset" \
+            | sha256sum --check --status) \
+            || die "${asset} does not match the sha256 repo.kdl declares"
+    else
+        curl -fsSL --retry 3 --retry-all-errors -o "${tmp}/sha256" "${url}.sha256" \
+            || die "cannot fetch ${url}.sha256"
+        (cd "$tmp" && printf '%s  %s\n' "$(cat sha256)" "$asset" \
+            | sha256sum --check --status) \
+            || die "${asset} does not match its published checksum"
+    fi
+
+    tar -xzf "${tmp}/${asset}" -C "$tmp" tect
+    mv "${tmp}/tect" "$bin"
+    rm -rf "$tmp"
+    trap - EXIT
+fi
+
+# Where the binary is: the build mounts it.
+if [ "${1:-}" = "--path" ]; then
+    echo "$bin"
+    exit 0
+fi
+
+exec "$bin" "$@"
+==== generated/scripts/smoke.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+# The boot path CI proves an image on: installed to a raw disk as the recipe
+# says, booted under qemu, and handed back once ssh answers. The smoke test and
+# the collection's machine scan both call it.
+cd "$(dirname "$0")/.."
+# The script runs from scripts/ or from generated/scripts/.
+[ -f repo.kdl ] || cd ..
+
+# The renderer a deb image ships and a fedora one does not.
+RENDERER=/usr/libexec/grub-menu-from-bls
+PORT=2222
+
+die() {
+    echo "smoke: $*" >&2
+    exit 1
+}
+
+[ "$#" -eq 2 ] || [ "$#" -eq 3 ] \
+    || die "usage: generated/scripts/smoke.sh <image-ref in root's store> <work dir> [target]"
+ref="$1"
+dir="$(realpath -m "$2")"
+mkdir -p "$dir"
+for tool in jq qemu-system-x86_64 ssh ssh-keygen; do
+    command -v "$tool" > /dev/null 2>&1 || die "$tool is not installed"
+done
+
+# The target's own recipe: images in one repository can install differently.
+recipe="$(./generated/scripts/tect.sh recipe ${3:+--target "$3"})"
+filesystem="$(jq -r .filesystem <<< "$recipe")"
+composefs="$(jq -r .composeFsBackend <<< "$recipe")"
+bootloader="$(jq -r .bootloader <<< "$recipe")"
+
+rm -f "${dir}/key" "${dir}/key.pub" "${dir}/disk.raw"
+ssh-keygen -q -t ed25519 -f "${dir}/key" -N '' -C smoke
+truncate -s "${DISK_SIZE:-20G}" "${dir}/disk.raw"
+
+# `--generic-image` whatever the recipe says: this disk boots under another
+# firmware than the one that installed it, so it wants the removable path and
+# no NVRAM entry. The assertions arrive over ssh, and an image may ship sshd
+# disabled. The last `console=` is /dev/console, so ttyS0 goes after tty0.
+args=(
+    --via-loopback --generic-image --filesystem "$filesystem"
+    --karg console=tty0 --karg 'console=ttyS0,115200n8'
+    --karg systemd.wants=sshd.service
+)
+# bootc takes grub2 by default, so only another bootloader needs a flag.
+case "$bootloader" in
+    "" | grub2) ;;
+    *) args+=(--bootloader "$bootloader") ;;
+esac
+mounts=()
+# `--composefs-backend` refuses a containers-storage source with `Invalid
+# splitstream content type`, and takes an OCI layout.
+if [ "$composefs" = true ]; then
+    sudo rm -rf "${dir}/oci"
+    sudo podman push -q "$ref" "oci:${dir}/oci"
+    mounts=(-v "${dir}/oci:/oci:ro")
+    args+=(--composefs-backend --source-imgref oci:/oci)
+fi
+sudo podman run --rm --privileged --pull=never --pid=host --net=host \
+    --security-opt label=type:unconfined_t \
+    -v /dev:/dev \
+    -v /var/lib/containers/storage:/var/lib/containers/storage \
+    -v "${dir}:/output" \
+    "${mounts[@]}" \
+    "$ref" bootc install to-disk "${args[@]}" /output/disk.raw
+
+# vm.sh's `render_menu`, over the same two layouts: nothing renders a deb
+# image's menu during an install, and its GRUB reads no BLS entries.
+render_menu() {
+    local lo target device root="" status=0
+    target="$(mktemp -d)"
+    mkdir "${target}/boot"
+    lo="$(sudo losetup --show -fP "${dir}/disk.raw")"
+    for device in "${lo}"p*; do
+        [ -b "$device" ] || continue
+        sudo mount "$device" "${target}/boot" 2> /dev/null || continue
+        if [ -d "${target}/boot/loader/entries" ]; then
+            root=/target
+            break
+        fi
+        if [ -d "${target}/boot/boot/loader/entries" ]; then
+            root=/target/boot
+            break
+        fi
+        sudo umount "${target}/boot"
+    done
+    if [ -z "$root" ]; then
+        sudo losetup -d "$lo"
+        die "no partition of the disk carries \`loader/entries\`"
+    fi
+    sudo podman run --rm --net=none --security-opt label=disable \
+        -v "${target}:/target" --entrypoint "" "$ref" \
+        /bin/sh -c "test -x ${RENDERER} || exit 3; exec ${RENDERER} ${root}" || status=$?
+    sudo umount "${target}/boot"
+    sudo losetup -d "$lo"
+    rmdir "${target}/boot" "$target"
+    case "$status" in
+        0) echo "smoke: rendered the boot menu" ;;
+        3) ;;
+        *) die "${RENDERER} failed: exit ${status}" ;;
+    esac
+}
+render_menu
+sudo chown "$(id -u):$(id -g)" "${dir}/disk.raw"
+
+# Secure Boot is on, under Microsoft's keys as on a bought machine, unless
+# SECURE_BOOT=0 declares a chain that boots without it.
+secure_boot="${SECURE_BOOT:-1}"
+if [ "$secure_boot" = 1 ]; then
+    firmware=(/usr/share/OVMF/OVMF_CODE_4M.secboot.fd:/usr/share/OVMF/OVMF_VARS_4M.ms.fd
+        /usr/share/edk2/ovmf/OVMF_CODE.secboot.fd:/usr/share/edk2/ovmf/OVMF_VARS.secboot.fd)
+    machine=(-machine 'q35,smm=on' -global 'driver=cfi.pflash01,property=secure,value=on')
+else
+    firmware=(/usr/share/OVMF/OVMF_CODE_4M.fd:/usr/share/OVMF/OVMF_VARS_4M.fd
+        /usr/share/edk2/ovmf/OVMF_CODE.fd:/usr/share/edk2/ovmf/OVMF_VARS.fd)
+    machine=(-machine q35)
+fi
+code=""
+for pair in "${firmware[@]}"; do
+    if [ -f "${pair%%:*}" ] && [ -f "${pair#*:}" ]; then
+        code="${pair%%:*}"
+        cp "${pair#*:}" "${dir}/vars.fd"
+        break
+    fi
+done
+[ -n "$code" ] || die "no OVMF firmware for SECURE_BOOT=${secure_boot} is installed"
+# A hardened image refuses root over ssh. The drop-in reaches the machine as a
+# credential and lives in /run, so the /etc a scan measures is the image's.
+# The key is a credential too: a composefs install drops
+# `--root-ssh-authorized-keys`.
+# shellcheck disable=SC2016 # expanded by systemd, from each family's EnvironmentFile
+dropin="$(printf '%s\n' '[Service]' 'ExecStart=' \
+    'ExecStart=/usr/sbin/sshd -D -oPermitRootLogin=prohibit-password $OPTIONS $SSHD_OPTS' \
+    | base64 -w0)"
+qemu-system-x86_64 \
+    -smbios "type=11,value=io.systemd.credential.binary:ssh.authorized_keys.root=$(base64 -w0 "${dir}/key.pub")" \
+    -smbios "type=11,value=io.systemd.credential.binary:systemd.unit-dropin.sshd.service=${dropin}" \
+    -smbios "type=11,value=io.systemd.credential.binary:systemd.unit-dropin.ssh.service=${dropin}" \
+    "${machine[@]}" -m "${RAM:-4096}" -smp 2 -cpu host -enable-kvm -display none \
+    -drive "if=pflash,unit=0,format=raw,readonly=on,file=${code}" \
+    -drive "if=pflash,unit=1,format=raw,file=${dir}/vars.fd" \
+    -serial "file:${dir}/console.log" \
+    -drive "file=${dir}/disk.raw,if=virtio,format=raw" \
+    -nic "user,hostfwd=tcp:127.0.0.1:${PORT}-:22" \
+    -daemonize -pidfile "${dir}/qemu.pid" \
+    > "${dir}/qemu.log" 2>&1
+
+on_machine() {
+    ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        -o ConnectTimeout=5 -o LogLevel=ERROR -i "${dir}/key" -p "$PORT" root@localhost "$@"
+}
+for i in $(seq 60); do
+    if on_machine true 2> /dev/null; then
+        echo "smoke: ssh answered after ${i} attempts"
+        # The fifth byte of the variable is the state; the first four are its
+        # attributes. Firmware built without Secure Boot has no variable.
+        sb=/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c
+        state=0
+        if on_machine test -e "$sb"; then
+            state="$(on_machine od -An -tu1 -j4 -N1 "$sb" | tr -d ' ')"
+        fi
+        [ "$state" = "$secure_boot" ] \
+            || die "the machine reads Secure Boot as '${state}' where SECURE_BOOT is ${secure_boot}"
+        exit 0
+    fi
+    sleep 10
+done
+die "ssh did not answer in ten minutes; the serial console is ${dir}/console.log"
+==== generated/scripts/vm.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+# The renderer a deb image ships and a fedora one does not.
+RENDERER=/usr/libexec/grub-menu-from-bls
+cd "$(dirname "$0")/.."
+# The script runs from scripts/ or from generated/scripts/.
+[ -f repo.kdl ] || cd ..
+
+die() {
+    echo "vm: $*" >&2
+    exit 1
+}
+
+usage() {
+    cat >&2 << 'EOF'
+usage: generated/scripts/vm.sh <command> <qcow2|raw|iso> [options]
+
+  build     convert the container image into a disk image under out/
+  run       boot that disk image under qemu, building it if it is missing
+  spawn     boot it with systemd-vmspawn instead (qcow2 or raw)
+
+  --image <ref>       container image to convert (default: localhost/ and
+                      the plan's ungated published name)
+  --tag <tag>         its tag (default: $DEFAULT_TAG, else latest)
+  --target <image/flavour>
+                      what a rebuild builds and what an iso installs
+                      (default: the plan's ungated target)
+  --rebuild           fetch modules, generate, then build the container image
+                      first. The one form of this that changes the repository.
+  --ram <size>        memory for the virtual machine (default: 8G)
+  --installer <which> what converts the image into a disk: `bib` for
+                      bootc-image-builder, `bootc` for `bootc install to-disk`.
+                      `tect vm` passes this off the target's base family; the
+                      default here is bib, which is fedora-only. An iso is
+                      converted by neither and passes none.
+  --live-image <ref>  what the installer media boots, built here from
+                      out/bootiso/Containerfile. `tect vm` names it, because
+                      this script has no JSON reader to find it with.
+
+Environment:
+  BIB_IMAGE           bootc-image-builder image
+  DISK_SIZE           size of the disk `--installer bootc` writes (default: 20G).
+                      The file is sparse, so this is a ceiling rather than a cost.
+  VM_USER             console account passed as a systemd credential (default: tect)
+  VM_PASSWORD_HASH    its crypt(5) hash; when unset, run and spawn ask for a password
+  GPU                 Y for hardware rendering in the qemu viewer (default: N)
+EOF
+}
+
+command="${1:-}"
+case "$command" in
+    build | run | spawn) shift ;;
+    -h | --help)
+        usage
+        exit 0
+        ;;
+    *)
+        usage
+        die "unknown command '${command}'"
+        ;;
+esac
+
+type="${1:-}"
+shift || true
+case "${command}/${type}" in
+    */qcow2 | */raw | build/iso | run/iso) ;;
+    spawn/iso) die "systemd-vmspawn cannot boot an installer iso" ;;
+    *) die "'${command}' needs an image type (qcow2, raw or iso)" ;;
+esac
+
+image=""
+tag="${DEFAULT_TAG:-latest}"
+target=""
+rebuild=0
+ram=8G
+installer=bib
+live_image=""
+login=0
+ssh_key=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --image | --tag | --target | --ram | --installer | --ssh-key | --live-image)
+            [ "$#" -ge 2 ] || die "$1 needs a value"
+            case "$1" in
+                --image) image="$2" ;;
+                --tag) tag="$2" ;;
+                --target) target="$2" ;;
+                --ram) ram="$2" ;;
+                --ssh-key) ssh_key="$2" ;;
+                --live-image) live_image="$2" ;;
+                --installer)
+                    case "$2" in
+                        bib | bootc) installer="$2" ;;
+                        *) die "--installer is bib or bootc, not '$2'" ;;
+                    esac
+                    ;;
+            esac
+            shift 2
+            ;;
+        --rebuild)
+            rebuild=1
+            shift
+            ;;
+        --login)
+            login=1
+            shift
+            ;;
+        -h | --help)
+            usage
+            exit 0
+            ;;
+        *)
+            usage
+            die "unknown argument '$1'"
+            ;;
+    esac
+done
+
+if [ -n "$image" ]; then
+    ref="${image}:${tag}"
+else
+    ref="$(IMAGE_REGISTRY=localhost ./generated/scripts/tect.sh registry ref --tag "$tag")"
+fi
+
+staged=out/bootiso
+image_file="out/${type}/disk.${type}"
+[ "$type" != iso ] || image_file="${staged}/install.iso"
+
+sudoif() {
+    if [ "${UID}" -eq 0 ]; then
+        "$@"
+    elif [ -n "${SUDO_ASKPASS:-}${SSH_ASKPASS:-}" ] && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
+        SUDO_ASKPASS="${SUDO_ASKPASS:-${SSH_ASKPASS}}" sudo --askpass "$@"
+    else
+        sudo "$@"
+    fi
+}
+
+# bootc-image-builder reads the image from rootful podman
+load_rootful() {
+    if [ "${UID}" -eq 0 ] || [ -n "${SUDO_USER:-}" ]; then
+        return 0
+    fi
+    if ! podman image exists "$ref"; then
+        # A rootful build leaves the image in root's store alone.
+        sudoif podman image exists "$ref" || sudoif podman pull "$ref"
+        return 0
+    fi
+    local mine theirs tmp
+    mine="$(podman images --filter reference="$ref" --format '{{.ID}}')"
+    theirs="$(sudoif podman images --filter reference="$ref" --format '{{.ID}}')"
+    [ "$mine" != "$theirs" ] || return 0
+    mkdir -p out
+    tmp="$(mktemp -p "${PWD}/out" -d scp.XXXXXXXX)"
+    sudoif env "TMPDIR=${tmp}" podman image scp \
+        "${UID}@localhost::${ref}" "root@localhost::${ref}"
+    rm -rf "$tmp"
+}
+
+build_disk() {
+    local config=disk_config/disk.toml tmp
+    load_rootful
+    mkdir -p out
+    tmp="$(mktemp -p "${PWD}/out" -d bib.XXXXXXXX)"
+    sudoif podman run \
+        --rm -it --privileged --pull=newer --net=host \
+        --security-opt label=type:unconfined_t \
+        -v "$(realpath "$config")":/config.toml:ro \
+        -v "$tmp":/output \
+        -v /var/lib/containers/storage:/var/lib/containers/storage \
+        "${BIB_IMAGE:-quay.io/centos-bootc/bootc-image-builder:latest}" \
+        --type "$type" --use-librepo=True --rootfs=btrfs "$ref"
+    sudoif mv -f "$tmp"/* out/
+    sudoif rmdir "$tmp"
+    sudoif chown -R "$(id -u):$(id -g)" out/
+}
+
+# The boot menu a deb image needs and a fedora one does not: their signed GRUB
+# reads no BLS entries, so it is rendered from the entries `bootc` just wrote.
+# No `--bootloader` is passed above, so bootc picks one itself.
+#
+# The renderer is run from the image: a composefs deployment on the disk is
+# sealed erofs with no walkable /usr. An image that ships none is a family that
+# needs none, which is exit 3 and not a failure. Two layouts and one mount
+# point: the entries sit at the top of a /boot partition and a level down when
+# /boot is a directory on the root filesystem.
+#
+# `render_menu` in src/install.rs is this algorithm over a real block device: it
+# is already root and needs no loop device, which is why the two are separate.
+render_menu() {
+    local raw="$1" lo target device root=""
+    target="$(mktemp -d)"
+    mkdir -p "${target}/boot"
+    lo="$(sudoif losetup --show -fP "$raw")"
+    for device in "${lo}"p*; do
+        [ -b "$device" ] || continue
+        sudoif mount "$device" "${target}/boot" 2> /dev/null || continue
+        if [ -d "${target}/boot/loader/entries" ]; then
+            root=/target
+            break
+        fi
+        if [ -d "${target}/boot/boot/loader/entries" ]; then
+            root=/target/boot
+            break
+        fi
+        sudoif umount "${target}/boot"
+    done
+    if [ -z "$root" ]; then
+        sudoif losetup -d "$lo"
+        rmdir "${target}/boot" "$target" 2> /dev/null || true
+        die "no partition of the disk carries \`loader/entries\`, so there is no menu to render"
+    fi
+    local status=0
+    sudoif podman run --rm --net=none --security-opt label=disable \
+        -v "${target}:/target" --entrypoint "" "$ref" \
+        /bin/sh -c "test -x ${RENDERER} || exit 3; exec ${RENDERER} ${root}" || status=$?
+    sudoif umount "${target}/boot"
+    sudoif losetup -d "$lo"
+    rmdir "${target}/boot" "$target" 2> /dev/null || true
+    case "$status" in
+        0) echo "vm: wrote the boot menu, since this image's GRUB reads no BLS" ;;
+        3) ;;
+        *) die "${RENDERER} in ${ref} failed: exit ${status}" ;;
+    esac
+}
+
+# `bootc install to-disk`, for a family bootc-image-builder cannot convert. It
+# writes a raw disk to a file with no loop device of its own: `--via-loopback`
+# is what removes the need for a `losetup -P`.
+install_disk() {
+    command -v skopeo > /dev/null 2>&1 \
+        || die "skopeo is not installed, and it writes the layout bootc installs from"
+    command -v jq > /dev/null 2>&1 || die "jq is not installed, and it reads the install recipe"
+    if [ "$type" = qcow2 ]; then
+        command -v qemu-img > /dev/null 2>&1 \
+            || die "qemu-img is not installed, and a qcow2 is converted from the raw disk"
+    fi
+
+    # Everything is written beside the disk and moved onto it at the end, so a
+    # run that fails or is interrupted leaves the disk that was already there.
+    local raw="out/${type}/disk.raw.part" layout="out/oci-cache" key_args=() recipe bootloader
+    recipe="$(./generated/scripts/tect.sh recipe ${target:+--target "$target"})"
+    bootloader="$(jq -r .bootloader <<< "$recipe")"
+    local install_args=(--filesystem "$(jq -r .filesystem <<< "$recipe")")
+    [ "$(jq -r .composeFsBackend <<< "$recipe")" != true ] || install_args+=(--composefs-backend)
+    # bootc takes grub2 by default, so only another bootloader needs a flag.
+    case "$bootloader" in
+        "" | grub2) ;;
+        *) install_args+=(--bootloader "$bootloader") ;;
+    esac
+    mkdir -p "out/${type}"
+    rm -f "$raw"
+    truncate -s "${DISK_SIZE:-20G}" "$raw"
+
+    # `--composefs-backend` refuses a containers-storage image with `Invalid
+    # splitstream content type`, and `--source-imgref containers-storage:`
+    # refuses identically. An OCI layout is a different transport and is
+    # accepted, so the bytes are copied out to one.
+    rm -rf "$layout"
+    skopeo copy "containers-storage:${ref}" "oci:${layout}"
+
+    # A composefs install drops `--root-ssh-authorized-keys`, so the key is a
+    # credential on the kernel command line, which systemd's provision.conf reads.
+    if [ -n "$ssh_key" ]; then
+        [ -s "$ssh_key" ] || die "$ssh_key does not hold an SSH public key"
+        key_args=(--karg "systemd.set_credential_binary=ssh.authorized_keys.root:$(base64 -w0 "$ssh_key")")
+    fi
+
+    # `load_rootful` keeps root's store from holding a stale image of the same
+    # name, so nothing here has to pull.
+    #
+    # --pid=host and --net=host were never separated out from the recipe this
+    # was built against. Do not drop them as tidying without re-running an
+    # install.
+    load_rootful
+    sudoif podman run \
+        --rm --privileged --pull=never \
+        --pid=host --net=host \
+        -v /var/lib/containers:/var/lib/containers \
+        -v /dev:/dev \
+        -v "${PWD}/out/${type}":/out \
+        -v "${PWD}/${layout}":/oci:ro \
+        --security-opt label=type:unconfined_t \
+        "$ref" \
+        bootc install to-disk --via-loopback --source-imgref oci:/oci \
+        --wipe --generic-image "${install_args[@]}" \
+        "${key_args[@]}" /out/disk.raw.part
+
+    sudoif chown -R "$(id -u):$(id -g)" out/
+    render_menu "$raw"
+    # bootc writes raw; a qcow2 is a conversion on top of it. Either way the
+    # finished article is moved into place as the last thing that happens.
+    if [ "$type" = qcow2 ]; then
+        qemu-img convert -O qcow2 "$raw" "${image_file}.part"
+        rm -f "$raw"
+        mv -f "${image_file}.part" "$image_file"
+    else
+        mv -f "$raw" "$image_file"
+    fi
+}
+
+# The installer media. Nothing here converts the image into a disk: the media
+# boots a live environment that installs the target through podman, so one live
+# environment installs every family and there is no branch here.
+#
+# `tect vm build iso` stages the whole build context under out/bootiso/ before
+# it execs this script: every part of it depends on --target, --tag and
+# $IMAGE_REGISTRY, or on the tree being built from.
+build_iso() {
+    local tools=localhost/tect-installer-tools:latest tbx="${PWD}/${staged}/tacklebox"
+    # Absolute, because tacklebox splices the build directory into a
+    # `containers-storage:[overlay@<dir>+<run>]` transport name for the offline
+    # store, and skopeo refuses that with `path name is not absolute`.
+    local build="${PWD}/${staged}/build"
+    [ -n "$live_image" ] || die "--live-image names what the media boots; \`tect vm\` passes it"
+    [ -f "${staged}/Containerfile" ] \
+        || die "${staged}/Containerfile is not there; \`tect vm build iso\` stages it"
+
+    # Everything runs against root's store: tacklebox reads it under sudo, and
+    # building the live environment as root is what puts both images there
+    # without a second copy. `load_rootful` brings the payload across.
+    load_rootful
+
+    # Written beside the media and moved onto it last, so a failed build leaves
+    # the iso that was already there.
+    rm -f "${image_file}.part"
+
+    # One sudo for the whole root half. sudo's timestamp lasts five minutes and
+    # the tools image, the live environment and tacklebox each hold the terminal
+    # longer than that, so a `sudoif` per step asks for the password per step. A
+    # background refresher cannot fix it: with no tty sudo keys its timestamp by
+    # parent process.
+    #
+    # tacklebox shells out to bare `sudo` and is already inside this one, so its
+    # internal calls are no-ops. HOME comes with it, because it writes there.
+    sudoif env HOME=/root \
+        TOOLS="$tools" LIVE="$live_image" STAGED="${PWD}/${staged}" TBX="$tbx" \
+        BUILD="$build" ISO="${PWD}/${image_file}.part" OWNER="$(id -u):$(id -g)" \
+        bash -s << 'ROOT' || die "the media could not be assembled; the staging is under ${build}"
+set -euo pipefail
+
+# tacklebox leaves its offline-store overlay mounted and then trips over it on
+# the next run. Cleared before and after: a mount nobody unmounts is one
+# `rm -rf out` answers `Device or resource busy` on.
+unmount_offline_store() {
+    if mountpoint -q "${BUILD}/tbox-offline-store/overlay" 2> /dev/null; then
+        umount "${BUILD}/tbox-offline-store/overlay"
+    fi
+}
+
+# On the failing path too. Everything root writes here is root's, and a failed
+# build that keeps it that way leaves a tree the person who ran this cannot
+# read, delete or retry over.
+finish() {
+    unmount_offline_store
+    chown -R "$OWNER" "$STAGED"
+}
+trap finish EXIT
+
+# Tacklebox assembles the media here, so it is copied out of its build stage.
+podman build --target tools -t "$TOOLS" "$STAGED"
+cid="$(podman create "$TOOLS")"
+podman cp "${cid}:/out/tacklebox" "$TBX"
+podman rm "$cid" > /dev/null
+
+podman build -t "$LIVE" "$STAGED"
+
+unmount_offline_store
+# The signed pair boots under Secure Boot, so it wins where the live image
+# carries systemd-boot too.
+env HOME=/root "$TBX" build "${STAGED}/media.json" --iso "$ISO" -b "$BUILD" \
+    --media-bootloader grub2 --offline-store-format oci
+ROOT
+
+    mv -f "${image_file}.part" "$image_file"
+}
+
+login_credentials() {
+    vm_user="${VM_USER:-tect}"
+    # An `if`, not `A && B || C`: shellcheck reads that as a mistyped
+    # if-then-else, because C runs whenever B is false as well as when A is.
+    if ! [[ "$vm_user" =~ ^[a-z_][a-z0-9_-]*$ ]] || [ "${#vm_user}" -gt 31 ]; then
+        die "VM_USER must be a Linux user name of at most 31 characters"
+    fi
+    vm_password_hash="${VM_PASSWORD_HASH:-}"
+    if [ -z "$vm_password_hash" ]; then
+        [ -t 0 ] || die "set VM_PASSWORD_HASH when no terminal can ask for a VM password"
+        command -v openssl > /dev/null 2>&1 \
+            || die "openssl is not installed, and it hashes the VM password"
+        read -rsp "vm: password for ${vm_user}: " vm_password
+        echo
+        [ -n "$vm_password" ] || die "the VM password cannot be empty"
+        read -rsp "vm: password again: " repeated
+        echo
+        [ "$vm_password" = "$repeated" ] || die "the VM passwords do not match"
+        vm_password_hash="$(printf '%s\n' "$vm_password" | openssl passwd -6 -stdin)"
+        unset vm_password repeated
+    fi
+    [[ "$vm_password_hash" != *[[:space:]]* ]] \
+        || die "VM_PASSWORD_HASH must not contain whitespace"
+    sysusers="u ${vm_user} - \"VM user\" /var/home/${vm_user} /bin/bash"
+    echo "vm: login as ${vm_user}; credentials provision the account on its first boot"
+}
+
+# A disk carrying a signature at the end of its first sector has a partition
+# table on it: an installer was run, or at least started. Blank is all zeros
+# there. The media is skipped only once that is true, because a run that still
+# has it attached boots it again after the restart the install asks for.
+partitioned() {
+    [ -f "$1" ] || return 1
+    [ "$(dd if="$1" bs=1 skip=510 count=2 2> /dev/null | od -An -tx1 | tr -d ' \n')" = "55aa" ]
+}
+
+# `GPU=Y` makes qemux build a `virtio-vga-gl` line carrying `host3d_blob_limit`,
+# which its own QEMU refuses, and the machine never boots. So qemux's own
+# variable is passed through at qemux's own default.
+run_qemu() {
+    local port=8006 arguments sysusers_base64 credential_args=() storage=() media=()
+    # An iso boots an installer, so the disk it installs onto has to outlive the
+    # container: qemux keeps it under /storage, which is otherwise thrown away
+    # with `--rm` and takes the installation with it.
+    if [ "$type" = iso ]; then
+        mkdir -p "${staged}/storage"
+        storage=(--volume "${PWD}/${staged}/storage":/storage)
+    fi
+    # Once the storage's disk has a partition table, this run boots it instead
+    # of the installer: the restart an install asks for comes back to the media
+    # while the container still has it attached, so the run after that is where
+    # the installed system can be reached at all. A partition table is also
+    # what a failed install leaves, which is why the message claims the disk
+    # and not the system on it. `rm -rf ${staged}/storage` installs again.
+    media=(--volume "${PWD}/${image_file}":"/boot.${type}")
+    if [ "$type" = iso ] && partitioned "${staged}/storage/data.img"; then
+        media=()
+        echo "vm: the storage disk has a partition table; booting the disk"
+        echo "vm: remove ${staged}/storage to boot the installer again"
+    fi
+    while ss -tunal | grep -q ":${port} "; do
+        port=$((port + 1))
+    done
+    if [ "$login" = 1 ]; then
+        sysusers_base64="$(printf %s "$sysusers" | base64 -w0)"
+        arguments="-smbios type=11,value=io.systemd.credential.binary:sysusers.extra=${sysusers_base64}"
+        arguments+=" -smbios type=11,value=io.systemd.credential:passwd.hashed-password.${vm_user}=${vm_password_hash}"
+        credential_args=(--env "ARGUMENTS=${arguments}")
+    fi
+    echo "vm: connect to http://localhost:${port}"
+    (sleep 30 && xdg-open "http://localhost:${port}") &
+    podman run \
+        --rm --privileged --pull=newer \
+        --publish "127.0.0.1:${port}:8006" \
+        --env CPU_CORES=4 \
+        --env "RAM_SIZE=${ram}" \
+        --env DISK_SIZE=64G \
+        --env TPM=Y \
+        --env "GPU=${GPU:-N}" \
+        "${credential_args[@]}" \
+        "${storage[@]}" \
+        --device=/dev/kvm \
+        "${media[@]}" \
+        docker.io/qemux/qemu
+}
+
+if [ "$command" = build ] || [ "$rebuild" = 1 ] || [ ! -f "$image_file" ]; then
+    if [ "$rebuild" = 1 ]; then
+        # The whole chain, in the only order it works in: `fetch modules` brings
+        # the pinned trees down, `generate` writes the committed files off what
+        # they hold, and `build` proves those files. This is the one path that
+        # changes the repository.
+        ./generated/scripts/tect.sh fetch modules
+        ./generated/scripts/tect.sh generate
+        args=(--tag "$ref")
+        [ -z "$target" ] || args+=(--target "$target")
+        ./generated/scripts/tect.sh build "${args[@]}"
+    fi
+    case "$type" in
+        iso) build_iso ;;
+        *)
+            case "$installer" in
+                bib) build_disk ;;
+                *) install_disk ;;
+            esac
+            ;;
+    esac
+fi
+
+if [ "$login" = 1 ] && [ "$command" != build ]; then
+    login_credentials
+fi
+
+case "$command" in
+    run) run_qemu ;;
+    spawn)
+        spawn_args=()
+        if [ "$login" = 1 ]; then
+            spawn_args=(
+                --set-credential="sysusers.extra:${sysusers}"
+                --set-credential="passwd.hashed-password.${vm_user}:${vm_password_hash}"
+            )
+        fi
+        systemd-vmspawn \
+            -M "bootc-image" \
+            --console=gui \
+            --cpus=2 \
+            --ram="$(numfmt --from=iec "$ram")" \
+            --network-user-mode \
+            --vsock=false --pass-ssh-key=false \
+            "${spawn_args[@]}" \
+            -i "$image_file"
+        ;;
+esac
+==== generated/suppressed/Containerfile
+# GENERATED FILE, do not edit. Produced by `tect generate` from
+# scripts/Containerfile.skeleton and the suppressed image definition.
+
+ARG BASE
+FROM scratch AS ctx
+COPY modules/ /modules/
+COPY generated/ /generated/
+
+FROM scratch AS tect
+COPY out/tect /tect
+
+# ---- BEGIN GENERATED (module layers) ----
+
+### Base Image
+FROM ${BASE} AS rootfs
+
+## Module layers
+
+# ---- /opt build root ----
+RUN mv /opt /opt.bak && mkdir /opt
+
+# ---- apps/browser ----
+RUN --mount=type=bind,from=ctx,source=/modules/apps/browser,target=/ctx/modules/apps/browser \
+    --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/generated/suppressed/modules/apps/browser.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/module.sh
+
+# ---- flavour gate ----
+ARG FLAVOUR
+
+# ---- image version ----
+ARG IMAGE_VERSION=dev
+
+# ---- base family ----
+ARG FAMILY
+
+# ---- declared conformance ----
+ARG CONFORMS=
+
+# ---- claimed and refused rules ----
+ARG SCAP_CONTENT=
+ARG SCAP_CLAIMED=
+ARG SCAP_REFUSED=
+
+# ---- image identity ----
+ARG IMAGE_ID="suppressed"
+ARG IMAGE_NAME="Suppressed"
+ARG IMAGE_REGISTRY=""
+
+# ---- os-release ----
+RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    IMAGE_VERSION="${IMAGE_VERSION}" IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" /ctx/tect os-release
+
+# ---- finalize ----
+RUN --mount=type=bind,from=ctx,source=/generated/suppressed/finalize.sh,target=/ctx/finalize.sh \
+    --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
+    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    FLAVOUR=${FLAVOUR} IMAGE_VERSION="${IMAGE_VERSION}" \
+    CONFORMS="${CONFORMS}" FAMILY="${FAMILY}" \
+    SCAP_CONTENT="${SCAP_CONTENT}" SCAP_CLAIMED="${SCAP_CLAIMED}" \
+    SCAP_REFUSED="${SCAP_REFUSED}" \
+    IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" bash /ctx/finalize.sh
+
+# ---- END GENERATED ----
+
+COPY --from=ctx /generated/plan.json /usr/share/tectonic/manifest.json
+
+ARG BASE
+ARG BASE_DECLARED=""
+ARG TARGET=""
+ARG SOURCE_COMMIT=""
+ARG BUILD_BACKEND=""
+ARG MODULE_HASHES=""
+ARG ASSET_RESOLUTIONS=""
+ARG AUDIT_ENFORCE=""
+RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    BASE="${BASE}" BASE_DECLARED="${BASE_DECLARED}" TARGET="${TARGET}" \
+    SOURCE_COMMIT="${SOURCE_COMMIT}" BUILD_BACKEND="${BUILD_BACKEND}" \
+    MODULE_HASHES="${MODULE_HASHES}" \
+    ASSET_RESOLUTIONS="${ASSET_RESOLUTIONS}" AUDIT_ENFORCE="${AUDIT_ENFORCE}" \
+    IMAGE_ID="${IMAGE_ID}" IMAGE_VERSION="${IMAGE_VERSION}" /ctx/tect build-record
+
+RUN --mount=type=tmpfs,target=/run --network=none bootc container lint
+
+# ---- BEGIN GENERATED (tail fragments) ----
+
+# ---- END GENERATED (tail fragments) ----
+
+ARG FAMILY
+ARG CONTRACT_FILES=""
+ARG VERIFY_EXCEPTIONS=""
+ARG MODULE_PRESETS=""
+ARG LUKS_INITRAMFS="false"
+RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    --mount=type=tmpfs,target=/tmp \
+    --mount=type=tmpfs,target=/run \
+    CONTRACT_FILES="${CONTRACT_FILES}" \
+    VERIFY_EXCEPTIONS="${VERIFY_EXCEPTIONS}" \
+    MODULE_PRESETS="${MODULE_PRESETS}" \
+    LUKS_INITRAMFS="${LUKS_INITRAMFS}" \
+    FAMILY="${FAMILY}" /ctx/tect validate-image
+==== generated/suppressed/modules/apps/browser.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/apps/browser
+export MODDIR
+==== generated/suppressed/finalize.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+# ---- /opt relocation ----
+mkdir -p /usr/lib/opt
+tmpfiles=/usr/lib/tmpfiles.d/zz-opt-symlinks.conf
+printf 'd /var/opt 0755 root root -\n' > "$tmpfiles"
+for d in /opt/*/; do
+    [ -d "$d" ] || continue
+    name="$(basename "$d")"
+    cp -a "$d" "/usr/lib/opt/${name}"
+    esc="${name// /\\x20}"
+    printf 'L+ /var/opt/%s - - - - /usr/lib/opt/%s\n' "$esc" "$esc" >> "$tmpfiles"
+done
+rm -rf /opt
+mv /opt.bak /opt
+
+# ---- module presets ----
+apply_module_presets() {
+    local scope="$1" dir="$2" flag=() f verb unit
+    [ "$scope" = user ] && flag=(--global)
+    for f in "$dir"/45-module-*.preset; do
+        [ -f "$f" ] || continue
+        while read -r verb unit; do
+            case "$verb" in
+                enable) systemctl "${flag[@]}" enable "$unit" ;;
+                disable) systemctl "${flag[@]}" disable "$unit" ;;
+                *) ;;
+            esac
+        done < "$f"
+    done
+}
+apply_module_presets system /usr/lib/systemd/system-preset
+apply_module_presets user /usr/lib/systemd/user-preset
+
+# ---- /var to tmpfiles ----
+# `rpm-ostree` walks /var at base compose time and writes these rules; nothing
+# regenerates them for a derived layer. A directory this build leaves in /var is
+# applied once at provisioning and never updated by `bootc upgrade`. Runs last,
+# after every hook: a directory a later step made would not be recorded.
+var_conf=/usr/lib/tmpfiles.d/zz-var-autogen.conf
+
+# /var/cache and /var/log are cache mounts on this layer — busy, and not ours.
+# /var/run is the symlink out to /run and stock systemd already declares it.
+# /var/lib/dpkg is the package database itself on the deb bases.
+var_keep=(/var/cache /var/log /var/run /var/lib/dpkg)
+
+# systemd splits a line on whitespace and unquotes it, then expands `%`
+# specifiers in what is left, so both have to be written escaped.
+var_escape() {
+    local s=$1
+    s=${s//\\/\\x5c}
+    s=${s//%/%%}
+    s=${s//$'\t'/\\x09}
+    s=${s//$'\n'/\\x0a}
+    s=${s//$'\r'/\\x0d}
+    s=${s//$'\v'/\\x0b}
+    s=${s//$'\f'/\\x0c}
+    s=${s//\'/\\x27}
+    s=${s//\"/\\x22}
+    s=${s// /\\x20}
+    printf '%s' "$s"
+}
+
+# Every path some tmpfiles.d file already declares, this run's own file
+# included: systemd warns about a duplicate and drops one of the two, and
+# reading our own back keeps entries whose directories a first pass emptied.
+declare -A var_declared=()
+touch "$var_conf"
+while read -r verb path _; do
+    case "$verb" in '' | \#*) continue ;; esac
+    [ -n "$path" ] && var_declared[$path]=1
+done < <(cat /usr/lib/tmpfiles.d/*.conf /etc/tmpfiles.d/*.conf 2> /dev/null)
+
+var_prune=()
+for keep in "${var_keep[@]}"; do
+    var_prune+=(-path "$keep" -o)
+done
+unset 'var_prune[-1]'
+
+# Pre-order, so a directory's own line lands above the lines below it.
+var_remove=()
+while IFS=$'\t' read -r -d '' type mode owner group path; do
+    esc="$(var_escape "$path")"
+    # Already declared by another tmpfiles file: that is the base's own /var,
+    # the lint does not flag it, and something later in the build may still need
+    # it on disk — the rechunk runs `rpm-ostree`, which writes to /var/tmp.
+    [ -n "${var_declared[$esc]:-}" ] && continue
+    var_declared[$esc]=1
+    var_remove+=("$path")
+    case "$type" in
+        d) printf 'd %s %s %s %s -\n' "$esc" "$mode" "$owner" "$group" >> "$var_conf" ;;
+        l) printf 'L+ %s - - - - %s\n' "$esc" "$(var_escape "$(readlink "$path")")" >> "$var_conf" ;;
+        # A regular file: a tmpfiles rule reconstructs a directory, not a
+        # file's content. Dropped, which is what bootc's own converter does.
+        *) ;;
+    esac
+done < <(find /var -mindepth 1 -xdev \( "${var_prune[@]}" \) -prune -o -printf '%y\t%m\t%u\t%g\t%p\0')
+
+# Only what was recorded above, deepest first since find listed parents before
+# children. `rmdir`, so a directory still holding something that was skipped
+# survives. `rm -rf` would take it down with everything in it.
+for ((i = ${#var_remove[@]} - 1; i >= 0; i--)); do
+    path="${var_remove[i]}"
+    if [ -d "$path" ] && [ ! -L "$path" ]; then
+        rmdir --ignore-fail-on-non-empty "$path"
+    else
+        rm -f "$path"
+    fi
+done
+==== generated/suppressed/graph.md
+# Suppressed capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["ghcr.io/ublue-os/bazzite:stable"]
+    m0["apps/browser"]
+    base -->|"flatpak"| m0
+```
+
+## Capabilities
+
+| Name | Kind | Provided by | Required by | After |
+|---|---|---|---|---|
+| `flatpak` | capability | `base` | `apps/browser` |  |
+| `rechunking` | capability | `base` |  |  |
+
+## Suppressed
+
+The base already provides everything these declare, so nothing builds
+them.
+
+| Module | Provides |
+|---|---|
+| `apps/flatpak` | `flatpak` |
+==== generated/suppressed/graph.json
+{
+  "image": "suppressed",
+  "capabilities": [
+    {
+      "name": "flatpak",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [
+        "apps/browser"
+      ],
+      "after": []
+    },
+    {
+      "name": "rechunking",
+      "kind": "capability",
+      "build_only": false,
+      "provider": "base",
+      "required_by": [],
+      "after": []
+    }
+  ],
+  "overrides": [],
+  "suppressed": [
+    {
+      "module": "apps/flatpak",
+      "provides": [
+        "flatpak"
+      ]
+    }
+  ]
+}
+==== generated/plan.json

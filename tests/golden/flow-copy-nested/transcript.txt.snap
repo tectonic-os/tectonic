@@ -1,0 +1,20 @@
+---
+source: tests/golden.rs
+---
+Tectonic v{version}
+
+  1) four/hardening/coredumps  Coredump lockdown, from a collection that groups what it holds
+Which modules? [1, 0 for none]: 1
+
+List it in example? (Yes/No)
+Yes
+
+
+example/
+├── modules/
+│   └── hardening/
+│       └── coredumps/
+│           ├── + module.kdl
+│           └── + provenance.kdl
+└── ~ example.image.kdl  hardening/coredumps added to modules
+==== exit 0

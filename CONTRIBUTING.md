@@ -10,8 +10,7 @@ a vulnerability.
 A pull request merges after these pass, beside GitHub's CodeQL analysis:
 
 - `lint` runs `./lint.sh`: shellcheck, shfmt, rustfmt, the boundary greps and
-  the tests. The tests are goldens: `UPDATE_GOLDEN=1 cargo test` regenerates
-  them, and the diff is the review.
+  the tests. Changed snapshots are reviewed with `cargo insta review`.
 - `msrv` runs `cargo nextest run --locked --profile ci` on the `rust-version`
   that `Cargo.toml` states.
 - `typed-title` checks the pull request title.

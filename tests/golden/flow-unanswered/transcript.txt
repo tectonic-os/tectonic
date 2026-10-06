@@ -1,8 +1,0 @@
-Tectonic v{version}
-
-module name: Other
-
-Error: nothing left in TECT_ANSWERS to answer `description (optional) []` with.
-
-Run 'tect --help' to list the commands
-==== exit 1

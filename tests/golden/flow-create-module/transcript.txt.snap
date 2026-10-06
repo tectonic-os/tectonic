@@ -1,0 +1,26 @@
+---
+source: tests/golden.rs
+---
+Tectonic v{version}
+
+module name: My Editor
+
+description (optional) []: A graphical editor
+
+supported base families, separated by spaces (optional) []: fedora
+
+Does this module install packages? (Yes/No)
+yes
+
+package names, separated by spaces []: nano vim
+
+List it in example? (Yes/No)
+Yes
+
+
+example/
+├── modules/
+│   └── my-editor/
+│       └── + module.kdl
+└── ~ example.image.kdl  my-editor added to modules
+==== exit 0

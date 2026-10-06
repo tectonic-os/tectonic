@@ -1,0 +1,70 @@
+---
+source: tests/golden.rs
+---
+  x a module pin cannot be `unpinned`
+    ,-[./image.kdl:12:17]
+ 11 |             pin {
+ 12 |                 unpinned "trusted"
+    :                 ^^^^|^^^
+    :                     `-- nothing would verify what arrived
+ 13 |                 version "main"
+    `----
+  help: only a module collection follows a moving ref: a fetched module is
+        arbitrary shell running as root in the build, and an asset lands in
+        the image
+
+  x the pin declares no `sha256`
+   ,-[./repo.kdl:6:9]
+ 5 |     unmarked {
+ 6 |         pin {
+   :         ^|^
+   :          `-- nothing to verify what arrived
+ 7 |             manual "nothing bumps it"
+   `----
+  help: the content hash is what says the archive is the one that was
+        reviewed; `unpinned "why it is trusted"` is how a collection following
+        a moving ref says it has none on purpose
+
+  x the pin is declared `unpinned` but pins a `sha256`
+    ,-[./repo.kdl:14:13]
+ 13 |         pin {
+ 14 |             unpinned "trusted"
+    :             ^^^^|^^^
+    :                 `-- one of the two is not true
+ 15 |             version "main"
+    `----
+  help: a moving ref does not hash the same twice, so the fetch would fail as
+        soon as it moved; drop whichever of them is wrong
+
+  x the pin is declared `manual` and `unpinned`
+    ,-[./repo.kdl:23:13]
+ 22 |             manual "nothing bumps it"
+ 23 |             unpinned "trusted"
+    :             ^^^^|^^^
+    :                 `-- pick one
+ 24 |             version "main"
+    `----
+  help: `renovate datasource="github-tags" depName="owner/repo"`, `manual "why
+        nothing tracks it"`, or `unpinned "why a moving ref is trusted here"`
+
+  x `here` is a directory, so its `pin` says nothing
+    ,-[./repo.kdl:29:9]
+ 28 |     here "../modules" {
+ 29 |         pin {
+    :         ^|^
+    :          `-- nothing is fetched
+ 30 |             unpinned "trusted"
+    `----
+  help: a collection on this machine is read where it is; a pin belongs on one
+        that is downloaded
+
+  x `loose` is not fetched
+    ,-[./image.kdl:10:9]
+  9 |     modules {
+ 10 |         module "loose" {
+    :         ^^^|^^
+    :            `-- no module.kdl here yet
+ 11 |             pin {
+    `----
+  help: run ./generated/scripts/tect.sh fetch modules to fetch what the image
+        references
