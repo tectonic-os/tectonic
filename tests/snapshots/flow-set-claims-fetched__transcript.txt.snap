@@ -1,9 +1,9 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 Tectonic v{version}
 
-Error: nothing can be changed here; `.remote/one/sshd` is a fetched module; `tect copy module one/sshd` makes a copy this repository owns.
+Error: nothing can be changed here; `.remote/upstream/sshd` is a fetched module; `tect copy module upstream/sshd` makes a copy this repository owns.
 
 Run 'tect --help' to list the commands
 ==== exit 1

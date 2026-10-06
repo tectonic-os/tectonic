@@ -165,15 +165,15 @@ fn create_into(name: &str, root: &Path) {
     let text = std::fs::read_to_string(&repo).unwrap().replace(
         "sources {\n",
         &format!(
-            "sources {{\n    one {:?}\n",
-            collections.join("one").display()
+            "sources {{\n    upstream {:?}\n",
+            collections.join("upstream").display()
         ),
     );
     std::fs::write(&repo, text).unwrap();
     let (list, issues, _) = tect::declarations(&here);
     assert!(issues.is_empty(), "{}", issues.plain());
     tect::import::Module::collect(
-        Some("one/fedora-family".into()),
+        Some("upstream/fedora-family".into()),
         &here,
         &list.sources,
         false,
@@ -214,9 +214,9 @@ fn copied(name: &str, root: &Path) {
     std::fs::write(
         root.join("repo.kdl"),
         format!(
-            "schema-version 1\nname \"Imported\"\nsources {{\n    one {:?}\n    two {:?}\n}}\n",
-            collections.join("one").display(),
-            collections.join("two").display()
+            "schema-version 1\nname \"Imported\"\nsources {{\n    upstream {:?}\n    community {:?}\n}}\n",
+            collections.join("upstream").display(),
+            collections.join("community").display()
         ),
     )
     .unwrap();
@@ -237,10 +237,10 @@ fn copied(name: &str, root: &Path) {
     for wanted in [
         "flatpak",
         "browser",
-        "one/browser",
-        "two/browser",
+        "upstream/browser",
+        "community/browser",
         "nosuch",
-        "one/nosuch",
+        "upstream/nosuch",
         "flatpak",
     ] {
         out.push_str(&format!("==== copy {wanted}\n"));
