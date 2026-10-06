@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 Tectonic v{version}
 
@@ -21,7 +21,7 @@ Beta
 What is the base image for this image? [1-12, 0 for none]: 12
 
 example.invalid/collected:1 needs the following modules:
-    one/fedora-family
+    upstream/fedora-family
 
 Add them now? (Yes/No)
 Yes

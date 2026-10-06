@@ -1,32 +1,32 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 ==== the registry
-one
-two
+upstream
+community
 ==== the catalog
-one/browser  A browser, from the first collection
-two/browser  A browser, from the second collection (requires flatpak)
-one/custom-kernel  A kernel the image pins, swapped in over the base's own
-one/debian-family  apt and its state directories, which every deb build layer reaches for
-one/fedora-family  dnf5 and its plugins, which every fedora build layer reaches for
-one/flatpak  Flatpak client and a daily update timer
-one/needs-family  A module that needs the family adapter under it (requires build-environment)
-one/signature-policy  Sigstore signature verification for the image's own updates
+community/browser  A browser, from the second collection (requires flatpak)
+upstream/browser  A browser, from the first collection
+upstream/custom-kernel  A kernel the image pins, swapped in over the base's own
+upstream/debian-family  apt and its state directories, which every deb build layer reaches for
+upstream/fedora-family  dnf5 and its plugins, which every fedora build layer reaches for
+upstream/flatpak  Flatpak client and a daily update timer
+upstream/needs-family  A module that needs the family adapter under it (requires build-environment)
+upstream/signature-policy  Sigstore signature verification for the image's own updates
 ==== copy flatpak
 copied modules/flatpak
 ==== copy browser
-ambiguous: one, two
-==== copy one/browser
+ambiguous: community, upstream
+==== copy upstream/browser
 copied modules/browser
-==== copy two/browser
-`browser` was copied from `one`; refusing the namesake from `two`
+==== copy community/browser
+`browser` was copied from `upstream`; refusing the namesake from `community`
 ==== copy nosuch
-no module called `nosuch` in one, two
-==== copy one/nosuch
-no module called `nosuch` in one
+no module called `nosuch` in upstream, community
+==== copy upstream/nosuch
+no module called `nosuch` in upstream
 ==== copy flatpak
-`flatpak` was already copied from `one`
+`flatpak` was already copied from `upstream`
 ==== the tree
 modules/.gitkeep
 modules/browser/module.kdl
@@ -35,7 +35,7 @@ modules/flatpak/files/usr/share/example/remotes.list
 modules/flatpak/module.kdl
 modules/flatpak/provenance.kdl
 ==== the record
-imported "one" {
+imported "upstream" {
     content "0d73958368889de63481af715cfed2349cc329c4b209f46d904533d5c29f4e61"
 }
 ==== check

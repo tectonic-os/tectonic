@@ -1,9 +1,9 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 Tectonic v{version}
 
-`one/flatpak` overwrites `/usr/share/example/remotes.list`, which `editor` also ships — declare `overrides "/usr/share/example/remotes.list"` in `one/flatpak` to take the replacement, or rename one of the two
+`upstream/flatpak` overwrites `/usr/share/example/remotes.list`, which `editor` also ships — declare `overrides "/usr/share/example/remotes.list"` in `upstream/flatpak` to take the replacement, or rename one of the two
 
 example/
 └── ~ example.image.kdl  flatpak added to modules

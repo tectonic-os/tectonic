@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 ==== modules/my-editor/module.kdl
 provides "editor"
@@ -24,7 +24,7 @@ image {
 
     modules {
         module "my-editor"
-        source "one" {
+        source "upstream" {
             module "fedora-family"
         }
     }
@@ -47,7 +47,7 @@ image {
 
     modules {
         module "my-editor"
-        source "one" {
+        source "upstream" {
             module "fedora-family"
         }
     }
