@@ -1,0 +1,109 @@
+---
+source: tests/golden.rs
+---
+### Base Image
+FROM ${BASE} AS rootfs
+
+## Module layers
+
+# ---- /opt build root ----
+RUN mv /opt /opt.bak && mkdir /opt
+
+# ---- fedora-family ----
+RUN --network=none --mount=type=bind,from=ctx,source=/modules/fedora-family,target=/ctx/modules/fedora-family \
+    --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib,rw \
+    --mount=type=bind,from=ctx,source=/modules/fedora-family/lib/family.sh,target=/ctx/lib/family.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-network/modules/fedora-family.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/module.sh
+
+# ---- core/tools ----
+RUN --network=none --mount=type=bind,from=ctx,source=/modules/core/tools,target=/ctx/modules/core/tools \
+    --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib,rw \
+    --mount=type=bind,from=ctx,source=/modules/fedora-family/lib/family.sh,target=/ctx/lib/family.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-network/modules/core/tools.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/module.sh
+
+# ---- core/fetcher ----
+RUN --network=none --mount=type=bind,from=ctx,source=/modules/core/fetcher,target=/ctx/modules/core/fetcher \
+    --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib,rw \
+    --mount=type=bind,from=ctx,source=/modules/fedora-family/lib/family.sh,target=/ctx/lib/family.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-network/modules/core/fetcher.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/module.sh
+
+# ---- core/asset-only ----
+RUN --network=none --mount=type=bind,from=ctx,source=/modules/core/asset-only,target=/ctx/modules/core/asset-only \
+    --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib,rw \
+    --mount=type=bind,from=ctx,source=/modules/fedora-family/lib/family.sh,target=/ctx/lib/family.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-network/modules/core/asset-only.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/module.sh
+
+# ---- core/fragment-only ----
+# verbatim from modules/core/fragment-only/Containerfile.inc:
+RUN true
+
+# ---- core/installer ----
+RUN --network=none --mount=type=bind,from=ctx,source=/modules/core/installer,target=/ctx/modules/core/installer \
+    --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib,rw \
+    --mount=type=bind,from=ctx,source=/modules/fedora-family/lib/family.sh,target=/ctx/lib/family.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-network/modules/core/installer.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/module.sh
+
+# ---- flavour gate ----
+ARG FLAVOUR
+
+# ---- image version ----
+ARG IMAGE_VERSION=dev
+
+# ---- base family ----
+ARG FAMILY
+
+# ---- declared conformance ----
+ARG CONFORMS=
+
+# ---- claimed and refused rules ----
+ARG SCAP_CONTENT=
+ARG SCAP_CLAIMED=
+ARG SCAP_REFUSED=
+
+# ---- image identity ----
+ARG IMAGE_ID="broken-network"
+ARG IMAGE_NAME="Broken network"
+ARG IMAGE_REGISTRY=""
+
+# ---- os-release ----
+RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    IMAGE_VERSION="${IMAGE_VERSION}" IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" /ctx/tect os-release
+
+# ---- finalize ----
+RUN --network=none --mount=type=bind,from=ctx,source=/generated/broken-network/finalize.sh,target=/ctx/finalize.sh \
+    --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/modules/core/tools,target=/ctx/modules/core/tools \
+    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    FLAVOUR=${FLAVOUR} IMAGE_VERSION="${IMAGE_VERSION}" \
+    CONFORMS="${CONFORMS}" FAMILY="${FAMILY}" \
+    SCAP_CONTENT="${SCAP_CONTENT}" SCAP_CLAIMED="${SCAP_CLAIMED}" \
+    SCAP_REFUSED="${SCAP_REFUSED}" \
+    IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" bash /ctx/finalize.sh

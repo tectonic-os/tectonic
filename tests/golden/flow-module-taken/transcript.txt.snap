@@ -1,0 +1,9 @@
+---
+source: tests/golden.rs
+---
+Tectonic v{version}
+
+Error: modules/my-editor is already there.
+
+Run 'tect --help' to list the commands
+==== exit 1

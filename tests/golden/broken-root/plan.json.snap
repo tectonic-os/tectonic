@@ -1,0 +1,454 @@
+---
+source: tests/golden.rs
+---
+{
+  "schema_version": 1,
+  "default_image": null,
+  "default_image_name": null,
+  "pr_image": null,
+  "default_target": null,
+  "default_published": null,
+  "pr_target": null,
+  "pr_published": null,
+  "ungated_target": null,
+  "ungated_published": null,
+  "cache_image": null,
+  "workflows": [],
+  "audit": {
+    "enforce": false
+  },
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "same",
+      "name": "Same",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "description": "",
+      "keywords": [],
+      "logo_url": "",
+      "conforms": "",
+      "boot": "",
+      "allows": [],
+      "layout": null,
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "witnesses": {
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
+          ]
+        },
+        "requires": [],
+        "satisfies": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "same",
+          "image": "same",
+          "flavour": null,
+          "published": "same",
+          "conforms": "",
+          "allows": [],
+          "default": false,
+          "pr": false,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "fedora-family",
+              "dir": "fedora-family",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "dnf5 and its plugins, which every fedora build layer reaches for",
+              "options": {},
+              "provides": [
+                "build-environment"
+              ],
+              "requires": [],
+              "files": {},
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "content": "5c6f954af6de4efc68c5525e8a65e941dff618e34ac7cb721cf0abb9f85e1364",
+                "repo": false,
+                "source": null,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": [],
+              "refuses": []
+            },
+            {
+              "path": "core/hello",
+              "dir": "core/hello",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "The smallest module a repository can hold",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "files": {},
+              "packages": [
+                {
+                  "family": "fedora",
+                  "names": [
+                    "fastfetch"
+                  ],
+                  "enablerepo": null
+                }
+              ],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "content": "08a304c017e1cab20d59955825823b01c16b766c8e8c2b5080e7fe9220b020d5",
+                "repo": false,
+                "source": null,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": [],
+              "refuses": []
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "overlay_files": {},
+          "overlay_overridden": [],
+          "collected_files": {},
+          "collect_destinations": []
+        },
+        {
+          "name": "same",
+          "image": "same",
+          "flavour": null,
+          "published": "same",
+          "conforms": "",
+          "allows": [],
+          "default": false,
+          "pr": false,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "fedora-family",
+              "dir": "fedora-family",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "dnf5 and its plugins, which every fedora build layer reaches for",
+              "options": {},
+              "provides": [
+                "build-environment"
+              ],
+              "requires": [],
+              "files": {},
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "content": "5c6f954af6de4efc68c5525e8a65e941dff618e34ac7cb721cf0abb9f85e1364",
+                "repo": false,
+                "source": null,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": [],
+              "refuses": []
+            },
+            {
+              "path": "core/hello",
+              "dir": "core/hello",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "The smallest module a repository can hold",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "files": {},
+              "packages": [
+                {
+                  "family": "fedora",
+                  "names": [
+                    "fastfetch"
+                  ],
+                  "enablerepo": null
+                }
+              ],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "content": "08a304c017e1cab20d59955825823b01c16b766c8e8c2b5080e7fe9220b020d5",
+                "repo": false,
+                "source": null,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": [],
+              "refuses": []
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "overlay_files": {},
+          "overlay_overridden": [],
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    },
+    {
+      "id": "same",
+      "name": "Same",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "description": "",
+      "keywords": [],
+      "logo_url": "",
+      "conforms": "",
+      "boot": "",
+      "allows": [],
+      "layout": null,
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "witnesses": {
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
+          ]
+        },
+        "requires": [],
+        "satisfies": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "same",
+          "image": "same",
+          "flavour": null,
+          "published": "same",
+          "conforms": "",
+          "allows": [],
+          "default": false,
+          "pr": false,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "fedora-family",
+              "dir": "fedora-family",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "dnf5 and its plugins, which every fedora build layer reaches for",
+              "options": {},
+              "provides": [
+                "build-environment"
+              ],
+              "requires": [],
+              "files": {},
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "content": "5c6f954af6de4efc68c5525e8a65e941dff618e34ac7cb721cf0abb9f85e1364",
+                "repo": false,
+                "source": null,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": [],
+              "refuses": []
+            },
+            {
+              "path": "core/hello",
+              "dir": "core/hello",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "The smallest module a repository can hold",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "files": {},
+              "packages": [
+                {
+                  "family": "fedora",
+                  "names": [
+                    "fastfetch"
+                  ],
+                  "enablerepo": null
+                }
+              ],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "content": "08a304c017e1cab20d59955825823b01c16b766c8e8c2b5080e7fe9220b020d5",
+                "repo": false,
+                "source": null,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": [],
+              "refuses": []
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "overlay_files": {},
+          "overlay_overridden": [],
+          "collected_files": {},
+          "collect_destinations": []
+        },
+        {
+          "name": "same",
+          "image": "same",
+          "flavour": null,
+          "published": "same",
+          "conforms": "",
+          "allows": [],
+          "default": false,
+          "pr": false,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "fedora-family",
+              "dir": "fedora-family",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "dnf5 and its plugins, which every fedora build layer reaches for",
+              "options": {},
+              "provides": [
+                "build-environment"
+              ],
+              "requires": [],
+              "files": {},
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "content": "5c6f954af6de4efc68c5525e8a65e941dff618e34ac7cb721cf0abb9f85e1364",
+                "repo": false,
+                "source": null,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": [],
+              "refuses": []
+            },
+            {
+              "path": "core/hello",
+              "dir": "core/hello",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "The smallest module a repository can hold",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "files": {},
+              "packages": [
+                {
+                  "family": "fedora",
+                  "names": [
+                    "fastfetch"
+                  ],
+                  "enablerepo": null
+                }
+              ],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "content": "08a304c017e1cab20d59955825823b01c16b766c8e8c2b5080e7fe9220b020d5",
+                "repo": false,
+                "source": null,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": [],
+              "refuses": []
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "overlay_files": {},
+          "overlay_overridden": [],
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

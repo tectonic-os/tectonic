@@ -1,0 +1,76 @@
+---
+source: tests/golden.rs
+---
+### Public keys
+FROM ctx AS public-keys
+COPY keys/public/ /public/
+
+### Base Image
+FROM ${BASE} AS rootfs
+
+## Module layers
+
+# ---- /opt build root ----
+RUN mv /opt /opt.bak && mkdir /opt
+
+# ---- kernel/signed-kernel ----
+RUN --mount=type=bind,from=ctx,source=/modules/kernel/signed-kernel,target=/ctx/modules/kernel/signed-kernel \
+    --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/generated/signing/modules/kernel/signed-kernel.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=public-keys,source=/public,target=/ctx/keys \
+    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    --mount=type=secret,id=mok_privkey,target=/run/secrets/mok_privkey,required=false \
+    KERNEL=${KERNEL} bash /ctx/module.sh
+
+# ---- drivers/kvmfr ----
+RUN --mount=type=bind,from=ctx,source=/modules/drivers/kvmfr,target=/ctx/modules/drivers/kvmfr \
+    --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/generated/signing/modules/drivers/kvmfr.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    --mount=type=secret,id=mok_privkey,target=/run/secrets/mok_privkey,required=false \
+    bash /ctx/module.sh
+
+# ---- flavour gate ----
+ARG FLAVOUR
+
+# ---- image version ----
+ARG IMAGE_VERSION=dev
+
+# ---- base family ----
+ARG FAMILY
+
+# ---- declared conformance ----
+ARG CONFORMS=
+
+# ---- claimed and refused rules ----
+ARG SCAP_CONTENT=
+ARG SCAP_CLAIMED=
+ARG SCAP_REFUSED=
+
+# ---- image identity ----
+ARG IMAGE_ID="signing"
+ARG IMAGE_NAME="Signing"
+ARG IMAGE_REGISTRY=""
+
+# ---- os-release ----
+RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    IMAGE_VERSION="${IMAGE_VERSION}" IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" /ctx/tect os-release
+
+# ---- finalize ----
+RUN --mount=type=bind,from=ctx,source=/generated/signing/finalize.sh,target=/ctx/finalize.sh \
+    --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
+    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    FLAVOUR=${FLAVOUR} IMAGE_VERSION="${IMAGE_VERSION}" \
+    CONFORMS="${CONFORMS}" FAMILY="${FAMILY}" \
+    SCAP_CONTENT="${SCAP_CONTENT}" SCAP_CLAIMED="${SCAP_CLAIMED}" \
+    SCAP_REFUSED="${SCAP_REFUSED}" \
+    IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" bash /ctx/finalize.sh

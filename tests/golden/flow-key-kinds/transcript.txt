@@ -1,9 +1,0 @@
-Tectonic v{version}
-
-  1) secureboot
-Which key? [1, 0 for none]: 0
-
-Error: `tect create key <kind>` names which key; this repository declares secureboot.
-
-Run 'tect --help' to list the commands
-==== exit 1

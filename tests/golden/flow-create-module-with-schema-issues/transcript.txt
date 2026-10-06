@@ -1,9 +1,0 @@
-Tectonic v{version}
-
-
-example/
-├── modules/
-│   └── local-tool/
-│       └── + module.kdl
-└── ~ example.image.kdl  local-tool added to modules
-==== exit 0

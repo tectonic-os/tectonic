@@ -1,0 +1,157 @@
+---
+source: tests/golden.rs
+---
+==== the first scan, which is the baseline
+The scan measured 4 rules: 2 pass, 1 fail.
+
+## Declared coverage, measured
+
+| Module | Benchmark | Rule | Result |
+| --- | --- | --- | --- |
+| one/hello | cis-fedora | 1.1.1.1 | pass |
+| one/hello | cis-fedora | 5.2.20 | fail |
+| one/hello | cis-fedora | 9.9.9.9 | **maps to nothing** |
+| one/hello | stig | RHEL-09-232010 | fail |
+
+## Measured against every profile
+
+| Profile | Selected | Pass | Fail | Other |
+| --- | --- | --- | --- | --- |
+| `standard` (declared) | 4 | 1 | 1 | 2 |
+| `ospp` | 4 | 1 | 1 | 2 |
+
+Every row is scored at the values the scan ran with, which are the named profile's under `tect scap tailoring` and every default under `(all)`.
+
+## Since the last scan
+
+Nothing to compare against; this run is the baseline.
+
+tect: one/hello claims cis-fedora 5.2.20 and the image fails it
+tect: one/hello claims cis-fedora 9.9.9.9, which names no rule in the datastream
+tect: one/hello claims stig RHEL-09-232010 and the image fails it
+tect: 3 findings, and the repository does not enforce
+==== exit 0
+==== and one where a rule stopped passing
+The scan measured 4 rules: 1 pass, 2 fail.
+
+## Declared coverage, measured
+
+| Module | Benchmark | Rule | Result |
+| --- | --- | --- | --- |
+| one/hello | cis-fedora | 1.1.1.1 | pass |
+| one/hello | cis-fedora | 5.2.20 | fail |
+| one/hello | cis-fedora | 9.9.9.9 | **maps to nothing** |
+| one/hello | stig | RHEL-09-232010 | fail |
+
+## Measured against every profile
+
+| Profile | Selected | Pass | Fail | Other |
+| --- | --- | --- | --- | --- |
+| `standard` (declared) | 4 | 1 | 1 | 2 |
+| `ospp` | 4 | 0 | 2 | 2 |
+
+Every row is scored at the values the scan ran with, which are the named profile's under `tect scap tailoring` and every default under `(all)`.
+
+## Since the last scan
+
+| Rule | Now |
+| --- | --- |
+| xccdf_org.ssgproject.content_rule_no_empty_passwords | fail |
+
+tect: one/hello claims cis-fedora 5.2.20 and the image fails it
+tect: one/hello claims cis-fedora 9.9.9.9, which names no rule in the datastream
+tect: one/hello claims stig RHEL-09-232010 and the image fails it
+tect: one rule passed the last scan and does not now: xccdf_org.ssgproject.content_rule_no_empty_passwords
+tect: 4 findings, and the repository does not enforce
+==== exit 0
+==== the tailoring
+<?xml version="1.0" encoding="UTF-8"?>
+<xccdf-1.2:Tailoring xmlns:xccdf-1.2="http://checklists.nist.gov/xccdf/1.2" id="xccdf_tect_tailoring_measured">
+  <xccdf-1.2:version time="1970-01-01T00:00:00">1</xccdf-1.2:version>
+  <xccdf-1.2:Profile id="xccdf_tect_profile_measured" extends="xccdf_org.ssgproject.content_profile_standard">
+    <xccdf-1.2:title>standard, and every other rule</xccdf-1.2:title>
+    <xccdf-1.2:select idref="xccdf_org.ssgproject.content_group_auditing" selected="true"/>
+    <xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_audit_rules_login_events" selected="true"/>
+    <xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_gpgcheck_enabled" selected="true"/>
+    <xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_no_empty_passwords" selected="true"/>
+    <xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_package_aide_installed" selected="true"/>
+    <xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_sshd_disable_root_login" selected="true"/>
+  </xccdf-1.2:Profile>
+</xccdf-1.2:Tailoring>
+==== exit 0
+==== and against what the bare base passes alone
+The scan measured 4 rules: 2 pass, 1 fail.
+
+## Declared coverage, measured
+
+| Module | Benchmark | Rule | Base alone | Result |
+| --- | --- | --- | --- | --- |
+| one/hello | cis-fedora | 1.1.1.1 | pass | pass |
+| one/hello | cis-fedora | 5.2.20 | pass | fail |
+| one/hello | cis-fedora | 9.9.9.9 | - | **maps to nothing** |
+| one/hello | stig | RHEL-09-232010 | pass | fail |
+
+The base column is the bare base's own pass set. It records what passed and nothing else, so `-` is not a failure: the rule may have failed on the base, or may never have been measured there.
+
+Not load-bearing: one/hello cis-fedora 1.1.1.1. The base alone already passes it, so the image passes with the module and without it. Whether the module implements it too is not something this scan can say, and it applies its settings either way.
+
+## Measured against every profile
+
+| Profile | Selected | Pass | Fail | Other |
+| --- | --- | --- | --- | --- |
+| `standard` (declared) | 4 | 1 | 1 | 2 |
+| `ospp` | 4 | 1 | 1 | 2 |
+
+Every row is scored at the values the scan ran with, which are the named profile's under `tect scap tailoring` and every default under `(all)`.
+
+tect: one/hello claims cis-fedora 5.2.20 and the image fails it
+tect: one/hello claims cis-fedora 9.9.9.9, which names no rule in the datastream
+tect: one/hello claims stig RHEL-09-232010 and the image fails it
+tect: 3 findings, and the repository does not enforce
+==== exit 0
+==== conforming to a profile nothing carries
+ against every profile
+
+| Profile | Selected | Pass | Fail | Other |
+| --- | --- | --- | --- | --- |
+| `standard` | 4 | 1 | 1 | 2 |
+| `ospp` | 4 | 1 | 1 | 2 |
+
+Every row is scored at the values the scan ran with, which are the named profile's under `tect scap tailoring` and every default under `(all)`.
+
+tect: one/hello claims cis-fedora 5.2.20 and the image fails it
+tect: one/hello claims cis-fedora 9.9.9.9, which names no rule in the datastream
+tect: one/hello claims stig RHEL-09-232010 and the image fails it
+tect: this image conforms to `nosuch`, which is none of the profiles the datastream carries: standard, ospp
+tect: 4 findings, and the repository does not enforce
+==== exit 0
+==== enforced, and the report is the same
+The scan measured 4 rules: 2 pass, 1 fail.
+
+## Declared coverage, measured
+
+| Module | Benchmark | Rule | Result |
+| --- | --- | --- | --- |
+| one/hello | cis-fedora | 1.1.1.1 | pass |
+| one/hello | cis-fedora | 5.2.20 | fail |
+| one/hello | cis-fedora | 9.9.9.9 | **maps to nothing** |
+| one/hello | stig | RHEL-09-232010 | fail |
+
+## Measured against every profile
+
+| Profile | Selected | Pass | Fail | Other |
+| --- | --- | --- | --- | --- |
+| `standard` (declared) | 4 | 1 | 1 | 2 |
+| `ospp` | 4 | 1 | 1 | 2 |
+
+Every row is scored at the values the scan ran with, which are the named profile's under `tect scap tailoring` and every default under `(all)`.
+
+==== the content it is measured with
+/usr/share/xml/scap/ssg/content/ssg-fedora-ds.xml
+==== exit 0
+==== and for an image declaring claims but no profile
+
+==== exit 0
+==== and for an image declaring neither a claim nor a profile
+
+==== exit 0

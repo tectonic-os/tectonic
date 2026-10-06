@@ -1,0 +1,18 @@
+---
+source: tests/golden.rs
+---
+Tectonic v{version}
+
+List it in example? (Yes/No)
+Yes
+
+`kernel-freshness` tracks the kernel a module pins, and proposes a bump
+
+Generate the workflows this makes runnable? (Yes/No)
+Yes
+
+
+example/
+├── ~ example.image.kdl  custom-kernel added to modules
+└── ~ repo.kdl  the workflows it generates
+==== exit 0

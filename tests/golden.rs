@@ -1,7 +1,7 @@
 //! Every command, over this repository and over the fixture repositories,
-//! compared byte for byte against a committed golden.
+//! compared byte for byte against a committed snapshot.
 //!
-//! Regenerate with `UPDATE_GOLDEN=1 cargo test`, then read the diff.
+//! Review changed snapshots with `cargo insta review`.
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -11,48 +11,32 @@ fn crate_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
-fn compare(name: &str, file: &str, actual: &str) {
-    let actual = actual.replace(env!("CARGO_PKG_VERSION"), "{version}");
-    let path = crate_dir().join("tests/golden").join(name).join(file);
-    if std::env::var_os("UPDATE_GOLDEN").is_some() {
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(&path, actual).unwrap();
-        return;
-    }
-    let expected = std::fs::read_to_string(&path)
-        .unwrap_or_else(|err| panic!("{}: {err}\nrun UPDATE_GOLDEN=1 cargo test", path.display()));
-    assert!(
-        expected == actual,
-        "{} changed. Rerun with UPDATE_GOLDEN=1 and read the diff.\n{}",
-        path.display(),
-        first_difference(&expected, &actual)
-    );
+fn snapshot_path(name: &str, file: &str) -> PathBuf {
+    crate_dir()
+        .join("tests/golden")
+        .join(name)
+        .join(format!("{file}.snap"))
 }
 
-/// Where two goldens first part, as escaped bytes either side of the offset.
-/// A transcript golden is mostly escape sequences and CI has no working tree to
-/// regenerate into, so the difference has to travel in the failure itself.
-fn first_difference(expected: &str, actual: &str) -> String {
-    let at = expected
-        .bytes()
-        .zip(actual.bytes())
-        .position(|(a, b)| a != b)
-        .unwrap_or(expected.len().min(actual.len()));
-    let window = |s: &str| {
-        let from = at.saturating_sub(60);
-        let to = (at + 60).min(s.len());
-        s.get(from..to)
-            .unwrap_or("<not a char boundary>")
-            .escape_debug()
-            .to_string()
-    };
-    format!(
-        "first difference at byte {at} of {} expected, {} actual\n  expected: {}\n    actual: {}",
-        expected.len(),
-        actual.len(),
-        window(expected),
-        window(actual)
-    )
+fn snapshot_text(name: &str, file: &str) -> String {
+    insta::Snapshot::from_file(&snapshot_path(name, file))
+        .unwrap_or_else(|err| panic!("{}: {err}", snapshot_path(name, file).display()))
+        .as_text()
+        .expect("the golden is a text snapshot")
+        .to_string()
+}
+
+fn normalize_snapshot_text(text: &str) -> String {
+    text.trim_end().replace("\r\n", "\n")
+}
+
+fn assert_golden(name: &str, file: &str, actual: &str) {
+    let actual = actual.replace(env!("CARGO_PKG_VERSION"), "{version}");
+    let mut settings = insta::Settings::clone_current();
+    settings.set_snapshot_path(Path::new("golden").join(name));
+    settings.set_prepend_module_to_snapshot(false);
+    settings.set_omit_expression(true);
+    settings.bind(|| insta::assert_snapshot!(file, actual));
 }
 
 /// The plan, the generated section and every diagnostic, for one repository.
@@ -68,9 +52,9 @@ fn capture(name: &str, root: &Path) {
         (Command::Summary, "summary.md"),
         (Command::Sbom, "sbom.json"),
     ] {
-        compare(name, file, &tect::run(command, None, here).stdout);
+        assert_golden(name, file, &tect::run(command, None, here).stdout);
     }
-    compare(
+    assert_golden(
         name,
         "issues.txt",
         &tect::run(Command::Check, None, here).issues.plain(),
@@ -90,7 +74,7 @@ fn capture(name: &str, root: &Path) {
             false => generated.push_str(&format!("==== {}\n{body}", path.display())),
         }
     }
-    compare(name, "generated.txt", &generated);
+    assert_golden(name, "generated.txt", &generated);
 }
 
 /// A repository `create repo` wrote, from flags alone, captured like any other
@@ -166,7 +150,7 @@ fn verify(name: &str, root: &Path) {
     std::fs::remove_dir_all("generated").unwrap();
     out.push_str(&format!("==== never generated\n{}", issues()));
 
-    compare(name, "verify.txt", &out);
+    assert_golden(name, "verify.txt", &out);
 }
 
 /// `create image` and `create module`, from flags alone: the URL a second image
@@ -256,7 +240,7 @@ fn create(name: &str, root: &Path) {
         "==== check\n{}",
         tect::run(Command::Check, None, here).issues.plain()
     ));
-    compare(name, "create.txt", &out);
+    assert_golden(name, "create.txt", &out);
 }
 
 /// `copy module`, against two collections on this machine: what one name
@@ -344,7 +328,7 @@ fn copied(name: &str, root: &Path) {
         tect::provenance::record::modified(here),
         tect::run(Command::Check, None, here).issues.plain()
     ));
-    compare(name, "import.txt", &out);
+    assert_golden(name, "import.txt", &out);
 }
 
 /// A module edited without regenerating is a `verify` failure, the per-module
@@ -420,7 +404,7 @@ fn why(name: &str, root: &Path, module: &str) {
             .unwrap_or_default(),
     );
 
-    compare(name, "why.txt", &out);
+    assert_golden(name, "why.txt", &out);
 }
 
 /// `summary`, both readings. The repository's comes off the resolved plan and
@@ -514,7 +498,7 @@ fn why_unbuilt(root: &Path) {
             .as_str(),
     );
 
-    compare("suppressed", "why.txt", &out);
+    assert_golden("suppressed", "why.txt", &out);
 }
 
 /// The same repository, both ways. `audit { enforce }` is a lever over a
@@ -691,7 +675,7 @@ fn flow_with_assets(name: &str, dir: &Path, gh: Option<&str>, args: &[&str], ass
         std::fs::read_to_string(&log).unwrap(),
         status.code().unwrap_or_default()
     );
-    compare(name, "transcript.txt", &transcript);
+    assert_golden(name, "transcript.txt", &transcript);
 }
 
 /// `create repo` where the scaffolded collection is a pinned archive on this
@@ -784,7 +768,7 @@ fn flow_offering(name: &str, dir: &Path) {
         status.code().unwrap_or_default()
     );
     let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755));
-    compare(name, "transcript.txt", &transcript);
+    assert_golden(name, "transcript.txt", &transcript);
 
     // The fetch that answered the offer went to scratch, not into a repository
     // that did not exist yet: a run left at the review screen writes nothing,
@@ -829,6 +813,9 @@ fn drawn_run(
         // A host exporting COLUMNS would leak into the pty and redraw at that
         // width, so the drawn width is pinned the way the golden captured it.
         .env("COLUMNS", "80")
+        // The transcript snapshots retain terminal styling, so a shell's
+        // NO_COLOR must not reach the pty.
+        .env_remove("NO_COLOR")
         // Whether this machine has a TPM decides which encryption rows are
         // present, so it is pinned the same way.
         .env("TECT_TPM", "/nonexistent")
@@ -886,7 +873,7 @@ fn drawn_flow(name: &str, dir: &Path, command: &str, after: &str, steps: &[&[u8]
 
     let text = String::from_utf8_lossy(&raw);
     let stable = text.rsplit_once(after).unwrap().1;
-    compare(
+    assert_golden(
         name,
         "transcript.txt",
         &format!("{after}{stable}==== exit 0\n"),
@@ -1321,7 +1308,7 @@ fn flows() {
     );
     // The CLI reference shows the block the run wrote.
     let image = std::fs::read_to_string(flavoured.join("example.image.kdl")).unwrap();
-    compare("flow-create-flavour", "example.image.kdl", &image);
+    assert_golden("flow-create-flavour", "example.image.kdl", &image);
 
     // The listing question is the image and its flavours, and a gated answer
     // writes the two blocks the image has neither of.
@@ -2505,15 +2492,8 @@ fn schema_doc() {
         .map(|area| (format!("docs/schema/{}", area.file()), page(area)));
     for (path, rendered) in pages {
         let at = crate_dir().join(&path);
-        if std::env::var_os("UPDATE_GOLDEN").is_some() {
-            std::fs::write(&at, rendered).unwrap();
-            continue;
-        }
         let doc = std::fs::read_to_string(&at).unwrap_or_else(|err| panic!("{path}: {err}"));
-        assert!(
-            doc == rendered,
-            "{path} is stale. Rerun with UPDATE_GOLDEN=1 and read the diff"
-        );
+        assert!(doc == rendered, "{path} is stale");
     }
 
     let mut on_disk: Vec<String> = std::fs::read_dir(crate_dir().join("docs/schema"))
@@ -2596,9 +2576,7 @@ const WRITTEN: &[Written] = &[
 /// that `written` names. The tree starts on a directory line after a blank
 /// line and runs to the next blank line.
 fn written(written: &Written) -> String {
-    let dir = crate_dir().join("tests/golden").join(written.flow);
-    let transcript =
-        std::fs::read_to_string(dir.join("transcript.txt")).expect("the flow transcript exists");
+    let transcript = snapshot_text(written.flow, "transcript.txt");
     let mut tree = String::new();
     let mut previous = "";
     for line in transcript.lines() {
@@ -2620,8 +2598,8 @@ fn written(written: &Written) -> String {
     );
     let mut out = format!("**What it writes:**\n\n```text\n{tree}```\n\n");
     if let Some(file) = written.file {
-        let text = std::fs::read_to_string(dir.join(file)).expect("the flow file exists");
-        let _ = write!(out, "`{file}` after it runs:\n\n```kdl\n{text}```\n\n");
+        let text = snapshot_text(written.flow, file);
+        let _ = write!(out, "`{file}` after it runs:\n\n```kdl\n{text}\n```\n\n");
     }
     out
 }
@@ -2731,15 +2709,8 @@ fn commands_doc() {
         ));
     }
     let rendered = format!("{}{}\n", tect::command::overview(), reference.trim_end());
-    if std::env::var_os("UPDATE_GOLDEN").is_some() {
-        std::fs::write(&path, rendered).unwrap();
-        return;
-    }
     let doc = std::fs::read_to_string(&path).expect("docs/cli.md exists");
-    assert!(
-        doc == rendered,
-        "docs/cli.md is stale. Rerun with UPDATE_GOLDEN=1 and read the diff"
-    );
+    assert!(doc == rendered, "docs/cli.md is stale");
 }
 
 /// One process, one working directory: every capture runs in turn.
@@ -2803,26 +2774,31 @@ fn golden() {
 /// corpus is the oracle, so the whole of it is the round trip.
 #[test]
 fn every_written_document_reads_back() {
-    // The corpus is being rewritten in another thread on a regeneration run,
-    // so what is on disk is not a document until it settles.
-    if std::env::var_os("UPDATE_GOLDEN").is_some() {
-        return;
-    }
     let dir = crate_dir().join("tests/golden");
     let mut read = 0;
     for path in walk(&dir) {
-        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+        let file = path
+            .file_stem()
+            .map(Path::new)
+            .and_then(Path::extension)
+            .and_then(|extension| extension.to_str());
+        if file != Some("json") {
             continue;
         }
-        let text = std::fs::read_to_string(&path).unwrap();
+        let text = insta::Snapshot::from_file(&path)
+            .unwrap_or_else(|err| panic!("{}: {err}", path.display()))
+            .as_text()
+            .expect("the golden is a text snapshot")
+            .to_string();
         // A command with nothing to say writes nothing, which is not a document.
         if text.trim().is_empty() {
             continue;
         }
         let parsed = common::json::Json::parse(&text)
             .unwrap_or_else(|err| panic!("{}: {err}", path.display()));
+        let rendered = normalize_snapshot_text(&parsed.render());
         assert!(
-            parsed.render() == text,
+            rendered == text,
             "{} did not read back as what was written",
             path.display()
         );
@@ -2912,7 +2888,7 @@ fn coverage() {
         "==== and with nothing to measure it against\n{said}==== exit {code}\n"
     ));
 
-    compare("coverage", "report.txt", &out);
+    assert_golden("coverage", "report.txt", &out);
 }
 
 /// `scap`, over a fixture report and datastream: what the modules claimed
@@ -3091,7 +3067,7 @@ fn scap() {
         out.push_str(&format!("==== {heading}\n{path}==== exit {code}\n"));
     }
 
-    compare("scap", "report.txt", &out);
+    assert_golden("scap", "report.txt", &out);
 }
 
 /// `create repo` on a real terminal, sealed like `flow`: the owner question is

@@ -1,0 +1,188 @@
+---
+source: tests/golden.rs
+---
+{
+  "schema_version": 1,
+  "default_image": "collecting",
+  "default_image_name": "Collecting",
+  "pr_image": "collecting",
+  "default_target": "collecting",
+  "default_published": "collecting",
+  "pr_target": "collecting",
+  "pr_published": "collecting",
+  "ungated_target": "collecting",
+  "ungated_published": "collecting",
+  "cache_image": "collecting-cache",
+  "workflows": [],
+  "audit": {
+    "enforce": false
+  },
+  "remotes": [],
+  "assets": [],
+  "images": [
+    {
+      "id": "collecting",
+      "name": "Collecting",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "description": "",
+      "keywords": [],
+      "logo_url": "",
+      "conforms": "",
+      "boot": "",
+      "allows": [],
+      "layout": null,
+      "base": {
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "witnesses": {
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
+          ]
+        },
+        "requires": [],
+        "satisfies": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "collecting",
+          "image": "collecting",
+          "flavour": null,
+          "published": "collecting",
+          "conforms": "",
+          "allows": [],
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "modules": [
+            {
+              "path": "core/menu",
+              "dir": "core/menu",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Assembles every contributed justfile fragment into one file",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "files": {},
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "content": "87cc75aaae54baea9b1f2bcfa9006777b55d45de9641ae36528622407935c9a1",
+                "repo": false,
+                "source": null,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": [],
+              "refuses": []
+            },
+            {
+              "path": "core/power",
+              "dir": "core/power",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Power recipes, contributed to the menu after the defaults",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "files": {},
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "content": "afd5aa2beb5484d15d04f19b5d17a5eac32dfdfed7a09bce899609eddc045db2",
+                "repo": false,
+                "source": null,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": [],
+              "refuses": []
+            },
+            {
+              "path": "core/network",
+              "dir": "core/network",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Network recipes, contributed to the menu before the defaults",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "files": {},
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "content": "a6136949c8649553770eb53ef45440ebd8c90cf1207d79865601a1c94655674e",
+                "repo": false,
+                "source": null,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": [],
+              "refuses": []
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "overlay_files": {},
+          "overlay_overridden": [],
+          "collected_files": {
+            "core/power": [
+              {
+                "file": "justfile.inc",
+                "staged": "/usr/share/menu/justfile.apps.d/0900-core-power.part"
+              }
+            ],
+            "core/network": [
+              {
+                "file": "justfile.inc",
+                "staged": "/usr/share/menu/justfile.apps.d/0100-core-network.part"
+              }
+            ]
+          },
+          "collect_destinations": [
+            "/usr/share/menu/justfile.apps"
+          ]
+        }
+      ]
+    }
+  ]
+}

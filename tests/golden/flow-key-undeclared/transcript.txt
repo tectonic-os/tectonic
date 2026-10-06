@@ -1,8 +1,0 @@
-Tectonic v{version}
-
-Error: no module in this repository declares a sbom key.
-
-Keys come from modules: image signing from a module carrying the cosign public key, Secure Boot from a kernel module carrying a MOK certificate. Import one and run this again.
-
-Run 'tect --help' to list the commands
-==== exit 1

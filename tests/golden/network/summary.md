@@ -1,9 +1,0 @@
-5 modules, the ungated set.
-
-| Module | Description | Options | Satisfies | Refuses |
-| --- | --- | --- | --- | --- |
-| `fedora-family` | dnf5 and its plugins, which every fedora build layer reaches for |  |  |  |
-| `core/tools` | Installs a package, then configures it with no network |  |  |  |
-| `core/fetcher` | Fetches a pinned release in its own script |  |  |  |
-| `core/quiet` | Ships files and nothing else |  |  |  |
-| `core/spliced` | Ships a fragment beside its standard layer |  |  |  |

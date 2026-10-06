@@ -1,8 +1,0 @@
-Tectonic v{version}
-
-tect: repo.kdl declares no `sources`; using the default module collection `one` and adding it to repo.kdl
-
-example/
-├── ~ example.image.kdl  browser added to modules
-└── ~ repo.kdl  the default module collection
-==== exit 0
