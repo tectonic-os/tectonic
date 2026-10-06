@@ -760,6 +760,8 @@ fn flow_offering(name: &str, dir: &Path) {
 
     let fixture = crate_dir().join("tests/golden").join(name);
     let log = tmp().join(format!("{name}.log"));
+    let scratch = work.join("tmp");
+    std::fs::create_dir_all(&scratch).unwrap();
     let file = std::fs::File::create(&log).unwrap();
     let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_tect"));
     let status = command
@@ -767,6 +769,7 @@ fn flow_offering(name: &str, dir: &Path) {
         .env("HOME", tmp())
         .env("GIT_CONFIG_GLOBAL", "/dev/null")
         .env("GIT_CONFIG_SYSTEM", "/dev/null")
+        .env("TMPDIR", &scratch)
         .env("TECT_ASSETS", &assets)
         .env("TECT_ANSWERS", fixture.join("answers.txt"))
         .args(["create", "repo"])
@@ -788,7 +791,7 @@ fn flow_offering(name: &str, dir: &Path) {
     // and this one leaves no cache behind either.
     let root = dir.join("example");
     assert!(!root.join("out").exists(), "the fetch cached into the repo");
-    let strays: Vec<PathBuf> = std::fs::read_dir(std::env::temp_dir())
+    let strays: Vec<PathBuf> = std::fs::read_dir(&scratch)
         .unwrap()
         .flatten()
         .map(|entry| entry.path())

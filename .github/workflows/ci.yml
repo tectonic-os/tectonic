@@ -36,6 +36,12 @@ jobs:
       - name: Install cargo-deny
         run: cargo install --locked cargo-deny --version 0.20.2
 
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@e407f7bafb71fd004bc5c2da3032e5470cbb6ef0
+        with:
+          tool: cargo-nextest@0.9.146
+          fallback: none
+
       - name: Install shfmt
         env:
           SHFMT_VERSION: "3.13.1"
@@ -45,6 +51,8 @@ jobs:
           sudo chmod +x /usr/local/bin/shfmt
 
       - name: Lint
+        env:
+          NEXTEST_PROFILE: ci
         run: ./lint.sh
 
   msrv:
@@ -53,9 +61,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@e407f7bafb71fd004bc5c2da3032e5470cbb6ef0
+        with:
+          tool: cargo-nextest@0.9.146
+          fallback: none
+
       - name: Test on rust-version
         run: |
           set -euo pipefail
           msrv="$(cargo metadata --no-deps --format-version 1 | jq -er '.packages[0].rust_version')"
           rustup toolchain install "$msrv" --profile minimal
-          cargo "+${msrv}" test --locked
+          cargo "+${msrv}" nextest run --locked --profile ci
