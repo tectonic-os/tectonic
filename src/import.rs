@@ -972,11 +972,11 @@ mod tests {
     #[test]
     fn a_complete_nested_path_wins_before_an_owner_prefix() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let sources = [collection("four", "tests/collections/four")];
+        let sources = [collection("grouped", "tests/collections/grouped")];
         let found = find(root, &sources, "hardening/coredumps", false).unwrap();
 
         assert_eq!(found.len(), 1);
-        assert_eq!(found[0].owner, "four");
+        assert_eq!(found[0].owner, "grouped");
         assert_eq!(found[0].name, "hardening/coredumps");
     }
 
@@ -984,13 +984,13 @@ mod tests {
     fn exact_matches_are_sorted_like_suffix_matches() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let sources = [
-            collection("two", "tests/collections/two"),
-            collection("one", "tests/collections/one"),
+            collection("community", "tests/collections/community"),
+            collection("upstream", "tests/collections/upstream"),
         ];
         let found = find(root, &sources, "browser", false).unwrap();
         let owners: Vec<&str> = found.iter().map(|found| found.owner.as_str()).collect();
 
-        assert_eq!(owners, ["one", "two"]);
+        assert_eq!(owners, ["community", "upstream"]);
     }
 
     #[test]
@@ -999,11 +999,11 @@ mod tests {
             std::env::temp_dir().join(format!("tect-default-sources-{}", std::process::id()));
         crate::init::put(&root.join(layout::REPO_FILE), "schema-version 1").unwrap();
 
-        declare_sources(&root, "sources {\n    one \"collection\"\n}\n").unwrap();
+        declare_sources(&root, "sources {\n    existing \"collection\"\n}\n").unwrap();
 
         assert_eq!(
             std::fs::read_to_string(root.join(layout::REPO_FILE)).unwrap(),
-            "schema-version 1\n\nsources {\n    one \"collection\"\n}\n"
+            "schema-version 1\n\nsources {\n    existing \"collection\"\n}\n"
         );
         let _ = std::fs::remove_dir_all(root);
     }
@@ -1082,7 +1082,7 @@ mod tests {
                 workflows: None,
                 conforms: Vec::new(),
             }
-            .write_with_sources(&root, &[], Some("sources { one \"collection\" }\n"))
+            .write_with_sources(&root, &[], Some("sources { existing \"collection\" }\n"))
             .unwrap();
             assert!(!root.join(&dest).exists());
         }
