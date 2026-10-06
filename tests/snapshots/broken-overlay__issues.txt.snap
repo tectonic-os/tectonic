@@ -1,0 +1,79 @@
+---
+source: tests/golden.rs
+---
+  x mode for `/etc/duplicate.conf` is declared twice
+    ,-[tests/repos/broken-overlay/modules/core/bad-modes/module.kdl:10:1]
+  9 | mode "/etc/duplicate.conf" "0440"
+ 10 | mode "/etc/duplicate.conf" "0600"
+    : ^^|^
+    :   `-- already declared above
+ 11 | mode "/etc/missing.conf" "0440"
+    `----
+
+  x `etc/relative.conf` is not a normal absolute overlay path
+   ,-[tests/repos/broken-overlay/modules/core/bad-modes/module.kdl:5:6]
+ 4 | 
+ 5 | mode "etc/relative.conf" "0440"
+   :      ^^^^^^^^^|^^^^^^^^^
+   :               `-- not a file path under `files/`
+ 6 | mode "/etc/non-octal.conf" "0880"
+   `----
+  help: name the path exactly as it lands in the image, such as `/etc/
+        example.conf`
+
+  x `0880` is not an octal file mode
+   ,-[tests/repos/broken-overlay/modules/core/bad-modes/module.kdl:6:28]
+ 5 | mode "etc/relative.conf" "0440"
+ 6 | mode "/etc/non-octal.conf" "0880"
+   :                            ^^^|^^
+   :                               `-- use only digits 0 through 7
+ 7 | mode "/etc/out-of-range.conf" "10000"
+   `----
+  help: a chmod file mode such as `0440`
+
+  x file mode `10000` is out of range
+   ,-[tests/repos/broken-overlay/modules/core/bad-modes/module.kdl:7:31]
+ 6 | mode "/etc/non-octal.conf" "0880"
+ 7 | mode "/etc/out-of-range.conf" "10000"
+   :                               ^^^|^^^
+   :                                  `-- greater than 07777
+ 8 | mode "/etc/empty.conf" ""
+   `----
+
+  x `` is not an octal file mode
+   ,-[tests/repos/broken-overlay/modules/core/bad-modes/module.kdl:8:24]
+ 7 | mode "/etc/out-of-range.conf" "10000"
+ 8 | mode "/etc/empty.conf" ""
+   :                        ^|
+   :                         `-- use only digits 0 through 7
+ 9 | mode "/etc/duplicate.conf" "0440"
+   `----
+  help: a chmod file mode such as `0440`
+
+  x `core/bad-modes` declares a mode for a file it does not ship
+    ,-[tests/repos/broken-overlay/modules/core/bad-modes/module.kdl:11:6]
+ 10 | mode "/etc/duplicate.conf" "0600"
+ 11 | mode "/etc/missing.conf" "0440"
+    :      ^^^^^^^^^|^^^^^^^^^
+    :               `-- /etc/missing.conf is missing from every `files/`
+    `----
+  help: shipping the overlay file is what makes its mode meaningful
+
+  x `core/second` overwrites `/etc/sudoers.d/99-hardening`, which `core/first`
+  | also ships
+  help: overlays are copied in build order, so this one wins and the other
+        file never reaches the image. Rename one of the two, or declare
+        `overrides "/etc/sudoers.d/99-hardening"` here if replacing it is the
+        point
+
+  x `core/third` overrides `/usr/lib/nothing.conf`, which no earlier module
+  | ships
+   ,-[tests/repos/broken-overlay/modules/core/third/module.kdl:5:1]
+ 4 | 
+ 5 | overrides "/usr/lib/nothing.conf"
+   : ^^^^|^^^^
+   :     `-- nothing to replace
+   `----
+  help: an override is checked, so it cannot outlive the collision it was
+        added for; drop it, or check the path against what the other module
+        actually ships
