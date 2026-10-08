@@ -208,7 +208,10 @@ fn offered(root: &Path, sources: &[Collection]) -> Result<(Vec<Provider>, Vec<Ch
     }
     let options = listed
         .iter()
-        .map(|module| Choice::new(module.qualified(), module.about()))
+        .map(|module| {
+            let group = module.name.split_once('/').map_or("", |(group, _)| group);
+            Choice::new(module.qualified(), module.about()).within(group)
+        })
         .collect();
     Ok((listed, options))
 }
@@ -608,6 +611,7 @@ impl Module {
         images: Vec<String>,
         datastream: Option<&Path>,
         place: Place,
+        dependencies: bool,
         prompt: &Prompt,
     ) -> Result<Self, Error> {
         let (list, _) = crate::model::image::List::load(root);
@@ -656,20 +660,29 @@ impl Module {
         }
         let named: Vec<String> = picked.iter().map(|(_, name)| name.clone()).collect();
 
-        let also = short(root, sources, &list, &listing, &declares, prompt)?
-            .into_iter()
-            .filter(|qualified| {
-                !picked
-                    .iter()
-                    .any(|(from, name)| format!("{}/{name}", from.owner) == *qualified)
-            })
-            .map(|qualified| {
-                let mut found = find(root, sources, &qualified, enforce)?;
-                let from = found.swap_remove(0);
-                let name = from.name.clone();
-                member(root, &from, &name, place)
-            })
-            .collect::<Result<Vec<Member>, String>>()?;
+        let also = short(
+            root,
+            sources,
+            &list,
+            &listing,
+            &named,
+            &declares,
+            dependencies,
+            prompt,
+        )?
+        .into_iter()
+        .filter(|qualified| {
+            !picked
+                .iter()
+                .any(|(from, name)| format!("{}/{name}", from.owner) == *qualified)
+        })
+        .map(|qualified| {
+            let mut found = find(root, sources, &qualified, enforce)?;
+            let from = found.swap_remove(0);
+            let name = from.name.clone();
+            member(root, &from, &name, place)
+        })
+        .collect::<Result<Vec<Member>, String>>()?;
 
         // Both offers are about what an image ends up holding, so neither is
         // worth asking where the answer listed it in nothing.
@@ -853,13 +866,15 @@ fn member(root: &Path, from: &Found, name: &str, place: Place) -> Result<Member,
 
 /// What the set requires that the images it is being listed in do not have, as
 /// the collection members that would satisfy it. One question for the set;
-/// declining it leaves a file that is still valid.
+/// declining it leaves the requirement for `check` to diagnose.
 fn short(
     root: &Path,
     sources: &[Collection],
     list: &crate::model::image::List,
     listing: &Listing,
+    names: &[String],
     declares: &[crate::parse::module::Summary],
+    dependencies: bool,
     prompt: &Prompt,
 ) -> Result<Vec<String>, String> {
     let targets: Vec<(&crate::model::image::Image, Option<&str>)> = listing
@@ -872,11 +887,12 @@ fn short(
                 .map(|image| (image, *flavour))
         })
         .collect();
-    let requires: Vec<&String> = declares
+    let requires: Vec<(&String, &String)> = names
         .iter()
-        .flat_map(|held| held.requires.iter())
+        .zip(declares)
+        .flat_map(|(name, held)| held.requires.iter().map(move |want| (name, want)))
         // One of the set may be what another one of them needs.
-        .filter(|want| {
+        .filter(|(_, want)| {
             !declares
                 .iter()
                 .any(|held| held.provides.iter().any(|has| &has == want))
@@ -888,12 +904,9 @@ fn short(
     let disk = crate::parse::disk::Disk::scan(root);
     let index = crate::provider::Index::scan(root, sources, &disk, false);
 
-    let mut unmet: Vec<&String> = Vec::new();
+    let mut mappings: Vec<(String, String, String, String)> = Vec::new();
     let mut bring: Vec<String> = Vec::new();
-    for want in requires {
-        if unmet.contains(&want) {
-            continue;
-        }
+    for (module, want) in requires {
         // Per target, because the adapter filling a role is a different module
         // on every family: two images on two families owe two providers, and
         // one image owes the one that supports it.
@@ -911,8 +924,19 @@ fn short(
             else {
                 continue;
             };
-            if !unmet.contains(&want) {
-                unmet.push(want);
+            let base = image
+                .base
+                .as_ref()
+                .map(|base| base.image.rsplit('/').next().unwrap_or(&base.image))
+                .unwrap_or_default();
+            let mapping = (
+                module.to_string(),
+                base.to_string(),
+                want.to_string(),
+                provider.name.clone(),
+            );
+            if !mappings.contains(&mapping) {
+                mappings.push(mapping);
             }
             let qualified = provider.qualified();
             if !bring.contains(&qualified) {
@@ -923,6 +947,18 @@ fn short(
     if bring.is_empty() {
         return Ok(Vec::new());
     }
+    if dependencies {
+        return Ok(bring);
+    }
+    if !prompt.asks() {
+        return Ok(Vec::new());
+    }
+
+    println!("{}", copy::REQUIRED);
+    for (module, base, want, provider) in mappings {
+        println!("\n  {module} > {base}\n    requires: {want}\n    provider module: {provider}");
+    }
+    println!();
 
     match prompt.confirm(copy::BRING_REQUIRED, copy::YES, copy::NO)? {
         true => Ok(bring),
@@ -1111,6 +1147,27 @@ mod tests {
     }
 
     #[test]
+    fn the_module_picker_groups_nested_paths_by_their_first_directory() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let sources = [
+            collection("community", "tests/collections/community"),
+            collection("grouped", "tests/collections/grouped"),
+        ];
+        let (_, options) = offered(root, &sources).unwrap();
+        let nested = options
+            .iter()
+            .find(|option| option.label == "grouped/hardening/coredumps")
+            .unwrap();
+        let root_level = options
+            .iter()
+            .find(|option| option.label == "community/browser")
+            .unwrap();
+
+        assert_eq!(nested.group, "hardening");
+        assert!(root_level.group.is_empty());
+    }
+
+    #[test]
     fn a_provider_in_one_flavour_does_not_cover_its_sibling() {
         let root =
             std::env::temp_dir().join(format!("tect-flavour-provider-{}", std::process::id()));
@@ -1218,6 +1275,7 @@ image {
             Vec::new(),
             None,
             Place::Reference,
+            false,
             &Prompt::silent(),
         );
         let message = match result {
@@ -1256,6 +1314,7 @@ image {
             vec!["example".into()],
             None,
             Place::Reference,
+            false,
             &Prompt::silent(),
         );
         let message = match result {

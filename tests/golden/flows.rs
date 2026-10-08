@@ -87,6 +87,32 @@ impl Flow {
         self.run_with_assets(name, dir, gh, args, &crate_dir().join("assets"));
     }
 
+    /// Runs without scripted answers, so the transcript includes the command's
+    /// unattended exit status.
+    fn run_silent(&self, name: &str, dir: &Path, args: &[&str]) {
+        let log = self.at(&format!("{name}.log"));
+        let file = std::fs::File::create(&log).unwrap();
+        let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_tect"));
+        let status = sealed(&mut command, &self.bin(name, None))
+            .env("TECT_ASSETS", crate_dir().join("assets"))
+            .args(args)
+            .current_dir(dir)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::from(file.try_clone().unwrap()))
+            .stderr(std::process::Stdio::from(file))
+            .status()
+            .unwrap();
+        let transcript = format!(
+            "{}==== exit {}\n",
+            std::fs::read_to_string(&log).unwrap(),
+            status.code().unwrap_or_default()
+        );
+        if name == self.target {
+            self.note_assertion();
+            assert_golden(name, "transcript.txt", &transcript);
+        }
+    }
+
     fn run_with_assets(
         &self,
         name: &str,
@@ -512,6 +538,7 @@ fn flow_case(flow: &Flow) {
         "flow-import-conforms-enforced" => setup_import_conforms_enforced(flow),
         "flow-import-conforms-two" => setup_import_conforms_two(flow),
         "flow-import-datastream" => setup_import_datastream(flow),
+        "flow-import-declined" => setup_import_declined(flow),
         "flow-import-family" => setup_import_family(flow),
         "flow-copy-conforms" => setup_copy_conforms(flow),
         "flow-set-claims" | "flow-set-claims-again" => setup_set_claims(flow),
@@ -519,6 +546,10 @@ fn flow_case(flow: &Flow) {
         "flow-set-claims-fetched" => setup_set_claims_fetched(flow),
         "flow-set-workflows" => setup_workflows(flow),
         "flow-import-requires" => setup_import_requires(flow),
+        "flow-import-requires-no-tui" => setup_import_requires_no_tui(flow),
+        "flow-import-requires-no-terminal" => setup_import_requires_no_terminal(flow),
+        "flow-import-requires-namesakes" => setup_import_requires_namesakes(flow),
+        "flow-copy-requires-no-tui" => setup_copy_requires_no_tui(flow),
         "flow-check-unmet" => setup_check_unmet(flow),
         "flow-import-skip" => setup_import_skip(flow),
         "flow-check-unfetched" => setup_check_unfetched(flow),
@@ -1192,13 +1223,14 @@ fn setup_import_requires(flow: &Flow) {
     flow.tect(&requires, &["--no-tui", "--root", ".", "check"]);
 }
 
-/// Declining leaves a file that is still valid, and a `check` that says which
-/// import would satisfy what is missing.
-fn setup_check_unmet(flow: &Flow) {
-    let target = flow.target;
-    let declined = flow.repo_sourced("flow-declined");
-    flow.tect(
-        &declined,
+/// An unattended dependency offer defaults to No and still imports the module
+/// the command named.
+fn setup_import_requires_no_tui(flow: &Flow) {
+    let requires = flow.repo_sourced("flow-requires-no-tui");
+    let image = requires.join("example.image.kdl");
+    flow.run_silent(
+        flow.target,
+        &requires,
         &[
             "--no-tui",
             "--root",
@@ -1210,6 +1242,109 @@ fn setup_check_unmet(flow: &Flow) {
             "example",
         ],
     );
+    let image = std::fs::read_to_string(image).unwrap();
+    assert!(image.contains("module \"browser\""), "{image}");
+    assert!(!image.contains("module \"flatpak\""), "{image}");
+}
+
+/// Redirected input follows the same default as `--no-tui`.
+fn setup_import_requires_no_terminal(flow: &Flow) {
+    let requires = flow.repo_sourced("flow-requires-no-terminal");
+    let image = requires.join("example.image.kdl");
+    flow.run_silent(
+        flow.target,
+        &requires,
+        &[
+            "--root",
+            ".",
+            "import",
+            "module",
+            "community/browser",
+            "--image",
+            "example",
+        ],
+    );
+    let image = std::fs::read_to_string(image).unwrap();
+    assert!(image.contains("module \"browser\""), "{image}");
+    assert!(!image.contains("module \"flatpak\""), "{image}");
+}
+
+/// The dependencies switch answers Yes without an interactive prompt and
+/// copies both the selected module and its provider.
+fn setup_copy_requires_no_tui(flow: &Flow) {
+    let requires = flow.repo_sourced("flow-copy-requires-no-tui");
+    let image = requires.join("example.image.kdl");
+    flow.run_silent(
+        flow.target,
+        &requires,
+        &[
+            "--no-tui",
+            "--root",
+            ".",
+            "copy",
+            "module",
+            "community/browser",
+            "--image",
+            "example",
+            "--dependencies",
+        ],
+    );
+    let image = std::fs::read_to_string(image).unwrap();
+    assert!(image.contains("module \"browser\""), "{image}");
+    assert!(image.contains("module \"flatpak\""), "{image}");
+    assert!(requires.join("modules/browser").is_dir());
+    assert!(requires.join("modules/flatpak").is_dir());
+}
+
+/// Two nested modules may share a leaf name, so both paths must remain visible
+/// in the provider mapping.
+fn setup_import_requires_namesakes(flow: &Flow) {
+    let requires = flow.repo_with("flow-requires-namesakes", "namesakes");
+    flow.run(
+        flow.target,
+        &requires,
+        None,
+        &["--root", ".", "import", "module"],
+    );
+    let image = std::fs::read_to_string(requires.join("example.image.kdl")).unwrap();
+    for module in ["apps/client", "desktop/client", "flatpak"] {
+        assert!(image.contains(&format!("module \"{module}\"")), "{image}");
+    }
+}
+
+/// Imports a module while declining its provider offer, and returns the
+/// repository whose unmet requirement a caller may inspect.
+fn import_declined(flow: &Flow) -> PathBuf {
+    let declined = flow.repo_sourced("flow-declined");
+    flow.run(
+        "flow-import-declined",
+        &declined,
+        None,
+        &[
+            "--root",
+            ".",
+            "import",
+            "module",
+            "community/browser",
+            "--image",
+            "example",
+        ],
+    );
+    let image = std::fs::read_to_string(declined.join("example.image.kdl")).unwrap();
+    assert!(image.contains("module \"browser\""), "{image}");
+    assert!(!image.contains("module \"flatpak\""), "{image}");
+    declined
+}
+
+fn setup_import_declined(flow: &Flow) {
+    let _ = import_declined(flow);
+}
+
+/// Declining leaves a requirement for `check` to diagnose, including which
+/// import would satisfy it.
+fn setup_check_unmet(flow: &Flow) {
+    let target = flow.target;
+    let declined = import_declined(flow);
     flow.tect(
         &declined,
         &[
@@ -1577,6 +1712,7 @@ fn setup_import_edit_guards(flow: &Flow) {
         Vec::new(),
         None,
         tect::import::Place::Reference,
+        false,
         &common::prompt::Prompt::silent(),
     )
     .unwrap_or_else(|err| panic!("{}", err.message()))
@@ -1592,6 +1728,7 @@ fn setup_import_edit_guards(flow: &Flow) {
         vec!["example".into()],
         None,
         tect::import::Place::Reference,
+        false,
         &common::prompt::Prompt::silent(),
     )
     .unwrap_or_else(|err| panic!("{}", err.message()))
@@ -1612,6 +1749,7 @@ fn setup_import_edit_guards(flow: &Flow) {
         vec!["example".into()],
         None,
         tect::import::Place::Reference,
+        false,
         &common::prompt::Prompt::silent(),
     )
     .err()
@@ -1977,6 +2115,7 @@ flow_cases! {
     flow_copy_conforms => "flow-copy-conforms",
     flow_copy_module => "flow-copy-module",
     flow_copy_nested => "flow-copy-nested",
+    flow_copy_requires_no_tui => "flow-copy-requires-no-tui",
     flow_copy_with_schema_issues => "flow-copy-with-schema-issues",
     flow_coverage => "flow-coverage",
     flow_create_flavour => "flow-create-flavour",
@@ -1996,12 +2135,16 @@ flow_cases! {
     flow_import_conforms_enforced => "flow-import-conforms-enforced",
     flow_import_conforms_two => "flow-import-conforms-two",
     flow_import_datastream => "flow-import-datastream",
+    flow_import_declined => "flow-import-declined",
     flow_import_default => "flow-import-default",
     flow_import_family => "flow-import-family",
     flow_import_kernel => "flow-import-kernel",
     flow_import_module => "flow-import-module",
     flow_import_nested => "flow-import-nested",
     flow_import_requires => "flow-import-requires",
+    flow_import_requires_namesakes => "flow-import-requires-namesakes",
+    flow_import_requires_no_tui => "flow-import-requires-no-tui",
+    flow_import_requires_no_terminal => "flow-import-requires-no-terminal",
     flow_import_several => "flow-import-several",
     flow_import_skip => "flow-import-skip",
     flow_import_suffix => "flow-import-suffix",
