@@ -26,7 +26,9 @@ Every command takes these options, before or after its own words. [`tect`](#tect
 | Command | Description | Schema |
 | --- | --- | --- |
 | [`tect create repo [name]`](#tect-create-repo) | start a repository of images | [repository&nbsp;layout](schema/repository.md) |
+| [`tect create git`](#tect-create-git) | initialise git and the ignore file in a directory |  |
 | [`tect create scripts [name]...`](#tect-create-scripts) | keep a copy of a script tect supplies in scripts/ | [`scripts/`](schema/repository.md) |
+| [`tect set library [kind]`](#tect-set-library) | add a module, base-image or capability library | [`repo.kdl`&nbsp;›&nbsp;`sources`](schema/repo.md#sources) |
 
 ### Image
 
@@ -231,9 +233,9 @@ example/
 ```
 
 > [!WARNING]
-> The `tectonic-os/modules` source that `repo.kdl` declares is `unpinned`. Each
+> The `tectonic-modules` source that `repo.kdl` declares is `unpinned`. Each
 > fetch takes the head of its branch, and no hash checks what arrives. To pin
-> it, replace its `pin` with a tagged and hashed one.
+> it, add `version` and `sha256` beside its `url`.
 
 > [!NOTE]
 > It runs `git init` and does no other git step. It prints the commands for the
@@ -244,6 +246,23 @@ example/
 >
 > A repository cannot sit inside another repository, so it refuses such a
 > directory.
+
+## `tect create git`
+
+Puts the directory under git control, so a hand-written repository is under
+version control before its first commit. It writes the `.gitignore` that
+ignores `keys/private/`, `out/` and `modules/.remote/`, unless one is already
+there.
+
+It refuses a directory that git already tracks, because a repository does not
+nest.
+
+**Usage:** `tect create git`
+
+> [!NOTE]
+> `tect create repo` already does this for a repository it scaffolds. This
+> command is for a directory written by hand or copied from somewhere, and it
+> leaves every file that is already there alone.
 
 ## `tect create image`
 
@@ -331,6 +350,8 @@ example/
 `example.image.kdl` after it runs:
 
 ```kdl
+schema-version 1
+
 image {
     name "Example"
     url "https://github.com/someone/example"
@@ -633,6 +654,26 @@ example/
 >
 > Each schedule is an offset from the daily build time, so a new daily time
 > moves every schedule.
+
+## `tect set library`
+
+Adds a library to the `sources` block in `repo.kdl`: the default library of
+that kind, or a source the user types. A source of the same kind and alias is
+replaced, so the declaration moves to what the user chose.
+
+It asks, in order:
+
+1. Choose the default library of that kind, or another source.
+2. For another source, give its alias, its HTTPS Git URL and the directory
+   inside the repository.
+
+**Usage:** `tect set library [kind]`
+
+| Argument | Description |
+| --- | --- |
+| `<kind>` | the kind of library: `base-images`, `capabilities` or `modules` |
+
+**Schema:** [`repo.kdl`&nbsp;›&nbsp;`sources`](schema/repo.md#sources)
 
 ## `tect set conforms`
 

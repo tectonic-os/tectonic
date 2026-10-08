@@ -1,3 +1,5 @@
+schema-version 1
+
 description "apt and its state directories, which every deb build layer reaches for"
 
 supports "debian" "ubuntu"

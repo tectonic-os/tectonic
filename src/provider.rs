@@ -3,7 +3,7 @@
 //!
 //! One index: five callers ask the same question.
 
-use crate::model::remote::{Collection, REMOTE_DIR};
+use crate::model::remote::{Collection, Kind as SourceKind, REMOTE_DIR};
 use crate::parse::disk::Disk;
 use crate::parse::module::Summary;
 use crate::{layout, parse};
@@ -59,11 +59,11 @@ impl Provider {
 /// reading the index states as fact what it did not check.
 pub struct Index {
     held: Vec<Provider>,
-    /// Declared collections not on this machine, which a scan that does not
-    /// fetch skips: empty when every one was read, and empty when none were
+    /// Declared module collections not on this machine, which a scan that does
+    /// not fetch skips: empty when every one was read, and empty when none were
     /// declared, which `sourced` tells apart.
     unread: Vec<String>,
-    /// Whether the repository declares any collections at all.
+    /// Whether the repository declares a module collection at all.
     sourced: bool,
     /// Why a fetching scan fell back to what was already here. `None` where it
     /// did not fetch, or where the fetch worked.
@@ -101,17 +101,28 @@ impl Index {
         Self {
             held: out,
             unreached,
-            // The collections `catalog` just skipped: `cached` is the same
-            // question it asked, and on `fetch` there is nothing to skip.
+            // The module collections `catalog` just skipped: a source counts
+            // as read only where the tree it names is. Two sources naming one
+            // library share a cache directory, so the other kind's subtree
+            // being there does not make this one read. A base-image or
+            // capability source is not a collection this index speaks for, so
+            // it is never named here.
             unread: match fetch && reached {
                 true => Vec::new(),
                 false => sources
                     .iter()
-                    .filter(|collection| crate::import::cached(root, collection).is_none())
+                    .filter(|collection| collection.kind == SourceKind::Modules)
+                    .filter(|collection| {
+                        !crate::import::cached(root, collection).is_some_and(|dir| {
+                            dir.join(collection.subtree().unwrap_or("")).is_dir()
+                        })
+                    })
                     .map(|collection| collection.name.clone())
                     .collect(),
             },
-            sourced: !sources.is_empty(),
+            sourced: sources
+                .iter()
+                .any(|collection| collection.kind == SourceKind::Modules),
         }
     }
 

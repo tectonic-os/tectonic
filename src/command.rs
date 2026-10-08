@@ -13,6 +13,7 @@ mod help;
 pub enum Verb {
     Upgrade,
     CreateRepo,
+    CreateGit,
     CreateImage,
     CreateFlavour,
     CreateModule,
@@ -21,6 +22,7 @@ pub enum Verb {
     ImportModule,
     CopyModule,
     SetWorkflows,
+    SetLibrary,
     SetConforms,
     SetClaims,
     SetKey,
@@ -81,6 +83,7 @@ impl Verb {
                 Area::Repo,
                 "workflows",
             )),
+            Verb::SetLibrary => Some(("`repo.kdl`&nbsp;›&nbsp;`sources`", Area::Repo, "sources")),
             Verb::SetConforms | Verb::Coverage => Some((
                 "`image.kdl`&nbsp;›&nbsp;`conforms`",
                 Area::Image,
@@ -124,7 +127,8 @@ impl Verb {
             | Verb::RegistryNamespace
             | Verb::RegistryRef
             | Verb::Recipe
-            | Verb::BuildRecord => None,
+            | Verb::BuildRecord
+            | Verb::CreateGit => None,
         }
     }
 }
@@ -133,6 +137,7 @@ impl Verb {
 pub const ALL: &[Verb] = &[
     Verb::Upgrade,
     Verb::CreateRepo,
+    Verb::CreateGit,
     Verb::CreateImage,
     Verb::CreateFlavour,
     Verb::CreateModule,
@@ -141,6 +146,7 @@ pub const ALL: &[Verb] = &[
     Verb::ImportModule,
     Verb::CopyModule,
     Verb::SetWorkflows,
+    Verb::SetLibrary,
     Verb::SetConforms,
     Verb::SetClaims,
     Verb::SetKey,
@@ -251,6 +257,13 @@ const SURFACE: &[(&str, Verb, Family, bool, Topic)] = &[
         Topic::Repository,
     ),
     (
+        "create git",
+        Verb::CreateGit,
+        Family::Anywhere,
+        false,
+        Topic::Repository,
+    ),
+    (
         "create image",
         Verb::CreateImage,
         Family::Repo,
@@ -305,6 +318,13 @@ const SURFACE: &[(&str, Verb, Family, bool, Topic)] = &[
         Family::Repo,
         false,
         Topic::Ci,
+    ),
+    (
+        "set library",
+        Verb::SetLibrary,
+        Family::Repo,
+        false,
+        Topic::Repository,
     ),
     (
         "set conforms",
@@ -688,6 +708,9 @@ pub enum CreateWhat {
         #[arg(long, value_name = "ref")]
         base: Option<String>,
     },
+    /// initialise git and the ignore file in a directory
+    #[command(long_about = help::CREATE_GIT, after_long_help = help::CREATE_GIT_NOTES)]
+    Git,
     /// add an image, with its name and the base it builds on
     #[command(long_about = help::CREATE_IMAGE, after_long_help = help::CREATE_IMAGE_NOTES)]
     Image {
@@ -791,6 +814,13 @@ pub enum SetWhat {
     /// choose the CI this repository generates
     #[command(long_about = help::SET_WORKFLOWS, after_long_help = help::SET_WORKFLOWS_NOTES)]
     Workflows,
+    /// add a module, base-image or capability library
+    #[command(long_about = help::SET_LIBRARY)]
+    Library {
+        /// the kind of library: `base-images`, `capabilities` or `modules`
+        #[arg(value_name = "kind")]
+        kind: Option<String>,
+    },
     /// choose the benchmark profile an image is measured by
     #[command(long_about = help::SET_CONFORMS, after_long_help = help::SET_CONFORMS_NOTES)]
     Conforms {
@@ -1469,6 +1499,7 @@ impl Verb {
             Self::Coverage => Command::Coverage,
             Self::Upgrade
             | Self::CreateRepo
+            | Self::CreateGit
             | Self::CreateImage
             | Self::CreateFlavour
             | Self::CreateModule
@@ -1477,6 +1508,7 @@ impl Verb {
             | Self::ImportModule
             | Self::CopyModule
             | Self::SetWorkflows
+            | Self::SetLibrary
             | Self::SetConforms
             | Self::SetClaims
             | Self::SetKey

@@ -534,7 +534,7 @@ fn datastream(root: &Path, list: &List, named: Option<&str>) -> Result<String, S
     }
     let base = image.base.as_ref();
     let mut issues = crate::diag::Issues::default();
-    let (bases, _) = crate::base::catalog(root, &list.sources, &mut issues);
+    let bases = crate::base::catalog(root, &list.sources, &mut issues);
     Ok(measured_by(
         CONTENT,
         &bases,
@@ -557,20 +557,19 @@ fn measured_by(
 ) -> Result<PathBuf, String> {
     match crate::base::find(bases, image) {
         Some(base) if !base.scap_content.is_empty() => Ok(Path::new(dir).join(&base.scap_content)),
-        // The catalog describes this base and names no content for it, which
-        // is a stale catalog when the family has content of its own.
+        // The library describes this base and names no content for it, which
+        // is a stale row when the family has content of its own.
         Some(base) => match installed(dir, family) {
             // The family has no content either, and carries its own reason.
             Err(refusal) => Err(refusal),
             Ok(_) => Err(format!(
                 "`{}` names no `scap-content`, so nothing says which benchmark it is measured \
-                 against\n\nhelp: add `scap-content \"ssg-<os>-ds.xml\"` to its row. A row that \
-                 carries one in the source tree and not here is a stale installed catalog, which \
-                 `TECT_ASSETS=<tree>/assets` points past",
+                 against\n\nhelp: add `scap-content \"ssg-<os>-ds.xml\"` to its base file in the \
+                 base-images library",
                 base.image
             )),
         },
-        // A base the catalog does not describe: the family is all there is.
+        // A base the library does not describe: the family is all there is.
         None => installed(dir, family),
     }
 }
@@ -1425,6 +1424,7 @@ mod tests {
     #[test]
     fn a_base_row_names_content_the_family_cannot() {
         let row = |image: &str, family: &str, content: &str| crate::base::Base {
+            name: image.to_string(),
             image: image.to_string(),
             family: family.to_string(),
             provides: Vec::new(),
@@ -1475,12 +1475,11 @@ mod tests {
         let err = of("example.invalid/alma:10", "rhel").unwrap_err();
         assert!(err.contains("one datastream per EL release"), "{err}");
 
-        // A row that names none is refused rather than guessed at. This is the
-        // stale-catalog case: the installed `bases.kdl` predates the field, and
-        // guessing hands the image its family's benchmark without a word.
+        // A row that names none is refused rather than guessed at: guessing
+        // hands the image its family's benchmark without a word.
         let err = of("example.invalid/silent:1", "fedora").unwrap_err();
         assert!(err.contains("names no `scap-content`"), "{err}");
-        assert!(err.contains("stale installed catalog"), "{err}");
+        assert!(err.contains("add `scap-content"), "{err}");
 
         // Where the family has no content either, its own reason wins.
         let err = of("example.invalid/silent:1", "debian").unwrap_err();

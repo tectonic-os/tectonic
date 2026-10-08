@@ -1,3 +1,5 @@
+schema-version 1
+
 description "A DKMS module built and signed against the kernel above"
 
 supports "fedora"

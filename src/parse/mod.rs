@@ -11,8 +11,60 @@ pub mod repo;
 pub mod schema;
 
 use crate::diag::{Issue, Issues, Source, Span};
-use crate::model::image::is_name;
-use kdl::KdlNode;
+use crate::model::image::{is_name, SCHEMA_VERSION};
+use kdl::{KdlDocument, KdlNode};
+
+/// Holds one file's declared schema to the repository's. The grammar reports
+/// an absent or malformed declaration; this check owns the relationship
+/// between two otherwise valid files.
+pub(crate) fn check_file_version(
+    doc: &KdlDocument,
+    repo_version: Option<u32>,
+    repo_src: &Source,
+    src: &Source,
+    issues: &mut Issues,
+) {
+    let Some(repo_version) = repo_version else {
+        return;
+    };
+    let Some(node) = doc
+        .nodes()
+        .iter()
+        .find(|node| node.name().value() == "schema-version")
+    else {
+        return;
+    };
+    let Some(version) = int_arg(node) else {
+        return;
+    };
+    if version == i128::from(repo_version) {
+        return;
+    }
+
+    let relation = match version > i128::from(repo_version) {
+        true => "newer than the repository",
+        false => "older than the repository",
+    };
+    issues.push(
+        Issue::new(
+            format!(
+                "{} declares schema version {version}, but {} declares {repo_version}",
+                src.name(),
+                repo_src.name()
+            ),
+            src,
+        )
+        .at(node.name().span(), relation)
+        .help(match version > i128::from(SCHEMA_VERSION) {
+            true => format!(
+                "this tool knows schema {SCHEMA_VERSION}; use the release that reads schema {version}, or write the file against schema {repo_version}"
+            ),
+            false => format!(
+                "write the file against schema {repo_version}; an older reader is used only when this release carries that schema"
+            ),
+        }),
+    );
+}
 
 /// A capability name reaches the generated graph verbatim, as a mermaid edge
 /// label and a markdown table cell, so it is held to the charset every other
@@ -30,8 +82,8 @@ pub(crate) fn check_capability(name: &str, span: Span, src: &Source, issues: &mu
             .at(span, "a name, such as `ssh` or `bootc`")
             .help(
                 "a capability is found at `/usr/bin/<name>` or `/usr/sbin/<name>`; anywhere \
-                     else, a module writes `provides \"<name>\" file=\"<path>\"`, or bases.kdl a \
-                     `capability \"<name>\" \"<path>\"` row",
+                     else, a module writes `provides \"<name>\" file=\"<path>\"`, or a \
+                     capabilities library a `capability \"<name>\" { path \"<path>\" }` row",
             ),
         );
         return;

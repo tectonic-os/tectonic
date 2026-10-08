@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 {
   "schema_version": 1,
@@ -52,21 +52,6 @@ source: tests/golden.rs
             "/usr/bin/boot policy",
             "/usr/sbin/boot policy"
           ],
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
           "nothing": [
             "/usr/bin/nothing",
             "/usr/sbin/nothing"
@@ -75,14 +60,13 @@ source: tests/golden.rs
             "/usr/bin/package-manager",
             "/usr/sbin/package-manager"
           ],
-          "podman": [
-            "/usr/bin/podman"
+          "rechunking": [
+            "/usr/bin/rechunking",
+            "/usr/sbin/rechunking"
           ],
           "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
+            "/usr/bin/selinux-policy",
+            "/usr/sbin/selinux-policy"
           ]
         },
         "requires": [
@@ -131,7 +115,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "2f32f4607af03a59b660c9331f9c76ddb72e71ecd686178bf27795f60a51c87f",
+                "content": "ecdde662c336c9ea66f943f139ab799e4d4d14b65ada51f97b612971487d0a3d",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -158,7 +142,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "4e919cf274a5c012aeb2be57885676f92b8849876220e0138a432d9132db7d91",
+                "content": "d35629d288e2a4927d7e7dce1f778279d301a7a16a6fb1207e03a1c3f1a509c6",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -184,7 +168,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "d7ef24cdb7af81e387e3ce6a1e452aa7339f04da38b34409749b79bb34fae00c",
+                "content": "50167da21c1c54e2dcdc98560a36955865765d2c086e0d39b0061c32d8431997",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -196,10 +180,7 @@ source: tests/golden.rs
           ],
           "suppressed": [],
           "secrets": [],
-          "contract_files": [
-            "/usr/bin/boot policy|/usr/sbin/boot policy",
-            "/usr/sbin/semodule"
-          ],
+          "contract_files": [],
           "verify_exceptions": [],
           "assets": [],
           "overlay_files": {},

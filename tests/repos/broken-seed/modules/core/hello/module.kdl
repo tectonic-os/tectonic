@@ -1,3 +1,5 @@
+schema-version 1
+
 description "A module no declared collection provides"
 
 supports "fedora"

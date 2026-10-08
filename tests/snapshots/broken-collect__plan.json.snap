@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 {
   "schema_version": 1,
@@ -42,29 +42,9 @@ source: tests/golden.rs
           "rechunking"
         ],
         "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
+          "rechunking": [
+            "/usr/bin/rechunking",
+            "/usr/sbin/rechunking"
           ]
         },
         "requires": [],
@@ -99,7 +79,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "48e1e5fa3c4a12fa82d1fc5a8c241ed07924604fe8c33160e75f15bdac8d09d9",
+                "content": "d61620eebc2ebd47dec3bc2c395eae8fc4ce59172c96fe0f80699552b5e2d7fe",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -123,7 +103,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "123d9b5e495fe3f9a2e060c29d6d0002fb7d20078491b9fec36073d659253c13",
+                "content": "d286fb683ef1945097a02ff0b4272eb398c0477fd8552723ade8fdeed36dcaf0",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -147,7 +127,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "c976a7300da31fd7b4fb56f1eb99fdd3bde567f1d773cb290250213dc3547f2a",
+                "content": "f90e0f0f628fe28779464aedc0b53480def0bdcbe5ec3b40237bc8a99c0623dd",
                 "repo": false,
                 "source": null,
                 "pin": null,

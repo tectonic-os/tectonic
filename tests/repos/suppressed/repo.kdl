@@ -1,2 +1,8 @@
 schema-version 1
 name "Suppressed"
+
+sources {
+    base-images "ublue" {
+        dir "../../collections/ublue"
+    }
+}

@@ -28,6 +28,18 @@ pub fn username(host: &str) -> String {
     }
 }
 
+// The libraries a repository reads
+
+pub const LIBRARIES: &str = "Included libraries:";
+pub const NO_BASE_LIBRARY: &str = "No base image library in repo, Add one now?";
+pub const WHICH_LIBRARY: &str = "Which library?";
+pub const WHICH_KIND: &str = "Which kind of library?";
+pub const OTHER_SOURCE: &str = "Another source";
+pub const OTHER_SOURCE_ABOUT: &str = "Type the alias, the Git URL and the directory";
+pub const SOURCE_ALIAS: &str = "source alias";
+pub const SOURCE_URL: &str = "repository URL";
+pub const SOURCE_PATH: &str = "directory inside the repository";
+
 // The images
 
 pub const IMAGES: &str = "Define an image now?";
@@ -149,7 +161,8 @@ pub fn host_github() -> String {
 
 // What each widget answers to.
 
-pub const REVIEW_KEYS: &str = "enter to change a field, Create to write, esc cancels";
+pub const REVIEW_KEYS: &str =
+    "\u{2191}\u{2193} navigate \u{2022} \u{23ce}  select \u{2022} Esc cancel";
 pub const FORM_KEYS: &str = "up and down to move, enter to change a field";
 
 // The review screen `create repo` draws over its collected answers before
@@ -164,6 +177,7 @@ pub const NONE: &str = "none";
 pub const ROW_NAME: &str = "name";
 pub const ROW_PROVIDER: &str = "provider";
 pub const ROW_REMOTE: &str = "github repo";
+pub const ROW_LIBRARIES: &str = "libraries";
 pub const ROW_IMAGE: &str = "image";
 pub const ROW_BASE: &str = "base";
 pub const ROW_WORKFLOWS: &str = "workflows";

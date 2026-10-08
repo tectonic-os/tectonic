@@ -1,3 +1,5 @@
+schema-version 1
+
 description "The other half of the cycle"
 
 supports "fedora"

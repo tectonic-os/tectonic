@@ -1,3 +1,5 @@
+schema-version 1
+
 description "dnf5 and its plugins, which every fedora build layer reaches for"
 
 supports "fedora"

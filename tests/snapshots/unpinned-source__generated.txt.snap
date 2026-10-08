@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 ==== generated/lib/apparmor-helpers.sh
 ==== generated/lib/dkms-helpers.sh
@@ -1152,12 +1152,10 @@ base "quay.io/fedora/fedora-bootc:44" {
 }
 
 sources {
-    tectonic-os {
-        pin {
-            unpinned "the collection this tool is published alongside, followed at its branch head"
-            version "main"
-            url "https://github.com/tectonic-os/modules/archive/refs/heads/{version}.tar.gz"
-        }
+    modules "tectonic-os" {
+        unpinned "the library this tool is published alongside, followed at its branch head"
+        url "https://github.com/tectonic-os/modules"
+        version "main"
     }
 }
 

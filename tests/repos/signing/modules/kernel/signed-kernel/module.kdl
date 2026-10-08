@@ -1,3 +1,5 @@
+schema-version 1
+
 description "A kernel that signs its own modules against a Secure Boot key"
 
 supports "fedora"

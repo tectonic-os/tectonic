@@ -1,6 +1,8 @@
 ---
 source: tests/golden.rs
 ---
+schema-version 1
+
 image {
     name "Example"
     url "https://github.com/someone/example"

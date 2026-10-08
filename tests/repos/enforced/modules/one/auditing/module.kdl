@@ -1,3 +1,5 @@
+schema-version 1
+
 description "Claims one rule the image does not list a module for, and one it does"
 
 supports "fedora"

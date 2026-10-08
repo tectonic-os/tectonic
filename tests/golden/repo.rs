@@ -1,6 +1,6 @@
 //! The repository fixtures: what each one renders and what it refuses.
 
-use crate::harness::{assert_golden, copy, crate_dir, given, walk};
+use crate::harness::{assert_golden, copy, crate_dir, given, seed_bases, walk};
 
 use std::path::{Path, PathBuf};
 
@@ -49,12 +49,15 @@ fn init_repo(name: &str) -> PathBuf {
     // `git init` runs here, and reads nothing this machine configured.
     std::env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
     std::env::set_var("GIT_CONFIG_SYSTEM", "/dev/null");
+    // The default libraries resolve from the fixture, so a silent run reads a
+    // catalog instead of the network.
+    seed_bases(&root);
     tect::create::Repo::collect(
         Some("Example".into()),
         None,
         Some("someone".into()),
         Some("Example".into()),
-        None,
+        Some("quay.io/fedora/fedora-bootc:44".into()),
         Some(root.clone()),
         &common::prompt::Prompt::silent(),
     )
@@ -126,10 +129,11 @@ fn create_into(name: &str, root: &Path) {
     tect::create::Image::collect(
         &here,
         Some("Server".into()),
-        None,
+        Some("quay.io/fedora/fedora-bootc:44".into()),
         "example",
         None,
         "a name argument",
+        "",
         tect::create::Field::Image,
         None,
         &silent,
@@ -165,7 +169,7 @@ fn create_into(name: &str, root: &Path) {
     let text = std::fs::read_to_string(&repo).unwrap().replace(
         "sources {\n",
         &format!(
-            "sources {{\n    upstream {:?}\n",
+            "sources {{\n    modules \"upstream\" {{ dir {:?} }}\n",
             collections.join("upstream").display()
         ),
     );
@@ -214,7 +218,7 @@ fn copied(name: &str, root: &Path) {
     std::fs::write(
         root.join("repo.kdl"),
         format!(
-            "schema-version 1\nname \"Imported\"\nsources {{\n    upstream {:?}\n    community {:?}\n}}\n",
+            "schema-version 1\nname \"Imported\"\nsources {{\n    modules \"upstream\" {{ dir {:?} }}\n    modules \"community\" {{ dir {:?} }}\n}}\n",
             collections.join("upstream").display(),
             collections.join("community").display()
         ),
@@ -432,7 +436,7 @@ fn why_unbuilt(root: &Path) {
     // say both things. Stopping at the first it finds loses the other.
     std::fs::write(
         temp.join("also.image.kdl"),
-        "image {\n    name \"Also\"\n\n    base \"ghcr.io/ublue-os/bazzite:stable\" {\n        \
+        "schema-version 1\n\nimage {\n    name \"Also\"\n\n    base \"ghcr.io/ublue-os/bazzite:stable\" {\n        \
          family \"fedora\"\n    }\n\n    modules {\n        module \"apps/flatpak\"\n    }\n}\n",
     )
     .unwrap();
@@ -634,10 +638,6 @@ fn every_repo_fixture_has_a_case() {
 #[test]
 fn init() {
     let init = init_repo("init");
-    assert!(
-        !init.join("bases.kdl").exists(),
-        "bases.kdl is a control asset; it must not land at a scaffolded repository root"
-    );
     assert!(
         !init.join("lib").exists(),
         "lib is generated; it must not land in the editable scaffold"

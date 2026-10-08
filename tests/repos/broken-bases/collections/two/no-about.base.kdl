@@ -1,0 +1,5 @@
+base {
+    image "example.invalid/no-about:1"
+    family "fedora"
+    bootloader "grub2"
+}

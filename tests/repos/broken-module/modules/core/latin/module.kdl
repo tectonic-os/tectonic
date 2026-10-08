@@ -1,2 +1,4 @@
+schema-version 1
+
 description "Café tools"
 supports "fedora"

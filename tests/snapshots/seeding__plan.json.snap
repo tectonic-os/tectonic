@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 {
   "schema_version": 1,
@@ -23,14 +23,14 @@ source: tests/golden.rs
       "dir": "modules/.remote/tectonic-os/flatpak",
       "file": "./example.image.kdl",
       "pin": {
-        "locator": "https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz",
+        "locator": "https://github.com/tectonic-os/modules",
         "selector": "v1.0.0",
         "verifier": "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3",
-        "tracker": "renovate",
-        "reason": null,
-        "from": "asset",
+        "tracker": "manual",
+        "reason": "",
+        "from": "manual",
         "path": null,
-        "resolved": "https://github.com/tectonic-os/modules/archive/refs/tags/v1.0.0.tar.gz"
+        "resolved": "https://github.com/tectonic-os/modules"
       }
     }
   ],
@@ -58,29 +58,9 @@ source: tests/golden.rs
           "rechunking"
         ],
         "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
+          "rechunking": [
+            "/usr/bin/rechunking",
+            "/usr/sbin/rechunking"
           ]
         },
         "requires": [],
@@ -128,7 +108,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "5c6f954af6de4efc68c5525e8a65e941dff618e34ac7cb721cf0abb9f85e1364",
+                "content": "3723ca1c2c425222dcc4ca69f9262963278dfbefe7f6cc5c588df27aa5278209",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -160,7 +140,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "1e3bca8b5bd1fac5812bbc04987737b5119fee8f22da0f011843d4f5c208daaa",
+                "content": "95c6ac797c60f0ae7f7bdcb93f1752061fe8e7eb4109abcaa36b4800420ad03b",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -197,18 +177,18 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "44de8f207845d70ba2eea51b605cdb86366917a27225143feedc49a6c8befcab",
+                "content": "92b59a9174674c7508a790d68206326d8816d9b17a472093acace7b6ee01a114",
                 "repo": false,
                 "source": "tectonic-os",
                 "pin": {
-                  "locator": "https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz",
+                  "locator": "https://github.com/tectonic-os/modules",
                   "selector": "v1.0.0",
                   "verifier": "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3",
-                  "tracker": "renovate",
-                  "reason": null,
-                  "from": "asset",
+                  "tracker": "manual",
+                  "reason": "",
+                  "from": "manual",
                   "path": null,
-                  "resolved": "https://github.com/tectonic-os/modules/archive/refs/tags/v1.0.0.tar.gz"
+                  "resolved": "https://github.com/tectonic-os/modules"
                 },
                 "imported": null
               },
@@ -218,9 +198,7 @@ source: tests/golden.rs
           ],
           "suppressed": [],
           "secrets": [],
-          "contract_files": [
-            "/usr/bin/flatpak"
-          ],
+          "contract_files": [],
           "verify_exceptions": [],
           "assets": [],
           "overlay_files": {},
@@ -261,7 +239,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "5c6f954af6de4efc68c5525e8a65e941dff618e34ac7cb721cf0abb9f85e1364",
+                "content": "3723ca1c2c425222dcc4ca69f9262963278dfbefe7f6cc5c588df27aa5278209",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -293,7 +271,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "1e3bca8b5bd1fac5812bbc04987737b5119fee8f22da0f011843d4f5c208daaa",
+                "content": "95c6ac797c60f0ae7f7bdcb93f1752061fe8e7eb4109abcaa36b4800420ad03b",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -330,18 +308,18 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "44de8f207845d70ba2eea51b605cdb86366917a27225143feedc49a6c8befcab",
+                "content": "92b59a9174674c7508a790d68206326d8816d9b17a472093acace7b6ee01a114",
                 "repo": false,
                 "source": "tectonic-os",
                 "pin": {
-                  "locator": "https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz",
+                  "locator": "https://github.com/tectonic-os/modules",
                   "selector": "v1.0.0",
                   "verifier": "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3",
-                  "tracker": "renovate",
-                  "reason": null,
-                  "from": "asset",
+                  "tracker": "manual",
+                  "reason": "",
+                  "from": "manual",
                   "path": null,
-                  "resolved": "https://github.com/tectonic-os/modules/archive/refs/tags/v1.0.0.tar.gz"
+                  "resolved": "https://github.com/tectonic-os/modules"
                 },
                 "imported": null
               },
@@ -371,7 +349,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "ee0f1fd3170c1a308f38630297cce8898bd1d81ab4de46e0bbc46bfdcd9194fc",
+                "content": "5fcdb6d8bc34a3d70056fc31385d8d31f3f8f07a04c21b045e07de975b4209c1",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -383,9 +361,7 @@ source: tests/golden.rs
           ],
           "suppressed": [],
           "secrets": [],
-          "contract_files": [
-            "/usr/bin/flatpak"
-          ],
+          "contract_files": [],
           "verify_exceptions": [],
           "assets": [],
           "overlay_files": {},

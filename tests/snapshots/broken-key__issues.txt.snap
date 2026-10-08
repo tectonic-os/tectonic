@@ -2,143 +2,143 @@
 source: tests/golden.rs
 ---
   x unknown key property `when`
-   ,-[tests/repos/broken-key/modules/core/keys/module.kdl:5:14]
- 4 | 
- 5 | key "cosign" when="published" {
+   ,-[tests/repos/broken-key/modules/core/keys/module.kdl:7:14]
+ 6 | 
+ 7 | key "cosign" when="published" {
    :              ^^^^^^^^|^^^^^^^
    :                      `-- not part of the schema
- 6 |     generator "gpg"
+ 8 |     generator "gpg"
    `----
   help: a key carries its kind, and everything else as child nodes
 
   x `gpg` is not a generator the tool has
-   ,-[tests/repos/broken-key/modules/core/keys/module.kdl:6:5]
- 5 | key "cosign" when="published" {
- 6 |     generator "gpg"
+   ,-[tests/repos/broken-key/modules/core/keys/module.kdl:8:5]
+ 7 | key "cosign" when="published" {
+ 8 |     generator "gpg"
    :     ^^^^|^^^^
    :         `-- not a generator
- 7 |     public "etc/pki/containers/cosign.pub" format="jwk"
+ 9 |     public "etc/pki/containers/cosign.pub" format="jwk"
    `----
   help: the generators are `cosign`, `openssl` and `ssh-keygen`; a manifest
         picks one of them by name
 
   x `format` must be "pem" or "der"
-   ,-[tests/repos/broken-key/modules/core/keys/module.kdl:7:44]
- 6 |     generator "gpg"
- 7 |     public "etc/pki/containers/cosign.pub" format="jwk"
-   :                                            ^^^^^^|^^^^^
-   :                                                  `-- not a format
- 8 |     private "keys/cosign.key"
-   `----
+    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:9:44]
+  8 |     generator "gpg"
+  9 |     public "etc/pki/containers/cosign.pub" format="jwk"
+    :                                            ^^^^^^|^^^^^
+    :                                                  `-- not a format
+ 10 |     private "keys/cosign.key"
+    `----
 
   x `profile` must be "module-signing", "pcr-signing" or "tls-ca"
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:12:25]
- 11 | key "secureboot" {
- 12 |     generator "openssl" profile="signing" bits=1
+    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:14:25]
+ 13 | key "secureboot" {
+ 14 |     generator "openssl" profile="signing" bits=1
     :                         ^^^^^^^^|^^^^^^^^
     :                                 `-- not a profile
- 13 |     public "/usr/share/secureboot/sb_cert.der" encoding="der"
+ 15 |     public "/usr/share/secureboot/sb_cert.der" encoding="der"
     `----
 
   x `bits` is a number from 2048 to 16384
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:12:43]
- 11 | key "secureboot" {
- 12 |     generator "openssl" profile="signing" bits=1
+    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:14:43]
+ 13 | key "secureboot" {
+ 14 |     generator "openssl" profile="signing" bits=1
     :                                           ^^^|^^
     :                                              `-- not a key size
- 13 |     public "/usr/share/secureboot/sb_cert.der" encoding="der"
+ 15 |     public "/usr/share/secureboot/sb_cert.der" encoding="der"
     `----
 
   x unknown `public` property `encoding`
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:13:48]
- 12 |     generator "openssl" profile="signing" bits=1
- 13 |     public "/usr/share/secureboot/sb_cert.der" encoding="der"
+    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:15:48]
+ 14 |     generator "openssl" profile="signing" bits=1
+ 15 |     public "/usr/share/secureboot/sb_cert.der" encoding="der"
     :                                                ^^^^^^^|^^^^^^
     :                                                       `-- not part of the schema
- 14 |     private ".hidden"
+ 16 |     private ".hidden"
     `----
   help: `public` accepts `format`
 
   x unknown node `passphrase` in a key
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:15:5]
- 14 |     private ".hidden"
- 15 |     passphrase "hunter2"
+    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:17:5]
+ 16 |     private ".hidden"
+ 17 |     passphrase "hunter2"
     :     ^^^^^|^^^^
     :          `-- not part of the schema
- 16 | }
+ 18 | }
     `----
   help: a key holds `generator`, `public` and `private`
 
   x key `secureboot` is declared twice
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:18:1]
- 17 | 
- 18 | key "secureboot" {
+    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:20:1]
+ 19 | 
+ 20 | key "secureboot" {
     : ^|^
     :  `-- already declared above
- 19 |     generator "openssl"
+ 21 |     generator "openssl"
     `----
 
   x `key` needs a kind
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:24:1]
- 23 | 
- 24 | key
+    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:26:1]
+ 25 | 
+ 26 | key
     : ^|^
     :  `-- no kind given
     `----
   help: `key "cosign" { ... }`, the kind being what `tect create key` names
 
   x a `key` needs `generator`
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:24:1]
- 23 | 
- 24 | key
+    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:26:1]
+ 25 | 
+ 26 | key
     : ^|^
     :  `-- incomplete
     `----
 
   x a `key` needs `public`
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:24:1]
- 23 | 
- 24 | key
+    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:26:1]
+ 25 | 
+ 26 | key
     : ^|^
     :  `-- incomplete
     `----
 
   x a `key` needs `private`
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:24:1]
- 23 | 
- 24 | key
+    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:26:1]
+ 25 | 
+ 26 | key
     : ^|^
     :  `-- incomplete
     `----
 
   x `etc/pki/containers/cosign.pub` is not an absolute path in the image
-   ,-[tests/repos/broken-key/modules/core/keys/module.kdl:7:5]
- 6 |     generator "gpg"
- 7 |     public "etc/pki/containers/cosign.pub" format="jwk"
-   :     ^^^|^^
-   :        `-- the public half goes here
- 8 |     private "keys/cosign.key"
-   `----
+    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:9:5]
+  8 |     generator "gpg"
+  9 |     public "etc/pki/containers/cosign.pub" format="jwk"
+    :     ^^^|^^
+    :        `-- the public half goes here
+ 10 |     private "keys/cosign.key"
+    `----
   help: it is the path the built image ships the public half at, and the
         module's files/ overlay is what puts it there
 
   x `.hidden` is not a filename
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:14:5]
- 13 |     public "/usr/share/secureboot/sb_cert.der" encoding="der"
- 14 |     private ".hidden"
+    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:16:5]
+ 15 |     public "/usr/share/secureboot/sb_cert.der" encoding="der"
+ 16 |     private ".hidden"
     :     ^^^|^^^
     :        `-- the private half is written here
- 15 |     passphrase "hunter2"
+ 17 |     passphrase "hunter2"
     `----
   help: the private half is written under keys/private/ and never committed,
         so it is a plain name
 
   x `core/keys` has no public half for its secureboot key
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:18:1]
- 17 | 
- 18 | key "secureboot" {
+    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:20:1]
+ 19 | 
+ 20 | key "secureboot" {
     : ^|^
     :  `-- tests/repos/broken-key/keys/public/usr/share/secureboot/sb_cert.der is missing or empty
- 19 |     generator "openssl"
+ 21 |     generator "openssl"
     `----
   help: run `tect create key secureboot`

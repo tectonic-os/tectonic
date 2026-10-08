@@ -7,6 +7,52 @@ use std::fmt::Write as _;
 
 use std::path::Path;
 
+/// Keeps the tutorial's KDL examples executable documentation. Whole-file
+/// examples declare the current schema; smaller node fragments still have to
+/// be valid KDL before a reader can paste them into that file.
+#[test]
+fn creating_an_image_kdl_blocks_parse() {
+    let path = crate_dir().join("docs/creating-an-image.md");
+    let page = std::fs::read_to_string(&path).unwrap();
+    let mut block = None::<String>;
+    let mut accepted = 0;
+
+    for line in page.lines() {
+        if line == "```kdl" {
+            assert!(block.replace(String::new()).is_none(), "nested KDL fence");
+            continue;
+        }
+        if line == "```" && block.is_some() {
+            let text = block.take().unwrap();
+            let doc: kdl::KdlDocument = text.parse().unwrap_or_else(|err| {
+                panic!("{} KDL block {}: {err}", path.display(), accepted + 1)
+            });
+            if let Some(version) = doc.get("schema-version") {
+                assert_eq!(
+                    version
+                        .entries()
+                        .first()
+                        .map(kdl::KdlEntry::value)
+                        .and_then(kdl::KdlValue::as_integer),
+                    Some(i128::from(tect::model::image::SCHEMA_VERSION)),
+                    "{} KDL block {} declares another schema",
+                    path.display(),
+                    accepted + 1
+                );
+            }
+            accepted += 1;
+            continue;
+        }
+        if let Some(text) = &mut block {
+            text.push_str(line);
+            text.push('\n');
+        }
+    }
+
+    assert!(block.is_none(), "unclosed KDL fence in {}", path.display());
+    assert!(accepted > 0, "{} has no KDL blocks", path.display());
+}
+
 #[test]
 fn schema_doc() {
     use tect::emit::schema_md::{areas, page};
@@ -195,10 +241,8 @@ fn reference_section(section: &str, command: &clap::Command, words: &str) -> Str
 
 /// The reference in docs/cli.md, rendered from the clap tree the parser
 /// reads, so the reference and the parser cannot disagree.
-#[test]
-fn commands_doc() {
+fn rendered_cli() -> String {
     use clap::CommandFactory;
-    let path = crate_dir().join("docs/cli.md");
     let options = clap_markdown::MarkdownOptions::new()
         .show_table_of_contents(false)
         .show_footer(false);
@@ -231,9 +275,14 @@ fn commands_doc() {
             words,
         ));
     }
-    let rendered = format!("{}{}\n", tect::command::overview(), reference.trim_end());
+    format!("{}{}\n", tect::command::overview(), reference.trim_end())
+}
+
+#[test]
+fn commands_doc() {
+    let path = crate_dir().join("docs/cli.md");
     let doc = std::fs::read_to_string(&path).expect("docs/cli.md exists");
-    assert!(doc == rendered, "docs/cli.md is stale");
+    assert!(doc == rendered_cli(), "docs/cli.md is stale");
 }
 
 /// Every document the tool writes has to read back as what was written. The

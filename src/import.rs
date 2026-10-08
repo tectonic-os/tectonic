@@ -6,7 +6,7 @@ use crate::copy;
 use crate::create::{report, Change, Listing};
 use crate::dispatch::Error;
 use crate::layout;
-use crate::model::remote::{At, Collection, REMOTE_DIR};
+use crate::model::remote::{At, Collection, Kind as SourceKind, REMOTE_DIR};
 use crate::provenance::record;
 use crate::provider::Provider;
 use common::prompt::Prompt;
@@ -34,23 +34,10 @@ pub fn split(name: &str) -> (Option<&str>, &str) {
 fn names(sources: &[Collection]) -> String {
     sources
         .iter()
+        .filter(|source| source.kind == SourceKind::Modules)
         .map(|c| c.name.as_str())
         .collect::<Vec<_>>()
         .join(", ")
-}
-
-/// Adds the default sources block to a repository that declared none.
-pub(crate) fn declare_sources(root: &Path, block: &str) -> Result<(), String> {
-    let path = root.join(layout::REPO_FILE);
-    let mut text =
-        std::fs::read_to_string(&path).map_err(|err| format!("{}: {err}", path.display()))?;
-    match text.ends_with('\n') {
-        true if !text.ends_with("\n\n") => text.push('\n'),
-        true => {}
-        false => text.push_str("\n\n"),
-    }
-    text.push_str(block);
-    crate::init::put(&path, &text)
 }
 
 /// Every collection that has `name`. Never the first of them: which one an
@@ -74,23 +61,31 @@ pub fn find(
              with a dot"
         ));
     }
-    if sources.is_empty() {
+    if !sources
+        .iter()
+        .any(|source| source.kind == SourceKind::Modules)
+    {
         const NONE: &str = "repo.kdl declares no `sources`, so there is no collection to import \
                             from";
-        // The scaffold is data, so it says what to write only where it is there.
-        let block = crate::init::assets().map(|dir| crate::init::sources(&dir));
-        return Err(match block.as_deref().unwrap_or("") {
-            "" => format!("{NONE}, and no collection is scaffolded to name one"),
-            block => format!("{NONE}.\n\nThis is the block `tect create repo` writes:\n\n{block}"),
-        });
+        let block = crate::init::sources_block(&crate::create::Libraries::every());
+        return Err(format!(
+            "{NONE}.\n\nThis is the block `tect create repo` writes:\n\n{block}"
+        ));
     }
 
     let (possible_owner, rest) = split(name);
-    let owner = possible_owner.filter(|owner| sources.iter().any(|source| source.name == *owner));
+    let owner = possible_owner.filter(|owner| {
+        sources
+            .iter()
+            .any(|source| source.kind == SourceKind::Modules && source.name == *owner)
+    });
     let module = owner.map_or(name, |_| rest);
     let mut searched: Vec<&str> = Vec::new();
     let mut found: Vec<Found> = Vec::new();
     for collection in sources {
+        if collection.kind != SourceKind::Modules {
+            continue;
+        }
         if owner.is_some_and(|owner| owner != collection.name) {
             continue;
         }
@@ -119,6 +114,9 @@ pub fn find(
         // every eligible collection is a candidate. The owner filter and the
         // unpinned refusal above already ran over all of them.
         for collection in sources {
+            if collection.kind != SourceKind::Modules {
+                continue;
+            }
             if owner.is_some_and(|owner| owner != collection.name) {
                 continue;
             }
@@ -170,6 +168,9 @@ fn members(tree: &Path) -> Vec<String> {
 pub fn catalog(root: &Path, sources: &[Collection], fetch: bool) -> Result<Vec<Provider>, String> {
     let mut listed: Vec<Provider> = Vec::new();
     for collection in sources {
+        if collection.kind != SourceKind::Modules {
+            continue;
+        }
         let tree = match fetch {
             true => tree(root, collection)?,
             false => match cached(root, collection) {
@@ -236,21 +237,21 @@ fn choose_several(
     }
 }
 
-/// The collection's tree where it is already on this machine: the directory it
-/// is, an archive fetched at the hash it is still pinned to, or whatever the
+/// The source's tree where it is already on this machine: the directory it
+/// is, a repository fetched at the hash it is still pinned to, or whatever the
 /// last import of an unpinned one left. Nothing is fetched.
 pub fn cached(root: &Path, collection: &Collection) -> Option<PathBuf> {
     let dir = match &collection.at {
         At::Dir(dir) => root.join(dir),
-        At::Archive(pin) if pin.unpinned() => {
-            root.join(layout::SOURCES_CACHE).join(&collection.name)
-        }
-        At::Archive(pin) => {
-            let stamp = root
-                .join(layout::SOURCES_CACHE)
-                .join(format!("{}.pin", collection.name));
+        At::Git(pin) => {
+            let key = source_key(pin).ok()?;
+            let dir = root.join(layout::SOURCES_CACHE).join(&key);
+            if pin.sha256.is_none() {
+                return dir.is_dir().then_some(dir);
+            }
+            let stamp = root.join(layout::SOURCES_CACHE).join(format!("{key}.pin"));
             match std::fs::read_to_string(&stamp).ok().as_deref() == pin.sha256.as_deref() {
-                true => root.join(layout::SOURCES_CACHE).join(&collection.name),
+                true => dir,
                 false => return None,
             }
         }
@@ -258,57 +259,179 @@ pub fn cached(root: &Path, collection: &Collection) -> Option<PathBuf> {
     dir.is_dir().then_some(dir)
 }
 
-/// The collection's tree on this machine: the directory it already is, or the
-/// pinned archive, fetched and verified once and kept for the next lookup. An
-/// unpinned one is fetched again every time, since the ref it follows may have
-/// moved.
+/// The source's tree on this machine: the directory it already is, or the
+/// fetched repository, verified once and kept for the next lookup. An unpinned
+/// one is fetched once per process, since the ref it follows may have moved.
 pub(crate) fn tree(root: &Path, collection: &Collection) -> Result<PathBuf, String> {
-    if !collection.unpinned() {
-        if let Some(dir) = cached(root, collection) {
-            return Ok(dir);
-        }
-    }
     let remote = match &collection.at {
         At::Dir(dir) => {
+            let dir = root.join(dir);
+            if dir.is_dir() {
+                return Ok(dir);
+            }
             return Err(format!(
                 "`{}` is {}, which is not a directory on this machine",
                 collection.name,
-                root.join(dir).display()
-            ))
+                dir.display()
+            ));
         }
-        At::Archive(remote) => remote,
+        At::Git(remote) => remote,
     };
 
-    let dir = root.join(layout::SOURCES_CACHE).join(&collection.name);
-    let pin = root
-        .join(layout::SOURCES_CACHE)
-        .join(format!("{}.pin", collection.name));
-    let url = remote.url_resolved().unwrap_or_default();
-    let sha256 = (!remote.unpinned())
-        .then_some(remote.sha256.as_deref())
-        .flatten();
-    // Extracted beside the cache and swapped in, never written over it: with
-    // the remove first, a fetch that cannot reach the network takes the tree it
-    // failed to replace with it.
-    let work = root.join(layout::SOURCES_CACHE).join(format!(
-        ".{}.fetching.{}",
-        collection.name,
-        std::process::id()
-    ));
+    let key = source_key(remote)?;
+    let cache = root.join(layout::SOURCES_CACHE);
+    let dir = cache.join(&key);
+    let pin = cache.join(format!("{key}.pin"));
+    let run = cache.join(format!("{key}.run"));
+    let this_run = std::process::id().to_string();
+    if remote.sha256.is_some() {
+        if let Some(current) = cached(root, collection) {
+            return Ok(current);
+        }
+    } else if dir.is_dir()
+        && std::fs::read_to_string(&run).is_ok_and(|found| found.trim() == this_run)
+    {
+        return Ok(dir);
+    }
+
+    std::fs::create_dir_all(&cache).map_err(|err| format!("{}: {err}", cache.display()))?;
+    let work = cache.join(format!(".{key}.fetching.{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&work);
-    if let Err(err) = crate::runtime::extract(&url, sha256, &work, &["--strip-components=1"]) {
+    let fetched = fetch_git(remote, &work);
+    if let Err(err) = fetched {
         let _ = std::fs::remove_dir_all(&work);
         return Err(format!("`{}`: {err}", collection.name));
     }
+    let fetched = work.join("tree");
     let _ = std::fs::remove_dir_all(&dir);
-    std::fs::rename(&work, &dir).map_err(|err| format!("{}: {err}", dir.display()))?;
-    match sha256 {
+    std::fs::rename(&fetched, &dir).map_err(|err| format!("{}: {err}", dir.display()))?;
+    let _ = std::fs::remove_dir_all(&work);
+    match &remote.sha256 {
         Some(sha256) => {
-            std::fs::write(&pin, sha256).map_err(|err| format!("{}: {err}", pin.display()))?
+            crate::init::put(&pin, &format!("{sha256}\n"))?;
+            let _ = std::fs::remove_file(&run);
         }
-        None => drop(std::fs::remove_file(&pin)),
+        None => {
+            crate::init::put(&run, &format!("{this_run}\n"))?;
+            let _ = std::fs::remove_file(&pin);
+        }
     }
     Ok(dir)
+}
+
+fn source_key(remote: &crate::provenance::Evidence) -> Result<String, String> {
+    let url = remote.url.as_deref().ok_or("source has no Git URL")?;
+    let selector = remote.version.as_deref().unwrap_or("HEAD");
+    cache_key(url, selector)
+}
+
+/// The key a Git URL and selector share, which is what makes two sources
+/// naming one library fetch one tree.
+pub fn cache_key(url: &str, selector: &str) -> Result<String, String> {
+    crate::runtime::sha256_stdin(format!("{url}\0{selector}").as_bytes())
+}
+
+/// The directory a fetched source's tree is cached under, for a caller that
+/// seeds or inspects the cache.
+pub fn cache_path(root: &Path, url: &str, selector: &str) -> Result<PathBuf, String> {
+    Ok(root
+        .join(layout::SOURCES_CACHE)
+        .join(cache_key(url, selector)?))
+}
+
+fn git(repo: &Path, args: &[&str]) -> Result<std::process::Output, String> {
+    std::process::Command::new("git")
+        .args(args)
+        .current_dir(repo)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_ASKPASS", "/bin/false")
+        .env("SSH_ASKPASS", "/bin/false")
+        .output()
+        .map_err(|err| format!("git {}: {err}", args.join(" ")))
+}
+
+fn git_ok(repo: &Path, args: &[&str]) -> Result<std::process::Output, String> {
+    let out = git(repo, args)?;
+    if out.status.success() {
+        return Ok(out);
+    }
+    Err(format!(
+        "git {}: {}\n{}",
+        args.join(" "),
+        out.status,
+        String::from_utf8_lossy(&out.stderr).trim_end()
+    ))
+}
+
+fn fetch_git(remote: &crate::provenance::Evidence, work: &Path) -> Result<(), String> {
+    let url = remote.url.as_deref().ok_or("source has no Git URL")?;
+    let selector = remote.version.as_deref().unwrap_or("HEAD");
+    // `git archive` resolves a relative `--output` under the bare repository it
+    // runs in, so every path here has to be absolute first.
+    let work = {
+        let repo = work.join("repo.git");
+        std::fs::create_dir_all(&repo).map_err(|err| format!("{}: {err}", repo.display()))?;
+        std::fs::canonicalize(work).map_err(|err| format!("{}: {err}", work.display()))?
+    };
+    let repo = work.join("repo.git");
+    let tree = work.join("tree");
+    let archive = work.join("source.tar");
+    git_ok(&repo, &["init", "--bare", "--quiet"])?;
+    git_ok(
+        &repo,
+        &[
+            "-c",
+            "protocol.version=2",
+            "fetch",
+            "--quiet",
+            "--depth=1",
+            "--no-tags",
+            // `--` ends the options, so a URL is data even when it starts
+            // with a dash.
+            "--",
+            url,
+            selector,
+        ],
+    )?;
+    let commit = git_ok(&repo, &["rev-parse", "FETCH_HEAD^{commit}"])?;
+    let commit = String::from_utf8_lossy(&commit.stdout).trim().to_string();
+    let archive_arg = archive.to_string_lossy();
+    git_ok(
+        &repo,
+        &[
+            "archive",
+            "--format=tar",
+            &format!("--output={archive_arg}"),
+            &commit,
+        ],
+    )?;
+    if let Some(expected) = &remote.sha256 {
+        let got = crate::runtime::sha256_file(&archive)?;
+        if &got != expected {
+            return Err(format!(
+                "{} at {selector}\n  expected sha256 {expected}\n  got      sha256 {got}",
+                url
+            ));
+        }
+    }
+    std::fs::create_dir_all(&tree).map_err(|err| format!("{}: {err}", tree.display()))?;
+    let out = std::process::Command::new("tar")
+        .args([
+            "-xf",
+            &archive.to_string_lossy(),
+            "-C",
+            &tree.to_string_lossy(),
+        ])
+        .output()
+        .map_err(|err| format!("tar: {err}"))?;
+    if !out.status.success() {
+        return Err(format!(
+            "tar: {}{}",
+            out.status,
+            String::from_utf8_lossy(&out.stderr)
+        ));
+    }
+    Ok(())
 }
 
 /// Where a copied module goes, refused when something is already there.
@@ -360,7 +483,7 @@ pub fn vendor(
         .collect();
     let pin = sources
         .iter()
-        .find(|c| c.name == found.owner)
+        .find(|c| c.kind == SourceKind::Modules && c.name == found.owner)
         .and_then(Collection::pin);
     crate::init::put(
         &dir.join(record::RECORD),
@@ -506,6 +629,16 @@ impl Module {
             .iter()
             .map(|name| resolve(name, root, sources, enforce, prompt))
             .collect::<Result<Vec<(Found, String)>, Error>>()?;
+        for (from, _) in &picked {
+            let issues = crate::parse::module::validate_manifest(
+                &from.dir.join(layout::MODULE_FILE),
+                list.schema_version,
+                &list.repo_src,
+            );
+            if !issues.is_empty() {
+                return Err(issues.plain().into());
+            }
+        }
         // Before any offer is made, so a repository that cannot take the set
         // says so before it asks four questions about it.
         let chosen = picked
@@ -587,22 +720,12 @@ impl Module {
     }
 
     /// Everything `apply` does but say so, for a caller drawing a tree of its
-    /// own around it.
+    /// own around it. The sources are the repository's declaration, which the
+    /// caller has already read.
     pub(crate) fn write(
         &self,
         root: &Path,
         sources: &[Collection],
-    ) -> Result<Vec<(PathBuf, Change)>, String> {
-        self.write_with_sources(root, sources, None)
-    }
-
-    /// Writes an import or copy, declaring the sources it resolved against
-    /// when the repository had none of its own.
-    pub(crate) fn write_with_sources(
-        &self,
-        root: &Path,
-        sources: &[Collection],
-        sources_block: Option<&str>,
     ) -> Result<Vec<(PathBuf, Change)>, String> {
         match self.listing {
             Listing::Cancelled => return Ok(Vec::new()),
@@ -629,13 +752,6 @@ impl Module {
             Listing::In(_) => {}
         }
         let mut wrote: Vec<(PathBuf, Change)> = Vec::new();
-        if let Some(block) = sources_block {
-            declare_sources(root, block)?;
-            wrote.push((
-                PathBuf::from(layout::REPO_FILE),
-                Change::Updated("the default module collection".into()),
-            ));
-        }
         for member in &self.members {
             match self.place {
                 // Whatever the pin fetches next replaces it, so the tree is
@@ -963,6 +1079,7 @@ mod tests {
 
     fn collection(name: &str, path: &str) -> Collection {
         Collection {
+            kind: SourceKind::Modules,
             name: name.to_string(),
             at: At::Dir(path.to_string()),
             span: crate::diag::Span::default(),
@@ -994,27 +1111,14 @@ mod tests {
     }
 
     #[test]
-    fn default_sources_are_added_after_existing_repo_declarations() {
-        let root =
-            std::env::temp_dir().join(format!("tect-default-sources-{}", std::process::id()));
-        crate::init::put(&root.join(layout::REPO_FILE), "schema-version 1").unwrap();
-
-        declare_sources(&root, "sources {\n    existing \"collection\"\n}\n").unwrap();
-
-        assert_eq!(
-            std::fs::read_to_string(root.join(layout::REPO_FILE)).unwrap(),
-            "schema-version 1\n\nsources {\n    existing \"collection\"\n}\n"
-        );
-        let _ = std::fs::remove_dir_all(root);
-    }
-
-    #[test]
     fn a_provider_in_one_flavour_does_not_cover_its_sibling() {
         let root =
             std::env::temp_dir().join(format!("tect-flavour-provider-{}", std::process::id()));
         crate::init::put(
             &root.join("image.kdl"),
-            r#"image {
+            r#"schema-version 1
+
+image {
     name "Example"
     base "example" { family "fedora" }
     flavours {
@@ -1028,7 +1132,7 @@ mod tests {
         .unwrap();
         crate::init::put(
             &root.join("modules/provider/module.kdl"),
-            "description \"Provider\"\nsupports \"fedora\"\nprovides \"tool\"\n",
+            "schema-version 1\n\ndescription \"Provider\"\nsupports \"fedora\"\nprovides \"tool\"\n",
         )
         .unwrap();
         let (list, _) = crate::model::image::List::load(&root);
@@ -1062,7 +1166,11 @@ mod tests {
         let root = std::env::temp_dir().join(format!("tect-cancel-import-{}", std::process::id()));
         let from = root.join("collection/module");
         crate::init::put(&root.join(layout::REPO_FILE), "schema-version 1\n").unwrap();
-        crate::init::put(&from.join(layout::MODULE_FILE), "description \"x\"\n").unwrap();
+        crate::init::put(
+            &from.join(layout::MODULE_FILE),
+            "schema-version 1\n\ndescription \"x\"\n",
+        )
+        .unwrap();
 
         for place in [Place::Reference, Place::Vendored] {
             let found = Found {
@@ -1082,7 +1190,7 @@ mod tests {
                 workflows: None,
                 conforms: Vec::new(),
             }
-            .write_with_sources(&root, &[], Some("sources { existing \"collection\" }\n"))
+            .write(&root, &[])
             .unwrap();
             assert!(!root.join(&dest).exists());
         }
@@ -1118,5 +1226,46 @@ mod tests {
         };
         assert!(message.contains("needs an image"), "{message}");
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn an_import_refuses_a_manifest_newer_than_the_repository() {
+        let root = std::env::temp_dir().join(format!("tect-import-schema-{}", std::process::id()));
+        crate::init::put(
+            &root.join(layout::REPO_FILE),
+            "schema-version 1\nname \"Example\"\n",
+        )
+        .unwrap();
+        crate::init::put(
+            &root.join(layout::IMAGE_FILE),
+            "schema-version 1\n\nimage { name \"Example\"; base \"example\"; modules { } }\n",
+        )
+        .unwrap();
+        crate::init::put(
+            &root.join("collection/new/module.kdl"),
+            "schema-version 2\n\npackages \"new\"\n",
+        )
+        .unwrap();
+        let sources = [collection("one", "collection")];
+
+        let result = Module::collect(
+            Some("new".into()),
+            &root,
+            &sources,
+            false,
+            vec!["example".into()],
+            None,
+            Place::Reference,
+            &Prompt::silent(),
+        );
+        let message = match result {
+            Err(err) => err.message().to_string(),
+            Ok(_) => panic!("an incompatible import was accepted"),
+        };
+        assert!(message.contains("module.kdl declares schema"), "{message}");
+        assert!(message.contains("version 2, but"), "{message}");
+        assert!(message.contains("repo.kdl declares 1"), "{message}");
+        assert!(!root.join("modules/.remote/one/new").exists());
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

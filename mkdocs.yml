@@ -2,7 +2,8 @@ site_name: tect
 site_description: The build tool for a bootc image repository
 site_url: https://tectonic-os.github.io/tectonic/
 repo_url: https://github.com/tectonic-os/tectonic
-# The pages under docs/ are generated, so an edit link would open a file that the next build overwrites.
+# Edit links are off because an edit link on a generated page would open a file
+# that the next build overwrites.
 edit_uri: ""
 
 theme:
@@ -24,6 +25,8 @@ hooks:
 nav:
   - Home: index.md
   - CLI: cli.md
+  - Getting started:
+      - How to create an image: creating-an-image.md
   - Schema:
       - KDL: kdl.md
       - Repository:
@@ -35,7 +38,7 @@ nav:
           - module.kdl: schema/module.md
           - provenance.kdl: schema/provenance.md
       - Assets:
-          - bases.kdl: schema/bases.md
+          - Base images: schema/bases.md
   - Project:
       - Changelog: changelog.md
       - Contributing: contributing.md

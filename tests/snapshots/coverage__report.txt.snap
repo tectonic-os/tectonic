@@ -68,11 +68,12 @@ tect: 2 of 4 rules are unclaimed
 ==== conforming to a profile the content does not carry
   × `enforced` conforms to `nosuch`, which is none of the profiles this
   │ datastream carries
-   ╭─[./example.image.kdl:1:1]
- 1 │ image {
+   ╭─[./example.image.kdl:3:1]
+ 2 │ 
+ 3 │ image {
    · ──┬──
    ·   ╰── this is what it is measured against
- 2 │     name "Enforced"
+ 4 │     name "Enforced"
    ╰────
   help: the datastream carries: standard, ospp
 
@@ -80,11 +81,12 @@ tect: 1 problem in ./example.image.kdl; none in ./repo.kdl
 ==== exit 2
 ==== and measured against nothing at all
   × `minimal` declares no `conforms`
-   ╭─[./image.kdl:1:1]
- 1 │ image {
+   ╭─[./image.kdl:3:1]
+ 2 │ 
+ 3 │ image {
    · ──┬──
    ·   ╰── this image is measured against nothing
- 2 │     name "Minimal"
+ 4 │     name "Minimal"
    ╰────
   help: `conforms "<profile>"` is the profile a scan measures it against, and
         what this read-out is coverage of

@@ -4,9 +4,10 @@
 
 Location: The root of the repository, as `image.kdl` or `<name>.image.kdl`.
 
-An image file holds one or more images. Each image says what it is called, which base it builds on and which modules it is made of.
+An image file holds its schema version and one or more images. Each image says what it is called, which base it builds on and which modules it is made of.
 
 ```kdl
+schema-version 1
 image {
     name "Workstation"
     url "https://github.com/owner/workstation"
@@ -27,12 +28,30 @@ image {
 
 | Field | Accepts | Description |
 | --- | --- | --- |
+| [`schema-version`](#schema-version) (required) | *number* | The schema release that this file is written against. |
 | [`image`](#image) (required,&nbsp;repeatable) | {&nbsp;[fields](#image-fields)&nbsp;} | One image, which declares its names, its base and every module that it is made of. |
 
 > [!NOTE]
 > A root `.kdl` file is an image file only if it is named `image.kdl` or ends in `.image.kdl`. `tect` reports each other root `.kdl` file and does not read it.
 >
 > The part of the file name in front of `.image.kdl` does not name the image. An image is called what it declares, so one file can hold as many images as suit the repository. `plan.json` records the file name only to say where each image is declared.
+
+<a id="schema-version"></a>
+
+## `schema-version` (required)
+
+The schema version tells `tect` which reader to use for this file. A file written against an earlier release keeps using that release's reader, while `repo.kdl` sets the newest schema the repository accepts.
+
+```kdl
+schema-version 1
+```
+
+Accepts: *number*
+
+> [!NOTE]
+> A file cannot declare a schema newer than `repo.kdl`.
+>
+> `tect create repo`, `tect create image` and `tect create module` write the version, and `tect` never changes it.
 
 <a id="image"></a>
 

@@ -2,6 +2,13 @@ schema-version 1
 name "Broken Bases"
 
 sources {
-    one "collections/one"
-    two "collections/two"
+    base-images "one" {
+        dir "collections/one"
+    }
+    base-images "two" {
+        dir "collections/two"
+    }
+    capabilities "caps" {
+        dir "collections/caps"
+    }
 }

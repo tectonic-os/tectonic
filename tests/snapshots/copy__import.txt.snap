@@ -1,5 +1,5 @@
 ---
-source: tests/golden/harness.rs
+source: tests/golden.rs
 ---
 ==== the registry
 upstream
@@ -36,7 +36,7 @@ modules/flatpak/module.kdl
 modules/flatpak/provenance.kdl
 ==== the record
 imported "upstream" {
-    content "0d73958368889de63481af715cfed2349cc329c4b209f46d904533d5c29f4e61"
+    content "458f87fc5f85d09877f75b41f4be3613cf7e38c9a78d7e3e4ec365a2e6aab6ce"
 }
 ==== check
 ==== modified

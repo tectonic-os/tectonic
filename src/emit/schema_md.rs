@@ -40,7 +40,7 @@ impl Area {
             Area::Image => "Image files",
             Area::Modules => "Modules",
             Area::Module => "Module manifests",
-            Area::Bases => "The base catalog",
+            Area::Bases => "Base images and capabilities",
             Area::Provenance => "The import record",
         }
     }
@@ -64,9 +64,10 @@ const SECTIONS: &[Section] = &[
         at: "The root of the repository." },
     Section { name: "image.kdl", node: &repo::IMAGE_FILE, declared: false, area: Area::Image,
         at: "The root of the repository, as `image.kdl` or `<name>.image.kdl`." },
-    Section { name: "bases.kdl", node: &bases::BASES, declared: false, area: Area::Bases,
-        at: "Compiled into `tect`. A `bases.kdl` beside the `tect` binary replaces it, and one at \
-            the root of a collection extends it." },
+    Section { name: "<name>.base.kdl", node: &bases::BASE_FILE, declared: false, area: Area::Bases,
+        at: "`base-images/<library>/<name>.base.kdl`, in a `base-images` source." },
+    Section { name: "capabilities.kdl", node: &bases::CAPABILITIES, declared: false, area: Area::Bases,
+        at: "`capabilities.kdl`, at the root of a `capabilities` source." },
     Section { name: "module.kdl", node: &module::MODULE, declared: false, area: Area::Module,
         at: "`modules/<module-name>/module.kdl`, in the directory of the module." },
     Section { name: "provenance.kdl", node: &record::RECORD_FILE, declared: false, area: Area::Provenance,

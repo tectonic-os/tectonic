@@ -252,12 +252,14 @@ fn run() -> Result<ExitCode, Error> {
     if matches!(
         verb,
         Verb::CreateRepo
+            | Verb::CreateGit
             | Verb::CreateImage
             | Verb::CreateFlavour
             | Verb::CreateModule
             | Verb::CreateKey
             | Verb::CreateScripts
             | Verb::SetKey
+            | Verb::SetLibrary
             | Verb::ImportModule
             | Verb::CopyModule
             | Verb::Check

@@ -3,7 +3,7 @@
 
 use crate::layout;
 use crate::model::image::{Entry, List, SCHEMA_VERSION};
-use crate::model::remote::{At, Collection};
+use crate::model::remote::{At, Collection, Kind as SourceKind};
 use crate::provenance::Tracker;
 use std::fmt::Write as _;
 use std::path::PathBuf;
@@ -41,7 +41,7 @@ pub fn file(list: &List) -> Option<(PathBuf, String)> {
     let sources: Vec<&Collection> = list
         .sources
         .iter()
-        .filter(|c| owners.contains(&c.name.as_str()))
+        .filter(|c| c.kind == SourceKind::Modules && owners.contains(&c.name.as_str()))
         .collect();
     if !sources.is_empty() {
         out.push_str("\nsources {\n");
@@ -72,31 +72,31 @@ fn source(collection: &Collection, out: &mut String) {
     let name = &collection.name;
     match &collection.at {
         At::Dir(path) => {
-            let _ = writeln!(out, "\x20   {name} {path:?}");
+            let _ = writeln!(out, "\x20   modules {name:?} {{");
+            let _ = writeln!(out, "\x20       dir {path:?}");
+            out.push_str("\x20   }\n");
         }
-        At::Archive(pin) => {
-            let _ = writeln!(out, "\x20   {name} {{");
-            out.push_str("\x20       pin {\n");
+        At::Git(pin) => {
+            let _ = writeln!(out, "\x20   modules {name:?} {{");
             if let Tracker::Unpinned(why) = &pin.tracker {
-                let _ = writeln!(out, "\x20           unpinned {why:?}");
+                if !why.is_empty() {
+                    let _ = writeln!(out, "\x20       unpinned {why:?}");
+                }
             }
             let _ = writeln!(
                 out,
-                "\x20           version {:?}",
-                pin.version.clone().unwrap_or_default()
-            );
-            let _ = writeln!(
-                out,
-                "\x20           url {:?}",
+                "\x20       url {:?}",
                 pin.url.clone().unwrap_or_default()
             );
+            if let Some(version) = &pin.version {
+                let _ = writeln!(out, "\x20       version {version:?}");
+            }
             if let Some(sha256) = &pin.sha256 {
-                let _ = writeln!(out, "\x20           sha256 {sha256:?}");
+                let _ = writeln!(out, "\x20       sha256 {sha256:?}");
             }
             if let Some(path) = &pin.path {
-                let _ = writeln!(out, "\x20           path {path:?}");
+                let _ = writeln!(out, "\x20       path {path:?}");
             }
-            out.push_str("\x20       }\n");
             out.push_str("\x20   }\n");
         }
     }

@@ -34,7 +34,7 @@ A claim the tool records rather than certifies. The scan is what confirms it.
 
 | Content | Hash |
 | --- | --- |
-| declared | `4c6d5c98776ca0b87887befcd01a7692a1f9d6874eebc26b2feeaddb5e1545f0` |
+| declared | `d40c2891d1aac415c97068412a248e05aaea222ab467ca113436d3954d4d6467` |
 
 It was written in this repository rather than imported, so nothing upstream to compare it against.
 

@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 ==== markdown
 # tectonic-os/flatpak
@@ -30,11 +30,11 @@ Nothing. It declares no `satisfies`.
 
 | Content | Hash |
 | --- | --- |
-| declared | `44de8f207845d70ba2eea51b605cdb86366917a27225143feedc49a6c8befcab` |
+| declared | `92b59a9174674c7508a790d68206326d8816d9b17a472093acace7b6ee01a114` |
 
 | Collection | Locator | Selector | Verifier | Tracker |
 | --- | --- | --- | --- | --- |
-| `tectonic-os` | https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3 | renovate |
+| `tectonic-os` | https://github.com/tectonic-os/modules | v1.0.0 | b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3 | manual |
 
 It is referenced rather than copied, so what a build reads is the collection's own tree at that pin.
 
@@ -73,16 +73,16 @@ None. It declares no `copr` and ships no `repo` file.
   "groups": [],
   "coprs": [],
   "satisfies": [],
-  "content": "44de8f207845d70ba2eea51b605cdb86366917a27225143feedc49a6c8befcab",
+  "content": "92b59a9174674c7508a790d68206326d8816d9b17a472093acace7b6ee01a114",
   "built": null,
   "imported": {
     "collection": "tectonic-os",
     "pin": {
       "name": "collection",
-      "locator": "https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz",
+      "locator": "https://github.com/tectonic-os/modules",
       "selector": "v1.0.0",
       "verifier": "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3",
-      "tracker": "renovate"
+      "tracker": "manual"
     }
   },
   "modified": false,
@@ -124,11 +124,11 @@ Nothing. It declares no `satisfies`.
 
 | Content | Hash |
 | --- | --- |
-| declared | `44de8f207845d70ba2eea51b605cdb86366917a27225143feedc49a6c8befcab` |
+| declared | `92b59a9174674c7508a790d68206326d8816d9b17a472093acace7b6ee01a114` |
 
 | Collection | Locator | Selector | Verifier | Tracker |
 | --- | --- | --- | --- | --- |
-| `tectonic-os` | https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3 | renovate |
+| `tectonic-os` | https://github.com/tectonic-os/modules | v1.0.0 | b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3 | manual |
 
 It is referenced rather than copied, so what a build reads is the collection's own tree at that pin.
 
@@ -147,13 +147,13 @@ drivers, fedora-family, hello, flatpak
 
 | Content | Hash |
 | --- | --- |
-| declared | `44de8f207845d70ba2eea51b605cdb86366917a27225143feedc49a6c8befcab` |
+| declared | `92b59a9174674c7508a790d68206326d8816d9b17a472093acace7b6ee01a114` |
 | observed by the build | `not what was declared` |
 
 **The two documents disagree**, which they cannot if both came from this build.
 
 | Collection | Locator | Selector | Verifier | Tracker |
 | --- | --- | --- | --- | --- |
-| `tectonic-os` | https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3 | renovate |
+| `tectonic-os` | https://github.com/tectonic-os/modules | v1.0.0 | b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3 | manual |
 
 It is referenced rather than copied, so what a build reads is the collection's own tree at that pin.

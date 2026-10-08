@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 {
   "schema_version": 1,
@@ -55,32 +55,7 @@ source: tests/golden.rs
         "family": "fedora",
         "signed": false,
         "provides": [],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -113,7 +88,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "23c660d4b7f0ebd664ab2c3d6571db7946eb1298d7e879e7e45b4ca5ae02de98",
+                "content": "1639ad74a39a6fe440c1fa8c5e4ac6ba659c4487bc559c28eee13d98c66efb83",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -137,7 +112,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "892be2a37e9809e4ddd11f8a3a112be4c7af0d39756e7a32576cea9acaa9a30b",
+                "content": "5198a79c57a07b258e2f1c19a0717aabfbd1083957b98af5ea6c1eed43714fa2",
                 "repo": false,
                 "source": null,
                 "pin": {

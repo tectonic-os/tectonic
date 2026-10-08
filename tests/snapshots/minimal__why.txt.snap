@@ -33,7 +33,7 @@ Nothing. It declares no `satisfies`.
 
 | Content | Hash |
 | --- | --- |
-| declared | `506e1c7d057550aae2c0a39f379ae994464921405ccc6b4735c97b09a9626079` |
+| declared | `33877acc20d198115512d34f23bc7481d0cd20ff656dc49e6931a2aa7986e318` |
 
 It was written in this repository rather than imported, so nothing upstream to compare it against.
 
@@ -97,7 +97,7 @@ It enables one, in `modules/core/hello/repo`. There is no grammar for that file,
     }
   ],
   "satisfies": [],
-  "content": "506e1c7d057550aae2c0a39f379ae994464921405ccc6b4735c97b09a9626079",
+  "content": "33877acc20d198115512d34f23bc7481d0cd20ff656dc49e6931a2aa7986e318",
   "built": null,
   "imported": null,
   "modified": false,
@@ -142,7 +142,7 @@ Nothing. It declares no `satisfies`.
 
 | Content | Hash |
 | --- | --- |
-| declared | `506e1c7d057550aae2c0a39f379ae994464921405ccc6b4735c97b09a9626079` |
+| declared | `33877acc20d198115512d34f23bc7481d0cd20ff656dc49e6931a2aa7986e318` |
 
 It was written in this repository rather than imported, so nothing upstream to compare it against.
 
@@ -169,7 +169,7 @@ hello, fedora-family
 
 | Content | Hash |
 | --- | --- |
-| declared | `506e1c7d057550aae2c0a39f379ae994464921405ccc6b4735c97b09a9626079` |
+| declared | `33877acc20d198115512d34f23bc7481d0cd20ff656dc49e6931a2aa7986e318` |
 | observed by the build | `not what was declared` |
 
 **The two documents disagree**, which they cannot if both came from this build.

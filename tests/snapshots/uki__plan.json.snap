@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 {
   "schema_version": 1,
@@ -43,29 +43,13 @@ source: tests/golden.rs
           "luks-initramfs"
         ],
         "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
           "bootupctl": [
-            "/usr/bin/bootupctl"
+            "/usr/bin/bootupctl",
+            "/usr/sbin/bootupctl"
           ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
+          "luks-initramfs": [
+            "/usr/bin/luks-initramfs",
+            "/usr/sbin/luks-initramfs"
           ]
         },
         "requires": [],
@@ -102,7 +86,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "8446cc792256fc58578fa7cba48206a10f3b3e43680eeb1f4529f7ab5dedd27f",
+                "content": "6cdc14dd351a2941ba0448c8a233c9d441c4fa35c61ea8bea6cdaeeac08a6b28",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -128,7 +112,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "66d6f73be42d22813b13b81cf8e15a2be342c30e3e2b3dbcf71341fad1b39e72",
+                "content": "ed3ce21e4b130a2a2db0090d1c8c633b97e56b79b05da7b698a0a2373ffa61ef",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -173,29 +157,13 @@ source: tests/golden.rs
           "luks-initramfs"
         ],
         "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
           "bootupctl": [
-            "/usr/bin/bootupctl"
+            "/usr/bin/bootupctl",
+            "/usr/sbin/bootupctl"
           ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
+          "luks-initramfs": [
+            "/usr/bin/luks-initramfs",
+            "/usr/sbin/luks-initramfs"
           ]
         },
         "requires": [],
@@ -232,7 +200,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "8446cc792256fc58578fa7cba48206a10f3b3e43680eeb1f4529f7ab5dedd27f",
+                "content": "6cdc14dd351a2941ba0448c8a233c9d441c4fa35c61ea8bea6cdaeeac08a6b28",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -258,7 +226,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "66d6f73be42d22813b13b81cf8e15a2be342c30e3e2b3dbcf71341fad1b39e72",
+                "content": "ed3ce21e4b130a2a2db0090d1c8c633b97e56b79b05da7b698a0a2373ffa61ef",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -303,29 +271,13 @@ source: tests/golden.rs
           "luks-initramfs"
         ],
         "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
           "bootupctl": [
-            "/usr/bin/bootupctl"
+            "/usr/bin/bootupctl",
+            "/usr/sbin/bootupctl"
           ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
+          "luks-initramfs": [
+            "/usr/bin/luks-initramfs",
+            "/usr/sbin/luks-initramfs"
           ]
         },
         "requires": [],

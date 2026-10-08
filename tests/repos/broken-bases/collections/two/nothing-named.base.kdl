@@ -1,0 +1,5 @@
+base {
+    about "Nothing names it"
+    family "fedora"
+    bootloader "grub2"
+}

@@ -13,12 +13,17 @@ workflows at="12:30" {
     build
 }
 sources {
-    tectonic-os {
-        pin {
-            unpinned "followed at its branch head"
-            version "v1.0.0"
-            url "https://github.com/owner/repo/archive/refs/tags/{version}.tar.gz"
-        }
+    modules "tectonic-modules" {
+        url "https://github.com/tectonic-os/library"
+        path "modules"
+    }
+    base-images "core" {
+        url "https://github.com/tectonic-os/library"
+        path "base-images/core"
+    }
+    capabilities "core" {
+        url "https://github.com/tectonic-os/library"
+        path "capabilities"
     }
 }
 ```
@@ -32,7 +37,7 @@ sources {
 | [`pr-image`](#pr-image) (optional) | *string* | The image a pull request builds. |
 | [`seed`](#seed) (optional) | *string* | The image that this repository publishes as a starting point for a new repository. |
 | [`workflows`](#workflows) (optional) | {&nbsp;[fields](#workflows-fields)&nbsp;} | The CI workflows that `tect generate` writes into `.github/workflows/`. |
-| [`sources`](#sources) (optional) | {&nbsp;[fields](#sources-fields)&nbsp;} | The module collections that `tect import module` and `tect copy module` resolve against. |
+| [`sources`](#sources) (optional) | {&nbsp;[fields](#sources-fields)&nbsp;} | The module, base-image and capability libraries this repository reads. |
 | [`manifest`](#manifest) (optional) | {&nbsp;[fields](#manifest-fields)&nbsp;} | Whether a build stamps the generated manifest onto the image as an OCI label. |
 | [`audit`](#audit) (optional) | {&nbsp;[fields](#audit-fields)&nbsp;} | How the repository treats a provenance check that fails. |
 | [`security-policy`](#security-policy) (optional) | optionally {&nbsp;[fields](#security-policy-fields)&nbsp;} | The security rules that the repository sets for every image it defines. |
@@ -200,11 +205,11 @@ workflows at="12:30" {
 
 ## `sources` (optional)
 
-Lists the module collections that this repository takes modules from. A collection is a shared set of modules, which `tect` fetches as a pinned archive or reads from a directory on this machine. `tect import module` and `tect copy module` look modules up here.
+Lists typed libraries that this repository reads from a local directory or fetches from an HTTPS Git repository. A `modules` source feeds imports and copies. A `base-images` source is the base catalog. A `capabilities` source locates the paths that witness a capability. Every source declares exactly one of `dir` and `url`: `dir` names a directory on this machine, and `url` names an HTTPS Git repository.
 
 ```kdl
 sources {
-    tectonic-os
+    modules "tectonic-modules"
 }
 ```
 
@@ -219,230 +224,207 @@ A module from a collection reaches the repository in one of two ways:
 
 | Field | Accepts | Description |
 | --- | --- | --- |
-| [`<name>`](#sources-name) (optional,&nbsp;repeatable) | *string*, then optionally {&nbsp;[fields](#sources-name-fields)&nbsp;} | One module collection, where the node name is the owner that its references use. |
+| [`modules`](#sources-modules) (optional,&nbsp;repeatable) | *string*, then optionally {&nbsp;[fields](#sources-modules-fields)&nbsp;} | A module library that imports and copies resolve against. |
+| [`base-images`](#sources-base-images) (optional,&nbsp;repeatable) | *string*, then optionally {&nbsp;[fields](#sources-base-images-fields)&nbsp;} | A base-image library that the base catalog is read out of. |
+| [`capabilities`](#sources-capabilities) (optional,&nbsp;repeatable) | *string*, then optionally {&nbsp;[fields](#sources-capabilities-fields)&nbsp;} | A capability library that locates capability witness paths. |
 
-<a id="sources-name"></a>
+<a id="sources-modules"></a>
 
-### `<name>` (optional, repeatable)
+### `modules` (optional, repeatable)
 
-A collection is a set of modules that another repository publishes. The node name is the owner name that module references use. A `pin` or a location says where the collection comes from.
+A module library that imports and copies resolve against.
 
 ```kdl
 sources {
-    tectonic-os
+    modules "tectonic-modules"
 }
 ```
 
-Accepts: *string*, then optionally {&nbsp;[fields](#sources-name-fields)&nbsp;}
+Accepts: *string*, then optionally {&nbsp;[fields](#sources-modules-fields)&nbsp;}
 
-A collection is one of two kinds:
-
-- An archive, if the collection holds a `pin`. `tect` fetches and verifies it like an out-of-tree module.
-- A directory on this machine, if the collection has a location argument. The location is relative to the repository root. `tect` reads it in place, and nothing is downloaded, pinned or hashed. The user can change the collection with no new archive for each edit.
-
-If the pin of a collection carries `unpinned`, then the collection follows a branch:
-
-- `tect create repo` scaffolds the collection that way.
-- Every import or copy downloads the branch again, and nothing checks what arrived.
-- Under `audit { enforce #true }`, an import or a copy is an error.
-- Without enforcement, an import runs the unverified content, and a copy lands in the tracked tree for review.
-- `tect check` names the collection above its counts and does not treat it as an error.
-
-<a id="sources-name-fields"></a>
+<a id="sources-modules-fields"></a>
 
 | Field | Accepts | Description |
 | --- | --- | --- |
-| [`pin`](#sources-name-pin) (optional) | {&nbsp;[fields](#sources-name-pin-fields)&nbsp;} | Where content comes from, which version it is, what verifies it, and what keeps the version current. |
+| [`dir`](#sources-modules-dir) (optional) | *string* | The local directory that holds this source. |
+| [`url`](#sources-modules-url) (optional) | *string* | The HTTPS Git repository that holds this source. |
+| [`path`](#sources-modules-path) (optional) | *string* | The directory inside the Git repository that holds this module library. |
+| [`version`](#sources-modules-version) (optional) | *string* | The branch, tag or commit that selects the repository tree. |
+| [`sha256`](#sources-modules-sha256) (optional) | *string* | The hash of the canonical tar archive for the selected commit. |
+| [`unpinned`](#sources-modules-unpinned) (optional) | *string* | Why this source follows a ref without a verified archive hash. |
 
-> [!NOTE]
-> `tect` checks a collection location when a command reads the collection. A check of the repository does not check it, because a directory can exist on one machine only.
->
-> A tagged collection verifies every fetch, and every module in it shares the one version.
+<a id="sources-modules-dir"></a>
 
-<a id="sources-name-pin"></a>
+#### `dir` (optional)
 
-#### `pin` (optional)
-
-A pin fixes where a download comes from and which version it is, and says how the version stays current. Unless the pin is `unpinned`, `tect` verifies each download against the pinned hash, so a changed upstream file is caught.
+The local directory that holds this source.
 
 ```kdl
 sources {
-    tectonic-os {
-        pin {
-            renovate datasource="github-tags" depName="owner/repo"
-            version "v1.0.0"
-            url "https://github.com/owner/repo/archive/refs/tags/{version}.tar.gz"
-            sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
-        }
+    modules "tectonic-modules" {
+        dir "../library/modules"
     }
 }
 ```
 
-Accepts: {&nbsp;[fields](#sources-name-pin-fields)&nbsp;}
+Accepts: *string*
 
-A pin holds exactly one of these, so every pin says how it stays current:
+<a id="sources-modules-url"></a>
 
-- `renovate`, if Renovate keeps the version current;
-- `manual`, if nothing tracks the pin;
-- `unpinned`, if the pin follows a moving ref with no `sha256`.
+#### `url` (optional)
 
-<a id="sources-name-pin-fields"></a>
+The HTTPS Git repository that holds this source.
+
+```kdl
+sources {
+    modules "tectonic-modules" {
+        url "https://github.com/tectonic-os/library"
+    }
+}
+```
+
+Accepts: *string*
+
+<a id="sources-modules-path"></a>
+
+#### `path` (optional)
+
+The directory inside the Git repository that holds this module library.
+
+```kdl
+sources {
+    modules "tectonic-modules" {
+        path "modules"
+    }
+}
+```
+
+Accepts: *string*
+
+<a id="sources-modules-version"></a>
+
+#### `version` (optional)
+
+The branch, tag or commit that selects the repository tree.
+
+```kdl
+sources {
+    modules "tectonic-modules" {
+        version "v1"
+    }
+}
+```
+
+Accepts: *string*
+
+<a id="sources-modules-sha256"></a>
+
+#### `sha256` (optional)
+
+The hash of the canonical tar archive for the selected commit.
+
+```kdl
+sources {
+    modules "tectonic-modules" {
+        sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+    }
+}
+```
+
+Accepts: *string*
+
+<a id="sources-modules-unpinned"></a>
+
+#### `unpinned` (optional)
+
+Why this source follows a ref without a verified archive hash.
+
+```kdl
+sources {
+    modules "tectonic-modules" {
+        unpinned "This repository follows the library's default ref"
+    }
+}
+```
+
+Accepts: *string*
+
+<a id="sources-base-images"></a>
+
+### `base-images` (optional, repeatable)
+
+A base-image library that the base catalog is read out of.
+
+```kdl
+sources {
+    base-images "core"
+}
+```
+
+Accepts: *string*, then optionally {&nbsp;[fields](#sources-base-images-fields)&nbsp;}
+
+<a id="sources-base-images-fields"></a>
 
 | Field | Accepts | Description |
 | --- | --- | --- |
-| [`renovate`](#sources-name-pin-renovate) (optional) |  | The Renovate custom manager that keeps `version` current. |
-| [`manual`](#sources-name-pin-manual) (optional) | *string* | Why nothing tracks this pin. |
-| [`unpinned`](#sources-name-pin-unpinned) (optional) | *string* | Why this pin follows a moving ref with no `sha256`. |
-| [`version`](#sources-name-pin-version) (required) | *string* | The version, tag or commit that `url` expands and Renovate rewrites. |
-| [`url`](#sources-name-pin-url) (required) | *string* | Where the content comes from. |
-| [`sha256`](#sources-name-pin-sha256) (optional) | *string* | The hash the fetched content must match. |
-| [`path`](#sources-name-pin-path) (optional) | *string* | The directory inside the archive that holds the content. |
+| [`dir`](#sources-modules-dir) (optional) | *string* | The local directory that holds this source. |
+| [`url`](#sources-modules-url) (optional) | *string* | The HTTPS Git repository that holds this source. |
+| [`path`](#sources-base-images-path) (optional) | *string* | The directory inside the Git repository that holds this base-image library. |
+| [`version`](#sources-modules-version) (optional) | *string* | The branch, tag or commit that selects the repository tree. |
+| [`sha256`](#sources-modules-sha256) (optional) | *string* | The hash of the canonical tar archive for the selected commit. |
+| [`unpinned`](#sources-modules-unpinned) (optional) | *string* | Why this source follows a ref without a verified archive hash. |
 
-> [!NOTE]
-> An `asset`, an out-of-tree module and a collection each hold a `pin`.
->
-> A base holds no `pin`. Its image reference holds the location and the version, and `signed` records whether the base publishes a cosign signature.
->
-> Renovate matches `renovate` together with the line directly below it. Put `version` on that line.
+<a id="sources-base-images-path"></a>
 
-<a id="sources-name-pin-renovate"></a>
+#### `path` (optional)
 
-##### `renovate` (optional)
-
-The Renovate custom manager that keeps `version` current.
+The directory inside the Git repository that holds this base-image library.
 
 ```kdl
 sources {
-    tectonic-os {
-        pin {
-            renovate datasource="github-tags" depName="owner/repo"
-        }
+    base-images "core" {
+        path "base-images/core"
     }
 }
 ```
 
-| Property | Accepts | Description |
+Accepts: *string*
+
+<a id="sources-capabilities"></a>
+
+### `capabilities` (optional, repeatable)
+
+A capability library that locates capability witness paths.
+
+```kdl
+sources {
+    capabilities "core"
+}
+```
+
+Accepts: *string*, then optionally {&nbsp;[fields](#sources-capabilities-fields)&nbsp;}
+
+<a id="sources-capabilities-fields"></a>
+
+| Field | Accepts | Description |
 | --- | --- | --- |
-| `datasource=` (required) | `github-releases` or `github-tags` or `git-refs` | The Renovate datasource that tracks the pin. |
-| `depName=` (required) | *string* | The name the datasource knows the dependency by. |
-| `extractVersion=` (optional) | *string* | The pattern that extracts the version from a tag. |
+| [`dir`](#sources-modules-dir) (optional) | *string* | The local directory that holds this source. |
+| [`url`](#sources-modules-url) (optional) | *string* | The HTTPS Git repository that holds this source. |
+| [`path`](#sources-capabilities-path) (optional) | *string* | The directory inside the Git repository that holds this capability library. |
+| [`version`](#sources-modules-version) (optional) | *string* | The branch, tag or commit that selects the repository tree. |
+| [`sha256`](#sources-modules-sha256) (optional) | *string* | The hash of the canonical tar archive for the selected commit. |
+| [`unpinned`](#sources-modules-unpinned) (optional) | *string* | Why this source follows a ref without a verified archive hash. |
 
-<a id="sources-name-pin-manual"></a>
+<a id="sources-capabilities-path"></a>
 
-##### `manual` (optional)
+#### `path` (optional)
 
-Why nothing tracks this pin.
-
-```kdl
-sources {
-    tectonic-os {
-        pin {
-            manual "upstream publishes no releases"
-        }
-    }
-}
-```
-
-Accepts: *string*
-
-<a id="sources-name-pin-unpinned"></a>
-
-##### `unpinned` (optional)
-
-Why this pin follows a moving ref with no `sha256`.
+The directory inside the Git repository that holds this capability library.
 
 ```kdl
 sources {
-    tectonic-os {
-        pin {
-            unpinned "followed at its branch head"
-        }
-    }
-}
-```
-
-Accepts: *string*
-
-> [!NOTE]
-> Every fetch takes what the ref holds at that moment, and nothing checks what arrived.
->
-> Only a collection's pin takes `unpinned`. The build runs an out-of-tree module as root, so the pin of an out-of-tree module needs a `sha256`.
->
-> `unpinned` does not combine with `sha256`, because a moving ref breaks the hash.
-
-<a id="sources-name-pin-version"></a>
-
-##### `version` (required)
-
-The version, tag or commit that `url` expands and Renovate rewrites.
-
-```kdl
-sources {
-    tectonic-os {
-        pin {
-            version "v1.0.0"
-        }
-    }
-}
-```
-
-Accepts: *string*
-
-<a id="sources-name-pin-url"></a>
-
-##### `url` (required)
-
-Where the content comes from.
-
-```kdl
-sources {
-    tectonic-os {
-        pin {
-            url "https://github.com/owner/repo/archive/refs/tags/{version}.tar.gz"
-        }
-    }
-}
-```
-
-Accepts: *string*
-
-<a id="sources-name-pin-sha256"></a>
-
-##### `sha256` (optional)
-
-The hash the fetched content must match.
-
-```kdl
-sources {
-    tectonic-os {
-        pin {
-            sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
-        }
-    }
-}
-```
-
-Accepts: *string*
-
-| Property | Accepts | Description |
-| --- | --- | --- |
-| `from=` (optional) | `asset` or `sidecar` or `manual` | Where the hash is refreshed from. `asset`, the default, hashes the payload itself. `sidecar` reads the `<url>.sha256` file that upstream publishes. `manual` means nothing recomputes the hash. |
-
-> [!NOTE]
-> If a pin has no `sha256` and no `unpinned`, then `tect check` reports an error.
-
-<a id="sources-name-pin-path"></a>
-
-##### `path` (optional)
-
-The directory inside the archive that holds the content.
-
-```kdl
-sources {
-    tectonic-os {
-        pin {
-            path "modules/example"
-        }
+    capabilities "core" {
+        path "capabilities"
     }
 }
 ```

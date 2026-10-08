@@ -1,70 +1,57 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
   x a module pin cannot be `unpinned`
-    ,-[tests/repos/broken-unpinned/image.kdl:12:17]
- 11 |             pin {
- 12 |                 unpinned "trusted"
+    ,-[tests/repos/broken-unpinned/image.kdl:14:17]
+ 13 |             pin {
+ 14 |                 unpinned "trusted"
     :                 ^^^^|^^^
     :                     `-- nothing would verify what arrived
- 13 |                 version "main"
+ 15 |                 version "main"
     `----
   help: only a module collection follows a moving ref: a fetched module is
         arbitrary shell running as root in the build, and an asset lands in
         the image
 
-  x the pin declares no `sha256`
-   ,-[tests/repos/broken-unpinned/repo.kdl:6:9]
- 5 |     unmarked {
- 6 |         pin {
-   :         ^|^
-   :          `-- nothing to verify what arrived
- 7 |             manual "nothing bumps it"
-   `----
-  help: the content hash is what says the archive is the one that was
-        reviewed; `unpinned "why it is trusted"` is how a collection following
-        a moving ref says it has none on purpose
-
-  x the pin is declared `unpinned` but pins a `sha256`
-    ,-[tests/repos/broken-unpinned/repo.kdl:14:13]
- 13 |         pin {
- 14 |             unpinned "trusted"
-    :             ^^^^|^^^
-    :                 `-- one of the two is not true
- 15 |             version "main"
+  x `hashed` is both pinned and unpinned
+    ,-[tests/repos/broken-unpinned/repo.kdl:13:9]
+ 12 |         sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+ 13 |         unpinned "trusted"
+    :         ^^^^|^^^
+    :             `-- one of these is not true
+ 14 |     }
     `----
-  help: a moving ref does not hash the same twice, so the fetch would fail as
-        soon as it moved; drop whichever of them is wrong
+  help: drop `unpinned` when `sha256` verifies the selected version
 
-  x the pin is declared `manual` and `unpinned`
-    ,-[tests/repos/broken-unpinned/repo.kdl:23:13]
- 22 |             manual "nothing bumps it"
- 23 |             unpinned "trusted"
-    :             ^^^^|^^^
-    :                 `-- pick one
- 24 |             version "main"
+  x `unselected` verifies a hash but selects no version
+    ,-[tests/repos/broken-unpinned/repo.kdl:17:9]
+ 16 |         url "https://github.com/owner/modules"
+ 17 |         sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+    :         ^^^|^^
+    :            `-- the remote HEAD can move
+ 18 |     }
     `----
-  help: `renovate datasource="github-tags" depName="owner/repo"`, `manual "why
-        nothing tracks it"`, or `unpinned "why a moving ref is trusted here"`
+  help: add `version` with the branch, tag or commit this canonical archive
+        hashes
 
-  x `here` is a directory, so its `pin` says nothing
-    ,-[tests/repos/broken-unpinned/repo.kdl:29:9]
- 28 |     here "../modules" {
- 29 |         pin {
-    :         ^|^
-    :          `-- nothing is fetched
- 30 |             unpinned "trusted"
+  x `here` is a local directory
+    ,-[tests/repos/broken-unpinned/repo.kdl:21:9]
+ 20 |         dir "../modules"
+ 21 |         unpinned "trusted"
+    :         ^^^^|^^^
+    :             `-- only a Git source accepts this field
+ 22 |     }
     `----
-  help: a collection on this machine is read where it is; a pin belongs on one
-        that is downloaded
+  help: a local source needs only `dir`; pinning fields describe a fetched
+        repository
 
   x `loose` is not fetched
-    ,-[tests/repos/broken-unpinned/image.kdl:10:9]
-  9 |     modules {
- 10 |         module "loose" {
+    ,-[tests/repos/broken-unpinned/image.kdl:12:9]
+ 11 |     modules {
+ 12 |         module "loose" {
     :         ^^^|^^
     :            `-- no module.kdl here yet
- 11 |             pin {
+ 13 |             pin {
     `----
   help: run ./generated/scripts/tect.sh fetch modules to fetch what the image
         references

@@ -29,7 +29,7 @@ A claim the tool records rather than certifies. The scan is what confirms it.
 
 | Content | Hash |
 | --- | --- |
-| declared | `143d40b94ab50b255daf037b1ffc7a31b7c7760e934213fe72cca5a5b1fa1670` |
+| declared | `d477d22a5a9ba3d0aaca5011b7ec83b4ed58c73e068a592c838d096f797f7df7` |
 
 | Collection | Locator | Selector | Verifier | Tracker |
 | --- | --- | --- | --- | --- |
@@ -87,7 +87,7 @@ It enables one, in `modules/one/hello/repo`. There is no grammar for that file, 
       ]
     }
   ],
-  "content": "143d40b94ab50b255daf037b1ffc7a31b7c7760e934213fe72cca5a5b1fa1670",
+  "content": "d477d22a5a9ba3d0aaca5011b7ec83b4ed58c73e068a592c838d096f797f7df7",
   "built": null,
   "imported": {
     "collection": "one",
@@ -145,7 +145,7 @@ A claim the tool records rather than certifies. The scan is what confirms it.
 
 | Content | Hash |
 | --- | --- |
-| declared | `143d40b94ab50b255daf037b1ffc7a31b7c7760e934213fe72cca5a5b1fa1670` |
+| declared | `d477d22a5a9ba3d0aaca5011b7ec83b4ed58c73e068a592c838d096f797f7df7` |
 
 | Collection | Locator | Selector | Verifier | Tracker |
 | --- | --- | --- | --- | --- |
@@ -172,7 +172,7 @@ consumer, hello
 
 | Content | Hash |
 | --- | --- |
-| declared | `143d40b94ab50b255daf037b1ffc7a31b7c7760e934213fe72cca5a5b1fa1670` |
+| declared | `d477d22a5a9ba3d0aaca5011b7ec83b4ed58c73e068a592c838d096f797f7df7` |
 | observed by the build | `not what was declared` |
 
 **The two documents disagree**, which they cannot if both came from this build.

@@ -3,7 +3,7 @@
 use crate::diag::{Issue, Source, Span};
 use crate::model::module::{Access, Coverage, Module, Refusal};
 use crate::model::options::Value;
-use crate::model::remote::{Collection, REMOTE_DIR};
+use crate::model::remote::{Collection, Kind as SourceKind, REMOTE_DIR};
 use crate::provenance::Evidence;
 
 /// The schema every file in the repository is written against.
@@ -158,7 +158,7 @@ pub struct Workflow {
 /// One entry in the list: a module, and the decisions the image author makes
 /// about it.
 pub struct Entry {
-    /// The collection this entry references, for a member listed under a
+    /// The modules source this entry references, for a member listed under a
     /// `source` block.
     pub source: Option<String>,
     pub path: String,
@@ -199,7 +199,11 @@ impl Entry {
         self.remote.as_ref().or_else(|| {
             self.source
                 .as_ref()
-                .and_then(|name| sources.iter().find(|source| &source.name == name))
+                .and_then(|name| {
+                    sources
+                        .iter()
+                        .find(|source| source.kind == SourceKind::Modules && &source.name == name)
+                })
                 .and_then(Collection::pin)
         })
     }
@@ -250,7 +254,7 @@ pub struct List {
     pub publishes_scheduled: bool,
     /// Whether image scans run only as part of the scheduled build.
     pub scans_scheduled: bool,
-    /// The module collections references and copies resolve against.
+    /// The sources this repository reads, of whichever kind.
     pub sources: Vec<Collection>,
     /// Which image a build with nothing named builds, and which one a pull
     /// request builds.

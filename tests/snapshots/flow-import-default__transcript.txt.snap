@@ -3,9 +3,7 @@ source: tests/golden/harness.rs
 ---
 Tectonic v{version}
 
-tect: repo.kdl declares no `sources`; using the default module collection `upstream` and adding it to repo.kdl
 
 example/
-├── ~ example.image.kdl  browser added to modules
-└── ~ repo.kdl  the default module collection
+└── ~ example.image.kdl  browser added to modules
 ==== exit 0
