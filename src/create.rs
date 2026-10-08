@@ -1,37 +1,30 @@
-//! `create repo`, `create image`, `create module` and `create scripts`. Every
-//! step of a chain is also a command: `create repo` calls `create image` and
-//! `create scripts` in place.
-//!
-//! Each of them collects every answer first and writes afterwards, which is why
-//! no `apply` takes a `Prompt`.
+//! Create commands collect every answer before writing, so no `apply` takes a
+//! `Prompt`.
 
 use crate::copy;
 use crate::diag::Issues;
 use crate::layout;
+use crate::model::remote::Kind as SourceKind;
 use common::prompt::Prompt;
 pub use common::ui::tree::Change;
 use common::ui::{Answer, Choice};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-/// Where a repository is hosted unless something says otherwise. The host is
-/// read into the origin and the image URLs and nowhere else: nothing in the
-/// tool learns about a second forge.
+/// One host feeds the origin and image URLs because the tool has no second
+/// forge model.
 pub const HOST: &str = "github.com";
 
 const GH_INSTALL: &str = "install gh from https://github.com/cli/cli";
 
-/// The family-adapter role: what makes a family's package manager usable from
+/// The family-adapter role makes a family's package manager usable from
 /// a build layer. Every family needs it filled by a different module.
 const BUILD_ENVIRONMENT: &str = "build-environment";
 
-/// The prefix every URL a repository writes is built from.
 pub fn origin(host: &str, owner: &str) -> String {
     format!("https://{host}/{owner}")
 }
 
-/// What the directory a repository sits in calls it, which is the only name a
-/// tree that is already written carries.
 pub fn named_after_root(root: &Path) -> Option<String> {
     std::fs::canonicalize(root)
         .ok()
@@ -40,15 +33,15 @@ pub fn named_after_root(root: &Path) -> Option<String> {
         .map(|name| name.to_string_lossy().into_owned())
 }
 
-/// A row of the review screen, and so a point `Repo::collect` can be re-entered
-/// at. The order is the order the questions are asked in: re-entering at a
-/// field asks it and everything after it. A row re-enters at its gate, so
-/// `provider` re-asks whether there is one at all and `none` can become one.
+/// Review rows double as re-entry points. Re-entry asks that field and every
+/// later field. A gated row must re-ask whether its value exists so the user
+/// can change `none` into a value.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Field {
     Name,
     Provider,
     Remote,
+    Libraries,
     Image,
     Base,
     Workflows,
@@ -58,9 +51,8 @@ pub enum Field {
     Scripts,
 }
 
-/// What the flags gave, which only the first pass reads. A field asked again
-/// opens on the answer it has; the flag seeded that answer and is spent. The
-/// root is the exception, since nothing else says where the tree goes.
+/// Flags seed only the first pass. A repeated field opens on its current
+/// answer. The root flag persists because it alone locates the tree.
 #[derive(Default)]
 struct Given {
     name: Option<String>,
@@ -71,20 +63,19 @@ struct Given {
     root: Option<PathBuf>,
 }
 
-/// The tree, the git repository, an image in it, then the remote, which is
-/// optional and last: each step adds to what the one before it wrote.
 pub struct Repo {
     name: String,
     id: String,
     root: PathBuf,
     host: String,
-    /// Who owns it on the host, which is absent where scheduled builds were
-    /// declined and no origin was composed.
+    /// Ownership is absent when the user declines scheduled builds and no
+    /// origin is composed.
     owner: Option<String>,
     assets: PathBuf,
+    libraries: Libraries,
     image: Option<Image>,
-    /// The CI to generate, asked through the struct `set workflows` uses so the
-    /// two cannot drift. Absent where there is no origin to run it on.
+    /// The shared `set workflows` type keeps both commands on the same CI
+    /// generator. A repository without an origin cannot run that CI.
     workflows: Option<crate::set::Workflows>,
     scripts: Scripts,
     remote: bool,
@@ -110,9 +101,6 @@ impl Repo {
             root: root_arg,
         };
         let mut repo = Self::ask(Field::Name, &given, None, prompt)?;
-        // The flags were the first pass's. A field asked again opens on the
-        // answer it has, not on the flag that seeded it; only the root a flag
-        // named survives, since nothing else says where the tree goes.
         given = Given {
             root: given.root.take(),
             ..Given::default()
@@ -123,16 +111,16 @@ impl Repo {
                 .iter()
                 .map(|(_, label, value)| (label.to_string(), value.clone()))
                 .collect();
+            // The action row is where the cursor opens, so a short review can
+            // be accepted without a walk down every summary row.
             match common::ui::review(
                 copy::REVIEW,
                 &drawn,
                 copy::CREATE,
                 copy::REVIEW_KEYS,
                 None,
-                0,
+                rows.len(),
             )? {
-                // Nothing was written, so leaving is a leaving, the way every
-                // other widget's is.
                 None => return Ok(None),
                 Some(at) if at == rows.len() => break,
                 Some(at) => repo = Self::ask(rows[at].0, &given, Some(&repo), prompt)?,
@@ -141,9 +129,8 @@ impl Repo {
         Ok(Some(repo))
     }
 
-    /// Ask from `from` onward, keeping every answer before it. What comes after
-    /// an edited answer opens on its previous answer where that still exists,
-    /// and is dropped where it no longer does.
+    /// Re-entry keeps earlier answers and revalidates later answers against the
+    /// edited choice.
     fn ask(
         from: Field,
         given: &Given,
@@ -174,8 +161,8 @@ impl Repo {
         let (host, owner) = match prev {
             Some(prev) if from > Field::Provider => (prev.host.clone(), prev.owner.clone()),
             _ => {
-                // One decision, one row, one entry point: the gate is asked
-                // first, so `provider` can become `none` and back again.
+                // One decision has one row and one entry point. The gate is
+                // asked first, so `provider` can become `none` and back again.
                 let configure = given.host.is_some()
                     || given.owner.is_some()
                     || match prev {
@@ -213,8 +200,8 @@ impl Repo {
                     install_gh = prev.install_gh;
                 }
                 _ => {
-                    // `gh` is github's, so the offer to create the repository is
-                    // too, and it is what closes the block the origin line opens.
+                    // The `gh` command supports GitHub, so only a GitHub origin
+                    // can offer remote repository creation.
                     let offering = host == HOST && prompt.asks();
                     // The origin line belongs to the question above it, which a
                     // re-entry at this row did not ask.
@@ -256,6 +243,10 @@ impl Repo {
         let url = owner
             .as_deref()
             .map(|owner| format!("{}/{id}", origin(&host, owner)));
+        let libraries = match prev {
+            Some(prev) if from > Field::Libraries => prev.libraries.clone(),
+            _ => Libraries::collect(prev.map(|prev| &prev.libraries), prompt)?,
+        };
         let held = prev.and_then(|prev| prev.image.as_ref());
         let image = match prev {
             Some(prev) if from > Field::Base => prev.image.clone(),
@@ -281,6 +272,7 @@ impl Repo {
                         &name,
                         url,
                         "`--image`",
+                        &crate::init::sources_block(&libraries.chosen),
                         from,
                         held,
                         prompt,
@@ -324,6 +316,7 @@ impl Repo {
             host,
             owner,
             assets,
+            libraries,
             image,
             workflows,
             scripts,
@@ -332,9 +325,8 @@ impl Repo {
         })
     }
 
-    /// One row per piece of configuration, and nothing per question. A gate
-    /// answered Yes is not a row; a gate answered No is one row saying `none`,
-    /// which is what re-enters the gate.
+    /// A gate answered Yes adds no review row. A gate answered No adds a
+    /// `none` row that can re-enter the gate.
     fn rows(&self) -> Vec<(Field, &'static str, String)> {
         let mut rows = vec![
             (Field::Name, copy::ROW_NAME, self.name.clone()),
@@ -347,7 +339,7 @@ impl Repo {
                 },
             ),
         ];
-        // An action, said as what will happen: nothing else on the screen says
+        // The action says what will happen because no other screen text says
         // a remote will be made.
         if self.owner.is_some() && self.host == HOST {
             rows.push((
@@ -360,6 +352,7 @@ impl Repo {
                 .to_string(),
             ));
         }
+        rows.push(self.libraries.row());
         match &self.image {
             Some(image) => {
                 rows.push((Field::Image, copy::ROW_IMAGE, image.name.clone()));
@@ -381,18 +374,21 @@ impl Repo {
     }
 
     pub fn apply(&self) -> Result<(), String> {
-        let mut wrote: Vec<(PathBuf, Change)> =
-            crate::init::write(&self.root, &self.name, &self.assets)?
-                .into_iter()
-                .map(|path| (path, Change::Created))
-                .collect();
+        let mut wrote: Vec<(PathBuf, Change)> = crate::init::write(
+            &self.root,
+            &self.name,
+            &self.assets,
+            &crate::init::sources_block(&self.libraries.chosen),
+        )?
+        .into_iter()
+        .map(|path| (path, Change::Created))
+        .collect();
         git_init(&self.root)?;
         println!("initialised a git repository in {}", self.root.display());
         if let Some(image) = &self.image {
             wrote.extend(image.apply(&self.root)?);
         }
         if let Some(workflows) = &self.workflows {
-            // repo.kdl is already in `wrote`, as the file this run created.
             workflows.apply(&self.root)?;
         }
         wrote.extend(self.scripts.apply(&self.root)?);
@@ -429,11 +425,74 @@ impl Repo {
     }
 }
 
-/// The skeleton takes this file name in `scripts/`.
 const SKELETON_FILE: &str = "Containerfile.skeleton";
 
-/// Every file a repository may keep in `scripts/`, with what it does. If the
-/// repository keeps one, then `tect` uses that copy in place of its own.
+/// The libraries a fresh repository reads, which is the one choice every
+/// default library is offered under.
+#[derive(Clone, Default)]
+pub struct Libraries {
+    pub(crate) chosen: Vec<&'static crate::base::DefaultLibrary>,
+}
+
+impl Libraries {
+    /// Every default library, in the order the scaffolded block lists them.
+    pub fn every() -> Vec<&'static crate::base::DefaultLibrary> {
+        crate::base::DEFAULT_LIBRARIES.iter().collect()
+    }
+
+    /// A first run opens on every default. A second opens on the answer held,
+    /// so a re-entry at this row does not silently take the defaults back.
+    pub fn collect(held: Option<&Libraries>, prompt: &Prompt) -> Result<Self, String> {
+        let every = Self::every();
+        let options: Vec<Choice> = every
+            .iter()
+            .map(|library| {
+                Choice::new(
+                    format!("{} \"{}\"", library.kind.as_str(), library.alias),
+                    library.about,
+                )
+            })
+            .collect();
+        let on: Vec<usize> = match held {
+            Some(held) => every
+                .iter()
+                .enumerate()
+                .filter(|(_, library)| {
+                    held.chosen
+                        .iter()
+                        .any(|held| held.alias == library.alias && held.kind == library.kind)
+                })
+                .map(|(at, _)| at)
+                .collect(),
+            None => (0..every.len()).collect(),
+        };
+        let Answer::Chosen(chosen) = prompt.choose_many(copy::LIBRARIES, &options, &on)? else {
+            unreachable!("choose_many answers with a choice or fails")
+        };
+        Ok(Self {
+            chosen: chosen.into_iter().map(|at| every[at]).collect(),
+        })
+    }
+
+    fn row(&self) -> (Field, &'static str, String) {
+        let mut aliases: Vec<&str> = Vec::new();
+        for library in &self.chosen {
+            if !aliases.contains(&library.alias) {
+                aliases.push(library.alias);
+            }
+        }
+        (
+            Field::Libraries,
+            copy::ROW_LIBRARIES,
+            match aliases.is_empty() {
+                true => copy::NONE.to_string(),
+                false => aliases.join(", "),
+            },
+        )
+    }
+}
+
+/// A repository-owned script replaces the matching script supplied by `tect`.
 fn offered() -> Vec<(&'static str, &'static str, &'static str)> {
     std::iter::once((
         SKELETON_FILE,
@@ -448,7 +507,6 @@ fn offered() -> Vec<(&'static str, &'static str, &'static str)> {
     .collect()
 }
 
-/// `create scripts` copies the chosen files into `scripts/`.
 #[derive(Clone, Default)]
 pub struct Scripts {
     chosen: Vec<&'static str>,
@@ -516,10 +574,11 @@ impl Scripts {
         )
     }
 
-    /// Writes each chosen file, then points every copied script at the other
-    /// scripts where they now live. A script that the repository already keeps
-    /// moves with them if it still matches what tect supplied, because the
-    /// user has not changed it.
+    /// Copied scripts must agree on the paths they use to call sibling scripts.
+    /// Otherwise an unchanged kept script could call a stale sibling path.
+    /// A script that the repository already keeps moves with them only if it
+    /// still matches what tect supplied. That equality proves the user has not
+    /// changed the script.
     pub fn apply(&self, root: &Path) -> Result<Vec<(PathBuf, Change)>, String> {
         let kept = |name: &str| root.join(layout::SCRIPTS).join(name);
         let unchanged: Vec<_> = crate::emit::SCRIPTS
@@ -554,8 +613,6 @@ impl Scripts {
     }
 }
 
-/// The tree a create, import or copy wrote, labelled by repo.kdl where it is
-/// declared and by the repository directory otherwise.
 pub fn report(root: &Path, wrote: &[(PathBuf, Change)]) {
     let declared = crate::model::image::List::load(root).0.id;
     let id = match declared.is_empty() {
@@ -565,9 +622,8 @@ pub fn report(root: &Path, wrote: &[(PathBuf, Change)]) {
     common::ui::tree::print(&id, wrote, describe);
 }
 
-/// What a line in the tree says: what a later step added to a file that was
-/// already there, and nothing for one this run wrote whole. What a kind of
-/// file is for is a documentation job, not a column beside every name.
+/// A tree line says what a later step added to an existing file. File-purpose
+/// descriptions stay in documentation so every path does not gain a column.
 fn describe(_path: &Path, change: Option<&Change>) -> String {
     match change {
         Some(Change::Updated(edit)) => edit.clone(),
@@ -575,18 +631,13 @@ fn describe(_path: &Path, change: Option<&Change>) -> String {
     }
 }
 
-/// A path a command wrote, said the way the tree draws it.
 fn under(root: &Path, path: &Path) -> PathBuf {
     path.strip_prefix(root).unwrap_or(path).to_path_buf()
 }
 
-/// Where the repository is hosted. The catalog is the two forges the workflows
-/// the tool ships know how to run under.
+/// The host catalog is limited to the forges supported by generated workflows.
 fn choose_host(current: Option<&str>, prompt: &Prompt) -> Result<String, String> {
-    let options = [
-        Choice::new(HOST, copy::host_github()),
-        Choice::new("forgejo", copy::HOST_FORGEJO),
-    ];
+    let options = host_options();
     let at = current.map(|held| usize::from(held != HOST));
     match ask_one(prompt, copy::REPO_HOST, &options, at)? {
         Some(0) | None => Ok(HOST.to_string()),
@@ -600,8 +651,15 @@ fn choose_host(current: Option<&str>, prompt: &Prompt) -> Result<String, String>
     }
 }
 
-/// A question with an answer already held opens on it; one asked for the first
-/// time opens where it always did.
+fn host_options() -> [Choice; 2] {
+    [
+        Choice::new(HOST, copy::host_github()),
+        Choice::new("forgejo", copy::HOST_FORGEJO),
+    ]
+}
+
+/// A repeated question opens on its current answer. A first question uses its
+/// normal default.
 fn ask_one(
     prompt: &Prompt,
     question: &str,
@@ -614,32 +672,28 @@ fn ask_one(
     }
 }
 
-/// One image, in `<image-id>.image.kdl` at the repository root.
 #[derive(Clone)]
 pub struct Image {
     file: PathBuf,
     text: String,
-    /// What it is called and what it is built on, which are the two rows the
-    /// review screen draws for it and the two answers asking it again opens on.
     pub name: String,
     pub base: String,
-    /// What the chosen base belongs to, which decides what CI can run here.
+    /// The base family decides which CI workflows can run.
     pub family: String,
-    /// Whether the offer of what the base cannot build without was taken, so
-    /// that asking again opens on the answer.
+    /// The recorded choice keeps the base-provider offer stable on re-entry.
     took: bool,
-    /// What the installer lays down, off the base's row. `None` for a base the
-    /// catalog does not describe, which answers for itself.
+    /// An uncatalogued base has no installer bootloader default.
     bootloader: Option<String>,
-    /// The image a second one takes the fallback away from, named in repo.kdl
-    /// so that a bare build still builds what it built before.
+    /// A second image records the former implicit default so a bare build keeps
+    /// its target.
     names_default: Option<String>,
 }
 
 impl Image {
-    /// `repo` is what the repository is called, which the name falls back to,
-    /// and `url` is the repository's own, which the images an existing one
-    /// holds already carry.
+    /// A missing image name falls back to the repository name. Existing images
+    /// already carry the repository URL. `sources_text` is the `sources` block
+    /// a repository not written yet is about to get, which is the only thing a
+    /// scaffolded image can offer modules against.
     pub fn collect(
         root: &Path,
         name: Option<String>,
@@ -647,6 +701,7 @@ impl Image {
         repo: &str,
         url: Option<String>,
         flag: &str,
+        sources_text: &str,
         from: Field,
         prev: Option<&Self>,
         prompt: &Prompt,
@@ -668,7 +723,7 @@ impl Image {
         if file.exists() {
             return Err(format!("{} is already there", file.display()));
         }
-        let (list, _) = crate::model::image::List::load(root);
+        let (mut list, _) = crate::model::image::List::load(root);
         let names_default = implicit_default(&list).filter(|was| *was != id);
         let url = url.or_else(|| {
             list.images
@@ -677,8 +732,40 @@ impl Image {
                 .map(|image| image.url.clone())
         });
 
+        // A repository with no base-image library has no catalog to pick from,
+        // and the offer is the one flow that writes one. A repository not
+        // written yet has its answer from the libraries question instead.
+        if root.join(layout::REPO_FILE).is_file()
+            && !list
+                .sources
+                .iter()
+                .any(|source| source.kind == SourceKind::BaseImages)
+            && prompt.asks()
+            && prompt.confirm(copy::NO_BASE_LIBRARY, copy::YES, copy::NO)?
+        {
+            if let Some(set) = crate::set::Library::adding(SourceKind::BaseImages, prompt)? {
+                report(root, &set.apply(root)?);
+                list = crate::model::image::List::load(root).0;
+            }
+        }
+        // A repository that is not written yet gets the block its libraries
+        // answer is about to write, which is the only thing `create repo` has
+        // to offer modules against. Both halves read the library through its
+        // source cache, which a declared library that is not on this machine is
+        // fetched into first.
+        let scaffolded;
+        let sources = match list.sources.is_empty() && !root.join(layout::REPO_FILE).is_file() {
+            true => {
+                scaffolded = crate::parse::repo::sources_in(sources_text);
+                scaffolded.as_slice()
+            }
+            false => list.sources.as_slice(),
+        };
+        if let Err(why) = crate::base::fetch(root, sources) {
+            eprintln!("tect: {why}; the catalog holds only what is already on this machine");
+        }
         let mut catalog_issues = Issues::default();
-        let (bases, _) = crate::base::catalog(root, &list.sources, &mut catalog_issues);
+        let bases = crate::base::catalog(root, sources, &mut catalog_issues);
         if !catalog_issues.is_empty() {
             return Err(catalog_issues.plain());
         }
@@ -686,6 +773,7 @@ impl Image {
             Some(given) => given,
             None => choose_base(&bases, prev.map(|prev| prev.base.as_str()), prompt)?,
         };
+        let base = catalogued(&bases, base);
         let family = match crate::base::find(&bases, &base) {
             Some(known) => known.family.clone(),
             None => prompt.text(
@@ -695,53 +783,27 @@ impl Image {
                 bases.first().map(|base| base.family.as_str()),
             )?,
         };
-        // A repository that is not written yet declares what the scaffold is
-        // about to give it, which is the only thing `create repo` has to offer
-        // modules against.
-        let scaffolded;
-        let sources = match list.sources.is_empty() && !root.join(layout::REPO_FILE).is_file() {
-            true => {
-                scaffolded =
-                    crate::parse::repo::sources_in(&crate::init::sources(&crate::init::assets()?));
-                scaffolded.as_slice()
-            }
-            false => list.sources.as_slice(),
-        };
         let disk = crate::parse::disk::Disk::scan(root);
         let known = crate::base::find(&bases, &base);
         let roles = roles(known);
         let index = crate::provider::Index::scan(root, sources, &disk, false);
         let mut wanted = wanted(&index, &family, &roles);
-        // The one moment this costs network: only where the question it is for
-        // can be asked, and only where the collections already here did not
-        // answer it.
+        // Network is used only while the user can answer the provider question
+        // and the local collections leave a required role unresolved. The
+        // fetch lands in the repository's own source cache, because a library
+        // the answer names is one the repository reads from then on.
         let fetched;
         if wanted.len() < roles.len() && prompt.asks() && !index.unread().is_empty() {
-            // Nothing is written yet and this run may end without anything
-            // ever being, so the fetch goes to scratch. The repository's own
-            // fetch is `tect fetch modules`, later.
-            let scratch = std::env::temp_dir().join(format!("tect-bases.{}", std::process::id()));
-            let _ = std::fs::remove_dir_all(&scratch);
-            let _ = std::fs::create_dir_all(&scratch);
-            let _ = std::fs::set_permissions(
-                &scratch,
-                std::os::unix::fs::PermissionsExt::from_mode(0o700),
-            );
-            let cache = match root.join(layout::REPO_FILE).is_file() {
-                true => root,
-                false => scratch.as_path(),
-            };
-            fetched = crate::provider::Index::scan(cache, sources, &disk, true);
-            // One line, in this tool's voice, before the offer it narrows: the
-            // fetcher's own `curl: (6) Could not resolve host` says nothing
-            // about the question it just made incomplete.
+            fetched = crate::provider::Index::scan(root, sources, &disk, true);
+            // One line in this tool's voice precedes the offer it narrows. The
+            // fetcher's own `curl: (6) Could not resolve host` does not explain
+            // the incomplete provider question.
             if let Some(why) = fetched.unreached() {
                 eprintln!(
                     "tect: {why}; what is offered below is only what is already on this machine"
                 );
             }
             wanted = self::wanted(&fetched, &family, &roles);
-            let _ = std::fs::remove_dir_all(&scratch);
         }
         let take_wanted = match wanted.is_empty() {
             true => true,
@@ -790,8 +852,8 @@ impl Image {
     }
 }
 
-/// The image a repository with one of them and no `default-image` falls back
-/// to, which a second image takes away unless it is written down.
+/// A repository with one image can omit `default-image`, but adding a second
+/// image must preserve the former implicit default.
 fn implicit_default(list: &crate::model::image::List) -> Option<String> {
     match (&list.default_image_id, list.images.as_slice()) {
         (None, [only]) => Some(only.id.clone()),
@@ -799,8 +861,8 @@ fn implicit_default(list: &crate::model::image::List) -> Option<String> {
     }
 }
 
-/// One `default-image` line at the end of repo.kdl, which does not carry the
-/// node: an append, never a rewrite.
+/// The writer appends `default-image` because rewriting `repo.kdl` would lose
+/// the user's layout and comments.
 fn append_default_image(root: &Path, id: &str) -> Result<(), String> {
     let file = root.join(layout::REPO_FILE);
     let mut text =
@@ -812,12 +874,10 @@ fn append_default_image(root: &Path, id: &str) -> Result<(), String> {
     std::fs::write(&file, text).map_err(|err| format!("{}: {err}", file.display()))
 }
 
-/// One flavour in an image's `flavours` block, creating the block when the
-/// image has none. Neither `default` nor `pr-build` is scaffolded: each is
-/// an edit, and `default` silently changes what a bare target builds.
+/// Flavours are appended because `default` and `pr-build` must remain explicit
+/// edits. A default flavour silently changes what a bare target builds.
 pub struct Flavour {
     name: String,
-    /// The image's `name`, which is what the writer walks to.
     image: String,
     file: PathBuf,
 }
@@ -912,17 +972,21 @@ impl Flavour {
     }
 }
 
-/// One of the bases the catalog holds, or one typed in: an unknown base is not
-/// an error, it is a base nothing can say anything about.
+/// The image reference a typed `--base` stands for: a catalogued base's own
+/// reference, whether the name was that reference or the catalog name, and the
+/// typed name itself where the catalog does not know it.
+fn catalogued(bases: &[crate::base::Base], base: String) -> String {
+    crate::base::find(bases, &base).map_or(base, |known| known.image.clone())
+}
+
+/// An unknown base stays available because the catalog cannot constrain a base
+/// it does not describe.
 fn choose_base(
     bases: &[crate::base::Base],
     current: Option<&str>,
     prompt: &Prompt,
 ) -> Result<String, String> {
-    let mut options: Vec<Choice> = bases
-        .iter()
-        .map(|base| Choice::new(&base.image, &base.about))
-        .collect();
+    let mut options = base_options(bases);
     let at = current.and_then(|held| bases.iter().position(|base| base.image == held));
     if prompt.draws() && !options.is_empty() {
         options.push(Choice::new(copy::OTHER_BASE, copy::OTHER_BASE_ABOUT));
@@ -948,8 +1012,15 @@ fn choose_base(
     }
 }
 
-/// The base row's default, or the person's pick where the row lists more than
-/// one. Asked only then, and opened on the default.
+fn base_options(bases: &[crate::base::Base]) -> Vec<Choice> {
+    bases
+        .iter()
+        .map(|base| Choice::new(&base.image, &base.about))
+        .collect()
+}
+
+/// A single bootloader uses the base default. Multiple bootloaders require the
+/// user's choice and open on that default.
 fn choose_bootloader(
     known: Option<&crate::base::Base>,
     held: Option<&str>,
@@ -961,21 +1032,24 @@ fn choose_bootloader(
     if offered.len() < 2 {
         return Ok(offered.first().cloned());
     }
-    let options: Vec<Choice> = offered
-        .iter()
-        .map(|name| match name.as_str() {
-            "grub2" => Choice::new(name, copy::BOOTLOADER_GRUB2),
-            _ => Choice::new(name, copy::BOOTLOADER_SYSTEMD),
-        })
-        .collect();
+    let options = bootloader_options(offered);
     let at = held.and_then(|held| offered.iter().position(|name| name == held));
     Ok(prompt
         .choose_current(copy::IMAGE_BOOTLOADER, &options, at.unwrap_or(0))?
         .map(|chosen| offered[chosen].clone()))
 }
 
-/// One module in the repository, and the offer to list it in an image, which
-/// is a separate operation.
+fn bootloader_options(offered: &[String]) -> Vec<Choice> {
+    offered
+        .iter()
+        .map(|name| match name.as_str() {
+            "grub2" => Choice::new(name, copy::BOOTLOADER_GRUB2),
+            _ => Choice::new(name, copy::BOOTLOADER_SYSTEMD),
+        })
+        .collect()
+}
+
+/// Module creation keeps repository ownership separate from image listing.
 pub struct Module {
     path: String,
     file: PathBuf,
@@ -1066,7 +1140,10 @@ fn module_kdl(
     pkgs: &[String],
     with: &[(String, String)],
 ) -> Result<String, String> {
-    let mut sections: Vec<String> = Vec::new();
+    let mut sections: Vec<String> = vec![format!(
+        "schema-version {}",
+        crate::model::image::SCHEMA_VERSION
+    )];
     if !description.is_empty() {
         sections.push(format!("description \"{}\"", quotable(description)?));
     }
@@ -1093,13 +1170,9 @@ fn module_kdl(
             .join(" ");
         sections.push(format!("packages {listed}"));
     }
-    Ok(match sections.is_empty() {
-        true => String::new(),
-        false => format!("{}\n", sections.join("\n\n")),
-    })
+    Ok(format!("{}\n", sections.join("\n\n")))
 }
 
-/// A value that would have to be escaped to survive being written into KDL.
 fn quotable(value: &str) -> Result<&str, String> {
     match value.contains(['"', '\\', '\n']) {
         true => Err(format!(
@@ -1109,24 +1182,19 @@ fn quotable(value: &str) -> Result<&str, String> {
     }
 }
 
-/// Which images a module is listed in, or why none is. It asks even when there
-/// is one image, because having a module in the repository and listing it in an
-/// image are different decisions.
+/// Image listing remains a user decision even when the repository has one
+/// image.
 pub enum Listing {
-    /// The picker was left, so the command writes nothing.
     Cancelled,
-    /// Nothing to list it in yet.
     NoImage,
-    /// None of them, which is an answer. `asked` is false where there was
-    /// nobody to ask, and naming the flag is the only useful thing to say.
+    /// Declining every image is a valid answer. `asked` is false when no image
+    /// exists and the response must name the flag.
     Declined {
         asked: bool,
     },
     In(Vec<Listed>),
 }
 
-/// One place a module gets a line: which image file, which image in it, and the
-/// flavour gating it, if any.
 pub struct Listed {
     file: PathBuf,
     image: String,
@@ -1134,9 +1202,8 @@ pub struct Listed {
 }
 
 impl Listing {
-    /// The question alone: which images, and nothing about what goes in them.
-    /// What one answer writes into each is checked per module by
-    /// `refuse_duplicate`, since one answer covers a set.
+    /// Duplicate checks run per module because one answer can select several
+    /// images.
     pub fn collect(root: &Path, given: Vec<String>, prompt: &Prompt) -> Result<Self, String> {
         let list = crate::model::image::List::editable(root).map_err(|issues| issues.plain())?;
         Self::collect_from(&list, given, prompt)
@@ -1178,7 +1245,7 @@ impl Listing {
         }
         let chosen = unique;
         // The ungated entry is already in every flavour. The widget makes the
-        // pair unreachable; a flag and the numbered list do not.
+        // pair unreachable. A flag and the numbered list do not.
         let ungated = |target: &crate::model::image::Target| {
             chosen.iter().any(|at| {
                 targets[*at].image == target.image
@@ -1224,9 +1291,8 @@ impl Listing {
         })
     }
 
-    /// The declaration `name` and `source` write, against what the images the
-    /// answer names already say. A module gated to two flavours is listed under
-    /// each, so only an overlap is a duplicate.
+    /// Duplicate checks compare `name` and `source` within each selected image.
+    /// A module gated to two flavours conflicts only where the flavours overlap.
     pub fn refuse_duplicate(
         &self,
         list: &crate::model::image::List,
@@ -1250,9 +1316,8 @@ impl Listing {
                 continue;
             };
             let (at, into) = (target(image, &held.flavour), target(image, &into.flavour));
-            // Where the two spellings differ the path is the whole of what
-            // the reader is missing: `dev-tools` says nothing about there
-            // already being a `.remote` node for it.
+            // When the spellings differ, the path distinguishes an owned
+            // `dev-tools` module from an existing `.remote` entry.
             let elsewhere = match held.dir() == dir {
                 true => String::new(),
                 false => format!(", as {}/{}", crate::layout::MODULES, held.dir()),
@@ -1267,9 +1332,9 @@ impl Listing {
         Ok(())
     }
 
-    /// The image files the module got a line in, which is nothing where no
-    /// image took it. Appending is the only thing this does, and an image that
-    /// already lists it is skipped, so every file named is an update.
+    /// Existing declarations are skipped per image, so every returned image
+    /// file was updated by this application. A declaration in one image does
+    /// not suppress insertion into another image.
     pub fn apply(
         &self,
         list: &crate::model::image::List,
@@ -1300,8 +1365,6 @@ impl Listing {
         Ok(())
     }
 
-    /// The images the answer writes into, by `name`, which is what a check
-    /// made at the point of the edit is made against.
     pub fn images(&self) -> Vec<&str> {
         let Self::In(listed) = self else {
             return Vec::new();
@@ -1315,7 +1378,6 @@ impl Listing {
         out
     }
 
-    /// The exact image targets the answer writes into.
     pub(crate) fn targets(&self) -> Vec<(&str, Option<&str>)> {
         let Self::In(listed) = self else {
             return Vec::new();
@@ -1326,10 +1388,9 @@ impl Listing {
             .collect()
     }
 
-    /// One answer applied to a set: every member gets its line in every image
-    /// the answer named, in the order they are given, under the collection it
-    /// came from or none where the repository now owns it. A member an image
-    /// already lists is skipped there alone.
+    /// Batch application preserves member order and collection ownership.
+    /// An existing member is skipped only in the image that already declares
+    /// it.
     pub(crate) fn apply_declaration(
         &self,
         list: &crate::model::image::List,
@@ -1399,9 +1460,8 @@ impl Listing {
     }
 }
 
-/// Where a declaration lives relative to `modules/`, which is what an image
-/// entry records: a referenced member under `.remote`, an owned module at its
-/// path.
+/// The relative path distinguishes referenced members under `.remote` from
+/// repository-owned modules.
 fn dir_of(name: &str, source: Option<&str>) -> String {
     match source {
         Some(owner) => format!("{}/{owner}/{name}", crate::model::remote::REMOTE_DIR),
@@ -1409,9 +1469,8 @@ fn dir_of(name: &str, source: Option<&str>) -> String {
     }
 }
 
-/// What the image already lists as `name`, where the way `into` names it
-/// counts it: an ungated entry is in every flavour, so only an overlap is a
-/// duplicate.
+/// An ungated entry spans every flavour, so an existing entry conflicts only
+/// where its target overlaps `into`.
 ///
 /// Matched by the module's name, so `import` under `.remote/<collection>/` and
 /// `copy` under `modules/` see each other. A namesake from a different
@@ -1438,14 +1497,12 @@ fn holds<'a>(
     Some((image, entry))
 }
 
-/// The declaration a module gets, which is one line whatever wraps it.
 fn leaf(name: &str) -> String {
     format!("module \"{name}\"")
 }
 
-/// The listing question: every image with its flavours under it, since listing
-/// a module in an image and gating it to a flavour are the same question at two
-/// depths. One image with no flavours is not a list, it is a yes or a no.
+/// Listing and flavour gating are one question at two depths. A single image
+/// without flavours therefore uses a yes-or-no question.
 fn ask(
     list: &crate::model::image::List,
     targets: &[crate::model::image::Target],
@@ -1480,7 +1537,6 @@ fn ask(
     prompt.choose_many(copy::LIST_IN_IMAGES, &rows, &[])
 }
 
-/// The blocks a module declaration sits inside, outermost first.
 fn listed_in<'a>(
     flavour: Option<&'a str>,
     source: Option<&'a str>,
@@ -1495,7 +1551,6 @@ fn listed_in<'a>(
     chain
 }
 
-/// A declaration inside the blocks that have to be written around it.
 fn wrap(blocks: &[(&str, Option<&str>)], leaf: &str) -> String {
     blocks
         .iter()
@@ -1507,9 +1562,8 @@ fn wrap(blocks: &[(&str, Option<&str>)], leaf: &str) -> String {
         })
 }
 
-/// One declaration before the closing brace of the deepest block on `chain`
-/// that is already there, wrapped in the ones below it that are not. Every
-/// other byte is left where it was: this appends, and never rewrites a value.
+/// Append inserts one declaration at the deepest existing block and wraps the
+/// missing blocks. Every other byte stays in place.
 fn append(
     file: &Path,
     image: &str,
@@ -1542,10 +1596,8 @@ fn append(
     std::fs::write(file, text).map_err(|err| format!("{}: {err}", file.display()))
 }
 
-/// The modules a fresh image cannot build without: whatever fills the
-/// family-adapter role, and whatever satisfies what the base row says it
-/// requires. Gathered as one list and asked as one question, since a fresh
-/// repository is missing both.
+/// A fresh image needs the family adapter and every provider required by its
+/// base, so one question offers both groups.
 fn wanted<'a>(
     index: &'a crate::provider::Index,
     family: &str,
@@ -1565,9 +1617,8 @@ fn wanted<'a>(
     out
 }
 
-/// The capabilities those modules are looked up by, which is also how many
-/// answers a complete offer has: one short of that is a collection nothing has
-/// read yet.
+/// A provider list shorter than these roles means an unread collection may
+/// still supply an answer.
 fn roles(base: Option<&crate::base::Base>) -> Vec<&str> {
     std::iter::once(BUILD_ENVIRONMENT)
         .chain(
@@ -1577,9 +1628,8 @@ fn roles(base: Option<&crate::base::Base>) -> Vec<&str> {
         .collect()
 }
 
-/// The question, which names them. *Needs*, since only one of the two kinds is
-/// a `requires` on the base row and the other is the family adapter, which no
-/// row declares. Nobody to ask takes them.
+/// The question says *needs* because the family adapter is not a declared
+/// `requires` on the base row.
 fn offer(
     base: &str,
     wanted: &[&crate::provider::Provider],
@@ -1593,11 +1643,14 @@ fn offer(
         }
         println!();
     }
-    prompt.confirm_current(copy::BRING_FOR_BASE, copy::YES, copy::NO, current)
+    let [yes, no] = yes_no_options();
+    prompt.confirm_current(copy::BRING_FOR_BASE, &yes.label, &no.label, current)
 }
 
-/// Those modules as an image's `modules` block, each collection's grouped under
-/// one `source`. An image with nothing to seed opens with an empty block.
+fn yes_no_options() -> [Choice; 2] {
+    [Choice::new(copy::YES, ""), Choice::new(copy::NO, "")]
+}
+
 fn seeded(wanted: &[&crate::provider::Provider]) -> String {
     let mut owners: Vec<Option<&str>> = Vec::new();
     for provider in wanted {
@@ -1657,12 +1710,14 @@ fn image_kdl(
                 ships.push_str(&format!("\x20       {node} {}\n", listed.join(" ")));
             }
         }
-        // Always written: the signature probe corrects the line it finds, and
-        // an omitted one is a correction it cannot make.
+        // The signature probe can correct only a written line. An omission
+        // would leave it no declaration to repair.
         ships.push_str(&format!("\x20       signed #{}\n", known.signed));
     }
     format!(
-        "image {{\n\
+        "schema-version {}\n\
+         \n\
+         image {{\n\
          \x20   name \"{name}\"\n\
          {urls}\n\
          \x20   base \"{base}\" {{\n\
@@ -1674,11 +1729,12 @@ fn image_kdl(
          \x20   modules {{\n\
          {modules}\
          \x20   }}\n\
-         }}\n"
+         }}\n",
+        crate::model::image::SCHEMA_VERSION
     )
 }
 
-/// A repository inside a repository: the outer one would read the inner tree as
+/// The outer repository would read a nested repository as
 /// its own modules and images.
 fn refuse_nesting(root: &Path) -> Result<(), String> {
     let full = match root.is_absolute() {
@@ -1696,10 +1752,48 @@ fn refuse_nesting(root: &Path) -> Result<(), String> {
     }
 }
 
-/// The repository the rest of the tree is committed into. Its own output is
-/// dropped: what a run prints is the one line every other step prints.
+/// Puts a directory under git control for a repository that was hand-written
+/// or copied. An existing ignore file is the repository's, so it is never
+/// replaced.
+pub fn git_control(root: &Path) -> Result<(), String> {
+    let full = match root.is_absolute() {
+        true => root.to_path_buf(),
+        false => std::env::current_dir().unwrap_or_default().join(root),
+    };
+    if let Some(outer) = enclosing_git(&full) {
+        return Err(match outer == full {
+            true => format!("{} is already a git repository", full.display()),
+            false => format!(
+                "{} is inside the git repository at {}; a repository does not nest",
+                full.display(),
+                outer.display()
+            ),
+        });
+    }
+    let mut wrote: Vec<(PathBuf, Change)> = Vec::new();
+    let ignore = full.join(".gitignore");
+    if !ignore.exists() {
+        crate::init::put(&ignore, crate::init::GITIGNORE)?;
+        wrote.push((PathBuf::from(".gitignore"), Change::Created));
+    }
+    git_init(&full)?;
+    report(&full, &wrote);
+    println!("initialised a git repository in {}", full.display());
+    Ok(())
+}
+
+/// The nearest directory holding a `.git` entry, the directory itself
+/// included. A `.git` file names a worktree, which is a repository too.
+fn enclosing_git(from: &Path) -> Option<PathBuf> {
+    from.ancestors()
+        .find(|dir| dir.join(".git").exists())
+        .map(Path::to_path_buf)
+}
+
+/// Git output is discarded so every create step emits one consistent status
+/// line.
 fn git_init(root: &Path) -> Result<(), String> {
-    // `main`, because the push line, the remote and every workflow name it.
+    // The push line, remote and workflows all require the `main` branch.
     match quietly(Command::new("git").args(["init", "-b", "main"]).arg(root)).status() {
         Ok(status) if status.success() => Ok(()),
         Ok(status) => Err(format!(
@@ -1719,8 +1813,8 @@ fn quietly(command: &mut Command) -> &mut Command {
     command.stdout(Stdio::null()).stderr(Stdio::null())
 }
 
-/// Whether `gh` is there and signed in, both collect-time reads: what they
-/// answer is which of the offers the flow makes.
+/// Both `gh` checks run during collection because their results decide which
+/// offers the flow can make.
 fn gh_installed() -> bool {
     quietly(Command::new("gh").arg("--version"))
         .status()
@@ -1779,8 +1873,8 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
-    /// Two collections' worth and two of one collection's, so the block a fresh
-    /// image opens with is one `source` per collection.
+    /// Interleaved members from two collections prove that seeding writes one
+    /// `source` block per collection.
     #[test]
     fn the_seeded_block_groups_each_collections_modules_under_one_source() {
         let provider = |owner: Option<&str>, name: &str| crate::provider::Provider {
@@ -1789,9 +1883,8 @@ mod tests {
             here: false,
             declares: crate::parse::module::Summary::default(),
         };
-        // The second `tectonic-os` is not beside the first: grouping is by
-        // owner, not by run, so a base whose `requires` interleaves two
-        // collections still writes one block apiece.
+        // Grouping by owner keeps one block per collection when a base
+        // interleaves their requirements.
         let held = [
             provider(Some("tectonic-os"), "debian-family"),
             provider(None, "mine"),
@@ -1814,7 +1907,9 @@ mod tests {
         let root = std::env::temp_dir().join(format!("tect-listing-{}", std::process::id()));
         crate::init::put(
             &root.join("image.kdl"),
-            r#"image {
+            r#"schema-version 1
+
+image {
     name "Example"
     base "example" { family "fedora" }
     flavours {
@@ -1859,19 +1954,53 @@ mod tests {
         let _ = std::fs::remove_dir_all(root);
     }
 
+    /// One catalog row, for a test that needs a known base rather than a
+    /// library on disk.
+    fn base(
+        name: &str,
+        image: &str,
+        family: &str,
+        provides: &[&str],
+        bootloaders: &[&str],
+    ) -> crate::base::Base {
+        crate::base::Base {
+            name: name.to_string(),
+            image: image.to_string(),
+            family: family.to_string(),
+            provides: provides.iter().map(|name| name.to_string()).collect(),
+            requires: Vec::new(),
+            about: format!("what {name} ships"),
+            signed: false,
+            scap_content: String::new(),
+            bootloaders: bootloaders.iter().map(|b| b.to_string()).collect(),
+            span: crate::diag::Span::default(),
+        }
+    }
+
+    /// A base and an unknown one write different images: a catalogued base
+    /// writes every property the library holds for it.
     #[test]
     fn a_catalogued_base_writes_what_it_ships_and_an_unknown_one_writes_nothing() {
         let bazzite = "ghcr.io/ublue-os/bazzite:stable";
-        let seeded: Vec<crate::base::Base> =
-            crate::base::catalog(Path::new("."), &[], &mut crate::diag::Issues::default()).0;
+        let seeded = base(
+            "bazzite",
+            bazzite,
+            "fedora",
+            &["rechunking", "flatpak"],
+            &["grub2"],
+        );
         let known = image_kdl(
             "Bazzite",
             None,
             bazzite,
             "fedora",
-            crate::base::find(&seeded, bazzite),
+            crate::base::find(std::slice::from_ref(&seeded), bazzite),
             Some("grub2"),
             "",
+        );
+        assert!(
+            known.starts_with("schema-version 1\n\nimage {\n"),
+            "{known}"
         );
         assert!(
             known.contains("        provides \"rechunking\" \"flatpak\"\n"),
@@ -1899,6 +2028,7 @@ mod tests {
         );
 
         let row = |bootloaders: &[&str]| crate::base::Base {
+            name: "own".to_string(),
             image: "example.invalid/own:1".to_string(),
             family: "fedora".to_string(),
             provides: Vec::new(),
@@ -1933,7 +2063,9 @@ mod tests {
         assert!(!unknown.contains("provides"), "{unknown}");
         assert!(!unknown.contains("layout"), "{unknown}");
 
-        // One bootloader is written without a question; two are asked, opened
+        assert_eq!(module_kdl("", &[], &[], &[]).unwrap(), "schema-version 1\n");
+
+        // One bootloader is written without a question. Two are asked, opened
         // on the row's default, and an unattended run takes it.
         let one = row(&["grub2"]);
         assert_eq!(
@@ -1963,21 +2095,52 @@ mod tests {
         );
     }
 
-    /// A capability the catalog misspells is written into every image scaffolded
-    /// on that base, where it suppresses nothing and satisfies nothing.
+    /// A typed `--base` naming the catalog name writes the image reference the
+    /// catalog holds for it, and an unknown name passes through.
     #[test]
-    fn every_catalogued_name_is_a_name() {
+    fn a_base_is_canonicalised_from_its_catalog_name() {
+        let seeded = base(
+            "bazzite",
+            "ghcr.io/ublue-os/bazzite:stable",
+            "fedora",
+            &[],
+            &["grub2"],
+        );
+        let bases = [seeded];
+        assert_eq!(
+            catalogued(&bases, "bazzite".to_string()),
+            "ghcr.io/ublue-os/bazzite:stable"
+        );
+        assert_eq!(
+            catalogued(&bases, "ghcr.io/other/unknown:1".to_string()),
+            "ghcr.io/other/unknown:1"
+        );
+    }
+
+    /// A capability the library misspells is a name a generated graph cannot
+    /// carry, and every witness path is checked on a machine with no working
+    /// directory.
+    #[test]
+    fn every_library_name_is_a_name() {
         use crate::model::image::is_name;
-        let bases =
-            crate::base::catalog(Path::new("."), &[], &mut crate::diag::Issues::default()).0;
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/collections/upstream");
+        let mut issues = crate::diag::Issues::default();
+        let mut bases = Vec::new();
+        for path in crate::base::base_files(&dir) {
+            let (base, _) = crate::parse::bases::read_base(&path, &mut issues)
+                .unwrap_or_else(|| panic!("{} describes no base", path.display()));
+            bases.push(base);
+        }
+        let (rows, _) =
+            crate::parse::bases::read_capabilities(&dir.join("capabilities.kdl"), &mut issues)
+                .expect("the fixture library carries capabilities.kdl");
+        assert!(issues.is_empty(), "{}", issues.plain());
         for base in bases {
             assert!(is_name(&base.family), "{}", base.image);
             for name in &base.provides {
                 assert!(is_name(name), "{} provides {name}", base.image);
             }
         }
-        let rows =
-            crate::base::capabilities(Path::new("."), &[], &mut crate::diag::Issues::default());
         for row in rows {
             assert!(is_name(&row.name), "capability {}", row.name);
             assert!(
@@ -1985,6 +2148,9 @@ mod tests {
                 "{}",
                 row.name
             );
+            for (_, path) in &row.families {
+                assert!(path.starts_with('/'), "{} reads {path}", row.name);
+            }
         }
     }
 
@@ -2024,7 +2190,6 @@ mod tests {
         .join("\n");
         assert!(written.contains(&nested), "{written}");
 
-        // A second member of the same collection joins the blocks now there.
         append(&file, "Example", &chain, "module \"editor\"").unwrap();
         let written = std::fs::read_to_string(&file).unwrap();
         assert_eq!(written.matches("flavour \"dx\"").count(), 1);
@@ -2034,7 +2199,6 @@ mod tests {
             "{written}"
         );
 
-        // The block `create flavour` writes, which the image had none of.
         append(&file, "Example", &[("flavours", None)], "dx").unwrap();
         let written = std::fs::read_to_string(&file).unwrap();
         assert!(
@@ -2056,5 +2220,190 @@ mod tests {
         assert!(module.apply(&root).unwrap().is_empty());
         assert!(!module.file.exists());
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn create_repo_and_image_screens_snapshot_production_copy() {
+        use crate::screen_tests::{assert_screen, screen};
+
+        assert_screen(
+            "create-repo-name",
+            screen().line(copy::REPO_NAME, "", "Example", Some("example")),
+        );
+        assert_screen(
+            "create-repo-owner",
+            screen().line(&copy::username(HOST), "github.com/", "someone", None),
+        );
+        let yes_no = yes_no_options();
+        assert_screen(
+            "create-repo-provider",
+            screen().picker(copy::SCHEDULED, &yes_no, None, "enter confirms", 0),
+        );
+        assert_screen(
+            "create-repo-host",
+            screen().picker(copy::REPO_HOST, &host_options(), None, "enter confirms", 0),
+        );
+        assert_screen(
+            "create-repo-image",
+            screen().picker(copy::IMAGES, &yes_no, None, "enter confirms", 1),
+        );
+        assert_screen(
+            "create-repo-remote",
+            screen().picker(copy::CREATE_REMOTE, &yes_no, None, "enter confirms", 1),
+        );
+        let scripts: Vec<Choice> = offered()
+            .into_iter()
+            .map(|(name, about, _)| Choice::new(name, about))
+            .collect();
+        assert_screen(
+            "create-repo-scripts",
+            screen().picker(copy::SCRIPTS, &scripts, Some(&[0]), "space toggles", 0),
+        );
+
+        assert_screen(
+            "create-image-name",
+            screen().line(copy::IMAGE_NAME, "", "Workstation", Some("Example")),
+        );
+        let libraries: Vec<Choice> = Libraries::every()
+            .iter()
+            .map(|library| {
+                Choice::new(
+                    format!("{} \"{}\"", library.kind.as_str(), library.alias),
+                    library.about,
+                )
+            })
+            .collect();
+        assert_screen(
+            "create-repo-libraries",
+            screen().picker(
+                copy::LIBRARIES,
+                &libraries,
+                Some(&[0, 1, 2]),
+                "space toggles",
+                0,
+            ),
+        );
+        let bases = vec![
+            base(
+                "fedora-bootc-44",
+                "quay.io/fedora/fedora-bootc:44",
+                "fedora",
+                &["rechunking", "bootc"],
+                &["grub2"],
+            ),
+            base(
+                "ubuntu-26-04",
+                "docker.io/library/ubuntu:26.04",
+                "ubuntu",
+                &[],
+                &["grub2", "systemd"],
+            ),
+        ];
+        let mut options = base_options(&bases);
+        options.push(Choice::new(copy::OTHER_BASE, copy::OTHER_BASE_ABOUT));
+        assert_screen(
+            "create-image-base",
+            screen().picker(copy::IMAGE_BASE, &options, None, "enter confirms", 0),
+        );
+        assert_screen(
+            "create-image-add-modules",
+            screen().picker(
+                copy::BRING_FOR_BASE,
+                &yes_no_options(),
+                None,
+                "enter confirms",
+                0,
+            ),
+        );
+        let dual = bases
+            .iter()
+            .find(|base| base.bootloaders.len() == 2)
+            .expect("the production catalog carries a two-bootloader base");
+        assert_screen(
+            "create-image-bootloader",
+            screen().picker(
+                copy::IMAGE_BOOTLOADER,
+                &bootloader_options(&dual.bootloaders),
+                None,
+                "enter confirms",
+                0,
+            ),
+        );
+        assert_screen(
+            "create-image-family",
+            screen().line(copy::BASE_FAMILY, "", "fedora", None),
+        );
+    }
+
+    #[test]
+    fn repository_review_screen_snapshots_collected_rows() {
+        use crate::screen_tests::{assert_screen, assert_style_at, screen};
+
+        let repo = Repo {
+            name: "Example".to_string(),
+            id: "example".to_string(),
+            root: PathBuf::from("example"),
+            host: HOST.to_string(),
+            owner: Some("someone".to_string()),
+            assets: PathBuf::from("assets"),
+            libraries: Libraries {
+                chosen: Libraries::every(),
+            },
+            image: None,
+            workflows: None,
+            scripts: Scripts {
+                chosen: vec![SKELETON_FILE],
+            },
+            remote: false,
+            install_gh: false,
+        };
+        let mut rows: Vec<Choice> = repo
+            .rows()
+            .into_iter()
+            .map(|(_, label, value)| Choice::new(format!("{label}  {value}"), ""))
+            .collect();
+        rows.push(Choice::new(copy::CREATE, ""));
+        let rendered = assert_screen(
+            "create-repo-review",
+            screen().picker(copy::REVIEW, &rows, None, copy::REVIEW_KEYS, rows.len() - 1),
+        );
+        assert_style_at(
+            &rendered,
+            0,
+            8,
+            "fg: Rgb(238, 111, 248), bg: Reset, underline: Reset, modifier: BOLD",
+            "the selected Create action",
+        );
+    }
+
+    /// The hand-written path's first step. A second run refuses, and an
+    /// ignore file the repository already keeps survives.
+    #[test]
+    fn git_control_initialises_once_and_keeps_a_kept_ignore_file() {
+        let fresh = std::env::temp_dir().join(format!("tect-git-{}", std::process::id()));
+        let kept = std::env::temp_dir().join(format!("tect-git-kept-{}", std::process::id()));
+        for dir in [&fresh, &kept] {
+            let _ = std::fs::remove_dir_all(dir);
+            std::fs::create_dir_all(dir).unwrap();
+        }
+        std::fs::write(kept.join(".gitignore"), "mine\n").unwrap();
+
+        git_control(&fresh).unwrap();
+        assert!(fresh.join(".git").is_dir());
+        assert_eq!(
+            std::fs::read_to_string(fresh.join(".gitignore")).unwrap(),
+            crate::init::GITIGNORE
+        );
+        let refused = git_control(&fresh).unwrap_err();
+        assert!(refused.contains("already a git repository"), "{refused}");
+
+        git_control(&kept).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(kept.join(".gitignore")).unwrap(),
+            "mine\n"
+        );
+
+        let _ = std::fs::remove_dir_all(&fresh);
+        let _ = std::fs::remove_dir_all(&kept);
     }
 }

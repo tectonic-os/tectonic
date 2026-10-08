@@ -1,3 +1,5 @@
+schema-version 1
+
 description "A claim whose benchmark name is empty"
 
 supports "fedora"

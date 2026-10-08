@@ -2,21 +2,23 @@ schema-version 1
 name "Broken Sources"
 
 sources {
-    tectonic-os {
-        pin {
-            renovate datasource="github-tags" depName="tectonic-os/modules"
-            version "v1.0.0"
-            url "https://github.com/tectonic-os/modules/archive/refs/tags/{version}.tar.gz"
-            sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
-        }
+    modules "tectonic-os" {
+        url "https://github.com/tectonic-os/modules"
+        version "v1.0.0"
+        sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
     }
-    tectonic-os "../modules"
-    Scratch "../modules"
-    local "../modules" {
-        pin {
-            version "v1.0.0"
-            sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
-        }
+    modules "tectonic-os" {
+        dir "../modules"
     }
-    bare
+    modules "Scratch" {
+        dir "../modules"
+    }
+    modules "local" {
+        dir "../modules"
+        version "v1.0.0"
+    }
+    modules "bare" {}
+    modules "insecure" {
+        url "http://github.com/tectonic-os/modules"
+    }
 }

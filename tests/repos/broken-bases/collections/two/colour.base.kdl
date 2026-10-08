@@ -1,0 +1,9 @@
+base {
+    image "example.invalid/wrong-names:1"
+    about "Names that are wrong"
+    family "fedora"
+    provides "Rechunking" "/usr/bin/flatpak"
+    signed "yes"
+    colour "red"
+    bootloader "grub2"
+}

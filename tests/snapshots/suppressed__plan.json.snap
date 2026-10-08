@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 {
   "schema_version": 1,
@@ -43,29 +43,13 @@ source: tests/golden.rs
           "flatpak"
         ],
         "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
           "flatpak": [
-            "/usr/bin/flatpak"
+            "/usr/bin/flatpak",
+            "/usr/sbin/flatpak"
           ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
+          "rechunking": [
+            "/usr/bin/rechunking",
+            "/usr/sbin/rechunking"
           ]
         },
         "requires": [],
@@ -110,7 +94,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "9653e06e8ebde711a9544cabdd7f4d9b7a60af2ca893fdf42be227ac29b90503",
+                "content": "f72b344604d4c3e827cd9666ae09ab2bd78434a3fe956d80bfdc67866bfcbdb6",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -149,7 +133,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "4c6d5c98776ca0b87887befcd01a7692a1f9d6874eebc26b2feeaddb5e1545f0",
+                "content": "d40c2891d1aac415c97068412a248e05aaea222ab467ca113436d3954d4d6467",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -167,9 +151,7 @@ source: tests/golden.rs
             }
           ],
           "secrets": [],
-          "contract_files": [
-            "/usr/bin/flatpak"
-          ],
+          "contract_files": [],
           "verify_exceptions": [],
           "assets": [],
           "overlay_files": {},

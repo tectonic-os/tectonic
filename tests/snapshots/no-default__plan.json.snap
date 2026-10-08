@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 {
   "schema_version": 1,
@@ -42,29 +42,9 @@ source: tests/golden.rs
           "rechunking"
         ],
         "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
+          "rechunking": [
+            "/usr/bin/rechunking",
+            "/usr/sbin/rechunking"
           ]
         },
         "requires": [],
@@ -102,7 +82,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "d0d0cffd9bbd211559d811d2617e3166ce50b7149a35eb9c67cee75b98e83ac4",
+                "content": "644e04194a52bd7fa6a63998dd8ac8661fbae8cdc88a1acc0e8814a7bff2f4d6",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -146,33 +126,13 @@ source: tests/golden.rs
           "rechunking"
         ],
         "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
+          "rechunking": [
+            "/usr/bin/rechunking",
+            "/usr/sbin/rechunking"
           ],
           "shell-tools": [
             "/usr/bin/shell-tools",
             "/usr/sbin/shell-tools"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
           ]
         },
         "requires": [],
@@ -230,7 +190,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "d0d0cffd9bbd211559d811d2617e3166ce50b7149a35eb9c67cee75b98e83ac4",
+                "content": "644e04194a52bd7fa6a63998dd8ac8661fbae8cdc88a1acc0e8814a7bff2f4d6",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -288,7 +248,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "d0d0cffd9bbd211559d811d2617e3166ce50b7149a35eb9c67cee75b98e83ac4",
+                "content": "644e04194a52bd7fa6a63998dd8ac8661fbae8cdc88a1acc0e8814a7bff2f4d6",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -346,7 +306,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "d0d0cffd9bbd211559d811d2617e3166ce50b7149a35eb9c67cee75b98e83ac4",
+                "content": "644e04194a52bd7fa6a63998dd8ac8661fbae8cdc88a1acc0e8814a7bff2f4d6",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -372,7 +332,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "ca999c1eb46cf76622b1fc110d13bda609da600b09410b281614daccf774250e",
+                "content": "b389afa2df549786eb6284f8de9df649ad3ab660902f2fa34e9b88ca4dff9d84",
                 "repo": false,
                 "source": null,
                 "pin": null,

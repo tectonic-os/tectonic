@@ -1,3 +1,5 @@
+schema-version 1
+
 description "The smallest module a repository can hold"
 
 supports "fedora"

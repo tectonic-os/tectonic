@@ -1,3 +1,5 @@
+schema-version 1
+
 description "Every way a file mode declaration can be wrong"
 
 supports "fedora"

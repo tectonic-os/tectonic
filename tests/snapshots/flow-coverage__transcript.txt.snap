@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 # Example coverage of `standard`
 
@@ -12,5 +12,5 @@ source: tests/golden.rs
 | `5.2.20`, `RHEL-09-232010` | Disable SSH Root Login |  | `hardening` |
 |  | Ensure gpgcheck Enabled In Main dnf Configuration |  |  |
 tect: 4 of 4 rules are unclaimed
-tect: The `tectonic-os` collection is declared but not on this machine, so nothing read it: `tect fetch modules` downloads it
+tect: The `tectonic-modules` collection is declared but not on this machine, so nothing read it: `tect fetch modules` downloads it
 ==== exit 0

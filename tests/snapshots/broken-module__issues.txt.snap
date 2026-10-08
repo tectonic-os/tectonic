@@ -2,34 +2,34 @@
 source: tests/golden.rs
 ---
   x `core/nameless` is listed twice
-    ,-[tests/repos/broken-module/image.kdl:10:9]
-  9 |     modules {
- 10 |         module "core/nameless"
+    ,-[tests/repos/broken-module/image.kdl:12:9]
+ 11 |     modules {
+ 12 |         module "core/nameless"
     :         ^^^|^^
     :            `-- first here
- 11 |         module "core/missing"
- 12 |         module "core/latin"
- 13 |         module "core/nameless"
+ 13 |         module "core/missing"
+ 14 |         module "core/latin"
+ 15 |         module "core/nameless"
     :         ^^^|^^
     :            `-- and again here
- 14 |     }
+ 16 |     }
     `----
   help: a module builds once per flavour it is listed under
 
   x unknown node `flies`
-   ,-[tests/repos/broken-module/modules/core/unlisted/module.kdl:4:1]
- 3 | 
- 4 | flies "a kite"
+   ,-[tests/repos/broken-module/modules/core/unlisted/module.kdl:6:1]
+ 5 | 
+ 6 | flies "a kite"
    : ^^|^^
    :   `-- not part of the schema
- 5 | provides "Shell|Tools"
+ 7 | provides "Shell|Tools"
    `----
   help: docs/schema/module.md documents every node a manifest may hold
 
   x invalid capability name `Shell|Tools`
-   ,-[tests/repos/broken-module/modules/core/unlisted/module.kdl:5:1]
- 4 | flies "a kite"
- 5 | provides "Shell|Tools"
+   ,-[tests/repos/broken-module/modules/core/unlisted/module.kdl:7:1]
+ 6 | flies "a kite"
+ 7 | provides "Shell|Tools"
    : ^^^^|^^^
    :     `-- lowercase, digits and dashes, starting with a letter
    `----
@@ -37,60 +37,60 @@ source: tests/golden.rs
         markdown table cell, neither of which quotes anything
 
   x unknown node `drives`
-   ,-[tests/repos/broken-module/modules/core/nameless/module.kdl:3:1]
- 2 | 
- 3 | drives "a truck"
+   ,-[tests/repos/broken-module/modules/core/nameless/module.kdl:5:1]
+ 4 | 
+ 5 | drives "a truck"
    : ^^^|^^
    :    `-- not part of the schema
- 4 | satisfies {
+ 6 | satisfies {
    `----
   help: docs/schema/module.md documents every node a manifest may hold
 
   x `cis-fedora` has no rules listed
-   ,-[tests/repos/broken-module/modules/core/nameless/module.kdl:5:5]
- 4 | satisfies {
- 5 |     cis-fedora
+   ,-[tests/repos/broken-module/modules/core/nameless/module.kdl:7:5]
+ 6 | satisfies {
+ 7 |     cis-fedora
    :     ^^^^^|^^^^
    :          `-- nothing to cover
- 6 |     "" "1.1.1.1"
+ 8 |     "" "1.1.1.1"
    `----
 
   x benchmark `stig` is declared twice
-   ,-[tests/repos/broken-module/modules/core/nameless/module.kdl:8:5]
- 7 |     stig "R1"
- 8 |     stig "R2"
-   :     ^^|^
-   :       `-- already declared above
- 9 | }
-   `----
+    ,-[tests/repos/broken-module/modules/core/nameless/module.kdl:10:5]
+  9 |     stig "R1"
+ 10 |     stig "R2"
+    :     ^^|^
+    :       `-- already declared above
+ 11 | }
+    `----
 
   x a benchmark name is required inside `satisfies`
-   ,-[tests/repos/broken-module/modules/core/nameless/module.kdl:6:5]
- 5 |     cis-fedora
- 6 |     "" "1.1.1.1"
+   ,-[tests/repos/broken-module/modules/core/nameless/module.kdl:8:5]
+ 7 |     cis-fedora
+ 8 |     "" "1.1.1.1"
    :     ^|
    :      `-- empty name
- 7 |     stig "R1"
+ 9 |     stig "R1"
    `----
   help: `satisfies { cis-fedora "1.1.1.1" }`
 
   x `core/missing` is not a module
-    ,-[tests/repos/broken-module/image.kdl:11:9]
- 10 |         module "core/nameless"
- 11 |         module "core/missing"
+    ,-[tests/repos/broken-module/image.kdl:13:9]
+ 12 |         module "core/nameless"
+ 13 |         module "core/missing"
     :         ^^^|^^
     :            `-- nothing to build
- 12 |         module "core/latin"
+ 14 |         module "core/latin"
     `----
   help: give modules/core/missing a module.kdl, a module.sh, a files/
         directory, a Containerfile.inc or a file that another module collects
 
   x tests/repos/broken-module/modules/core/latin/module.kdl cannot be read:
   | stream did not contain valid UTF-8
-    ,-[tests/repos/broken-module/image.kdl:12:9]
- 11 |         module "core/missing"
- 12 |         module "core/latin"
+    ,-[tests/repos/broken-module/image.kdl:14:9]
+ 13 |         module "core/missing"
+ 14 |         module "core/latin"
     :         ^^^|^^
     :            `-- module.kdl unreadable
- 13 |         module "core/nameless"
+ 15 |         module "core/nameless"
     `----

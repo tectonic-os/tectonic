@@ -2,9 +2,9 @@
 source: tests/golden.rs
 ---
   x `collects` needs into=, where the build puts them
-   ,-[tests/repos/broken-collect/modules/core/menu/module.kdl:5:1]
- 4 | 
- 5 | collects "justfile.inc" priority=500
+   ,-[tests/repos/broken-collect/modules/core/menu/module.kdl:7:1]
+ 6 | 
+ 7 | collects "justfile.inc" priority=500
    : ^^^^|^^^
    :     `-- incomplete
    `----
@@ -12,31 +12,31 @@ source: tests/golden.rs
         priority=500`
 
   x `priority` is a number from 0 to 9999
-   ,-[tests/repos/broken-collect/modules/core/absent/module.kdl:5:28]
- 4 | 
- 5 | contributes "justfile.inc" priority=90000
+   ,-[tests/repos/broken-collect/modules/core/absent/module.kdl:7:28]
+ 6 | 
+ 7 | contributes "justfile.inc" priority=90000
    :                            ^^^^^^^|^^^^^^
    :                                   `-- not a priority
- 6 | contributes "justfile.inc" priority=100
+ 8 | contributes "justfile.inc" priority=100
    `----
   help: it becomes the NNNN in the staged filename, so four digits is the
         whole range there is
 
   x `core/absent` orders a justfile.inc it does not ship
-   ,-[tests/repos/broken-collect/modules/core/absent/module.kdl:5:1]
- 4 | 
- 5 | contributes "justfile.inc" priority=90000
+   ,-[tests/repos/broken-collect/modules/core/absent/module.kdl:7:1]
+ 6 | 
+ 7 | contributes "justfile.inc" priority=90000
    : ^^^^^|^^^^^
    :      `-- nothing to order
- 6 | contributes "justfile.inc" priority=100
+ 8 | contributes "justfile.inc" priority=100
    `----
   help: shipping the file is what contributes it; this node only says where it
         lands
 
   x `core/absent` orders a justfile.inc it does not ship
-   ,-[tests/repos/broken-collect/modules/core/absent/module.kdl:6:1]
- 5 | contributes "justfile.inc" priority=90000
- 6 | contributes "justfile.inc" priority=100
+   ,-[tests/repos/broken-collect/modules/core/absent/module.kdl:8:1]
+ 7 | contributes "justfile.inc" priority=90000
+ 8 | contributes "justfile.inc" priority=100
    : ^^^^^|^^^^^
    :      `-- nothing to order
    `----

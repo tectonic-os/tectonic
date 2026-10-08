@@ -1,3 +1,5 @@
+schema-version 1
+
 description "What a container base needs before it is a bootc image at all"
 
 supports "debian"

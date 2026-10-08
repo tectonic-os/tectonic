@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 {
   "schema_version": 1,
@@ -43,20 +43,9 @@ source: tests/golden.rs
           "initramfs-generation"
         ],
         "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
           "initramfs-generation": [
-            "/usr/bin/dracut"
+            "/usr/bin/initramfs-generation",
+            "/usr/sbin/initramfs-generation"
           ],
           "kernel-devel": [
             "/usr/bin/kernel-devel",
@@ -66,14 +55,9 @@ source: tests/golden.rs
             "/usr/bin/kernel-devel-helpers",
             "/usr/sbin/kernel-devel-helpers"
           ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
+          "rechunking": [
+            "/usr/bin/rechunking",
+            "/usr/sbin/rechunking"
           ]
         },
         "requires": [],
@@ -117,7 +101,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "355111a1aa1c18b1eb28b565b5467ac90318da40b51a060ba22f0a36ebc52927",
+                "content": "5ac14983e4b81694e894685b202b0b8ab3e3cb418ef16b8cd27976eb59319840",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -158,7 +142,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "1f0dd864c0c77568eb600489b2054f5becf06ea1b609b19ff1acaf5313183412",
+                "content": "1ad92bc90ff2be7753e1143747b366e8ddc19e7dd219b82110452f6d35db8118",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -173,7 +157,6 @@ source: tests/golden.rs
             "mok_privkey"
           ],
           "contract_files": [
-            "/usr/bin/dracut",
             "/usr/share/secureboot/sb_cert.der"
           ],
           "verify_exceptions": [],

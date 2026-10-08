@@ -2,51 +2,56 @@
 source: tests/golden.rs
 ---
   x `image` takes no argument
-   ,-[tests/repos/broken-image/image.kdl:1:1]
- 1 | image "argument" {
+   ,-[tests/repos/broken-image/image.kdl:3:1]
+ 2 | 
+ 3 | image "argument" {
    : ^^|^^
    :   `-- the name belongs in the block
- 2 |     id "Not An Id"
+ 4 |     id "Not An Id"
    `----
   help: `image { id "argument" }` is the machine name, and `name` is the human
         one it derives from when absent
 
   x `image` declares no `name`
-   ,-[tests/repos/broken-image/image.kdl:1:1]
- 1 | image "argument" {
+   ,-[tests/repos/broken-image/image.kdl:3:1]
+ 2 | 
+ 3 | image "argument" {
    : ^^|^^
    :   `-- no name
- 2 |     id "Not An Id"
+ 4 |     id "Not An Id"
    `----
   help: `name "Tectonic"` is os-release NAME, which the boot menu and the
         desktop read
 
   x `image` declares no `base`
-   ,-[tests/repos/broken-image/image.kdl:1:1]
- 1 | image "argument" {
+   ,-[tests/repos/broken-image/image.kdl:3:1]
+ 2 | 
+ 3 | image "argument" {
    : ^^|^^
    :   `-- nothing to build on
- 2 |     id "Not An Id"
+ 4 |     id "Not An Id"
    `----
   help: `base "quay.io/fedora/fedora-bootc:44" { family "fedora" }`, naming
         the image every layer builds on
 
   x `image` has no `modules` block
-   ,-[tests/repos/broken-image/image.kdl:1:1]
- 1 | image "argument" {
+   ,-[tests/repos/broken-image/image.kdl:3:1]
+ 2 | 
+ 3 | image "argument" {
    : ^^|^^
    :   `-- nothing in it
- 2 |     id "Not An Id"
+ 4 |     id "Not An Id"
    `----
   help: an image with no modules is almost certainly a mistake; the block is
         required even when empty
 
   x invalid image name `Not An Id`
-   ,-[tests/repos/broken-image/image.kdl:1:1]
- 1 | image "argument" {
+   ,-[tests/repos/broken-image/image.kdl:3:1]
+ 2 | 
+ 3 | image "argument" {
    : ^^|^^
    :   `-- must be lowercase letters, digits and dashes, starting with a letter
- 2 |     id "Not An Id"
+ 4 |     id "Not An Id"
    `----
   help: it becomes an image tag, a cache tag and the default hostname, all of
         which restrict it

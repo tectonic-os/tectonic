@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 Tectonic v{version}
 
@@ -23,26 +23,23 @@ forge.example.org/someone
 
 Added forge.example.org/someone/example as the origin repo
 
+  1) [x] modules "tectonic-modules"  Feature modules for many use cases
+  2) [x] base-images "core"  Fedora, CentOS, RHEL, AlmaLinux, Rocky, Debian and Ubuntu
+  3) [x] capabilities "core"  Where each capability's witness is read
+Included libraries [1-3, several, 0 for none]: 
+
 Define an image now? (Yes/No)
 Yes
 
 What will the image be called? [Example]
 Desktop
 
-  1) quay.io/fedora/fedora-bootc:44  Fedora 44, nothing above the base system
-  2) quay.io/centos-bootc/centos-bootc:stream10  CentOS Stream 10, the EL base a stated claim can be measured against
-  3) registry.redhat.io/rhel10/rhel-bootc:latest  RHEL 10, the supported EL base, behind a Red Hat login
-  4) quay.io/almalinuxorg/almalinux-bootc:10  AlmaLinux 10, the RHEL rebuild, whose benchmark needs no entitlement
-  5) ghcr.io/ublue-os/bazzite:stable  KDE, gaming and hardware support over kinoite-main
-  6) ghcr.io/ublue-os/aurora:stable  KDE developer workstation over kinoite-main
-  7) ghcr.io/ublue-os/bluefin:stable  GNOME developer workstation over silverblue-main
-  8) ghcr.io/ublue-os/kinoite-main:44  Fedora Kinoite with the ublue additions, what bazzite builds on
-  9) quay.io/rockylinux/rockylinux:10  Rocky Linux 10, which a module set has to turn into a bootc image
-  10) docker.io/library/debian:forky  Debian 14, which a module set has to turn into a bootc image
-  11) docker.io/library/ubuntu:26.04  Ubuntu 26.04 LTS, which a module set has to turn into a bootc image
-What is the base image for this image? [1-11, 0 for none]: 1
+  1) example.invalid/collected:1  A base only the collection knows about
+  2) quay.io/fedora/fedora-bootc:44  Fedora 44, as this collection describes it
+What is the base image for this image? [1-2, 0 for none]: 2
 
-tect: `tectonic-os`: curl: No such file or directory (os error 2); what is offered below is only what is already on this machine
+tect: `tectonic-modules`: git -c protocol.version=2 fetch --quiet --depth=1 --no-tags -- https://github.com/tectonic-os/library HEAD: exit status: 128
+fatal: transport 'https' not allowed; what is offered below is only what is already on this machine
   1) [x] build  builds, scans, signs and publishes every image
   2) [x] build-disk  builds a disk image with bootc-image-builder
   3) [x] base-sig-probe  measures what each base signs and ships, and fixes it

@@ -17,7 +17,7 @@ miette = { version = "7.6.0", features = ["fancy"] }
 # a bump here, which keeps the rev that was built with visible in `Cargo.lock`.
 # To work on both trees at once, put a `paths` override in `.cargo/config.toml`,
 # which redirects a git dependency and leaves `Cargo.lock` alone.
-common = { git = "https://github.com/tectonic-os/common", rev = "054a99bfcd6e94c2400fe85d09ea6a8b0931decb" }
+common = { git = "https://github.com/tectonic-os/common", rev = "595582033fa256f95325ade9eaa7a7be5810e218" }
 
 [profile.release]
 opt-level = 1
@@ -44,4 +44,5 @@ codegen-units = 1
 # Renders `docs/cli.md` in a test, so it never reaches a dist binary.
 [dev-dependencies]
 clap-markdown = "0.1.5"
+common = { git = "https://github.com/tectonic-os/common", rev = "595582033fa256f95325ade9eaa7a7be5810e218", features = ["test-support"] }
 insta = { version = "1.49.0", default-features = false, features = ["filters"] }

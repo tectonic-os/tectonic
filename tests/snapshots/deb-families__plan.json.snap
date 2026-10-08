@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 {
   "schema_version": 1,
@@ -42,32 +42,7 @@ source: tests/golden.rs
         "family": "debian",
         "signed": false,
         "provides": [],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -102,7 +77,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "d0aef64747bab757d5abe18e45642c433f89d89fedefa3ff470157d222d2bb48",
+                "content": "90ee445922e5e06434547f59bd3c77a3adea4c268fd2fa6794ca789670b8c575",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -126,7 +101,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "2a6f8d22daf6f487613524677a42149601d6ea56b226ce27d0fa59e0bd99bbd7",
+                "content": "c9a5ae0790070fbfbb7b042d5a68ef2e93368eb5acc0e3a5753a6b7d8e70bcbd",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -165,7 +140,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "e51e39ffebfdac2011e41191448d86a11b54bc16e80b8f5f028e4469af548592",
+                "content": "50d842066176973a833abf03f9e65e94dc5432636d45c7e97b0610a26e96f58c",
                 "repo": true,
                 "source": null,
                 "pin": null,
@@ -221,32 +196,7 @@ source: tests/golden.rs
         "family": "debian",
         "signed": false,
         "provides": [],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [
           "bootc-base"
         ],
@@ -283,7 +233,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "d0aef64747bab757d5abe18e45642c433f89d89fedefa3ff470157d222d2bb48",
+                "content": "90ee445922e5e06434547f59bd3c77a3adea4c268fd2fa6794ca789670b8c575",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -310,7 +260,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "7f9208775c520e92428889588f5a385a0fbf2333db0f3a6c82bebf90b109030a",
+                "content": "e9e1a74be2ca49e0741bdd0beca3d3d09c8bd458ae1968342a679325b26f4275",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -334,7 +284,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "93d2a8f73f72f9bf9ded25fc442e70a9495c4b507531a15d76b06b5a55b77169",
+                "content": "0f6b3af8d230922486a1fe6005bd60dee659fcedd53fcdce457df965a6c0d8f4",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -358,7 +308,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "2a6f8d22daf6f487613524677a42149601d6ea56b226ce27d0fa59e0bd99bbd7",
+                "content": "c9a5ae0790070fbfbb7b042d5a68ef2e93368eb5acc0e3a5753a6b7d8e70bcbd",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -397,7 +347,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "e51e39ffebfdac2011e41191448d86a11b54bc16e80b8f5f028e4469af548592",
+                "content": "50d842066176973a833abf03f9e65e94dc5432636d45c7e97b0610a26e96f58c",
                 "repo": true,
                 "source": null,
                 "pin": null,
@@ -453,32 +403,7 @@ source: tests/golden.rs
         "family": "ubuntu",
         "signed": false,
         "provides": [],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -513,7 +438,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "d0aef64747bab757d5abe18e45642c433f89d89fedefa3ff470157d222d2bb48",
+                "content": "90ee445922e5e06434547f59bd3c77a3adea4c268fd2fa6794ca789670b8c575",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -537,7 +462,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "2a6f8d22daf6f487613524677a42149601d6ea56b226ce27d0fa59e0bd99bbd7",
+                "content": "c9a5ae0790070fbfbb7b042d5a68ef2e93368eb5acc0e3a5753a6b7d8e70bcbd",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -576,7 +501,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "e51e39ffebfdac2011e41191448d86a11b54bc16e80b8f5f028e4469af548592",
+                "content": "50d842066176973a833abf03f9e65e94dc5432636d45c7e97b0610a26e96f58c",
                 "repo": true,
                 "source": null,
                 "pin": null,

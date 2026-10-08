@@ -1,2 +1,4 @@
+schema-version 1
+
 image {
     name "Broken Syntax"

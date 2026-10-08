@@ -11,5 +11,4 @@ Tectonic v{version}
         the point
 
 tect: 1 problem in ./modules/.remote/upstream/flatpak/module.kdl; none in ./example.image.kdl, ./repo.kdl
-tect: upstream/bases.kdl replaces the tool's own entry for quay.io/fedora/fedora-bootc:44
 ==== exit 2

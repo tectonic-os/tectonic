@@ -2,11 +2,16 @@
 source: tests/golden/harness.rs
 ---
 ==== modules/my-editor/module.kdl
+schema-version 1
+
 provides "editor"
 
 packages "nano"
 ==== modules/plain/module.kdl
+schema-version 1
 ==== example.image.kdl
+schema-version 1
+
 image {
     name "Example"
     url "https://github.com/someone/example"
@@ -30,6 +35,8 @@ image {
     }
 }
 ==== server.image.kdl
+schema-version 1
+
 image {
     name "Server"
     url "https://github.com/someone/example"

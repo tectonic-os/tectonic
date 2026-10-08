@@ -1,3 +1,5 @@
+schema-version 1
+
 description "Requires a capability nothing in this image provides"
 
 supports "fedora"

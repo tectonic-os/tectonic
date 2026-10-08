@@ -2,11 +2,12 @@
 source: tests/golden.rs
 ---
   x tests/repos/broken-syntax/image.kdl is not valid KDL
-   ,-[tests/repos/broken-syntax/image.kdl:1:7]
- 1 | ,-> image {
+   ,-[tests/repos/broken-syntax/image.kdl:3:7]
+ 2 |     
+ 3 | ,-> image {
    : |         |
    : |         `-- No closing '}' for child block
- 2 | |->     name "Broken Syntax"
+ 4 | |->     name "Broken Syntax"
    : `---- Closing '}' was not found after nodes
    `----
 
@@ -23,15 +24,16 @@ source: tests/golden.rs
         is true of the repository. An image goes in a file of its own
 
   x unknown top-level node `palette`
-   ,-[tests/repos/broken-syntax/second.image.kdl:1:1]
- 1 | palette {
+   ,-[tests/repos/broken-syntax/second.image.kdl:3:1]
+ 2 | 
+ 3 | palette {
    : ^^^|^^^
    :    `-- not part of the schema
- 2 |     accent "red"
+ 4 |     accent "red"
    `----
-  help: an image file holds `image` nodes and nothing else; `base`, `flavours`
-        and `modules` are declared inside one, because they are what the image
-        is
+  help: an image file holds `schema-version` and `image` nodes; `base`,
+        `flavours` and `modules` are declared inside one, because they are
+        what the image is
 
   x tests/repos/broken-syntax/second.image.kdl declares no image
   help: an image file holds at least one `image` node: `image { name "Name" }

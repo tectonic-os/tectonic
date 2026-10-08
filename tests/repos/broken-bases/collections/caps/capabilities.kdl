@@ -1,0 +1,11 @@
+capability "flatpak" {
+    path "usr/bin/flatpak"
+}
+
+capability "Bad Name" {
+    path "/usr/bin/x"
+}
+
+capability "familyless" {
+    family "fedora" "debian"
+}

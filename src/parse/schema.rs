@@ -6,6 +6,21 @@ use crate::diag::{Issue, Issues, Source, Span};
 use crate::parse::{bool_arg, int_arg, kids, string_arg, string_args};
 use kdl::{KdlDocument, KdlNode};
 
+/// The schema reader that one repository file selects. Every declared file
+/// carries this field so a copied module does not silently inherit a grammar
+/// it predates.
+#[rustfmt::skip]
+pub const FILE_SCHEMA_VERSION: Node = Node::new("schema-version",
+    "The schema release that this file is written against.").about("The schema version tells `tect` which reader to use for this file. A file written against an earlier release keeps using that release's reader, while `repo.kdl` sets the newest schema the repository accepts.").example("1")
+    .arg(Arg::Int, Say::new("`{}` needs a number", "not a version", "`schema-version 1`"))
+    .missing(Say::new("this file declares no `{}`", "no schema version",
+        "`schema-version 1`, so the repository and every file state which reader they need"))
+    .once("")
+    .notes(&[
+        "A file cannot declare a schema newer than `repo.kdl`.",
+        "`tect create repo`, `tect create image` and `tect create module` write the version, and `tect` never changes it.",
+    ]);
+
 /// One thing the shape has to say. `{}` stands for the name or value it is
 /// about, and an empty `text` says nothing at all.
 pub struct Say {

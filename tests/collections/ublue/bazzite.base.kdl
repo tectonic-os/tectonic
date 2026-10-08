@@ -1,0 +1,9 @@
+base {
+    image "ghcr.io/ublue-os/bazzite:stable"
+    about "KDE, gaming and hardware support over kinoite-main"
+    family "fedora"
+    provides "rechunking" "flatpak"
+    signed #true
+    scap-content "ssg-fedora-ds.xml"
+    bootloader "grub2"
+}

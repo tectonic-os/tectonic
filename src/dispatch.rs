@@ -1,5 +1,3 @@
-//! The work behind every command the parser accepts.
-
 use crate::command::{self, Context, Verb};
 use crate::copy;
 use crate::emit::Part;
@@ -9,13 +7,9 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-/// Exit 1: a refused invocation, or a run that could not do its job.
 pub const USAGE_ERROR: u8 = 1;
-/// The repository is wrong, and every problem was printed to stderr.
 pub const REPO_ERROR: u8 = 2;
 
-/// Why a command did not run. A parse refusal is clap's, so what is left is a
-/// command that got the right words and then could not do the job.
 pub enum Error {
     Invocation(String),
     Operation(String),
@@ -31,7 +25,6 @@ impl Error {
     }
 }
 
-/// A library error is an operation that failed, not a bad invocation.
 impl From<String> for Error {
     fn from(message: String) -> Self {
         match common::prompt::cancelled(&message) {
@@ -41,8 +34,6 @@ impl From<String> for Error {
     }
 }
 
-/// Every flag the surface takes, as the words gave them. A flag a command does
-/// not read is refused before it runs, so a field it never looks at is empty.
 pub struct Flags {
     pub root: Option<PathBuf>,
     pub owner: Option<String>,
@@ -50,7 +41,6 @@ pub struct Flags {
     pub images: Vec<String>,
     pub module: Option<String>,
     pub cn: Option<String>,
-    /// Where `set key` reads the public half it records from.
     pub from: Option<String>,
     pub base: Option<String>,
     pub format: Option<String>,
@@ -71,7 +61,6 @@ pub struct Flags {
     pub rebuild: bool,
 }
 
-/// The optional name a `create` takes, and nothing else.
 fn one_name(rest: &[&str], name: &str) -> Result<Option<String>, Error> {
     match rest {
         [] => Ok(None),
@@ -83,9 +72,6 @@ fn one_name(rest: &[&str], name: &str) -> Result<Option<String>, Error> {
     }
 }
 
-/// The repository the run is in. `Context` already asked where this is; this
-/// is the one place that turns *not a repository* into a refusal, so it is
-/// also the one place that can name what does run here instead.
 fn repo_root(here: &Context) -> Result<PathBuf, Error> {
     let root = match here {
         Context::Repo(root) => root.clone(),
@@ -121,13 +107,14 @@ fn answers() -> String {
     }
 }
 
-/// Whether the pin notice is already on stderr, since `repo_root` answers more
-/// than once in an invocation and the notice is about the run, not the call.
+/// The pin notice belongs to the run because `repo_root` can answer more than
+/// once in one invocation.
 static PINNED: AtomicBool = AtomicBool::new(false);
 
-/// A repository pinned to another release still reads: `schema-version` is what
+/// A repository pinned to another release still reads. `schema-version`
 /// decides that. What differs is what this release would generate, so the
-/// notice names the two commands that settle it and nothing refuses.
+/// notice names the two commands that settle it. The mismatch remains a
+/// notice.
 fn note_pin(root: &Path) {
     if PINNED.swap(true, Ordering::Relaxed) {
         return;
@@ -162,8 +149,6 @@ fn this_target(named: Option<&str>, scope: &crate::emit::why::Scope) -> Result<(
     }
 }
 
-/// The refusal when the record named no target and the manifest holds more
-/// than one, so there is no honest answer to give.
 fn unscoped(name: &str) -> String {
     format!(
         "the build record does not name a target and the baked manifest holds more than one, so \
@@ -172,10 +157,6 @@ fn unscoped(name: &str) -> String {
     )
 }
 
-/// What a booted image answers, off the two documents the build baked: the
-/// manifest is what it declares it is made of, the record what the build
-/// resolved. Both describe the whole repository, so everything here is scoped
-/// to the target the record names.
 fn on_host(
     verb: Verb,
     name: &str,
@@ -188,7 +169,6 @@ fn on_host(
     use crate::provenance::build::{MANIFEST, RECORD};
 
     let unwanted = || Error::Invocation(format!("`{name}` does not take {}", rest.join(" ")));
-    // The manifest as it stands, before the record is parsed for a target.
     if verb == Verb::Plan {
         if !matches!(rest, [] | ["--json"]) {
             return Err(unwanted());
@@ -207,8 +187,8 @@ fn on_host(
         return why_on_host(&manifest, record.as_ref(), rest, format, prompt);
     }
 
-    // `summary` names its target as an argument and `scap content` as a flag;
-    // either way a host takes it only when it is the one that is running.
+    // `summary` names its target as an argument. `scap content` uses a flag.
+    // Either way, a host takes it only when it is the one that is running.
     this_target(
         match (verb, rest) {
             (Verb::ScapContent, []) => target,
@@ -292,9 +272,8 @@ fn why_on_host(
     Ok(ExitCode::SUCCESS)
 }
 
-/// The repository, or `None` when this release may not work in it and said so.
-/// A command that writes is refused here; everything that reads one is refused
-/// where it loads it.
+/// Compatibility refusal returns `None` because the diagnostic is already
+/// printed. Writers stop here, while readers stop where they load.
 fn open(here: &Context) -> Result<Option<PathBuf>, Error> {
     let root = repo_root(here)?;
     let refused =
@@ -302,7 +281,7 @@ fn open(here: &Context) -> Result<Option<PathBuf>, Error> {
     Ok((!refused).then_some(root))
 }
 
-/// `import module` and `copy module`: the same collection, the same questions
+/// `import module` and `copy module` use the same collection, questions
 /// and the same offers, differing only in where the members land.
 fn module_from_collection(
     name: Option<String>,
@@ -313,45 +292,17 @@ fn module_from_collection(
     place: crate::import::Place,
     prompt: &Prompt,
 ) -> Result<(), Error> {
-    let default_block = match list.sources.is_empty() {
-        true => Some(crate::init::sources(&crate::init::assets()?)),
-        false => None,
-    };
-    let default_sources = default_block
-        .as_deref()
-        .map(crate::parse::repo::sources_in)
-        .unwrap_or_default();
-    let sources = match list.sources.is_empty() {
-        true if default_sources.is_empty() => {
-            let message = "repo.kdl declares no `sources`, and this installation supplies no \
-                           default module collection";
-            return Err(message.to_string().into());
-        }
-        true => default_sources.as_slice(),
-        false => list.sources.as_slice(),
-    };
     let module = crate::import::Module::collect(
         name,
         root,
-        sources,
+        &list.sources,
         list.audit_enforce,
         images,
         datastream,
         place,
         prompt,
     )?;
-    let wrote = module.write_with_sources(root, sources, default_block.as_deref())?;
-    if default_block.is_some() && !wrote.is_empty() {
-        let named = default_sources
-            .iter()
-            .map(|source| format!("`{}`", source.name))
-            .collect::<Vec<_>>()
-            .join(", ");
-        eprintln!(
-            "tect: repo.kdl declares no `sources`; using the default module collection {named} \
-             and adding it to repo.kdl"
-        );
-    }
+    let wrote = module.write(root, &list.sources)?;
     if !wrote.is_empty() {
         crate::create::report(root, &wrote);
     }
@@ -376,7 +327,7 @@ pub fn dispatch(
     here: &Context,
 ) -> Result<ExitCode, Error> {
     let Flags {
-        // `--root` is already folded into `here`; `create repo` may write
+        // `--root` is already folded into `here`. `create repo` may write
         // where there is no repository, so it takes the raw flag.
         root: root_arg,
         owner,
@@ -437,6 +388,12 @@ pub fn dispatch(
             }
             Ok(ExitCode::SUCCESS)
         }
+        Verb::CreateGit => {
+            let root = root_arg
+                .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+            crate::create::git_control(&root)?;
+            Ok(ExitCode::SUCCESS)
+        }
         Verb::CreateImage => {
             let name = one_name(rest, name)?;
             let Some(root) = open(here)? else {
@@ -458,6 +415,7 @@ pub fn dispatch(
                 &repo,
                 url,
                 "a name argument",
+                "",
                 crate::create::Field::Image,
                 None,
                 prompt,
@@ -556,8 +514,8 @@ pub fn dispatch(
             if !prompt.asks() {
                 return Err(Error::Invocation(crate::set::BY_HAND.to_string()));
             }
-            // The declaration this edits is readable whatever else is wrong
-            // with the repository, so the issues are `check`'s.
+            // The declaration remains readable when other repository
+            // declarations are invalid, so `check` owns those issues.
             let list = crate::load(&root).list;
             let on: Vec<&str> = list.workflows.iter().map(|w| w.name.as_str()).collect();
             let Some(set) = crate::set::Workflows::collect(
@@ -575,6 +533,46 @@ pub fn dispatch(
             let wrote = set.apply(&root)?;
             crate::create::report(&root, &wrote);
             println!("\nnext, in {}:\n\x20 tect generate\n", root.display());
+            Ok(ExitCode::SUCCESS)
+        }
+        Verb::SetLibrary => {
+            use crate::model::remote::Kind as SourceKind;
+            let kinds = [
+                SourceKind::Modules,
+                SourceKind::BaseImages,
+                SourceKind::Capabilities,
+            ];
+            let kind =
+                match one_name(rest, name)? {
+                    Some(kind) => SourceKind::parse(&kind).ok_or_else(|| {
+                        Error::Invocation(format!(
+                            "`{kind}` is not a library kind; `set library` takes `base-images`, \
+                         `capabilities` or `modules`"
+                        ))
+                    })?,
+                    None if prompt.asks() => {
+                        let options: Vec<common::ui::Choice> = kinds
+                            .iter()
+                            .map(|kind| common::ui::Choice::new(kind.as_str(), ""))
+                            .collect();
+                        match prompt.choose(copy::WHICH_KIND, &options)? {
+                            Some(at) => kinds[at],
+                            None => return Ok(ExitCode::SUCCESS),
+                        }
+                    }
+                    None => return Err(Error::Invocation(
+                        "`set library` takes a kind: `base-images`, `capabilities` or `modules`"
+                            .to_string(),
+                    )),
+                };
+            let Some(root) = open(here)? else {
+                return Ok(ExitCode::from(REPO_ERROR));
+            };
+            let Some(set) = crate::set::Library::adding(kind, prompt)? else {
+                return Ok(ExitCode::SUCCESS);
+            };
+            let wrote = set.apply(&root)?;
+            crate::create::report(&root, &wrote);
             Ok(ExitCode::SUCCESS)
         }
         Verb::SetConforms => {
@@ -673,13 +671,13 @@ pub fn dispatch(
             );
             Ok(ExitCode::SUCCESS)
         }
-        // The half of an installer recipe the declaration answers. The disk,
-        // the account and the encryption are the user's, and are not here.
+        // Repository declarations answer the image half of a recipe. The user
+        // answers disk, account and encryption choices in the installer.
         Verb::Recipe => {
             let root = repo_root(here)?;
-            // The loaded list, because the recipe carries a module-provided
-            // capability. `List::load` leaves every entry's module empty, and
-            // the media stages this document from a full read.
+            // A recipe needs loaded module capabilities. `List::load` leaves
+            // every entry's module empty, while the media stages this document
+            // from a full read.
             let loaded = crate::load(&root);
             let (list, issues, context) = (loaded.list, loaded.issues, loaded.context);
             if issues.report(&context) {
@@ -693,8 +691,8 @@ pub fn dispatch(
             }
             .to_string();
             let imgref = crate::registry::reference(&list, &root, Some(&selected), tags.last())?;
-            // What the media carries is the local build; what the installed
-            // machine tracks is the published reference either way.
+            // The media carries the local build, while the installed machine
+            // tracks the published reference.
             let image = images.last().cloned().unwrap_or_else(|| imgref.clone());
             let recipe = crate::emit::recipe::build(&list, &selected, &image, &imgref, &[])
                 .ok_or_else(|| Error::Invocation(crate::emit::recipe::refusal(&list, &selected)))?;
@@ -717,10 +715,9 @@ pub fn dispatch(
                 crate::scap::Verdict::Wrong => ExitCode::from(REPO_ERROR),
             },
         ),
-        // The finalize layer's resolver. A claim is a number and a tailoring
-        // wants a rule, and the one place that mapping is written is
-        // `Content::read`; a hook re-deriving it in shell would be a second
-        // implementation of the rule this project's claims rest on.
+        // The finalize layer needs a rule for each claim number. `Content::read`
+        // owns that mapping, so a shell hook must not reimplement the rule on
+        // which claims depend.
         Verb::ScapRules => {
             let Some(path) = datastream.as_deref() else {
                 return Err(Error::Invocation(
@@ -737,9 +734,9 @@ pub fn dispatch(
                     None => lost.push(number),
                 }
             }
-            // A shorter list than was asked for is a shorter exclusion list,
-            // and the caller building one cannot tell. Silence here is a rule
-            // remediated out from under the module that claims it.
+            // A shorter result silently shortens the exclusion list that the
+            // calling command builds. The missing rule would then remain
+            // remediated despite the module's claim.
             if !lost.is_empty() {
                 return Err(Error::Invocation(format!(
                     "{} no rule in {}: {}\n\nhelp: a number resolves against the content \
@@ -774,7 +771,8 @@ pub fn dispatch(
                 },
             )
         }
-        // The build-layer commands read the image around them, not a repository.
+        // Build-layer commands read the surrounding image and need no
+        // repository.
         Verb::OsRelease => {
             crate::runtime::os_release()?;
             Ok(ExitCode::SUCCESS)
@@ -812,10 +810,8 @@ pub fn dispatch(
     }
 }
 
-/// `coverage`'s read-out onto the run that produced it. The datastream is a
-/// flag and `run_loaded` reads none, so it is resolved here, and only from what
-/// was passed: probing the host would make the output depend on whether SSG is
-/// installed.
+/// Coverage resolves only the passed datastream because probing the host would
+/// make output depend on whether SSG is installed.
 fn coverage(
     run: &mut crate::Run,
     json: bool,
@@ -872,8 +868,6 @@ fn coverage(
     Ok(())
 }
 
-/// The commands the repository is read for, which is one call into the library
-/// and then the counts and read-outs that hang off it.
 fn reading(
     verb: Verb,
     name: &str,
@@ -920,15 +914,14 @@ fn reading(
     }
 
     let root = repo_root(here)?;
-    // The two read-outs about one thing: what is named is picked from what
-    // there is, where there is a terminal to pick on.
+    // A terminal can pick a missing name from the available items.
     let picks = matches!(
         command,
         Command::Why | Command::WhyJson | Command::Coverage | Command::CoverageJson
     ) && arg.is_none()
         && prompt.draws();
     // What `generate` writes is read off the fetched trees, so it fetches them
-    // first: a `.remote` older than the collection bakes a deleted file into
+    // first. A `.remote` older than the collection bakes a deleted file into
     // `plan.json`. The issues are left for `run` to report.
     if command == Command::Generate {
         let (list, issues, _) = crate::declarations(&root);
@@ -956,10 +949,7 @@ fn reading(
         if known.is_empty() {
             crate::run_loaded(command, None, &root, loaded)
         } else {
-            let options = shown
-                .iter()
-                .map(|name| common::ui::Choice::new(name, ""))
-                .collect::<Vec<_>>();
+            let options = picker_options(&shown);
             let Some(at) = prompt.choose(question, &options)? else {
                 return Ok(ExitCode::SUCCESS);
             };
@@ -983,14 +973,6 @@ fn reading(
     }
     let problems = run.issues.report(&run.context);
     if command == Command::Check {
-        for shadow in &run.shadowed {
-            eprintln!(
-                "tect: {}/{} replaces the tool's own entry for {}",
-                shadow.collection,
-                crate::base::BASES_FILE,
-                shadow.image
-            );
-        }
         for name in &run.unpinned {
             eprintln!(
                 "tect: `{name}` is unpinned, so a fetch from it takes whatever its ref holds \
@@ -1029,8 +1011,8 @@ fn reading(
         return Ok(ExitCode::from(REPO_ERROR));
     }
     if command == Command::Generate {
-        // Read before the write, which is what makes every one of them exist:
-        // a file already there is one this run took further, not a new one.
+        // Reading before the write distinguishes files this run updates from
+        // files it creates.
         let wrote: Vec<(PathBuf, crate::create::Change)> = run
             .files
             .iter()
@@ -1044,15 +1026,14 @@ fn reading(
             .collect();
         crate::write_generated(&root, &run.files)?;
         if prompt.draws() {
-            // The same tree every writing command draws. The flat list of
-            // paths stays on stdout for a pipe, which is the only reader a
-            // tree would be worse for.
+            // Writing commands share one tree view. A pipe keeps the flat path
+            // list because a tree would be harder to consume there.
             crate::create::report(&root, &wrote);
             run.stdout.clear();
         }
     }
     // A terminal gets the read-out and nothing else, and only while it is wide
-    // enough that no table folds a word mid-way; a pipe, a redirect, `--no-tui`
+    // enough that no table folds a word mid-way. A pipe, redirect, `--no-tui`
     // and a too-narrow terminal get the markdown a forge would render.
     print!(
         "{}",
@@ -1110,8 +1091,15 @@ fn reading(
     Ok(ExitCode::SUCCESS)
 }
 
-/// Whether the terminal is wide enough that no table folds a word mid-way,
-/// which is the point at which a read-out falls back to its markdown.
+/// The live picker and its screen proof share one row constructor, so their
+/// order cannot drift.
+pub(crate) fn picker_options(shown: &[String]) -> Vec<common::ui::Choice> {
+    shown
+        .iter()
+        .map(|name| common::ui::Choice::new(name, ""))
+        .collect()
+}
+
 fn fits(parts: &[Part]) -> bool {
     let room = common::ui::width();
     parts.iter().all(|part| match part {

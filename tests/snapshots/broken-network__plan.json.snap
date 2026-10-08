@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 {
   "schema_version": 1,
@@ -76,29 +76,9 @@ source: tests/golden.rs
           "rechunking"
         ],
         "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
+          "rechunking": [
+            "/usr/bin/rechunking",
+            "/usr/sbin/rechunking"
           ]
         },
         "requires": [],
@@ -135,7 +115,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "bed8965fb074912261ce21afc90ec0a365c4655bf5e0be032fc1b71064d65838",
+                "content": "90fed2e5b6c345fb0d615059da327f1499bdd2b1748756caf0e3e772455466f9",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -167,7 +147,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "6dd81292c396ef71d71d7ea1edf86ef4b72e7f61bdf06029377b740dc9a533f4",
+                "content": "0178bff68faa4388f15ca68fffa530efef0b882c4e142bdb92c8f0bd3f3fd7b4",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -191,7 +171,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "d49f6e4910f7ddaaf773d9cd9511266892215efaffc0645fd0bf5d1aee193aca",
+                "content": "70ccaa7afc7ec3c653ae149fcffe3ea3f37496324e945e88eff19c0032ac78fd",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -215,7 +195,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "22e751afba9121cb35e551638784330f2a3516d1d5b6107c05b4868f5d6438a5",
+                "content": "28a6087ac68384bbc6a6ffe287a28e75b108e9a66c8c4aa11af1173da28889a1",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -239,7 +219,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "ca646c991495fc718e9f4929ae480c4cab46deb7e6934f04a0fbc46701c312ba",
+                "content": "ecc25ec08388b203ec01025517fb51c930bb476c3da392f610c0a61290956071",
                 "repo": false,
                 "source": null,
                 "pin": null,
@@ -263,7 +243,7 @@ source: tests/golden.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "5dbb725fd83377a37b3cff537c2ca429f7549334a83577d7f691c85f55fd1781",
+                "content": "1aa6833f36a676db124355253f18039ec9567bee5d4ca720a93d7168f2897ee8",
                 "repo": false,
                 "source": null,
                 "pin": null,

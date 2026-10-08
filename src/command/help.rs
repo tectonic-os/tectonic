@@ -62,9 +62,9 @@ It asks, in order:
 8. Review every answer, change any of them, and choose Create."#;
 
 pub(super) const CREATE_REPO_NOTES: &str = r#"> [!WARNING]
-> The `tectonic-os/modules` source that `repo.kdl` declares is `unpinned`. Each
+> The `tectonic-modules` source that `repo.kdl` declares is `unpinned`. Each
 > fetch takes the head of its branch, and no hash checks what arrives. To pin
-> it, replace its `pin` with a tagged and hashed one.
+> it, add `version` and `sha256` beside its `url`.
 
 > [!NOTE]
 > It runs `git init` and does no other git step. It prints the commands for the
@@ -196,6 +196,19 @@ pub(super) const COPY_MODULE_NOTES: &str = r#"> [!NOTE]
 > If `modules/<name>` exists, then it refuses and names the collection that the
 > existing module came from."#;
 
+pub(super) const CREATE_GIT: &str = r#"Puts the directory under git control, so a hand-written repository is under
+version control before its first commit. It writes the `.gitignore` that
+ignores `keys/private/`, `out/` and `modules/.remote/`, unless one is already
+there.
+
+It refuses a directory that git already tracks, because a repository does not
+nest."#;
+
+pub(super) const CREATE_GIT_NOTES: &str = r#"> [!NOTE]
+> `tect create repo` already does this for a repository it scaffolds. This
+> command is for a directory written by hand or copied from somewhere, and it
+> leaves every file that is already there alone."#;
+
 pub(super) const CREATE_SCRIPTS: &str = r#"Copies a script that `tect` supplies into `scripts/`, where the repository
 owns it. Git tracks the copy, the user can review and change it, and a `tect`
 upgrade does not replace it. The scripts are:
@@ -306,6 +319,16 @@ pub(super) const SET_WORKFLOWS_NOTES: &str = r#"> [!NOTE]
 >
 > Each schedule is an offset from the daily build time, so a new daily time
 > moves every schedule."#;
+
+pub(super) const SET_LIBRARY: &str = r#"Adds a library to the `sources` block in `repo.kdl`: the default library of
+that kind, or a source the user types. A source of the same kind and alias is
+replaced, so the declaration moves to what the user chose.
+
+It asks, in order:
+
+1. Choose the default library of that kind, or another source.
+2. For another source, give its alias, its HTTPS Git URL and the directory
+   inside the repository."#;
 
 pub(super) const SET_CONFORMS: &str = r#"Chooses the benchmark profile that a scan measures an image against, and writes
 it into the image's `conforms`. A `conforms` turns on the image scan for every

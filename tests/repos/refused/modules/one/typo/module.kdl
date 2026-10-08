@@ -1,3 +1,5 @@
+schema-version 1
+
 description "Refuses a rule the content carries nothing by"
 
 supports "fedora"

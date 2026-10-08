@@ -4,7 +4,7 @@
 
 use crate::layout;
 use crate::model::image::List;
-use crate::model::remote::{At, REMOTE_DIR};
+use crate::model::remote::{At, Kind as SourceKind, REMOTE_DIR};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -144,65 +144,67 @@ fn pins(root: &Path, list: &List) -> Result<Vec<Pin>, String> {
             if out.iter().any(|pin| pin.name == entry.path) {
                 continue;
             }
-            let pin = match &entry.source {
-                Some(name) => {
-                    let Some(collection) = list.sources.iter().find(|source| &source.name == name)
-                    else {
-                        continue;
-                    };
-                    let tree = match trees.iter().find(|(found, _)| found == name) {
-                        Some((_, tree)) => tree.clone(),
-                        None => {
-                            let tree = crate::import::tree(root, collection)?;
-                            trees.push((name.clone(), tree.clone()));
-                            tree
+            let pin =
+                match &entry.source {
+                    Some(name) => {
+                        let Some(collection) = list.sources.iter().find(|source| {
+                            source.kind == SourceKind::Modules && &source.name == name
+                        }) else {
+                            continue;
+                        };
+                        let tree = match trees.iter().find(|(found, _)| found == name) {
+                            Some((_, tree)) => tree.clone(),
+                            None => {
+                                let tree = crate::import::tree(root, collection)?;
+                                trees.push((name.clone(), tree.clone()));
+                                tree
+                            }
+                        };
+                        let (git_ref, verified) = match &collection.at {
+                            At::Dir(_) => ("local".into(), None),
+                            At::Git(remote) => (
+                                remote.version.clone().unwrap_or_default(),
+                                Some(!remote.unpinned()),
+                            ),
+                        };
+                        let stamp = collection.pin().and_then(|remote| {
+                            remote.sha256.as_ref().map(|sha256| {
+                                let member = Path::new(collection.subtree().unwrap_or(""))
+                                    .join(entry.name());
+                                format!(
+                                    "{sha256} {} {}",
+                                    remote.url_resolved().unwrap_or_default(),
+                                    member.display()
+                                )
+                            })
+                        });
+                        Pin {
+                            name: entry.path.clone(),
+                            git_ref,
+                            from: From::Collection {
+                                dir: tree
+                                    .join(collection.subtree().unwrap_or(""))
+                                    .join(entry.name()),
+                                verified,
+                                stamp,
+                            },
                         }
-                    };
-                    let (git_ref, verified) = match &collection.at {
-                        At::Dir(_) => ("local".into(), None),
-                        At::Archive(remote) => (
-                            remote.version.clone().unwrap_or_default(),
-                            Some(!remote.unpinned()),
-                        ),
-                    };
-                    let stamp = collection.pin().and_then(|remote| {
-                        remote.sha256.as_ref().map(|sha256| {
-                            let member =
-                                Path::new(collection.subtree().unwrap_or("")).join(entry.name());
-                            format!(
-                                "{sha256} {} {}",
-                                remote.url_resolved().unwrap_or_default(),
-                                member.display()
-                            )
-                        })
-                    });
-                    Pin {
-                        name: entry.path.clone(),
-                        git_ref,
-                        from: From::Collection {
-                            dir: tree
-                                .join(collection.subtree().unwrap_or(""))
-                                .join(entry.name()),
-                            verified,
-                            stamp,
-                        },
                     }
-                }
-                None => {
-                    let Some(remote) = &entry.remote else {
-                        continue;
-                    };
-                    Pin {
-                        name: entry.path.clone(),
-                        git_ref: remote.version.clone().unwrap_or_default(),
-                        from: From::Archive {
-                            url: remote.url_resolved().unwrap_or_default(),
-                            sha256: remote.sha256.clone(),
-                            path: remote.path.clone().unwrap_or_default(),
-                        },
+                    None => {
+                        let Some(remote) = &entry.remote else {
+                            continue;
+                        };
+                        Pin {
+                            name: entry.path.clone(),
+                            git_ref: remote.version.clone().unwrap_or_default(),
+                            from: From::Archive {
+                                url: remote.url_resolved().unwrap_or_default(),
+                                sha256: remote.sha256.clone(),
+                                path: remote.path.clone().unwrap_or_default(),
+                            },
+                        }
                     }
-                }
-            };
+                };
             out.push(pin);
         }
     }
@@ -272,7 +274,100 @@ fn empties(dir: &Path) {
 
 #[cfg(test)]
 mod tests {
+    use crate::model::remote::{At, Collection, Kind as SourceKind};
+    use crate::provenance::{Evidence, ShaFrom, Tracker};
     use std::path::{Path, PathBuf};
+
+    fn git(repo: &Path, args: &[&str]) {
+        let out = std::process::Command::new("git")
+            .args(args)
+            .current_dir(repo)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "git {}: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+
+    fn commit(repo: &Path, message: &str) {
+        git(repo, &["add", "."]);
+        git(
+            repo,
+            &[
+                "-c",
+                "user.name=Tectonic tests",
+                "-c",
+                "user.email=tests@example.invalid",
+                "commit",
+                "--quiet",
+                "-m",
+                message,
+            ],
+        );
+    }
+
+    fn archive_hash(repo: &Path) -> String {
+        let archive = repo.join("../source.tar");
+        let output = format!("--output={}", archive.display());
+        git(repo, &["archive", "--format=tar", &output, "HEAD"]);
+        crate::runtime::sha256_file(&archive).unwrap()
+    }
+
+    fn git_source(repo: &Path, sha256: Option<String>) -> Collection {
+        let mut pin = Evidence::new(crate::diag::Span::default());
+        pin.url = Some(format!("file://{}", repo.display()));
+        pin.version = Some("main".to_string());
+        pin.sha256 = sha256;
+        pin.from = ShaFrom::Manual;
+        pin.tracker = match pin.sha256.is_some() {
+            true => Tracker::Manual("test fixture".to_string()),
+            false => Tracker::Unpinned("test fixture".to_string()),
+        };
+        Collection {
+            kind: SourceKind::Modules,
+            name: "one".to_string(),
+            at: At::Git(pin),
+            span: crate::diag::Span::default(),
+        }
+    }
+
+    fn list_with(root: &Path, source: Collection) -> crate::model::image::List {
+        let name = &source.name;
+        crate::init::put(
+            &root.join("repo.kdl"),
+            &format!(
+                "schema-version 1\nname \"Example\"\nsources {{ modules {name:?} {{ dir \"source\" }} }}\n"
+            ),
+        )
+        .unwrap();
+        crate::init::put(
+            &root.join("image.kdl"),
+            &format!(
+                "schema-version 1\n\nimage {{\n    name \"Example\"\n    base \"example.invalid/image\" {{ family \"fedora\" }}\n    modules {{ source {name:?} {{ module \"hello\" }} }}\n}}\n"
+            ),
+        )
+        .unwrap();
+        let (mut list, issues, _) = crate::declarations(root);
+        assert!(issues.is_empty(), "{}", issues.plain());
+        list.sources = vec![source];
+        list
+    }
+
+    fn next_fetch(root: &Path) {
+        let cache = root.join(crate::layout::SOURCES_CACHE);
+        for entry in std::fs::read_dir(cache).into_iter().flatten().flatten() {
+            if entry
+                .path()
+                .extension()
+                .is_some_and(|extension| extension == "run")
+            {
+                std::fs::remove_file(entry.path()).unwrap();
+            }
+        }
+    }
 
     #[test]
     fn a_collection_member_is_copied_to_the_remote_tree() {
@@ -281,25 +376,25 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         crate::init::put(
             &collection.join("hello/module.kdl"),
-            "description \"Says hello\"\n\nsupports \"fedora\"\n",
+            "schema-version 1\n\ndescription \"Says hello\"\n\nsupports \"fedora\"\n",
         )
         .unwrap();
         crate::init::put(
             &collection.join("goodbye/module.kdl"),
-            "description \"Says goodbye\"\n\nsupports \"fedora\"\n",
+            "schema-version 1\n\ndescription \"Says goodbye\"\n\nsupports \"fedora\"\n",
         )
         .unwrap();
         crate::init::put(
             &root.join("repo.kdl"),
             &format!(
-                "schema-version 1\nname \"Example\"\nsources {{\n    one {:?}\n}}\n",
+                "schema-version 1\nname \"Example\"\nsources {{\n    modules \"one\" {{ dir {:?} }}\n}}\n",
                 collection.display()
             ),
         )
         .unwrap();
         crate::init::put(
             &root.join("image.kdl"),
-            "image {\n    name \"Example\"\n    base \"example.invalid/image\" { family \"fedora\" }\n    modules {\n        source \"one\" { module \"hello\"; module \"goodbye\" }\n    }\n}\n",
+            "schema-version 1\n\nimage {\n    name \"Example\"\n    base \"example.invalid/image\" { family \"fedora\" }\n    modules {\n        source \"one\" { module \"hello\"; module \"goodbye\" }\n    }\n}\n",
         )
         .unwrap();
 
@@ -313,7 +408,7 @@ mod tests {
 
         crate::init::put(
             &root.join("image.kdl"),
-            "image {\n    name \"Example\"\n    base \"example.invalid/image\" { family \"fedora\" }\n    modules { source \"missing\" { module \"hello\" } }\n}\n",
+            "schema-version 1\n\nimage {\n    name \"Example\"\n    base \"example.invalid/image\" { family \"fedora\" }\n    modules { source \"missing\" { module \"hello\" } }\n}\n",
         )
         .unwrap();
         let (list, issues, _) = crate::declarations(&root);
@@ -322,12 +417,12 @@ mod tests {
 
         crate::init::put(
             &root.join("image.kdl"),
-            "image {\n    name \"Example\"\n    base \"example.invalid/image\" { family \"fedora\" }\n    modules { source \"one\" { module \"hello\" } }\n}\n",
+            "schema-version 1\n\nimage {\n    name \"Example\"\n    base \"example.invalid/image\" { family \"fedora\" }\n    modules { source \"one\" { module \"hello\" } }\n}\n",
         )
         .unwrap();
         crate::init::put(
             &root.join("repo.kdl"),
-            "schema-version 1\nname \"Example\"\nsources { one \"missing\" }\n",
+            "schema-version 1\nname \"Example\"\nsources { modules \"one\" { dir \"missing\" } }\n",
         )
         .unwrap();
         let (list, issues, _) = crate::declarations(&root);
@@ -338,7 +433,7 @@ mod tests {
 
         crate::init::put(
             &root.join("repo.kdl"),
-            "schema-version 1\nname \"Example\"\nsources {\n    one {\n        pin {\n            unpinned \"test\"\n            version \"main\"\n            url \"https://example.invalid/{version}\"\n        }\n    }\n}\naudit { enforce #true }\n",
+            "schema-version 1\nname \"Example\"\nsources {\n    modules \"one\" {\n        url \"https://example.invalid/repository\"\n        version \"main\"\n        unpinned \"test\"\n    }\n}\naudit { enforce #true }\n",
         )
         .unwrap();
         let (_, issues, _) = crate::declarations(&root);
@@ -349,55 +444,27 @@ mod tests {
     #[test]
     fn a_pinned_collection_member_is_current_the_second_time() {
         let root = std::env::temp_dir().join(format!("tect-fetch-pinned.{}", std::process::id()));
-        let collection = root.join("collection");
-        let archive = root.join("collection.tar.gz");
+        let repository = root.join("library");
         let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&repository).unwrap();
+        git(&repository, &["init", "--quiet", "-b", "main"]);
         crate::init::put(
-            &collection.join("hello/module.kdl"),
-            "description \"Says hello\"\n\nsupports \"fedora\"\n",
+            &repository.join("hello/module.kdl"),
+            "schema-version 1\n\ndescription \"Says hello\"\n\nsupports \"fedora\"\n",
         )
         .unwrap();
-        let packed = std::process::Command::new("tar")
-            .arg("-czf")
-            .arg(&archive)
-            .arg("-C")
-            .arg(&root)
-            .arg("collection")
-            .status()
-            .unwrap();
-        assert!(packed.success());
-        let output = std::process::Command::new("sha256sum")
-            .arg(&archive)
-            .output()
-            .unwrap();
-        assert!(output.status.success());
-        let sha256 = String::from_utf8_lossy(&output.stdout)
-            .split_whitespace()
-            .next()
-            .unwrap()
-            .to_string();
-        crate::init::put(
-            &root.join("repo.kdl"),
-            &format!(
-                "schema-version 1\nname \"Example\"\nsources {{\n    one {{\n        pin {{\n            manual \"test\"\n            version \"v1\"\n            url \"file://{}\"\n            sha256 \"{sha256}\"\n        }}\n    }}\n}}\n",
-                archive.display()
-            ),
-        )
-        .unwrap();
-        crate::init::put(
-            &root.join("image.kdl"),
-            "image {\n    name \"Example\"\n    base \"example.invalid/image\" { family \"fedora\" }\n    modules { source \"one\" { module \"hello\" } }\n}\n",
-        )
-        .unwrap();
-        let (list, issues, _) = crate::declarations(&root);
-        assert!(issues.is_empty(), "{}", issues.plain());
+        commit(&repository, "initial");
+        let list = list_with(
+            &root,
+            git_source(&repository, Some(archive_hash(&repository))),
+        );
         let first = super::modules(&root, &list).unwrap();
         assert!(first
             .iter()
             .any(|line| line.contains("copied from its verified collection")));
         assert_eq!(
             super::modules(&root, &list).unwrap(),
-            ["one/hello v1 is current"]
+            ["one/hello main is current"]
         );
         let _ = std::fs::remove_dir_all(root);
     }
@@ -426,52 +493,26 @@ mod tests {
     #[test]
     fn a_deleted_file_does_not_survive_the_next_fetch() {
         let root = std::env::temp_dir().join(format!("tect-fetch-stale.{}", std::process::id()));
-        let collection = root.join("collection");
-        // Named apart from the other tests' archives: `runtime::scratch` names
-        // its download by the URL's last segment and this process's id, so two
-        // tests fetching `collection.tar.gz` at once are one scratch file.
-        let archive = root.join("stale.tar.gz");
+        let repository = root.join("library");
         let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&repository).unwrap();
+        git(&repository, &["init", "--quiet", "-b", "main"]);
         crate::init::put(
-            &collection.join("hello/module.kdl"),
-            "description \"Says hello\"\n\nsupports \"fedora\"\n",
+            &repository.join("hello/module.kdl"),
+            "schema-version 1\n\ndescription \"Says hello\"\n\nsupports \"fedora\"\n",
         )
         .unwrap();
-        crate::init::put(&collection.join("hello/files/gone.conf"), "old\n").unwrap();
-        let pack = || {
-            assert!(std::process::Command::new("tar")
-                .arg("-czf")
-                .arg(&archive)
-                .arg("-C")
-                .arg(&root)
-                .arg("collection")
-                .status()
-                .unwrap()
-                .success());
-        };
-        pack();
-        crate::init::put(
-            &root.join("repo.kdl"),
-            &format!(
-                "schema-version 1\nname \"Example\"\nsources {{\n    one {{\n        pin {{\n            unpinned \"test\"\n            version \"main\"\n            url \"file://{}\"\n        }}\n    }}\n}}\n",
-                archive.display()
-            ),
-        )
-        .unwrap();
-        crate::init::put(
-            &root.join("image.kdl"),
-            "image {\n    name \"Example\"\n    base \"example.invalid/image\" { family \"fedora\" }\n    modules { source \"one\" { module \"hello\" } }\n}\n",
-        )
-        .unwrap();
-        let (list, issues, _) = crate::declarations(&root);
-        assert!(issues.is_empty(), "{}", issues.plain());
+        crate::init::put(&repository.join("hello/files/gone.conf"), "old\n").unwrap();
+        commit(&repository, "initial");
+        let list = list_with(&root, git_source(&repository, None));
         super::modules(&root, &list).unwrap();
         assert!(root
             .join("modules/.remote/one/hello/files/gone.conf")
             .is_file());
 
-        std::fs::remove_file(collection.join("hello/files/gone.conf")).unwrap();
-        pack();
+        std::fs::remove_file(repository.join("hello/files/gone.conf")).unwrap();
+        commit(&repository, "remove gone file");
+        next_fetch(&root);
         let said = super::modules(&root, &list).unwrap();
         assert!(
             !root
@@ -480,45 +521,26 @@ mod tests {
             "stale file survived: {said:?}"
         );
 
-        // The same thing pinned: with no `sha256` there is nothing to stamp, so
-        // an unpinned collection never reaches the `current` short-circuit. A
-        // pin makes the stamp load-bearing, and it has to move with the
-        // content.
-        let hash = || {
-            let out = std::process::Command::new("sha256sum")
-                .arg(&archive)
-                .output()
-                .unwrap();
-            String::from_utf8_lossy(&out.stdout)
-                .split_whitespace()
-                .next()
-                .unwrap()
-                .to_string()
-        };
-        let pinned = || {
-            crate::init::put(
-                &root.join("repo.kdl"),
-                &format!(
-                    "schema-version 1\nname \"Example\"\nsources {{\n    one {{\n        pin {{\n            manual \"test\"\n            version \"main\"\n            url \"file://{}\"\n            sha256 \"{}\"\n        }}\n    }}\n}}\n",
-                    archive.display(),
-                    hash()
-                ),
-            )
-            .unwrap();
-            let (list, issues, _) = crate::declarations(&root);
-            assert!(issues.is_empty(), "{}", issues.plain());
-            list
-        };
-        crate::init::put(&collection.join("hello/files/back.conf"), "new\n").unwrap();
-        pack();
-        super::modules(&root, &pinned()).unwrap();
+        // A pinned source instead uses the canonical archive hash as its
+        // current stamp, and changing the expected hash replaces the tree.
+        crate::init::put(&repository.join("hello/files/back.conf"), "new\n").unwrap();
+        commit(&repository, "add back file");
+        let pinned = list_with(
+            &root,
+            git_source(&repository, Some(archive_hash(&repository))),
+        );
+        super::modules(&root, &pinned).unwrap();
         assert!(root
             .join("modules/.remote/one/hello/files/back.conf")
             .is_file());
 
-        std::fs::remove_file(collection.join("hello/files/back.conf")).unwrap();
-        pack();
-        let said = super::modules(&root, &pinned()).unwrap();
+        std::fs::remove_file(repository.join("hello/files/back.conf")).unwrap();
+        commit(&repository, "remove back file");
+        let repinned = list_with(
+            &root,
+            git_source(&repository, Some(archive_hash(&repository))),
+        );
+        let said = super::modules(&root, &repinned).unwrap();
         assert!(
             !root
                 .join("modules/.remote/one/hello/files/back.conf")
@@ -526,5 +548,82 @@ mod tests {
             "a pinned collection kept a file its new hash does not carry: {said:?}"
         );
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// A `sha256` that does not match the canonical archive stops the fetch, so
+    /// a commit that changed under a tag lands nowhere.
+    #[test]
+    fn a_wrong_hash_stops_the_fetch() {
+        let root = std::env::temp_dir().join(format!("tect-fetch-hash.{}", std::process::id()));
+        let repository = root.join("library");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&repository).unwrap();
+        git(&repository, &["init", "--quiet", "-b", "main"]);
+        crate::init::put(
+            &repository.join("hello/module.kdl"),
+            "schema-version 1\n\ndescription \"Says hello\"\n\nsupports \"fedora\"\n",
+        )
+        .unwrap();
+        commit(&repository, "initial");
+        let list = list_with(&root, git_source(&repository, Some("0".repeat(64))));
+        let failed = super::modules(&root, &list).unwrap_err();
+        assert!(
+            failed.contains("expected sha256") && failed.contains("got"),
+            "{failed}"
+        );
+        assert!(!root.join("modules/.remote/one/hello/module.kdl").exists());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// Two sources that name one repository at one selector share the one
+    /// fetched tree. The repository is gone before the second source reads it,
+    /// so a fetch keyed by the alias would fail here.
+    #[test]
+    fn two_sources_naming_one_library_share_the_fetch() {
+        let root = std::env::temp_dir().join(format!("tect-fetch-share.{}", std::process::id()));
+        let repository = root.join("library");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&repository).unwrap();
+        git(&repository, &["init", "--quiet", "-b", "main"]);
+        crate::init::put(
+            &repository.join("hello/module.kdl"),
+            "schema-version 1\n\ndescription \"Says hello\"\n\nsupports \"fedora\"\n",
+        )
+        .unwrap();
+        commit(&repository, "initial");
+        let mut second = git_source(&repository, None);
+        second.name = "two".to_string();
+        let _ = super::modules(&root, &list_with(&root, git_source(&repository, None))).unwrap();
+        let _ = std::fs::remove_dir_all(&repository);
+        let said = super::modules(&root, &list_with(&root, second)).unwrap();
+        assert!(
+            said.iter().any(|line| line.contains("two/hello")),
+            "{said:?}"
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// A repository named by a relative `--root` fetches the same way. The
+    /// archive write runs inside the bare repository, so a work path relative
+    /// to the calling shell would land outside it.
+    #[test]
+    fn a_relative_root_fetches() {
+        let root = PathBuf::from(format!("target/fetch-relative.{}", std::process::id()));
+        let repository =
+            std::env::temp_dir().join(format!("tect-fetch-relative.{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let _ = std::fs::remove_dir_all(&repository);
+        std::fs::create_dir_all(&repository).unwrap();
+        git(&repository, &["init", "--quiet", "-b", "main"]);
+        crate::init::put(
+            &repository.join("hello/module.kdl"),
+            "schema-version 1\n\ndescription \"Says hello\"\n\nsupports \"fedora\"\n",
+        )
+        .unwrap();
+        commit(&repository, "initial");
+        let tree = crate::import::tree(&root, &git_source(&repository, None)).unwrap();
+        assert!(tree.join("hello/module.kdl").is_file());
+        let _ = std::fs::remove_dir_all(&root);
+        let _ = std::fs::remove_dir_all(&repository);
     }
 }

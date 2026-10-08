@@ -1,9 +1,0 @@
-sources {
-    tectonic-os {
-        pin {
-            unpinned "This is the trusted source for modules"
-            version "main"
-            url "https://github.com/tectonic-os/modules/archive/refs/heads/{version}.tar.gz"
-        }
-    }
-}

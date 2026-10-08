@@ -11,7 +11,9 @@ fn after_rejects_a_provider_on_another_target() {
     std::fs::write(root.join("repo.kdl"), "schema-version 1\nname \"After\"\n").unwrap();
     std::fs::write(
         root.join("image.kdl"),
-        r#"image {
+        r#"schema-version 1
+
+image {
     name "After"
     base "example" { family "fedora" }
     flavours {
@@ -34,22 +36,22 @@ fn after_rejects_a_provider_on_another_target() {
     .unwrap();
     std::fs::write(
         root.join("modules/consumer/module.kdl"),
-        "description \"Consumes everywhere\"\nsupports \"fedora\"\nafter \"tool\"\n",
+        "schema-version 1\n\ndescription \"Consumes everywhere\"\nsupports \"fedora\"\nafter \"tool\"\n",
     )
     .unwrap();
     std::fs::write(
         root.join("modules/provider/module.kdl"),
-        "description \"Provides tools\"\nsupports \"fedora\"\nprovides \"tool\"\n",
+        "schema-version 1\n\ndescription \"Provides tools\"\nsupports \"fedora\"\nprovides \"tool\"\n",
     )
     .unwrap();
     std::fs::write(
         root.join("modules/coinstalled/module.kdl"),
-        "description \"Consumes with provider\"\nsupports \"fedora\"\nafter \"tool\"\n",
+        "schema-version 1\n\ndescription \"Consumes with provider\"\nsupports \"fedora\"\nafter \"tool\"\n",
     )
     .unwrap();
     std::fs::write(
         root.join("modules/separate/module.kdl"),
-        "description \"Consumes elsewhere\"\nsupports \"fedora\"\nafter \"tool\"\n",
+        "schema-version 1\n\ndescription \"Consumes elsewhere\"\nsupports \"fedora\"\nafter \"tool\"\n",
     )
     .unwrap();
 
@@ -84,7 +86,9 @@ fn shipped_policy_orders_a_module_after_the_mac_that_installs_it() {
     std::fs::write(root.join("repo.kdl"), "schema-version 1\nname \"Mac\"\n").unwrap();
     std::fs::write(
         root.join("image.kdl"),
-        r#"image {
+        r#"schema-version 1
+
+image {
     name "Mac"
     base "example" { family "debian" }
     modules {
@@ -97,12 +101,12 @@ fn shipped_policy_orders_a_module_after_the_mac_that_installs_it() {
     .unwrap();
     std::fs::write(
         root.join("modules/apparmor/module.kdl"),
-        "description \"The MAC\"\nsupports \"debian\"\nprovides \"apparmor-policy\"\n",
+        "schema-version 1\n\ndescription \"The MAC\"\nsupports \"debian\"\nprovides \"apparmor-policy\"\n",
     )
     .unwrap();
     std::fs::write(
         root.join("modules/yubikey/module.kdl"),
-        "description \"Ships a profile and requires nothing\"\nsupports \"debian\"\n",
+        "schema-version 1\n\ndescription \"Ships a profile and requires nothing\"\nsupports \"debian\"\n",
     )
     .unwrap();
     std::fs::write(root.join("modules/yubikey/apparmor/usr.sbin.pcscd"), "").unwrap();

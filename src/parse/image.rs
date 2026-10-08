@@ -466,7 +466,7 @@ impl Image {
                     .at(layout.span, "no bootloader")
                     .help(
                         "no family answers the bootloader: `bootloader \"grub2\"` here, from what \
-                         the base's row in bases.kdl lists",
+                         the base's file in its base-images library lists",
                     ),
             );
         } else if !missing.is_empty() {

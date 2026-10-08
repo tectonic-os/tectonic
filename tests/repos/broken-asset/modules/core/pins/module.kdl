@@ -1,3 +1,5 @@
+schema-version 1
+
 description "Asset pins that say nothing usable about what they fetch"
 
 supports "fedora"

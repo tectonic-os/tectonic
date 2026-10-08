@@ -25,6 +25,9 @@ pub mod set;
 pub mod upgrade;
 pub mod vm;
 
+#[cfg(test)]
+mod screen_tests;
+
 pub use command::{Arg, Command};
 use diag::Issue;
 use diag::Issues;
@@ -77,11 +80,8 @@ pub struct Run {
     /// Listed modules the base covers, which nothing builds.
     pub suppressed: usize,
     pub flavours: usize,
-    /// Seeded bases a collection describes instead. Only `check` looks, since
-    /// it is the only command a collection's catalog is any of the business of.
-    pub shadowed: Vec<base::Shadow>,
     /// Collections following a moving ref, which is what makes the repository
-    /// build a different tree tomorrow. `check`'s alone, like `shadowed`.
+    /// build a different tree tomorrow. `check`'s alone.
     pub unpinned: Vec<String>,
     /// Imported modules whose content no longer matches the record beside them.
     /// Forking one is legitimate, so this is a read-out; `check`'s alone.
@@ -191,12 +191,22 @@ pub(crate) fn load(root: &Path) -> Loaded {
     parse::module::check_unlisted(&list, root, &disk, &mut issues);
 
     let network = list.network;
+    let schema_version = list.schema_version;
+    let repo_src = list.repo_src.clone();
     let mut resolved: Vec<Resolved> = Vec::new();
     for image in &mut list.images {
         // Taken out so a diagnostic can still read the image it was declared in.
         let mut entries = std::mem::take(&mut image.entries);
         for entry in &mut entries {
-            entry.module = Module::load(entry, image, root, &disk, &mut issues);
+            entry.module = Module::load(
+                entry,
+                image,
+                root,
+                &disk,
+                schema_version,
+                &repo_src,
+                &mut issues,
+            );
             if let Some(module) = entry.module.as_mut() {
                 module.access = network.access(module);
             }
@@ -262,17 +272,21 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
         ungoverned,
     } = loaded;
 
-    let (shadowed, unpinned, modified) = match command {
-        Command::Check => (
-            base::catalog(root, &list.sources, &mut issues).1,
-            list.sources
-                .iter()
-                .filter(|c| c.unpinned())
-                .map(|c| c.name.clone())
-                .collect(),
-            provenance::record::modified(root),
-        ),
-        _ => (Vec::new(), Vec::new(), Vec::new()),
+    let (unpinned, modified) = match command {
+        Command::Check => {
+            // Reading the catalog is what reports two libraries describing one
+            // base, and `check` is where the repository is answered for.
+            let _ = base::catalog(root, &list.sources, &mut issues);
+            (
+                list.sources
+                    .iter()
+                    .filter(|c| c.unpinned())
+                    .map(|c| c.name.clone())
+                    .collect(),
+                provenance::record::modified(root),
+            )
+        }
+        _ => (Vec::new(), Vec::new()),
     };
     if list.audit_enforce {
         for name in &modified {
@@ -507,7 +521,6 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
         modules: list.images.iter().map(|i| i.modules().count()).sum(),
         suppressed: list.images.iter().map(|i| i.suppressed.len()).sum(),
         flavours: list.images.iter().map(|i| i.flavours.len()).sum(),
-        shadowed,
         unpinned,
         modified,
         ungoverned,

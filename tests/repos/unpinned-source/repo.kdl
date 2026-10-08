@@ -4,11 +4,9 @@ name "Unpinned Source"
 seed "example" collection="tectonic-os"
 
 sources {
-    tectonic-os {
-        pin {
-            unpinned "the collection this tool is published alongside, followed at its branch head"
-            version "main"
-            url "https://github.com/tectonic-os/modules/archive/refs/heads/{version}.tar.gz"
-        }
+    modules "tectonic-os" {
+        url "https://github.com/tectonic-os/modules"
+        version "main"
+        unpinned "the library this tool is published alongside, followed at its branch head"
     }
 }

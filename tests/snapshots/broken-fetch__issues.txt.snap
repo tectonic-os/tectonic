@@ -3,7 +3,7 @@ source: tests/golden.rs
 ---
   x `core/grabber` fetches in module.sh with nothing declaring what
    ,-[tests/repos/broken-fetch/modules/core/grabber/module.kdl:1:1]
- 1 | description "Reaches the network with nothing declaring what it pulls"
+ 1 | schema-version 1
    : ^
    : `-- `curl` reaches the network
  2 | 

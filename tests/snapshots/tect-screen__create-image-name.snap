@@ -1,0 +1,46 @@
+---
+source: src/screen_tests.rs
+---
+Buffer {
+    area: Rect { x: 0, y: 0, width: 80, height: 32 },
+    content: [
+        "What will the image be called?                                                  ",
+        "Workstation                                                                     ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "                                                                                ",
+        "enter confirms, esc cancels                                                     ",
+    ],
+    styles: [
+        x: 0, y: 0, fg: Rgb(90, 86, 224), bg: Reset, underline: Reset, modifier: BOLD,
+        x: 30, y: 0, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
+        x: 0, y: 31, fg: Reset, bg: Reset, underline: Reset, modifier: DIM,
+        x: 27, y: 31, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
+    ]
+}

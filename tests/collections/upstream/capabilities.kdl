@@ -1,0 +1,43 @@
+// Where a capability's presence is read, for a name found neither at
+// `/usr/bin/<name>` nor at `/usr/sbin/<name>`. A `path` holds for every base
+// family; a `family` block reads a different path on the families it names.
+//
+// A capability with no path is abstract, and nothing witnesses it.
+
+capability "ssh" {
+    path "/usr/sbin/sshd"
+}
+
+capability "initramfs-generation" {
+    path "/usr/bin/dracut"
+}
+
+capability "selinux-policy" {
+    path "/usr/sbin/semodule"
+}
+
+capability "flatpak" {
+    path "/usr/bin/flatpak"
+}
+
+capability "bootc" {
+    path "/usr/bin/bootc"
+}
+
+capability "bootupctl" {
+    path "/usr/bin/bootupctl"
+}
+
+capability "podman" {
+    path "/usr/bin/podman"
+}
+
+capability "crun" {
+    path "/usr/bin/crun"
+}
+
+capability "rechunking"
+
+// No filesystem path can witness what is inside an initramfs. The final image
+// check opens it instead.
+capability "luks-initramfs"

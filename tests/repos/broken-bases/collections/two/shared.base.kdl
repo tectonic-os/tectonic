@@ -1,0 +1,6 @@
+base {
+    image "example.invalid/shared:1"
+    about "Also shared"
+    family "fedora"
+    bootloader "grub2"
+}

@@ -1,0 +1,7 @@
+base {
+    image "example.invalid/collected:1"
+    about "A base only the collection knows about"
+    family "fedora"
+    provides "rechunking" "collected"
+    bootloader "grub2"
+}

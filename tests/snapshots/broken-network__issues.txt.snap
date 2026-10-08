@@ -8,34 +8,34 @@ source: tests/golden.rs
 
   x `core/fetcher` declares that its scripts reach the network, and repo.kdl
   | denies it
-   ,-[tests/repos/broken-network/modules/core/fetcher/module.kdl:5:1]
- 4 | 
- 5 | network "scripts"
+   ,-[tests/repos/broken-network/modules/core/fetcher/module.kdl:7:1]
+ 6 | 
+ 7 | network "scripts"
    : ^^^|^^^
    :    `-- denied by `scripts "deny"`
- 6 | 
+ 8 | 
    `----
   help: set `scripts "strict"` in repo.kdl's `security-policy { network }` to
         honour this declaration, or leave this module out of the image
 
   x `core/asset-only` declares an asset its script step cannot fetch
-   ,-[tests/repos/broken-network/modules/core/asset-only/module.kdl:5:1]
- 4 | 
- 5 | asset "tool" {
+   ,-[tests/repos/broken-network/modules/core/asset-only/module.kdl:7:1]
+ 6 | 
+ 7 | asset "tool" {
    : ^^|^^
    :   `-- fetched with the network closed
- 6 |     pin {
+ 8 |     pin {
    `----
   help: set `scripts "strict"` in repo.kdl's `security-policy { network }` and
         declare `network "scripts"`, or leave this module out of the image
 
   x `core/fragment-only` declares a script step it has not got
-   ,-[tests/repos/broken-network/modules/core/fragment-only/module.kdl:5:1]
- 4 | 
- 5 | network "scripts"
+   ,-[tests/repos/broken-network/modules/core/fragment-only/module.kdl:7:1]
+ 6 | 
+ 7 | network "scripts"
    : ^^^|^^^
    :    `-- no standard layer
- 6 | 
+ 8 | 
    `----
   help: `standard-layer #false` leaves the fragment the only thing this module
         emits, and a fragment's own RUN lines are emitted as written
@@ -43,7 +43,7 @@ source: tests/golden.rs
   x `core/installer` installs packages in module.sh, and its script step has
   | no network
    ,-[tests/repos/broken-network/modules/core/installer/module.kdl:1:1]
- 1 | description "Installs a package from its own script"
+ 1 | schema-version 1
    : ^
    : `-- `dnf5` needs the network
  2 | 

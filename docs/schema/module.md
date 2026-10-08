@@ -4,9 +4,10 @@
 
 Location: `modules/<module-name>/module.kdl`, in the directory of the module.
 
-A module is one reusable part of an image, such as a desktop, a kernel or a set of tools. `module.kdl` declares what the module needs and provides, what it installs and which families it supports, and the files beside it do the work.
+A module is one reusable part of an image, such as a desktop, a kernel or a set of tools. `module.kdl` declares its schema version, what the module needs and provides, what it installs and which families it supports, and the files beside it do the work.
 
 ```kdl
+schema-version 1
 description "Traditional CLI utilities"
 supports "fedora" "debian"
 packages "htop" "tmux"
@@ -14,6 +15,7 @@ packages "htop" "tmux"
 
 | Field | Accepts | Description |
 | --- | --- | --- |
+| [`schema-version`](#schema-version) (required) | *number* | The schema release that this file is written against. |
 | [`description`](#description) (optional) | *string* | One line that names the module in the resolved build summary. |
 | [`supports`](#supports) (optional,&nbsp;repeatable) | *list of strings* | The base families that this module builds on, which the image's `family` must match. Omit it to support every family. |
 | [`provides`](#provides) (optional,&nbsp;repeatable) | *list of strings* | A capability that this module provides for the modules that require it. |
@@ -44,6 +46,23 @@ packages "htop" "tmux"
 > `requires` and `after` decide the build order. The order of the image list only breaks ties.
 >
 > If nothing provides a `requires` or an `after`, then `tect check` fails and names every module that would satisfy it.
+
+<a id="schema-version"></a>
+
+## `schema-version` (required)
+
+The schema version tells `tect` which reader to use for this file. A file written against an earlier release keeps using that release's reader, while `repo.kdl` sets the newest schema the repository accepts.
+
+```kdl
+schema-version 1
+```
+
+Accepts: *number*
+
+> [!NOTE]
+> A file cannot declare a schema newer than `repo.kdl`.
+>
+> `tect create repo`, `tect create image` and `tect create module` write the version, and `tect` never changes it.
 
 <a id="description"></a>
 

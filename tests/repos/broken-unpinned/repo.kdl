@@ -2,32 +2,22 @@ schema-version 1
 name "Broken Unpinned"
 
 sources {
-    unmarked {
-        pin {
-            manual "nothing bumps it"
-            version "main"
-            url "https://github.com/owner/modules/archive/refs/heads/{version}.tar.gz"
-        }
+    modules "unmarked" {
+        url "https://github.com/owner/modules"
+        version "main"
     }
-    hashed {
-        pin {
-            unpinned "trusted"
-            version "main"
-            url "https://github.com/owner/modules/archive/refs/heads/{version}.tar.gz"
-            sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
-        }
+    modules "hashed" {
+        url "https://github.com/owner/modules"
+        version "main"
+        sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
+        unpinned "trusted"
     }
-    twice {
-        pin {
-            manual "nothing bumps it"
-            unpinned "trusted"
-            version "main"
-            url "https://github.com/owner/modules/archive/refs/heads/{version}.tar.gz"
-        }
+    modules "unselected" {
+        url "https://github.com/owner/modules"
+        sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
     }
-    here "../modules" {
-        pin {
-            unpinned "trusted"
-        }
+    modules "here" {
+        dir "../modules"
+        unpinned "trusted"
     }
 }

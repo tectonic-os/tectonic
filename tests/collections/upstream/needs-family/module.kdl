@@ -1,3 +1,5 @@
+schema-version 1
+
 description "A module that needs the family adapter under it"
 
 supports "fedora"

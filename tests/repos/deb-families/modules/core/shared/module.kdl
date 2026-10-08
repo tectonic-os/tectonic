@@ -1,3 +1,5 @@
+schema-version 1
+
 description "A module both the Debian and Ubuntu images enable"
 
 supports "debian" "ubuntu"
