@@ -16,7 +16,13 @@ Which modules? [1-8, several, 0 for none]: 1 3
 List it in example? (Yes/No)
 Yes
 
-Bring what these modules require? (Yes/No)
+The selected modules have dependencies not currently provided by the images:
+
+  browser > fedora-bootc:44
+    requires: flatpak
+    provider module: flatpak
+
+Add these provider modules now? (Yes/No)
 Yes
 
 `kernel-freshness` tracks the kernel a module pins, and proposes a bump

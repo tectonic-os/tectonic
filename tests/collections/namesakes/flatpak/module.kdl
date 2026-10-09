@@ -1,0 +1,7 @@
+schema-version 1
+
+description "The provider for both namesake clients"
+
+supports "fedora"
+
+provides "flatpak"

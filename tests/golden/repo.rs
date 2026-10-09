@@ -184,6 +184,7 @@ fn create_into(name: &str, root: &Path) {
         vec!["example".into(), "server".into()],
         None,
         tect::import::Place::Reference,
+        false,
         &silent,
     )
     .unwrap_or_else(|err| panic!("{}", err.message()))

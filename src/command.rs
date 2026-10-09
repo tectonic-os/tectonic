@@ -472,7 +472,7 @@ pub struct Cli {
     /// directory
     #[arg(long, global = true, value_name = "dir")]
     pub root: Option<PathBuf>,
-    /// ask nothing, and fail naming the flag a missing answer needs
+    /// ask nothing, using defaults or failing when an answer has no default
     #[arg(long = "no-tui", global = true)]
     pub no_tui: bool,
     #[command(subcommand)]
@@ -788,6 +788,9 @@ pub enum ImportWhat {
         /// installed copy by default, and no content is no offer
         #[arg(long, value_name = "file")]
         datastream: Option<PathBuf>,
+        /// add provider modules for dependencies the selected modules require
+        #[arg(long)]
+        dependencies: bool,
     },
 }
 
@@ -806,6 +809,9 @@ pub enum CopyWhat {
         /// installed copy by default, and no content is no offer
         #[arg(long, value_name = "file")]
         datastream: Option<PathBuf>,
+        /// add provider modules for dependencies the selected modules require
+        #[arg(long)]
+        dependencies: bool,
     },
 }
 
@@ -1356,8 +1362,9 @@ impl Context {
 const HEAD: &str = "usage: tect [--root <dir>] <command>\n";
 
 const RULE: &str = "\
-Every command takes a flag for everything it needs. What no flag gave is asked
-for, and `--no-tui` asks nothing, failing and naming the flag instead.
+Every answer a command may ask for has a matching flag. What no flag gave is
+asked for, and `--no-tui` asks nothing. An unattended question uses its default
+or fails and names the flag when it has no default.
 
 docs/cli.md is the reference. Data goes to stdout and diagnostics to
 stderr; exit 1 is the invocation, exit 2 the repository.
@@ -1612,6 +1619,16 @@ mod tests {
             .try_get_matches_from(["tect", "check", "--cache-to"])
             .expect_err("check does not read the cache switches");
         assert_eq!(error.kind(), ErrorKind::UnknownArgument);
+    }
+
+    #[test]
+    fn import_and_copy_take_the_dependencies_switch() {
+        for verb in ["import", "copy"] {
+            let matches = Cli::command()
+                .try_get_matches_from(["tect", verb, "module", "browser", "--dependencies"])
+                .unwrap_or_else(|error| panic!("{verb} module refused --dependencies: {error}"));
+            assert_eq!(flag::<bool>(&matches, "dependencies"), Some(true));
+        }
     }
 
     #[test]

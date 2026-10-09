@@ -1,0 +1,7 @@
+schema-version 1
+
+description "An app client with a namesake"
+
+supports "fedora"
+
+requires "flatpak"

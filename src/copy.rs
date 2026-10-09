@@ -77,7 +77,9 @@ pub fn list_in(target: &str) -> String {
 
 /// Asked by both commands, and answered by whichever one asked: an import
 /// references what it brings, a copy vendors it.
-pub const BRING_REQUIRED: &str = "Bring what these modules require?";
+pub const REQUIRED: &str =
+    "The selected modules have dependencies not currently provided by the images:";
+pub const BRING_REQUIRED: &str = "Add these provider modules now?";
 /// The same question against the base row, asked one step earlier: a base that
 /// is not a bootc image says what makes it one, and a fresh repository has
 /// neither that nor the family adapter.

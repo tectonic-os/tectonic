@@ -5,15 +5,14 @@ Tectonic v{version}
 
 The selected modules have dependencies not currently provided by the images:
 
-  browser > collected:1
+  browser > fedora-bootc:44
     requires: flatpak
     provider module: flatpak
 
 Add these provider modules now? (Yes/No)
-Yes
+No
 
 
 example/
-├── ~ example.image.kdl  browser added to modules
-└── ~ server.image.kdl  flatpak and browser added to modules
+└── ~ example.image.kdl  browser added to modules
 ==== exit 0

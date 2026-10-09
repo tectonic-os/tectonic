@@ -17,7 +17,7 @@ Every command takes these options, before or after its own words. [`tect`](#tect
 | Option | Description |
 | --- | --- |
 | `--root <dir>` | the repository, else the nearest `repo.kdl` at or above the working directory |
-| `--no-tui` | ask nothing, and fail naming the flag a missing answer needs |
+| `--no-tui` | ask nothing, using defaults or failing when an answer has no default |
 
 ## Commands
 
@@ -128,7 +128,7 @@ The build tool for a bootc image repository. With no command, it opens a picker 
 | Option | Description |
 | --- | --- |
 | `--root <dir>` | the repository, else the nearest `repo.kdl` at or above the working directory |
-| `--no-tui` | ask nothing, and fail naming the flag a missing answer needs |
+| `--no-tui` | ask nothing, using defaults or failing when an answer has no default |
 
 > [!NOTE]
 > In a terminal, a command asks for each answer that its arguments and flags
@@ -551,6 +551,7 @@ It asks, in order:
 | --- | --- |
 | `--image <name>` | list the module in this image or flavour; repeatable |
 | `--datastream <file>` | the SCAP content the profile offer is read out of; the family's installed copy by default, and no content is no offer |
+| `--dependencies` | add provider modules for dependencies the selected modules require |
 
 **Schema:** [`image.kdl`&nbsp;›&nbsp;`source`](schema/image.md#image-modules-source)
 
@@ -596,6 +597,7 @@ It asks the same questions as `tect import module`.
 | --- | --- |
 | `--image <name>` | list the module in this image or flavour; repeatable |
 | `--datastream <file>` | the SCAP content the profile offer is read out of; the family's installed copy by default, and no content is no offer |
+| `--dependencies` | add provider modules for dependencies the selected modules require |
 
 **Schema:** [`provenance.kdl`](schema/provenance.md)
 

@@ -1,12 +1,18 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 Tectonic v{version}
 
 List it in example? (Yes/No)
 Yes
 
-Bring what these modules require? (Yes/No)
+The selected modules have dependencies not currently provided by the images:
+
+  needs-family > fedora-bootc:44
+    requires: build-environment
+    provider module: fedora-family
+
+Add these provider modules now? (Yes/No)
 Yes
 
 

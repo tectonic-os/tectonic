@@ -1,0 +1,7 @@
+schema-version 1
+
+description "A desktop client with a namesake"
+
+supports "fedora"
+
+requires "flatpak"
