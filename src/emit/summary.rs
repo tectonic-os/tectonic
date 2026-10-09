@@ -138,10 +138,14 @@ pub fn on_host(target: &Json) -> String {
 }
 
 fn table(flavour: Option<&str>, conforms: &str, rows: &[Row]) -> String {
+    let noun = match rows.len() {
+        1 => "module",
+        _ => "modules",
+    };
     let mut out = match flavour {
-        None => format!("{} modules, the ungated set.\n", rows.len()),
+        None => format!("{} {noun}, the ungated set.\n", rows.len()),
         Some(flavour) => format!(
-            "{} modules, {} of them gated to `{flavour}`.\n",
+            "{} {noun}, {} gated to `{flavour}`.\n",
             rows.len(),
             rows.iter().filter(|row| row.flavour.is_some()).count()
         ),

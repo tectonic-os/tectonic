@@ -1,7 +1,7 @@
 ---
 source: tests/golden.rs
 ---
-1 modules, the ungated set.
+1 module, the ungated set.
 
 | Module | Description | Options | Satisfies | Refuses |
 | --- | --- | --- | --- | --- |

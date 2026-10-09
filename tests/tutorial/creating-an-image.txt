@@ -1,0 +1,75 @@
+==== tect create key cosign
+Private key written to cosign.key
+Public key written to cosign.pub
+wrote keys/public/etc/pki/containers/cosign.pub
+wrote keys/private/cosign.key
+
+the key carries no password, which is what the build workflow decrypts it with.
+
+next:
+  commit keys/public/etc/pki/containers/cosign.pub
+  gh secret set SIGNING_SECRET < keys/private/cosign.key
+==== tect graph
+# workstation-1 capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["quay.io/fedora/fedora-bootc:44"]
+    m0["kde"]
+```
+==== tect summary
+1 module, the ungated set.
+
+| Module | Description | Options | Satisfies | Refuses |
+| --- | --- | --- | --- | --- |
+| `kde` |  |  |  |  |
+==== tect why bazaar
+# tectonic-modules/apps/bazaar
+
+Bazaar, the Flatpak storefront
+
+## Where it is built
+
+workstation-2
+
+## What it exchanges
+
+| Direction | What | With |
+| --- | --- | --- |
+| provides | `bazaar` | nothing |
+| requires | `flatpak` | tectonic-modules/flatpak |
+| requires | `display-manager` | tectonic-modules/desktop-environment/kde-plasma |
+
+## What it claims
+
+Nothing. It declares no `satisfies`.
+
+## Where it came from
+
+| Content | Hash |
+| --- | --- |
+| declared | `8d53093c778d20bac559dc9697fd2507c6891af5ffb754c8717402c3fd4c171e` |
+
+| Collection | Locator | Selector | Verifier | Tracker |
+| --- | --- | --- | --- | --- |
+| `tectonic-modules` | https://github.com/tectonic-os/library | not declared | not declared | unpinned |
+
+It is referenced rather than copied, so what a build reads is the collection's own tree at that pin.
+
+## What it pulls in
+
+Nothing. It declares no `asset`.
+
+## Third-party repositories
+
+None. It declares no `copr` and ships no `repo` file.
+==== tect build
+tect: tags workstation-1:latest
+==== IMAGE_REGISTRY=ghcr.io/example tect registry ref
+ghcr.io/example/workstation-1:latest
