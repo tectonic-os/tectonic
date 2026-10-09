@@ -1,7 +1,7 @@
 ---
 source: tests/golden.rs
 ---
-1 modules, 0 of them gated to `base`.
+1 module, 0 gated to `base`.
 
 | Module | Description | Options | Satisfies | Refuses |
 | --- | --- | --- | --- | --- |

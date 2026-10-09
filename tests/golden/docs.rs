@@ -14,43 +14,144 @@ use std::path::Path;
 fn creating_an_image_kdl_blocks_parse() {
     let path = crate_dir().join("docs/creating-an-image.md");
     let page = std::fs::read_to_string(&path).unwrap();
-    let mut block = None::<String>;
+    let mut kind = None::<Option<String>>;
+    let mut block = None::<(Option<String>, String)>;
     let mut accepted = 0;
+    let mut files = 0;
+    let mut fragments = 0;
 
-    for line in page.lines() {
+    for quoted in page.lines() {
+        let line = quoted.strip_prefix("> ").unwrap_or(quoted);
+        if let Some(file) = line
+            .strip_prefix("<!-- kdl-file: ")
+            .and_then(|line| line.strip_suffix(" -->"))
+        {
+            assert!(kind.replace(Some(file.to_string())).is_none());
+            continue;
+        }
+        if line == "<!-- kdl-fragment -->" {
+            assert!(kind.replace(None).is_none());
+            continue;
+        }
         if line == "```kdl" {
-            assert!(block.replace(String::new()).is_none(), "nested KDL fence");
+            let kind = kind.take().unwrap_or_else(|| {
+                panic!(
+                    "{} KDL block {} is not marked as a file or fragment",
+                    path.display(),
+                    accepted + 1
+                )
+            });
+            assert!(
+                block.replace((kind, String::new())).is_none(),
+                "nested KDL fence"
+            );
             continue;
         }
         if line == "```" && block.is_some() {
-            let text = block.take().unwrap();
+            let (kind, text) = block.take().unwrap();
             let doc: kdl::KdlDocument = text.parse().unwrap_or_else(|err| {
                 panic!("{} KDL block {}: {err}", path.display(), accepted + 1)
             });
-            if let Some(version) = doc.get("schema-version") {
-                assert_eq!(
-                    version
-                        .entries()
-                        .first()
-                        .map(kdl::KdlEntry::value)
-                        .and_then(kdl::KdlValue::as_integer),
-                    Some(i128::from(tect::model::image::SCHEMA_VERSION)),
-                    "{} KDL block {} declares another schema",
-                    path.display(),
-                    accepted + 1
-                );
+            match kind {
+                Some(file) => {
+                    let version = doc.get("schema-version").unwrap_or_else(|| {
+                        panic!(
+                            "{} KDL block {} is a whole {file} without schema-version",
+                            path.display(),
+                            accepted + 1
+                        )
+                    });
+                    assert_eq!(
+                        version
+                            .entries()
+                            .first()
+                            .map(kdl::KdlEntry::value)
+                            .and_then(kdl::KdlValue::as_integer),
+                        Some(i128::from(tect::model::image::SCHEMA_VERSION)),
+                        "{} KDL block {} declares another schema",
+                        path.display(),
+                        accepted + 1
+                    );
+                    files += 1;
+                }
+                None => {
+                    assert!(
+                        doc.get("schema-version").is_none(),
+                        "{} KDL block {} marks a whole file as a fragment",
+                        path.display(),
+                        accepted + 1
+                    );
+                    fragments += 1;
+                }
             }
             accepted += 1;
             continue;
         }
-        if let Some(text) = &mut block {
+        if let Some((_, text)) = &mut block {
             text.push_str(line);
             text.push('\n');
+        } else if kind.is_some() {
+            panic!("a KDL marker must stand immediately before its fence");
         }
     }
 
     assert!(block.is_none(), "unclosed KDL fence in {}", path.display());
-    assert!(accepted > 0, "{} has no KDL blocks", path.display());
+    assert!(kind.is_none(), "unused KDL marker in {}", path.display());
+    assert!(files > 0 && fragments > 0 && accepted == files + fragments);
+}
+
+/// The command/output pairs copied into the tutorial come from one recorded
+/// walkthrough, so neither side may be edited without the other.
+#[test]
+fn creating_an_image_transcript_matches_the_page() {
+    let page = std::fs::read_to_string(crate_dir().join("docs/creating-an-image.md")).unwrap();
+    let transcript =
+        std::fs::read_to_string(crate_dir().join("tests/tutorial/creating-an-image.txt")).unwrap();
+    let mut commands = Vec::new();
+
+    for section in transcript.strip_prefix("==== ").unwrap().split("\n==== ") {
+        let (command, output) = section.split_once('\n').unwrap();
+        commands.push(command);
+        assert_eq!(
+            marked_fence(&page, "transcript-command", command),
+            command,
+            "the page does not run the recorded `{command}` command"
+        );
+        assert_eq!(
+            marked_fence(&page, "transcript-output", command),
+            output.trim_end(),
+            "the page does not show the recorded output of `{command}`"
+        );
+    }
+
+    assert_eq!(
+        commands,
+        [
+            "tect create key cosign",
+            "tect graph",
+            "tect summary",
+            "tect why bazaar",
+            "tect build",
+            "IMAGE_REGISTRY=ghcr.io/example tect registry ref",
+        ]
+    );
+}
+
+fn marked_fence<'a>(page: &'a str, kind: &str, command: &str) -> &'a str {
+    let marker = format!("<!-- {kind}: {command} -->\n");
+    assert_eq!(
+        page.matches(marker.as_str()).count(),
+        1,
+        "the page must have one {kind} marker for `{command}`"
+    );
+    let marked = page.split_once(marker.as_str()).unwrap().1;
+    let (opening, body) = marked.split_once('\n').unwrap();
+    let ticks = opening.chars().take_while(|ch| *ch == '`').count();
+    assert!(ticks >= 3, "the {kind} for `{command}` is not fenced");
+    let closing = format!("\n{}", "`".repeat(ticks));
+    body.split_once(closing.as_str())
+        .unwrap_or_else(|| panic!("the {kind} fence for `{command}` is not closed"))
+        .0
 }
 
 #[test]

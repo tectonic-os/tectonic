@@ -41,6 +41,7 @@ structure looks like this:
 
 ```text
 tect-tutorial/
+├── .gitignore
 ├── modules/
 ├── image.kdl
 └── repo.kdl
@@ -87,6 +88,7 @@ layout](https://tectonic-os.github.io/tectonic/schema/repository/) schema.
 
 Add the following to `repo.kdl`:
 
+<!-- kdl-file: repo.kdl -->
 ```kdl
 schema-version 1
 ```
@@ -104,6 +106,7 @@ files.
 
 Add the following to `image.kdl` in the repository root:
 
+<!-- kdl-file: image.kdl -->
 ```kdl
 schema-version 1
 
@@ -152,6 +155,7 @@ and fills the `base` node for you.
 
 A base-images library is declared in the `sources` node in `repo.kdl`:
 
+<!-- kdl-file: repo.kdl -->
 ```kdl
 schema-version 1
 
@@ -164,7 +168,7 @@ sources {
 ```
 
 This uses the default `core` base-images library, which contains definitions
-for Fedora, CentOS, RHEL, Debian and Ubuntu.
+for Fedora, CentOS Stream, RHEL, AlmaLinux, Rocky Linux, Debian and Ubuntu.
 
 > [!NOTE]
 > You can define your own base images, or create a base-images library in this
@@ -188,10 +192,12 @@ also records `default-image "workstation-1"` in `repo.kdl`.
 If you declared the optional `core` base-images library in the step above, the
 `base` node is written with the properties the library holds for that image:
 
+<!-- kdl-fragment -->
 ```kdl
 base "quay.io/fedora/fedora-bootc:44" {
     family "fedora"
     provides "rechunking" "initramfs-generation" "luks-initramfs" "selinux-policy" "ssh" "bootc" "bootupctl" "podman" "crun"
+    signed #false
 }
 ```
 
@@ -222,6 +228,7 @@ to the `modules/` directory.
 >
 > They are declared in `modules` like this:
 >
+> <!-- kdl-fragment -->
 > ```kdl
 > modules {
 >     module "custom-module"
@@ -279,6 +286,7 @@ During the build, this tree is copied into the image at the same path, so
 
 Include the `kde` module in the `workstation-1` image node in `image.kdl`:
 
+<!-- kdl-file: image.kdl -->
 ```kdl
 schema-version 1
 
@@ -301,6 +309,7 @@ The default modules library provides feature modules for many use cases.
 To add the default modules library to your repository, edit `repo.kdl` and add
 it to the `sources` node:
 
+<!-- kdl-file: repo.kdl -->
 ```kdl
 schema-version 1
 
@@ -309,11 +318,17 @@ sources {
         url "https://github.com/tectonic-os/library"
         path "base-images/core"
     }
+    capabilities "core" {
+        url "https://github.com/tectonic-os/library"
+        path "capabilities"
+    }
     modules "tectonic-modules" {
         url "https://github.com/tectonic-os/library"
         path "modules"
     }
 }
+
+default-image "workstation-1"
 ```
 
 Now run:
@@ -327,20 +342,22 @@ library. Scroll to the `desktop-environment` section, expand it with the →
 key, and toggle `kde-plasma` with the space bar:
 
 ```ansi
-Select modules to import:
-  browsers
-  desktop-environment
-    [ ] gnome
-  > [x] kde-plasma
-  fedora
-  hardening
+Which modules?
+  [ ] ▸ browsers
+  [-] ▾ desktop-environment
+    [ ] tectonic-modules/desktop-environment/gamemode
+    [ ] tectonic-modules/desktop-environment/gnome
+  > [x] tectonic-modules/desktop-environment/kde-plasma
+    [ ] tectonic-modules/desktop-environment/krunner-bazaar
+  [ ] ▸ fedora
+  [ ] ▸ hardening
 ↑↓ navigate • ←/→ open • ␣ toggle • ⏎  confirm • Esc cancel
 ```
 
 At the next prompt, select `workstation-2` and press enter to confirm:
 
 ```ansi
-Select the images to import the module into:
+Which images list it?
   [ ] workstation-1
 > [x] workstation-2
 ↑↓ navigate • ␣ toggle • ⏎  confirm • Esc cancel
@@ -365,6 +382,7 @@ Add these provider modules now?
 
 This modifies `workstation-2.image.kdl` to include two imported modules:
 
+<!-- kdl-file: workstation-2.image.kdl -->
 ```kdl
 schema-version 1
 
@@ -374,6 +392,11 @@ image {
     base "quay.io/fedora/fedora-bootc:44" {
         family "fedora"
         provides "rechunking" "initramfs-generation" "luks-initramfs" "selinux-policy" "ssh" "bootc" "bootupctl" "podman" "crun"
+        signed #false
+    }
+
+    layout {
+        bootloader "grub2"
     }
 
     modules {
@@ -388,11 +411,10 @@ image {
 Imported modules are placed inside a `source` node named for the library they
 came from.
 
-Notice that a `modules/.remote/tectonic-modules` directory now exists. It
-holds a local cached copy of each imported module, under a directory named for
-the library source. Modules in `modules/.remote` follow the library's ref
-unless pinned to a specific release commit. These files are not tracked by
-git, and a deleted copy is fetched again.
+Notice that a `modules/.remote/tectonic-modules` directory now exists. It is
+an untracked fetch cache, under a directory named for the library source, and
+not an editing surface. `tect generate` refreshes an unpinned module from the
+library; use `tect copy module` before modifying one.
 
 #### Copying modules from a library
 
@@ -405,11 +427,10 @@ A `provenance.kdl` beside the copy records where it came from.
 
 Looking at `modules/.remote/tectonic-modules/desktop-environment/kde-plasma`,
 you will see it contains a `module.kdl` file. This is a module manifest. It
-contains the following nodes:
+includes the following nodes:
 
+<!-- kdl-fragment -->
 ```kdl
-schema-version 1
-
 supports "fedora" "debian" "ubuntu"
 
 provides "plasma-desktop" "display-manager" "graphical-session" "wayland"
@@ -471,9 +492,10 @@ Does this module install packages? Yes
 
 package names, separated by spaces: firefox
 
-Select the images that list the module:
+Which images list it?
   [ ] workstation-1
 > [x] workstation-2
+↑↓ navigate • ␣ toggle • ⏎  confirm • Esc cancel
 ```
 
 Alternatively, you can configure a module with command arguments:
@@ -491,6 +513,7 @@ flag. Use it in scripts with all arguments supplied.
 
 Review the `module.kdl` file in `modules/browser/`:
 
+<!-- kdl-file: module.kdl -->
 ```kdl
 schema-version 1
 
@@ -508,6 +531,7 @@ Declaring `provides` and `requires` in a module's `module.kdl` manifest lets
 Since Firefox is a GUI app, it requires a graphical session. Add the following
 line to `modules/browser/module.kdl`:
 
+<!-- kdl-file: module.kdl -->
 ```kdl
 schema-version 1
 
@@ -546,6 +570,7 @@ module declares in the image.
 
 The `key` node takes these fields:
 
+<!-- kdl-fragment -->
 ```kdl
 key "cosign" {
     generator "cosign"
@@ -565,12 +590,14 @@ tect import module updates/signature-policy --image workstation-2
 
 then create the cosign keys with:
 
+<!-- transcript-command: tect create key cosign -->
 ```sh
 tect create key cosign
 ```
 
 This prints:
 
+<!-- transcript-output: tect create key cosign -->
 ```bash
 Private key written to cosign.key
 Public key written to cosign.pub
@@ -599,20 +626,23 @@ module in the image.
 Add Flatpak and Bazaar to workstation-2 with:
 
 ```sh
-tect import module flatpak bazaar --image workstation-2
+tect import module flatpak --image workstation-2
+tect import module apps/bazaar --image workstation-2
 ```
 
 The cached Flatpak `module.kdl` at
 `modules/.remote/tectonic-modules/flatpak` holds:
 
+<!-- kdl-fragment -->
 ```kdl
 collects "flatpaks.list" into="/usr/share/flatpak-defaults/apps.list" priority=500
 
 provides "flatpak"
 ```
 
-The cached Bazaar module at `modules/.remote/tectonic-modules/bazaar` has only
-a manifest with `requires "flatpak"` and a `flatpaks.list` file holding:
+The cached Bazaar module at
+`modules/.remote/tectonic-modules/apps/bazaar` has a manifest that requires
+`flatpak` and `display-manager`, and a `flatpaks.list` file holding:
 
 ```text
 io.github.kolunmi.Bazaar
@@ -652,34 +682,126 @@ under `modules/`, `finalize.sh` and the capability graph (`graph.md`).
 `tect graph` prints the capability graph generated at
 `generated/workstation-1/graph.md`:
 
-```bash
-{tect graph output}
+<!-- transcript-command: tect graph -->
+```sh
+tect graph
 ```
+
+<!-- transcript-output: tect graph -->
+````markdown
+# workstation-1 capability graph
+
+GENERATED FILE, do not edit.
+
+An arrow points from a provider to what needs it, dotted for `after`,
+which orders the build without requiring anything. Layers build left to
+right.
+
+```mermaid
+graph LR
+    base["quay.io/fedora/fedora-bootc:44"]
+    m0["kde"]
+```
+````
 
 `tect summary` prints what the target is made of:
 
-```bash
-{tect summary output}
+<!-- transcript-command: tect summary -->
+```sh
+tect summary
+```
+
+<!-- transcript-output: tect summary -->
+```markdown
+1 module, the ungated set.
+
+| Module | Description | Options | Satisfies | Refuses |
+| --- | --- | --- | --- | --- |
+| `kde` |  |  |  |  |
 ```
 
 `tect why bazaar` prints where each part of the Bazaar module came from:
 
-```bash
-{tect why output}
+<!-- transcript-command: tect why bazaar -->
+```sh
+tect why bazaar
+```
+
+<!-- transcript-output: tect why bazaar -->
+```markdown
+# tectonic-modules/apps/bazaar
+
+Bazaar, the Flatpak storefront
+
+## Where it is built
+
+workstation-2
+
+## What it exchanges
+
+| Direction | What | With |
+| --- | --- | --- |
+| provides | `bazaar` | nothing |
+| requires | `flatpak` | tectonic-modules/flatpak |
+| requires | `display-manager` | tectonic-modules/desktop-environment/kde-plasma |
+
+## What it claims
+
+Nothing. It declares no `satisfies`.
+
+## Where it came from
+
+| Content | Hash |
+| --- | --- |
+| declared | `8d53093c778d20bac559dc9697fd2507c6891af5ffb754c8717402c3fd4c171e` |
+
+| Collection | Locator | Selector | Verifier | Tracker |
+| --- | --- | --- | --- | --- |
+| `tectonic-modules` | https://github.com/tectonic-os/library | not declared | not declared | unpinned |
+
+It is referenced rather than copied, so what a build reads is the collection's own tree at that pin.
+
+## What it pulls in
+
+Nothing. It declares no `asset`.
+
+## Third-party repositories
+
+None. It declares no `copr` and ships no `repo` file.
 ```
 
 ## Build the image
 
 To build the image run:
 
+<!-- transcript-command: tect build -->
 ```sh
 tect build
 ```
 
-`tect build` verifies the generated files, then builds every image unless one
-is named. Each image lands in the local podman or Docker store tagged
-`<image>:latest`, so `podman images` lists it. `tect registry ref` prints the
-reference the image publishes under.
+`tect build` verifies the generated files, then builds the default image. Name
+another target, such as `tect build workstation-2`, to build it instead. With
+the default buildah backend, the image lands in the local Podman store. The
+walkthrough's default tag is printed before the build starts:
+
+<!-- transcript-output: tect build -->
+```text
+tect: tags workstation-1:latest
+```
+
+Once `IMAGE_REGISTRY` is set, or the repository has a GitHub `origin`,
+`tect registry ref` prints the full reference the image publishes under. For
+example:
+
+<!-- transcript-command: IMAGE_REGISTRY=ghcr.io/example tect registry ref -->
+```sh
+IMAGE_REGISTRY=ghcr.io/example tect registry ref
+```
+
+<!-- transcript-output: IMAGE_REGISTRY=ghcr.io/example tect registry ref -->
+```text
+ghcr.io/example/workstation-1:latest
+```
 
 ## Publish with CI
 
