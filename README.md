@@ -139,6 +139,7 @@ flag.
 The full documentation is at
 <https://tectonic-os.github.io/tectonic/>.
 
+- [How to create an image](docs/creating-an-image.md)
 - [CLI reference](docs/cli.md)
 - [KDL syntax](docs/kdl.md)
 - [Repository layout](docs/schema/repository.md)

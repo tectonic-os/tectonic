@@ -306,7 +306,7 @@ pub const REPOSITORY: Tree = Tree {
     places: &[
         Place { path: &[REPO_FILE], writer: "`tect create repo`, then the user", tracked: true,
             what: "The settings of the whole repository. See [`repo.kdl`](repo.md)." },
-        Place { path: &[IMAGE_FILE], writer: "`tect create image`, then the user", tracked: true,
+        Place { path: &[IMAGE_FILE], writer: "the user", tracked: true,
             what: "The images of the repository. See [`image.kdl`](image.md)." },
         Place { path: &["<name>", IMAGE_SUFFIX], writer: "`tect create image`, then the user", tracked: true,
             what: "More images. The name in front of the suffix is decorative." },

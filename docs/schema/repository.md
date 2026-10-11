@@ -26,7 +26,7 @@ A repository is a git repository with `repo.kdl` at its root, which is how `tect
 | Path | Written by | In git | Description |
 | --- | --- | --- | --- |
 | `repo.kdl` | `tect create repo`, then the user | yes | The settings of the whole repository. See [`repo.kdl`](repo.md). |
-| `image.kdl` | `tect create image`, then the user | yes | The images of the repository. See [`image.kdl`](image.md). |
+| `image.kdl` | the user | yes | The images of the repository. See [`image.kdl`](image.md). |
 | `<name>.image.kdl` | `tect create image`, then the user | yes | More images. The name in front of the suffix is decorative. |
 | `modules/` | the user, `tect create module` or `tect copy module` | yes | The modules of the repository, one directory each. See [Modules](modules.md). |
 | `modules/.remote/` | `tect` | no | The modules that an image pins from another repository, fetched and verified against their hash. |
