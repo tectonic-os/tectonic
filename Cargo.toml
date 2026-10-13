@@ -2,8 +2,8 @@
 name = "tect"
 version = "0.6.51"
 edition = "2021"
-# The lowest toolchain the crate builds and tests on. CI tests on it, so a
-# dependency bump that needs a newer one fails there.
+# CI tests this minimum before accepting a dependency that needs a newer
+# toolchain.
 rust-version = "1.95"
 publish = false
 description = "Reads the image files and the per-module module.kdl manifests"
@@ -13,36 +13,32 @@ clap = { version = "4.6.7", features = ["derive"] }
 kdl = "6.3.4"
 libc = "0.2"
 miette = { version = "7.6.0", features = ["fancy"] }
-# Pinned by rev, never by version. A change in `common` is a commit there and
-# a bump here, which keeps the rev that was built with visible in `Cargo.lock`.
-# To work on both trees at once, put a `paths` override in `.cargo/config.toml`,
-# which redirects a git dependency and leaves `Cargo.lock` alone.
-common = { git = "https://github.com/tectonic-os/common", rev = "ef7742ba5b768bd1983a3f775536545ccd727c65" }
+quick-xml = "0.42.0"
+# The commit pin keeps the shared contract exact.
+# Cargo.lock records the revision that was built.
+# A local paths override can redirect development to a working tree.
+# The override leaves Cargo.lock unchanged.
+common = { git = "https://github.com/tectonic-os/common", rev = "8ad7beb36fe5228b1ed17555faa113a78ca865c8" }
 
 [profile.release]
 opt-level = 1
 debug = false
 lto = false
 codegen-units = 16
-# No `panic = "abort"` here. **The reason this was written for left with the
-# installer** in `NEXT-53` stage 2 step 4: the LUKS, mount and staged-recipe
-# guards are `work/installer/`'s now. What is left in this crate is one guard,
-# `upgrade::Staged`, which removes a part-downloaded release so a panicking
-# `tect upgrade` does not leave one beside the running binary. That is a
-# smaller reason than the one that put this here, and unwinding costs about
-# 385 KB of the stripped `dist` binary, so whether `tect` still wants it is an
-# open question filed in `BACKLOG.md` rather than answered here.
+# `tect upgrade` unwinds so `upgrade::Staged` can remove a partially downloaded
+# release after a panic. Aborting would leave that release beside the running
+# binary.
 strip = true
 
-# What a release is built with; `release` stays tuned for rebuild speed
+# The dist profile favours binary size while release favours rebuild speed.
 [profile.dist]
 inherits = "release"
 opt-level = "s"
 lto = true
 codegen-units = 1
 
-# Renders `docs/cli.md` in a test, so it never reaches a dist binary.
+# clap-markdown renders `docs/cli.md` in a test and never reaches a dist binary.
 [dev-dependencies]
 clap-markdown = "0.1.5"
-common = { git = "https://github.com/tectonic-os/common", rev = "ef7742ba5b768bd1983a3f775536545ccd727c65", features = ["test-support"] }
+common = { git = "https://github.com/tectonic-os/common", rev = "8ad7beb36fe5228b1ed17555faa113a78ca865c8", features = ["test-support"] }
 insta = { version = "1.49.0", default-features = false, features = ["filters"] }

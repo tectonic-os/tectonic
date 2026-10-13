@@ -1,10 +1,11 @@
-//! The build record: what was resolved, where `plan.json` is what was declared.
+//! The build record captures resolved inputs while `plan.json` captures
+//! declarations.
 //!
-//! Three moving references get one treatment: a base image tag resolves to a
-//! manifest digest, a cloned asset's ref to a commit, and an unpinned
-//! collection's ref to what the tarball hashed to.
+//! Moving references must resolve before a build can be reproduced. Base tags
+//! resolve to manifest digests, cloned asset refs resolve to commits, and
+//! unpinned collection refs resolve to tarball hashes.
 //!
-//! The resolution cannot go in `plan.json`: that file is committed and byte
+//! The resolution cannot go in `plan.json`. That file is committed and byte
 //! compared, so a daily-changing value would fail `verify`. This document is
 //! written in-layer from ARGs, so nothing under `generated/` holds it.
 
@@ -12,20 +13,16 @@ use common::json::Json;
 use std::path::Path;
 use std::process::Command;
 
-/// Where the record lands in the image, beside the baked manifest.
 pub const RECORD: &str = "/usr/share/tectonic/build.json";
 
-/// Where the generated plan is baked, which is what the image declares it is
-/// made of.
 pub const MANIFEST: &str = "/usr/share/tectonic/manifest.json";
 
 fn env(name: &str) -> Option<String> {
     std::env::var(name).ok().filter(|v| !v.is_empty())
 }
 
-/// What `<program> <args>` printed, or None when it is not installed or said
-/// nothing. A resolution that fails is recorded as absent; `audit { enforce }`
-/// is what makes it an error.
+/// Failed, missing and empty commands all yield `None` because audit
+/// enforcement decides whether an absent resolution is fatal.
 fn output(program: &str, args: &[&str]) -> Option<String> {
     let out = Command::new(program).args(args).output().ok()?;
     if !out.status.success() {
@@ -50,16 +47,14 @@ pub fn base(reference: &str) -> Option<String> {
             &format!("docker://{reference}"),
         ],
     )?;
-    // The tag stays on: `repo:tag@sha256:...` is what was asked for and what
-    // answered, and the digest is what a pull honours.
+    // Keeping the tag records what was requested, while the digest controls
+    // what a pull retrieves.
     digest
         .starts_with("sha256:")
         .then(|| format!("{reference}@{digest}"))
 }
 
-/// A cloned asset's selector as the commit it points at. A selector that is
-/// already a commit resolves to itself; a tag is asked of the remote, which is
-/// what makes a tag that moved later detectable.
+/// Resolving movable selectors to commits makes later tag movement detectable.
 pub fn clone_commit(url: &str, version: &str) -> Option<String> {
     if version.len() == 40 && version.chars().all(|c| c.is_ascii_hexdigit()) {
         return Some(version.to_lowercase());
@@ -86,8 +81,8 @@ fn pairs(raw: &str) -> Vec<Vec<&str>> {
         .collect()
 }
 
-/// The record, from the arguments the generated Containerfile passed down.
-/// Nothing here reads the repository: the layer has none.
+/// The generated layer has no repository, so build arguments provide the
+/// record.
 pub fn build() -> Json {
     record(&env)
 }
@@ -103,13 +98,13 @@ fn record(env: &dyn Fn(&str) -> Option<String>) -> Json {
     let declared = env("BASE_DECLARED");
     let resolved = env("BASE");
     Json::object([
-        ("schema_version", Json::Number(SCHEMA_VERSION)),
+        ("schema_version", Json::number(SCHEMA_VERSION)),
         ("target", Json::optional(env("TARGET"))),
         ("image", Json::optional(env("IMAGE_ID"))),
         ("version", Json::optional(env("IMAGE_VERSION"))),
         ("tect", Json::string(env!("CARGO_PKG_VERSION"))),
-        // Which of buildx and buildah produced this. Nothing else in the
-        // image can say, and the two do not always agree on what they make.
+        // No other image field records whether buildx or buildah produced it.
+        // The backends can produce different results.
         ("backend", Json::optional(env("BUILD_BACKEND"))),
         ("source_commit", Json::optional(env("SOURCE_COMMIT"))),
         (
@@ -163,7 +158,6 @@ fn record(env: &dyn Fn(&str) -> Option<String>) -> Json {
     ])
 }
 
-/// Writes the record into the image being built.
 pub fn write() -> Result<(), String> {
     let path = Path::new(RECORD);
     if let Some(dir) = path.parent() {
@@ -177,7 +171,6 @@ pub fn write() -> Result<(), String> {
 mod tests {
     use super::*;
 
-    /// What a build stamps, from the arguments the Containerfile passes down.
     #[test]
     fn the_record_names_the_digest_and_says_whether_anything_was_enforced() {
         let given = |name: &str| {
@@ -201,7 +194,6 @@ mod tests {
         assert!(out.contains("\"backend\": \"buildah\""));
         assert!(out.contains("\"path\": \"apps/browser\""));
         assert!(out.contains("\"selector\": \"B7\""));
-        // Nothing was declared, so the record says so.
         assert!(out.contains("\"enforce\": false"));
         assert!(out.contains("\"verified\": null"));
     }

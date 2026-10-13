@@ -1,7 +1,5 @@
-//! What the modules claimed, what the scan measured, and what stopped passing
-//! since the last one. The claims come off the resolved plan; the mapping from
-//! a benchmark number to a rule, and the rule to a result, come off the two
-//! XML documents a scan run produces.
+//! SCAP claims resolve through datastream numbering before scan results can
+//! verify them or expose a regression.
 
 mod xml;
 
@@ -15,7 +13,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-/// Where a runner installs the SSG content.
+/// A fixed system path lets generated layers and host commands find the same
+/// SSG content.
 const CONTENT: &str = "/usr/share/xml/scap/ssg/content";
 
 #[derive(Default)]
@@ -28,15 +27,14 @@ pub struct Options {
     pub base: Option<PathBuf>,
 }
 
-/// What the scan came back with; the report is on stdout either way.
+/// A verdict separates enforcement from the report already written to stdout.
 pub enum Verdict {
     Clean,
-    /// Findings, in a repository that enforces. Every one of them was printed.
+    /// Enforcement fails only after every finding has been printed.
     Wrong,
 }
 
-/// Prints the datastream one target is measured with, and nothing at all when
-/// the image declares no `conforms`.
+/// Empty output preserves the build layer's existing `conforms` gate.
 pub fn content(root: &Path, named: Option<&str>) -> Result<Verdict, String> {
     let Some((list, _)) = open(root, named) else {
         return Ok(Verdict::Wrong);
@@ -45,9 +43,8 @@ pub fn content(root: &Path, named: Option<&str>) -> Result<Verdict, String> {
     Ok(Verdict::Clean)
 }
 
-/// The same answer with no repository at all: the `conforms` comes off the
-/// running target and the base family off the image it belongs to. Same gate
-/// as above — a target measured against nothing says so with a blank line.
+/// Host lookup derives conformance and base family from the baked target
+/// because no repository is available.
 pub fn content_on_host(image: &Json, target: &Json) -> Result<Verdict, String> {
     let path = match json::text(target, "conforms")
         .unwrap_or_default()
@@ -67,11 +64,10 @@ pub fn content_on_host(image: &Json, target: &Json) -> Result<Verdict, String> {
     Ok(Verdict::Clean)
 }
 
-/// What `check` says about an image declaring `conforms`, in two tiers. A
-/// notice, never an error: declaring a profile before reaching it is the point.
-/// Without a datastream nothing knows which rules a profile selects, so it can
-/// only report an image that declares one and claims nothing; with one it names
-/// the unclaimed rules and the modules that would claim them.
+/// A conformance gap is a notice because users can declare a profile before
+/// reaching it. Without a datastream, only an entirely unclaimed image can be
+/// identified. With a datastream, the notice can name each open rule and a
+/// module that would claim it.
 pub fn conformance(
     list: &List,
     index: &Index,
@@ -113,23 +109,17 @@ pub fn conformance(
     Ok(out)
 }
 
-/// Every benchmark number an image claims and every rule it refuses: the two
-/// lists that keep remediation off what a module owns.
+/// Claims and refusals keep remediation away from module-owned rules.
 ///
-/// **The base is a claimant.** It declares `satisfies` the way a module does,
-/// and a claim missing from this list is one remediation can silently make
-/// true, which leaves the claim standing and unproved. `owed` and
-/// `conformance` both chain the base already; this is the third reader that
-/// has to agree with them.
+/// Base claims must be included because remediation could otherwise satisfy a
+/// suppressed module's claim without measuring the base's ownership. `owed`,
+/// `conformance` and this function must agree on that rule.
 ///
-/// Claims are numbers and refusals are rule IDs, which is the vocabularies
-/// staying apart on purpose: 710 of 994 rules carry no number that reaches
-/// them, and a rule worth refusing is often one.
+/// Claims use benchmark numbers, while refusals use rule IDs. Some rules have
+/// no number, and refusals must still reach them.
 ///
-/// **An image may lift a refusal.** A module's refusal is its judgement about
-/// a deployment, and the deployment is the image's. A lifted rule is
-/// remediated and then measured, so the scan says which way it went either
-/// way — which is where the honesty lives.
+/// An image can lift a module refusal because the deployment owns remediation.
+/// The later scan verifies the resulting rule either way.
 pub fn exclusions(image: &Image) -> (Vec<String>, Vec<String>) {
     let claimed = crate::emit::plan::distinct(
         image
@@ -154,18 +144,14 @@ pub fn exclusions(image: &Image) -> (Vec<String>, Vec<String>) {
     (claimed, refused)
 }
 
-/// The capability the remediation step provides, which is how an image says it
-/// runs one without the tool naming a module.
+/// The capability decouples remediation detection from a specific module name.
 const REMEDIATION: &str = "scap-remediation";
 
-/// An image measured against a profile that nothing in it will remediate. Needs
-/// no datastream: it is a question about the module list alone. A notice rather
-/// than an error, because measuring without remediating is a real thing to want
-/// — it is measuring and *silently* not remediating that is the accident.
+/// A conformance claim without a remediation provider may be intentional, so
+/// it produces a notice rather than an error.
 ///
-/// Silent until something on this machine offers the capability. A notice
-/// telling a reader to add a module that exists nowhere is one they cannot act
-/// on, and every image declaring `conforms` would carry it.
+/// The notice is useful only when the library offers a provider the user can
+/// add.
 fn unremediated(image: &Image, index: &Index) -> Option<String> {
     if index.providing(REMEDIATION).is_empty() {
         return None;
@@ -187,9 +173,8 @@ fn unremediated(image: &Image, index: &Index) -> Option<String> {
     })
 }
 
-/// A refusal naming a rule the content does not carry. It reaches the build as
-/// one more `-u` and protects nothing, and a misspelling looks exactly like a
-/// rule that was left alone — which is the whole thing a refusal is for.
+/// A refusal that reaches no content rule protects nothing and is
+/// indistinguishable from a misspelling.
 fn refuses_nothing(image: &Image, content: &Content) -> Vec<String> {
     let known: BTreeSet<&str> = content.ids.iter().map(|id| rule_name(id)).collect();
     image
@@ -212,16 +197,11 @@ fn refuses_nothing(image: &Image, content: &Content) -> Vec<String> {
         .collect()
 }
 
-/// A claim whose number reaches no rule in the content this image is measured
-/// against. The finalize layer resolves those numbers itself — a claim is
-/// written as a benchmark number and a tailoring wants a rule — so a number
-/// that reaches nothing fails the build inside the remediation hook, where the
-/// diagnostic is a `RUN` that stopped. Named here instead.
+/// A claim that reaches no rule would fail inside the generated remediation
+/// step. Reporting it here identifies the declaration instead.
 ///
-/// This is not always a typo. A whole vocabulary can be missing: measured
-/// 2026-09-09, `ssg-cs10-ds.xml` carries no `CCI-` number and no `BP28(` at
-/// all, so a claim correct against Fedora 0.1.71 names nothing on the EL base.
-/// The gate a claim needs is the content, and `family` is not it.
+/// Benchmark vocabularies differ, so a claim valid for one base can be absent
+/// from another. The datastream, not the family name, is the correct gate.
 fn claims_nothing(image: &Image, content: &Content) -> Vec<String> {
     let claimants = image
         .base
@@ -251,10 +231,8 @@ fn claims_nothing(image: &Image, content: &Content) -> Vec<String> {
         .collect()
 }
 
-/// A rule one image both claims and refuses. The two are written in different
-/// vocabularies — a claim in a benchmark number, a refusal in a rule ID — so
-/// only a datastream can tell that they meet, which is what puts this in the
-/// second tier.
+/// Claims use benchmark numbers while refusals use rule IDs, so only
+/// datastream resolution can reveal a conflict.
 fn claimed_and_refused(image: &Image, content: &Content) -> Vec<String> {
     let (claimed, refused) = exclusions(image);
     let refused: BTreeSet<&str> = refused.iter().map(String::as_str).collect();
@@ -274,30 +252,24 @@ fn claimed_and_refused(image: &Image, content: &Content) -> Vec<String> {
         .collect()
 }
 
-/// What an image still owes the profile it is measured against.
+/// Profile selection and claims determine the rules an image still owes.
 pub struct Owed<'a> {
-    /// How many rules the profile selects, which is what `open` is out of.
+    /// The selected-rule count gives `open` its denominator.
     pub selects: usize,
-    /// The selected rules nothing the image installs and no base it builds on
-    /// claims. A module the base suppressed is installed by nothing, so its
-    /// claims are not here.
+    /// `open` excludes claims from installed modules and the base. Suppressed
+    /// module claims remain excluded because the module was not installed.
     pub open: BTreeSet<String>,
     /// Modules elsewhere claiming one of them, already minus what the image
-    /// lists: an offer is only worth making about what it does not have.
+    /// lists. An offer is useful only for a module the image does not have.
     pub helping: Vec<&'a crate::provider::Provider>,
-    /// The open rules `helping` would close, which is fewer than `open` where
-    /// nothing claims the rest.
+    /// The open rules `helping` would close. Some open rules have no provider.
     pub covered: BTreeSet<String>,
 }
 
-/// Which of a profile's rules an image is still missing, and who would claim
-/// them. The claim resolves forward through `Content::rules`; the search for
-/// who would help runs backward through `Content::numbering`.
+/// Forward claim resolution and reverse provider lookup must use the same
+/// numbering index.
 pub fn owed<'a>(image: &Image, content: &Content, profile: &Profile, index: &'a Index) -> Owed<'a> {
     let selected = content.selected(&profile.id);
-    // The base claims rules the way a listed module does, and a module the base
-    // suppressed left `entries` with its claims, so a base that covers a module
-    // says for itself what that module was claiming.
     let claimed = reached(
         content,
         image
@@ -307,9 +279,7 @@ pub fn owed<'a>(image: &Image, content: &Content, profile: &Profile, index: &'a 
             .flat_map(|coverage| coverage.rules.iter()),
     );
     let open: BTreeSet<String> = selected.difference(&claimed).cloned().collect();
-    // A module the image already lists is not an answer to what it is missing.
-    // A module the base suppressed is still one the image lists, so it is
-    // still not an answer to what the image is missing.
+    // Provider offers must exclude both installed and base-suppressed modules.
     let listed: BTreeSet<String> = image
         .entries
         .iter()
@@ -337,8 +307,8 @@ pub fn owed<'a>(image: &Image, content: &Content, profile: &Profile, index: &'a 
     }
 }
 
-/// The rules `numbers` reach: a claim names the first rule in document order
-/// carrying it, which is the direction a claim resolves in.
+/// A claim resolves each benchmark number to the first matching rule in
+/// document order.
 pub fn reached<'a>(
     content: &Content,
     numbers: impl Iterator<Item = &'a String>,
@@ -357,9 +327,8 @@ pub(crate) fn profile_names(content: &Content) -> String {
     }
 }
 
-/// The datastream-backed tier: of the rules the declared profile selects, the
-/// ones nothing it installs and no base it builds on claims, and what
-/// elsewhere would claim them.
+/// Only the datastream can identify unclaimed profile rules and modules that
+/// could close them.
 fn unclaimed(image: &Image, content: &Content, index: &Index) -> Option<String> {
     let Some(profile) = content.profiles.iter().find(|p| p.is(&image.conforms)) else {
         return Some(format!(
@@ -405,10 +374,9 @@ fn unclaimed(image: &Image, content: &Content, index: &Index) -> Option<String> 
     ))
 }
 
-/// An `allow-remediation` naming a rule nothing this image installs refuses. It
-/// changes no build arg and reads exactly like one that lifted something, which
-/// is the same failure a misspelled refusal has. Needs no datastream: it is a
-/// question about the module list.
+/// An allowance that answers no installed refusal changes no build argument,
+/// so it is indistinguishable from a misspelling. Module declarations alone
+/// determine this result.
 fn allows_nothing(image: &Image) -> Vec<String> {
     let refused: BTreeSet<&str> = image
         .modules()
@@ -428,9 +396,8 @@ fn allows_nothing(image: &Image) -> Vec<String> {
         .collect()
 }
 
-/// Every manifest read and every image resolved, or nothing where the
-/// repository is wrong and has been told so. A claim lives in a module, so
-/// neither command here can work off the declarations alone.
+/// Claims require resolved modules, so an invalid repository yields no result
+/// after its errors have been reported.
 fn open(root: &Path, named: Option<&str>) -> Option<(List, Vec<crate::resolve::Resolved>)> {
     let crate::Loaded {
         list,
@@ -450,14 +417,13 @@ fn open(root: &Path, named: Option<&str>) -> Option<(List, Vec<crate::resolve::R
     }
 }
 
-/// The content one target is measured against, as `tect build` hands it to the
-/// finalize layer. Empty where the target declares no `conforms`, which is the
-/// same gate the layer's own `CONFORMS` carries.
+/// The finalize layer must receive the same datastream selected by target
+/// conformance.
 pub fn content_for(root: &Path, list: &List, named: Option<&str>) -> Result<String, String> {
     datastream(root, list, named)
 }
 
-/// The profile a scan names to run the tailoring below.
+/// A fixed profile name keeps the generated tailoring and scan command aligned.
 const MEASURED: &str = "xccdf_tect_profile_measured";
 
 /// Prints the tailoring one target is scanned with, and nothing where it
@@ -497,9 +463,8 @@ pub fn tailoring_for(
     Ok(Verdict::Clean)
 }
 
-/// The declared profile with every rule selected, so one scan measures the
-/// profile at its own values and every claim outside it besides.
-/// XCCDF requires the version's `time`; a fixed one keeps the output a golden.
+/// Selecting every rule lets one scan measure the declared profile and claims
+/// outside it. A fixed required XCCDF time keeps output deterministic.
 fn tailoring(content: &Content, profile: &Profile) -> String {
     let mut out = format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
@@ -545,10 +510,9 @@ fn datastream(root: &Path, list: &List, named: Option<&str>) -> Result<String, S
     .to_string())
 }
 
-/// The content one base is measured against: the file its catalog row names,
-/// and the family default for a base the catalog does not describe. A row
-/// declaring none falls through to that default, which is what refuses the deb
-/// families by name.
+/// A catalogued base uses its named content, while an uncatalogued base uses
+/// the family default. An empty catalog field falls through so the family can
+/// provide its explicit refusal.
 fn measured_by(
     dir: &str,
     bases: &[crate::base::Base],
@@ -560,7 +524,6 @@ fn measured_by(
         // The library describes this base and names no content for it, which
         // is a stale row when the family has content of its own.
         Some(base) => match installed(dir, family) {
-            // The family has no content either, and carries its own reason.
             Err(refusal) => Err(refusal),
             Ok(_) => Err(format!(
                 "`{}` names no `scap-content`, so nothing says which benchmark it is measured \
@@ -569,15 +532,14 @@ fn measured_by(
                 base.image
             )),
         },
-        // A base the library does not describe: the family is all there is.
+        // The family default is the only evidence for an uncatalogued base.
         None => installed(dir, family),
     }
 }
 
-/// Where a family's SCAP content is. Both deb families refuse: SSG writes one
-/// `<xccdf-1.2:platform>` per benchmark and every rule inherits it, so against
-/// bases of `debian:forky` and `ubuntu:26.04` the nearest content marks every
-/// rule `notapplicable` — a scan that measures nothing, silently.
+/// SSG binds every rule in a benchmark to its platform. The available Debian
+/// and Ubuntu content would mark every rule `notapplicable` and silently
+/// measure nothing.
 fn installed(dir: &str, family: &str) -> Result<PathBuf, String> {
     let file =
         match family {
@@ -601,16 +563,17 @@ fn installed(dir: &str, family: &str) -> Result<PathBuf, String> {
     Ok(Path::new(dir).join(file))
 }
 
-/// The content a profile is chosen out of: what was named, else the copy this
-/// machine has for the family. This probes the host, so no command whose output
-/// is a golden may reach it.
+/// An explicit path overrides the host's family default. Golden-producing
+/// commands must not reach the host probe.
 pub fn content_path(family: &str, given: Option<&Path>) -> Result<PathBuf, String> {
     content_at(CONTENT, family, given)
 }
 
-/// Reads and recognizes a SCAP datastream.
+/// Empty rule and profile indexes are rejected so non-SCAP XML cannot pass as
+/// content.
 pub fn content_of(path: &Path) -> Result<Content, String> {
-    let content = Content::read(&read(path)?);
+    let content =
+        Content::read(&read(path)?).map_err(|error| format!("{}: {error}", path.display()))?;
     if content.ids.is_empty() && content.profiles.is_empty() {
         return Err(format!(
             "{} carries no XCCDF rule and no profile, so it is not SCAP content\n\nhelp: use an \
@@ -636,8 +599,8 @@ fn content_at(dir: &str, family: &str, given: Option<&Path>) -> Result<PathBuf, 
     }
 }
 
-/// Reads the repository, the datastream and the report, prints what the three
-/// of them say together, and holds the claims to it.
+/// Claim enforcement needs repository declarations, datastream mappings and
+/// measured results together.
 pub fn run(root: &Path, arf: &Path, opts: &Options) -> Result<Verdict, String> {
     let named = opts.target.as_deref();
     let Some((list, resolved)) = open(root, named) else {
@@ -662,7 +625,7 @@ pub fn run(root: &Path, arf: &Path, opts: &Options) -> Result<Verdict, String> {
         },
     };
     let content = content_of(&datastream)?;
-    let measured = results(&read(arf)?);
+    let measured = results(&read(arf)?).map_err(|error| format!("{}: {error}", arf.display()))?;
     let base = match &opts.base {
         None => None,
         Some(path) => {
@@ -742,16 +705,16 @@ pub fn run(root: &Path, arf: &Path, opts: &Options) -> Result<Verdict, String> {
     Ok(Verdict::Wrong)
 }
 
-/// One thing the measurement says is wrong, pointed at the declaration that
-/// says it, which is a module manifest for a claim and nothing for a rule that
-/// merely stopped passing.
+/// A finding retains its declaration site so diagnostics can point back to a
+/// module manifest.
 struct Finding {
     message: String,
     at: Option<(Source, Span)>,
     help: Option<String>,
 }
 
-/// Everything the declared half of the comparison reads.
+/// Grouping claim inputs keeps every comparison on the same resolved image and
+/// datastream.
 struct Measured<'a> {
     image: &'a Image,
     entries: &'a [&'a Entry],
@@ -764,8 +727,8 @@ struct Measured<'a> {
     base: Option<&'a BTreeSet<String>>,
 }
 
-/// Every rule the target's modules claim, against what the scan measured, and
-/// where a base scan was read, against what the bare base passed alone.
+/// Comparing built and optional bare-base scans distinguishes image failures
+/// from base regressions.
 fn claims(out: &mut String, found: &mut Vec<Finding>, m: Measured) {
     let mut rows = String::new();
     let mut redundant: Vec<String> = Vec::new();
@@ -813,8 +776,8 @@ fn claims(out: &mut String, found: &mut Vec<Finding>, m: Measured) {
                 if result != "fail" {
                     continue;
                 }
-                // A claim whose files another module replaced is a composition
-                // failure: the claimant is honest and the image is not hardened.
+                // Replaced claimant files make the composition dishonest even
+                // when the claimant itself is correct.
                 let lost = overridden(m.image, m.shipped, m.gate, &entry.path);
                 let help = lost
                     .first()
@@ -885,8 +848,6 @@ fn base_cell(base: Option<&BTreeSet<String>>, id: Option<&str>) -> String {
     }
 }
 
-/// A claim the base alone passed and the built image now fails, which is the
-/// base moving under the image.
 fn regressed(image: &Image) -> String {
     format!(
         "{} alone passed this rule when the base scan was taken, so the image lost it rather \
@@ -898,8 +859,7 @@ fn regressed(image: &Image) -> String {
     )
 }
 
-/// What the image scores against every profile the datastream carries, which
-/// is what makes choosing one to declare honest.
+/// Scoring every available profile lets the user validate a declared choice.
 fn profiles(
     out: &mut String,
     found: &mut Vec<Finding>,
@@ -962,8 +922,8 @@ fn profiles(
     );
 }
 
-/// What passed last time and does not now. The baseline is read before it is
-/// written, so one deliberate regression is one red run and then the new floor.
+/// Reading the baseline before overwriting it makes a deliberate regression
+/// fail once and establish the new floor.
 fn ratchet(
     out: &mut String,
     found: &mut Vec<Finding>,
@@ -1037,7 +997,6 @@ fn ratchet(
     Ok(())
 }
 
-/// The pass set a previous run wrote.
 fn baseline(doc: &Json) -> Option<BTreeSet<String>> {
     let Json::Object(fields) = doc else {
         return None;
@@ -1057,8 +1016,8 @@ fn baseline(doc: &Json) -> Option<BTreeSet<String>> {
     )
 }
 
-/// Every overlay path this module ships that another one in the same target
-/// replaced, as the path and who took it.
+/// Overlay replacement identifies composition failures separately from false
+/// claims.
 fn overridden(
     image: &Image,
     shipped: &overlay::Index,
@@ -1090,29 +1049,23 @@ fn read(path: &Path) -> Result<String, String> {
     std::fs::read_to_string(path).map_err(|err| format!("{}: {err}", path.display()))
 }
 
-// ---- the two documents a scan run produces --------------------------------
-
-/// What the datastream knows: which rule a benchmark number names, which
-/// numbers name it back, what each rule and profile is called, and which rules
-/// each profile selects.
+/// Datastream indexes keep claim resolution, profile selection and
+/// user-facing labels on one parse.
 #[derive(Default)]
 pub struct Content {
-    /// A number to the first rule in document order carrying it, matched
-    /// against every reference, ident and version the way the datastream's own
-    /// numbering is written.
+    /// First-match indexing preserves document-order claim resolution across
+    /// reference, ident and version values.
     pub rules: BTreeMap<String, String>,
-    /// The inverse of `rules`: a rule to every number that resolves to it, so a
-    /// number a later rule also carries is absent here. Kept, it would point at
-    /// a rule a claim would not reach.
+    /// The inverse index omits numbers captured by an earlier rule. Keeping
+    /// them would credit a claim to a rule it cannot reach.
     pub numbers: BTreeMap<String, BTreeSet<String>>,
-    /// A rule to its title, which is the one line naming it a person reads.
+    /// Titles are the shortest datastream labels available to the user.
     pub titles: BTreeMap<String, String>,
-    /// A rule to the head of its description, which is the only prose the
-    /// content carries about it. Markup between the open and the text drops it,
-    /// the way a title's does.
+    /// Only direct description text is stable enough for reports. Nested markup
+    /// is discarded like title markup.
     pub descriptions: BTreeMap<String, String>,
     ids: BTreeSet<String>,
-    /// Every group, which a profile may deselect with the rules under it.
+    /// Groups remain distinct because a profile can deselect their child rules.
     groups: BTreeSet<String>,
     pub profiles: Vec<Profile>,
 }
@@ -1122,12 +1075,13 @@ pub struct Profile {
     pub id: String,
     pub title: String,
     extends: String,
-    /// Each `select`, in document order, and whether it selects or deselects.
+    /// Document order is required because later selections can reverse earlier
+    /// inherited choices.
     selects: Vec<(String, bool)>,
 }
 
 impl Profile {
-    /// The tail of the id, which is what a `conforms` names.
+    /// `conforms` uses the profile-id tail accepted by the scan tools.
     pub fn name(&self) -> &str {
         match self.id.rsplit_once("_profile_") {
             Some((_, name)) => name,
@@ -1147,7 +1101,6 @@ pub fn profile_name(id: &str) -> &str {
     id.rsplit_once("_profile_").map_or(id, |(_, tail)| tail)
 }
 
-/// The tail of a rule id, which names it without the datastream's own prefix.
 pub fn rule_name(id: &str) -> &str {
     id.rsplit_once("_rule_").map_or(id, |(_, tail)| tail)
 }
@@ -1162,47 +1115,65 @@ pub fn ordinal(number: &str) -> Vec<u64> {
 }
 
 impl Content {
-    pub fn read(text: &str) -> Self {
+    pub fn read(text: &str) -> Result<Self, String> {
         let mut content = Content::default();
         let mut rule = String::new();
-        // The element whose text is wanted, taken every event so that anything
-        // between the open and the text drops it.
-        let mut wanted: Option<&str> = None;
+        // Reading only the next event preserves direct text and discards nested
+        // markup.
+        let mut wanted: Option<String> = None;
         let mut profile: Option<Profile> = None;
-        for event in xml::scan(text) {
+        xml::scan(text, |event| {
+            if matches!(&event, xml::Event::Text(text) if text.trim().is_empty()) {
+                return;
+            }
             let want = wanted.take();
             match event {
-                xml::Event::Open {
-                    name: "Rule",
-                    attrs,
-                } => {
-                    rule = xml::attr(attrs, "id").unwrap_or_default().to_string();
-                    content.ids.insert(rule.clone());
-                }
-                xml::Event::Close { name: "Rule" } => rule.clear(),
-                xml::Event::Open {
-                    name: "Group",
-                    attrs,
-                } => {
-                    content
-                        .groups
-                        .insert(xml::attr(attrs, "id").unwrap_or_default().to_string());
-                }
-                xml::Event::Open {
-                    name: name @ ("reference" | "ident" | "version" | "title" | "description"),
-                    ..
-                } => wanted = Some(name),
-                xml::Event::Text(text) => match want {
+                xml::Event::Open { name, attrs } => match xml::local(&name) {
+                    "Rule" => {
+                        rule = xml::attr(&attrs, "id").unwrap_or_default().to_string();
+                        content.ids.insert(rule.clone());
+                    }
+                    "Group" => {
+                        content
+                            .groups
+                            .insert(xml::attr(&attrs, "id").unwrap_or_default().to_string());
+                    }
+                    name @ ("reference" | "ident" | "version" | "title" | "description") => {
+                        wanted = Some(name.to_string());
+                    }
+                    "Profile" => {
+                        profile = Some(Profile {
+                            id: xml::attr(&attrs, "id").unwrap_or_default().to_string(),
+                            extends: xml::attr(&attrs, "extends").unwrap_or_default().to_string(),
+                            ..Profile::default()
+                        });
+                    }
+                    "select" => {
+                        if let (Some(profile), Some(idref)) =
+                            (profile.as_mut(), xml::attr(&attrs, "idref"))
+                        {
+                            let on = xml::attr(&attrs, "selected") != Some("false");
+                            profile.selects.push((idref.to_string(), on));
+                        }
+                    }
+                    _ => {}
+                },
+                xml::Event::Close { name } => match xml::local(&name) {
+                    "Rule" => rule.clear(),
+                    "Profile" => content.profiles.extend(profile.take()),
+                    _ => {}
+                },
+                xml::Event::Text(text) => match want.as_deref() {
                     Some("title") if !rule.is_empty() => {
                         content
                             .titles
                             .entry(rule.clone())
-                            .or_insert_with(|| text.to_string());
+                            .or_insert_with(|| text.trim().to_string());
                     }
                     Some("title") => {
                         if let Some(profile) = profile.as_mut() {
                             if profile.title.is_empty() {
-                                profile.title = text.to_string();
+                                profile.title = text.trim().to_string();
                             }
                         }
                     }
@@ -1210,43 +1181,18 @@ impl Content {
                         content
                             .descriptions
                             .entry(rule.clone())
-                            .or_insert_with(|| text.to_string());
+                            .or_insert_with(|| text.trim().to_string());
                     }
                     Some(_) if !rule.is_empty() => {
                         content
                             .rules
-                            .entry(text.to_string())
+                            .entry(text.trim().to_string())
                             .or_insert_with(|| rule.clone());
                     }
                     _ => {}
                 },
-                xml::Event::Open {
-                    name: "Profile",
-                    attrs,
-                } => {
-                    profile = Some(Profile {
-                        id: xml::attr(attrs, "id").unwrap_or_default().to_string(),
-                        extends: xml::attr(attrs, "extends").unwrap_or_default().to_string(),
-                        ..Profile::default()
-                    })
-                }
-                xml::Event::Close { name: "Profile" } => {
-                    content.profiles.extend(profile.take());
-                }
-                xml::Event::Open {
-                    name: "select",
-                    attrs,
-                } => {
-                    if let (Some(profile), Some(idref)) =
-                        (profile.as_mut(), xml::attr(attrs, "idref"))
-                    {
-                        let on = xml::attr(attrs, "selected") != Some("false");
-                        profile.selects.push((idref.to_string(), on));
-                    }
-                }
-                _ => {}
             }
-        }
+        })?;
         let mut numbers: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         for (number, rule) in &content.rules {
             numbers
@@ -1255,11 +1201,11 @@ impl Content {
                 .insert(number.clone());
         }
         content.numbers = numbers;
-        content
+        Ok(content)
     }
 
-    /// Every benchmark number that would reach these rules, which is what a
-    /// module's claim is written in.
+    /// Reverse numbering lets provider lookup start from rule IDs while modules
+    /// declare benchmark numbers.
     pub fn numbering(&self, rules: &BTreeSet<String>) -> BTreeSet<String> {
         rules
             .iter()
@@ -1269,8 +1215,8 @@ impl Content {
             .collect()
     }
 
-    /// Every rule one profile selects, following what it extends first, since
-    /// a profile that extends another may deselect part of it.
+    /// Parent selection must run first because a child profile can deselect its
+    /// inherited rules.
     pub fn selected(&self, id: &str) -> BTreeSet<String> {
         self.select(id, 0)
     }
@@ -1296,29 +1242,27 @@ impl Content {
     }
 }
 
-/// What the report measured, as a rule id to its outcome.
-fn results(text: &str) -> BTreeMap<String, String> {
+/// One result index serves both claim and regression reports.
+fn results(text: &str) -> Result<BTreeMap<String, String>, String> {
     let mut out = BTreeMap::new();
     let mut rule = String::new();
     let mut wanted = false;
-    for event in xml::scan(text) {
-        match event {
-            xml::Event::Open {
-                name: "rule-result",
-                attrs,
-            } => rule = xml::attr(attrs, "idref").unwrap_or_default().to_string(),
-            xml::Event::Close {
-                name: "rule-result",
-            } => rule.clear(),
-            xml::Event::Open { name: "result", .. } => wanted = !rule.is_empty(),
-            xml::Event::Text(text) if wanted => {
-                out.entry(rule.clone()).or_insert_with(|| text.to_string());
-                wanted = false;
-            }
-            _ => wanted = false,
+    xml::scan(text, |event| match event {
+        xml::Event::Open { name, attrs } if xml::local(&name) == "rule-result" => {
+            rule = xml::attr(&attrs, "idref").unwrap_or_default().to_string();
         }
-    }
-    out
+        xml::Event::Close { name } if xml::local(&name) == "rule-result" => rule.clear(),
+        xml::Event::Open { name, .. } if xml::local(&name) == "result" => wanted = !rule.is_empty(),
+        xml::Event::Text(text) if wanted => {
+            let text = text.trim();
+            if !text.is_empty() {
+                out.entry(rule.clone()).or_insert_with(|| text.to_string());
+            }
+            wanted = false;
+        }
+        _ => wanted = false,
+    })?;
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -1330,12 +1274,69 @@ mod tests {
         Path::new(env!("CARGO_MANIFEST_DIR")).join(name)
     }
 
-    /// The one derivation this adds: a profile selects rules, each rule is
-    /// reached by the numbers that resolve to it, and the index says which
-    /// modules claim those numbers.
+    #[test]
+    fn content_values_belong_only_to_the_rule_that_contains_them() {
+        let content = Content::read(
+            "<root xmlns:x='urn:test'><x:Rule id='one'><x:title> One </x:title><description>About one</description>\
+             <reference>1</reference></x:Rule><title>Outside</title><description>Outside</description>\
+             <reference>2</reference><Rule id='two'><title>Two</title>\
+             <reference>3</reference></Rule></root>",
+        )
+        .unwrap();
+
+        assert_eq!(content.rules.get("1").map(String::as_str), Some("one"));
+        assert!(!content.rules.contains_key("2"));
+        assert_eq!(content.rules.get("3").map(String::as_str), Some("two"));
+        assert_eq!(content.titles.get("one").map(String::as_str), Some("One"));
+        assert_eq!(content.titles.get("two").map(String::as_str), Some("Two"));
+        assert_eq!(
+            content.descriptions.get("one").map(String::as_str),
+            Some("About one")
+        );
+        assert!(!content.titles.contains_key(""));
+        assert!(!content.descriptions.contains_key(""));
+    }
+
+    #[test]
+    fn results_take_only_result_text_inside_its_rule_result() {
+        let measured = results(
+            "<root><result>before</result><rule-result idref='one'><wrapper/>\
+             <result> pass </result></rule-result><rule-result idref='lookalike'>\
+             <wrapper>wrong</wrapper></rule-result><rule-result idref='closed'></rule-result>\
+             <result>after</result><rule-result idref='two'><result>fail</result>\
+             </rule-result></root>",
+        )
+        .unwrap();
+
+        assert_eq!(
+            measured,
+            BTreeMap::from([
+                ("one".to_string(), "pass".to_string()),
+                ("two".to_string(), "fail".to_string()),
+            ])
+        );
+    }
+
+    #[test]
+    fn malformed_xml_never_supplies_scap_content_or_results() {
+        for text in [
+            "<root><rule-result idref='r'><result>pass</result></rule-result></root><!DOCTYPE later>",
+            "<![CDATA[ ]]><root/>",
+            "<1root/>",
+            "<root>&#1;</root>",
+            "<?xml version='1.1'?><root/>",
+            "<root/><?xml version='1.0'?>",
+        ] {
+            assert!(Content::read(text).is_err(), "content accepted {text:?}");
+            assert!(results(text).is_err(), "results accepted {text:?}");
+        }
+    }
+
+    /// This derivation crosses three indexes. Profiles select rules, benchmark
+    /// numbers reach those rules, and modules claim the numbers.
     #[test]
     fn the_index_answers_which_modules_claim_a_profile_s_rules() {
-        let content = Content::read(&read(&fixture("tests/scap/datastream.xml")).unwrap());
+        let content = Content::read(&read(&fixture("tests/scap/datastream.xml")).unwrap()).unwrap();
         let profile = content
             .profiles
             .iter()
@@ -1367,8 +1368,8 @@ mod tests {
         assert!(index.claiming(&BTreeSet::new()).is_empty());
     }
 
-    /// The flag wins; with none, the family's installed copy, and its absence
-    /// names both ways to answer it.
+    /// An explicit flag must override installed family content. If neither is
+    /// available, the diagnostic names both ways to provide it.
     #[test]
     fn a_named_datastream_is_taken_and_a_missing_one_names_both_remedies() {
         let given = fixture("tests/scap/datastream.xml");
@@ -1398,8 +1399,8 @@ mod tests {
             .contains("no SSG content is known"));
     }
 
-    /// A deb image declaring `conforms` is refused: a scan reporting nothing
-    /// measured looks exactly like a scan reporting nothing wrong.
+    /// A deb image declaring `conforms` is refused because an empty scan is
+    /// indistinguishable from a clean scan.
     #[test]
     fn a_deb_family_is_refused_rather_than_given_content_that_measures_nothing() {
         for family in ["debian", "ubuntu"] {
@@ -1410,8 +1411,8 @@ mod tests {
             );
             assert!(err.contains("drop `conforms`"), "{err}");
         }
-        // A named datastream still wins: the refusal is about what is published,
-        // not about the family being unmeasurable by anything.
+        // An explicit datastream still wins because the refusal applies only
+        // to the published family default.
         let given = fixture("tests/scap/datastream.xml");
         assert_eq!(
             content_at("/nowhere", "debian", Some(&given)).unwrap(),
@@ -1475,20 +1476,22 @@ mod tests {
         let err = of("example.invalid/alma:10", "rhel").unwrap_err();
         assert!(err.contains("one datastream per EL release"), "{err}");
 
-        // A row that names none is refused rather than guessed at: guessing
-        // hands the image its family's benchmark without a word.
+        // A catalogued row that names no content must not inherit a family
+        // benchmark silently.
         let err = of("example.invalid/silent:1", "fedora").unwrap_err();
         assert!(err.contains("names no `scap-content`"), "{err}");
         assert!(err.contains("add `scap-content"), "{err}");
 
-        // Where the family has no content either, its own reason wins.
+        // If the family also has no content, its refusal wins.
         let err = of("example.invalid/silent:1", "debian").unwrap_err();
         assert!(err.contains("no content a `debian` image"), "{err}");
     }
 
     #[test]
     fn a_file_without_rules_or_profiles_is_not_scap_content() {
-        let path = fixture("tests/repos/enforced/example.image.kdl");
+        let path =
+            std::env::temp_dir().join(format!("tect-not-scap-content.{}.xml", std::process::id()));
+        std::fs::write(&path, "<root/>").unwrap();
         assert_eq!(
             content_of(&path)
                 .err()
@@ -1499,14 +1502,12 @@ mod tests {
                 path.display()
             )
         );
+        let _ = std::fs::remove_file(path);
     }
 
-    /// The datastream-backed tier over a repository whose every source was
-    /// read: the claims the image lists come off the profile's rules, what is
-    /// left is named, and nothing is said about a collection.
-    /// Both lists feed the tailoring that keeps remediation off what a module
-    /// owns, so anything missing here is a rule SSG sets on a claimant's
-    /// behalf — leaving the claim standing and nothing proving it.
+    /// The fixture makes every source readable so missing rules can be
+    /// attributed without a collection warning. The resulting claim and open
+    /// rule lists protect module-owned settings from unmeasured remediation.
     #[test]
     fn the_exclusions_carry_every_claim_including_the_bases_and_every_refusal() {
         let root = fixture("tests/repos/refused");
@@ -1531,10 +1532,8 @@ mod tests {
         );
     }
 
-    /// Two checks that need no scan. One is a manifest arguing with itself: a
-    /// claim says the image passes a rule and a refusal says nothing may set
-    /// it. The other is an image measured against a profile nothing will act
-    /// on, which is a report rather than a hardened image.
+    /// These declaration conflicts need no scan. A claim can contradict a
+    /// refusal, and a conformance target can lack a remediation provider.
     #[test]
     fn check_catches_a_rule_both_claimed_and_refused_and_an_image_nothing_remediates() {
         let root = fixture("tests/repos/refused");
@@ -1557,9 +1556,8 @@ mod tests {
                 .any(|m| m.contains("nothing it installs provides `scap-remediation`")),
             "{said:#?}"
         );
-        // A claim the content carries no rule by fails inside the finalize
-        // layer, where the diagnostic is a `RUN` that stopped, so it is named
-        // here. This is the EL case: a number correct on one benchmark and
+        // Reporting an unreachable claim here avoids a generic finalize-layer
+        // failure. The fixture models a number present in one benchmark and
         // absent from another.
         assert!(
             said.iter().any(|m| m.contains("one/typo")
@@ -1592,9 +1590,8 @@ mod tests {
             "an allowance that answers a real refusal is silent: {said:#?}"
         );
 
-        // And the lift reaches the build: the rule the image allowed is out of
-        // the refused set the finalize layer tailors with, while the other
-        // module's refusal stands.
+        // The allowed rule must leave the finalize-layer refusal set while the
+        // other module's refusal remains.
         let image = &loaded.list.images[0];
         let (_, refused) = exclusions(image);
         assert!(
@@ -1606,8 +1603,8 @@ mod tests {
             "another module's refusal is untouched: {refused:?}"
         );
 
-        // Silent where nothing on this machine offers the capability: a notice
-        // naming a module that exists nowhere cannot be acted on.
+        // A remediation notice is actionable only when the local index offers
+        // a provider.
         let bare = fixture("tests/scap");
         let nothing = Index::scan(&bare, &[], &Disk::scan(&bare), false);
         assert!(
@@ -1629,9 +1626,8 @@ mod tests {
             Some(&fixture("tests/scap/datastream.xml")),
         )
         .expect("the fixture datastream reads");
-        // `9.9.9.9` is the fixture's number that reaches nothing, and it is
-        // named twice over: the count leaves it out, and the claim itself is
-        // one the remediation hook would fail the build resolving.
+        // The fixture's unreachable number must stay outside the resolved rule
+        // count and remain visible as a declaration error.
         assert_eq!(
             said,
             [
@@ -1642,9 +1638,8 @@ mod tests {
               of the 4 rules it selects; `one/auditing` would claim 1 of them"
             ]
         );
-        // The other arm, over an index holding no module at all: what is left
-        // open is the image's own, so only the offer goes away. The claim that
-        // reaches nothing is the image's own too, and stays.
+        // An empty provider index removes only the offer. The image's open and
+        // unreachable claims must remain.
         let bare = fixture("tests/scap");
         let nothing = Index::scan(&bare, &[], &Disk::scan(&bare), false);
         assert_eq!(
@@ -1662,8 +1657,8 @@ mod tests {
               of the 4 rules it selects; nothing else in the repository claims them"
             ]
         );
-        // No datastream, and a listed module does declare `satisfies`: there
-        // is nothing the manifests alone can say.
+        // Manifest-only checks stay silent when a listed module declares a
+        // claim.
         assert!(conformance(&loaded.list, &loaded.index, None)
             .unwrap()
             .is_empty());
@@ -1734,8 +1729,8 @@ mod tests {
               the 4 rules it selects; nothing else in the repository claims them"
             ]
         );
-        // The declaration tier reads the same way: the suppressed module is not
-        // among the ones the image lists, so the base is what keeps this quiet.
+        // The base must also suppress the manifest-only notice because the
+        // module is absent from the built list.
         assert!(conformance(&loaded.list, &loaded.index, None)
             .unwrap()
             .is_empty());

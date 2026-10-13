@@ -1,12 +1,12 @@
-//! What one target is made of, as the markdown a build summary shows.
+//! Repository and baked-manifest readings share one Markdown renderer.
 
 use crate::emit::plan::of_target;
 use crate::model::image::{List, NO_FLAVOUR};
 use common::json::{field, items, strings, text, Json};
 use std::fmt::Write as _;
 
-/// One module's line, filled by either reading. `options` holds each value as
-/// it is written after the `=`, which is the one thing the two readings render
+/// A shared row model keeps repository and baked-manifest output aligned.
+/// Options retain rendered values because the two sources represent them
 /// differently.
 struct Row {
     path: String,
@@ -21,7 +21,7 @@ struct Row {
     refuses: Vec<(String, bool)>,
 }
 
-/// None when nothing publishes under that name.
+/// Missing targets produce no summary.
 pub fn render(list: &List, target: &str) -> Option<String> {
     let (image, flavour, entries) = of_target(list, target)?;
     let lifted: Vec<&str> = image.allows.iter().map(|a| a.rule.as_str()).collect();
@@ -70,9 +70,8 @@ pub fn render(list: &List, target: &str) -> Option<String> {
     ))
 }
 
-/// The same table with no repository at all, off one target of the manifest a
-/// build baked. The caller scopes `target` to the image that is running; this
-/// renders what it is handed and nothing else.
+/// The host command passes only the running target, which prevents
+/// repository-wide data from entering the table.
 pub fn on_host(target: &Json) -> String {
     let lifted: Vec<String> = items(target, "allows")
         .iter()
@@ -92,10 +91,8 @@ pub fn on_host(target: &Json) -> String {
                     .map(|(name, value)| {
                         let written = match value {
                             Json::String(value) => format!("\"{}\"", cell(value)),
-                            // `render` writes a document, so it ends in a
-                            // newline and indents; a cell holds one line.
-                            // `escape` leaves no raw newline inside a string,
-                            // so only the layout's own is folded away.
+                            // JSON layout whitespace must be folded into one
+                            // Markdown table cell.
                             other => cell(
                                 other
                                     .render()
@@ -189,8 +186,8 @@ fn table(flavour: Option<&str>, conforms: &str, rows: &[Row]) -> String {
                 )
             })
             .collect();
-        // A lifted refusal is shown where the refusal is: the module still
-        // declares it, and this image overrode it.
+        // A lifted refusal stays beside its module because the declaration
+        // remains even when the image overrides it.
         let refuses: Vec<String> = row
             .refuses
             .iter()
@@ -220,9 +217,8 @@ fn cell(text: &str) -> String {
 mod tests {
     use super::*;
 
-    /// Only a manifest `tect` did not write carries an option that is not a
-    /// string, and `Json::render` writes a whole document: a newline and the
-    /// indent of a nested value both break the row they land in.
+    /// A foreign manifest can contain a non-string option. JSON rendering must
+    /// not split its Markdown row.
     #[test]
     fn an_option_that_is_not_a_string_stays_on_its_row() {
         let module = Json::object([
@@ -230,7 +226,7 @@ mod tests {
             (
                 "options",
                 Json::map([
-                    ("count".to_string(), Json::Number(3)),
+                    ("count".to_string(), Json::number(3)),
                     ("on".to_string(), Json::Bool(true)),
                     ("missing".to_string(), Json::Null),
                     ("names".to_string(), Json::strings(["a|b", "two  spaces"])),
