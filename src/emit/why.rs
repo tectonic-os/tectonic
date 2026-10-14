@@ -870,11 +870,17 @@ pub fn known_on_host(manifest: &Json, record: Option<&Json>) -> Vec<String> {
 fn readable(document: &Json, at: &std::path::Path, reads: u32) -> Result<(), String> {
     let tool = env!("CARGO_PKG_VERSION");
     match common::json::declared(document, "schema_version") {
-        Some(Json::Number(found)) if *found == reads => Ok(()),
-        Some(Json::Number(found)) => Err(format!(
+        Some(Json::Number(found)) if found.as_u32() == Some(reads) => Ok(()),
+        Some(Json::Number(found)) if found.as_u32().is_some() => Err(format!(
             "{}: this image was built against schema version {found}, and Tectonic v{tool} reads \
              {reads}\n\nrun the release that built the image, which `tect summary` names as the \
              tool version in the build record",
+            at.display()
+        )),
+        Some(Json::Number(found)) => Err(format!(
+            "{}: this image names schema version {found}, which is not an unsigned 32-bit integer \
+             and cannot be compared against the {reads} Tectonic v{tool} reads\n\nthe document is \
+             malformed; rebuild the image",
             at.display()
         )),
         None => Err(format!(
@@ -883,9 +889,7 @@ fn readable(document: &Json, at: &std::path::Path, reads: u32) -> Result<(), Str
              image with this release, or read it with the one that built it",
             at.display()
         )),
-        // A present non-number is malformed. Saying it was
-        // built before the field existed would send the reader to rebuild an
-        // image whose document is simply malformed.
+        // A malformed version must not be diagnosed as a legacy document.
         Some(_) => Err(format!(
             "{}: this image names a schema version that is not a number, so nothing can be \
              compared against the {reads} Tectonic v{tool} reads\n\nthe document is malformed; \
@@ -950,7 +954,7 @@ mod tests {
         assert_eq!(known_on_host(&manifest, Some(&ungated)), ["apps/kde"]);
         let why = on_host(&manifest, Some(&ungated), "apps/kde").expect("the image carries it");
         assert_eq!(why.images, ["desktop"]);
-        // The other target requires the capability. This target does not.
+        // The fixture makes only the other target require the capability.
         assert_eq!(why.provides, [("desktop".to_string(), Vec::new())]);
         assert!(why.scope == Scope::Built("desktop".into()));
         assert!(on_host(&manifest, Some(&ungated), "apps/vscodium").is_none());
@@ -963,8 +967,6 @@ mod tests {
             [("desktop".to_string(), vec!["apps/vscodium".to_string()])]
         );
 
-        // The module tree is not in a finished image, so the read-out prints
-        // the clone that fetches the real declarations.
         let record =
             common::json::Json::parse(r#"{"target": "desktop", "source_commit": "1f2bb19aa"}"#)
                 .expect("the record is a document");
@@ -982,8 +984,6 @@ mod tests {
             "{built}"
         );
 
-        // Without a target, the answer discloses its baked-repository scope so
-        // the user cannot mistake it for the running image alone.
         for record in [None, Some(&common::json::Json::parse("{}").unwrap())] {
             let why = on_host(&manifest, record, "apps/kde").expect("the manifest names it");
             assert_eq!(why.images, ["desktop", "desktop-dx"]);
@@ -1117,6 +1117,19 @@ mod tests {
         let refused = super::baked(&manifest, &record).err().expect("refused");
         assert!(refused.contains("not a number"), "{refused}");
 
+        for version in ["-1", "1.5", "4294967296"] {
+            write(
+                &manifest,
+                &format!(r#"{{"schema_version": {version}, "images": []}}"#),
+            );
+            let refused = super::baked(&manifest, &record).err().expect("refused");
+            assert!(refused.contains(version), "{refused}");
+            assert!(
+                refused.contains("not an unsigned 32-bit integer"),
+                "{refused}"
+            );
+        }
+
         // Record schema refusal must identify the record rather than the
         // already accepted manifest.
         write(&manifest, r#"{"schema_version": 1, "images": []}"#);
@@ -1125,8 +1138,6 @@ mod tests {
         assert!(refused.contains("build.json"), "{refused}");
         assert!(refused.contains("schema version 7"), "{refused}");
 
-        // An absent record permits an unscoped read-out, which already
-        // discloses its scope.
         std::fs::remove_file(&record).unwrap();
         assert!(super::baked(&manifest, &record).is_ok());
         let _ = std::fs::remove_dir_all(&dir);

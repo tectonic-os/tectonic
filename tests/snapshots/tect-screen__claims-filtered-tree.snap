@@ -5,7 +5,7 @@ Buffer {
     area: Rect { x: 0, y: 0, width: 80, height: 32 },
     content: [
         "Which rules does `sshd` claim?                                                  ",
-        "> [x] 1.1.1.1  Install AIDE  package_aide_installed  Read this rather than the &",
+        "> [x] 1.1.1.1  Install AIDE  package_aide_installed  Read this rather than the >",
         "                                                                                ",
         "                                                                                ",
         "                                                                                ",

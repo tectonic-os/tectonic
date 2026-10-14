@@ -1,4 +1,4 @@
-//! One resolved plan, as JSON: every fact anything downstream derives.
+//! One resolved JSON plan holds every fact that downstream commands derive.
 
 use crate::base::Capability;
 use crate::model::asset::Asset;
@@ -32,13 +32,13 @@ pub(crate) fn of_target<'a>(
 
 /// The shape of this document. Additive fields stay in version 1 while the
 /// software has no external consumers; bump this only for an incompatible
-/// shape. `model::image::SCHEMA_VERSION` is a separate number: `repo.kdl`'s own
-/// grammar, held against every repository by `parse::repo::compatible`.
+/// shape. `model::image::SCHEMA_VERSION` separately governs `repo.kdl` grammar
+/// through `parse::repo::compatible`.
 pub const SCHEMA_VERSION: u32 = 1;
 
 pub fn build(list: &List, resolved: &[Resolved], workflows: &[Declared]) -> Json {
     Json::object([
-        ("schema_version", Json::Number(SCHEMA_VERSION)),
+        ("schema_version", Json::number(SCHEMA_VERSION)),
         (
             "default_image",
             Json::optional(list.default_image().map(|i| i.id.clone())),
@@ -194,7 +194,6 @@ fn image(list: &List, image: &Image, resolved: &Resolved) -> Json {
     ])
 }
 
-/// What one target is made of.
 fn target(list: &List, image: &Image, resolved: &Resolved, target: &Target) -> Json {
     let flavour = target.flavour.as_str();
     let family = image.base.as_ref().map_or("", |base| base.family.as_str());
@@ -391,8 +390,8 @@ fn module(list: &List, entry: &Entry, family: &str) -> Json {
     ])
 }
 
-/// A refusal or an allowance, which carry the same two fields and are read
-/// beside each other wherever either is rendered.
+/// Refusals and allowances share this shape because renderers read them
+/// together.
 fn refusals(declared: &[crate::model::module::Refusal]) -> Json {
     Json::array(declared.iter().map(|refusal| {
         Json::object([
@@ -402,7 +401,7 @@ fn refusals(declared: &[crate::model::module::Refusal]) -> Json {
     }))
 }
 
-/// One family-keyed name list, narrowed to the family this target builds on.
+/// Only the target family's package groups can reach its build layer.
 fn batches(declared: Option<&[crate::model::module::PackageGroup]>, family: &str) -> Json {
     Json::array(
         declared
@@ -439,8 +438,7 @@ fn coprs(module: Option<&Module>, family: &str) -> Json {
     )
 }
 
-/// One list of capability names off a module, empty where the manifest did not
-/// load.
+/// An unresolved manifest contributes no capability declarations.
 fn decls(
     module: Option<&Module>,
     of: impl Fn(&Module) -> &Vec<crate::model::module::Decl>,
@@ -450,8 +448,8 @@ fn decls(
         .unwrap_or_default()
 }
 
-/// Where this module came from: the content hash `verify` covers, the pin an
-/// out-of-tree module is fetched at, and the record an import left inside it.
+/// Keeping content, pin and import evidence together lets consumers distinguish
+/// local copies from fetched modules.
 fn provenance(list: &List, entry: &Entry) -> Json {
     let module = entry.module.as_ref();
     Json::object([
@@ -460,8 +458,6 @@ fn provenance(list: &List, entry: &Entry) -> Json {
             Json::optional(module.and_then(|m| m.content.clone())),
         ),
         ("repo", Json::Bool(module.is_some_and(|m| m.repo))),
-        // The collection a referenced module is fetched from; its pin is the
-        // one beside it.
         ("source", Json::optional(entry.source.clone())),
         (
             "pin",
@@ -481,9 +477,8 @@ fn provenance(list: &List, entry: &Entry) -> Json {
     ])
 }
 
-/// The paths the finished image still carries, alternatives joined by `|`:
-/// every name the base claims, and every module name its module or a catalog
-/// row locates.
+/// Each capability stays one layer probe even when base, module and catalog
+/// paths offer alternatives.
 pub(crate) fn contract_files(
     image: &Image,
     modules: &[&Module],
@@ -520,8 +515,6 @@ pub(crate) fn contract_files(
     out
 }
 
-/// Whether the selected target declares a capability, from its base or one of
-/// the modules that actually lands in that target.
 pub(crate) fn provides(image: &Image, entries: &[&Entry], name: &str) -> bool {
     image
         .base
@@ -536,9 +529,8 @@ pub(crate) fn provides(image: &Image, entries: &[&Entry], name: &str) -> bool {
         .any(|decl| decl.name == name)
 }
 
-/// Every name a probe of the base can decide, to the paths that witness it:
-/// each located row, what the base claims, and what the image's modules
-/// require. An abstract row is left out, so a probe leaves it as it was.
+/// Only located capabilities can produce filesystem probes. Abstract rows must
+/// leave the probe result unchanged.
 fn witnesses(image: &Image, rows: &[Capability]) -> Json {
     let family = image.base.as_ref().map_or("", |base| base.family.as_str());
     let mut names: Vec<&str> = rows
@@ -568,8 +560,6 @@ fn witnesses(image: &Image, rows: &[Capability]) -> Json {
     }))
 }
 
-/// Every path a files/ overlay puts in this target's image, to the module it
-/// comes from.
 fn overlay_files(image: &Image, shipped: &overlay::Index, flavour: &str) -> Json {
     Json::map(shipped.iter().filter_map(|(path, owners)| {
         owners
@@ -599,8 +589,6 @@ fn overridden(image: &Image, shipped: &overlay::Index, flavour: &str) -> Json {
     )
 }
 
-/// Every overlay path one target's modules ship twice, as the path, the module
-/// that lost it and the one that took it.
 pub(crate) fn overrides(
     image: &Image,
     shipped: &overlay::Index,
@@ -627,8 +615,7 @@ pub(crate) fn overrides(
     out
 }
 
-/// The preset files the target's overlays put in the image, which is what the
-/// layer checks arrived.
+/// The layer verifies only presets delivered by this target's overlays.
 pub(crate) fn preset_files(image: &Image, shipped: &overlay::Index, flavour: &str) -> Vec<String> {
     shipped
         .keys()
@@ -652,8 +639,7 @@ fn is_preset(path: &str) -> bool {
     name.starts_with(crate::runtime::MODULE_PRESET) && name.ends_with(".preset")
 }
 
-/// Every pinned asset the given modules declare, deduplicated by module and
-/// name.
+/// A module-level key prevents the same asset from reaching the build twice.
 pub(crate) fn pinned<'a>(modules: &[&'a Module]) -> Vec<(&'a Module, &'a Asset)> {
     let mut seen: Vec<(&str, &str)> = Vec::new();
     let mut out = Vec::new();
@@ -683,14 +669,13 @@ fn assets(modules: &[&Module]) -> Json {
     }))
 }
 
-/// Every asset in the repository, whatever image or flavour it is behind.
 fn every_asset(list: &List) -> Json {
     let modules: Vec<&Module> = list.images.iter().flat_map(Image::modules).collect();
     assets(&modules)
 }
 
-/// Every out-of-tree pin, across every image, because there is one fetch
-/// directory: a module two images pin is one tree on disk, fetched once.
+/// A shared fetch directory requires one pin for a module used by several
+/// images.
 fn remotes(list: &List) -> Json {
     let mut seen: Vec<&str> = Vec::new();
     let mut out: Vec<Json> = Vec::new();
@@ -714,9 +699,8 @@ fn remotes(list: &List) -> Json {
     Json::Array(out)
 }
 
-/// Whether an entry lands in a target's image. The ungated target is
-/// `NO_FLAVOUR`, never an absent one: a caller with nothing to compare against
-/// would silently take the gated entries too.
+/// `NO_FLAVOUR` must identify the ungated target because an absent gate would
+/// silently admit gated entries.
 pub(crate) fn in_target(entry: &Entry, target: &str) -> bool {
     match &entry.flavour {
         None => true,
@@ -735,9 +719,7 @@ pub(crate) fn unique_pairs(
     distinct(modules.iter().flat_map(|module| of(module)))
 }
 
-/// In order and without repeats. The order is the resolved build order, so a
-/// reader comparing one of these lists against the module list finds them in
-/// step.
+/// Preserving resolved build order keeps derived lists aligned with modules.
 pub(crate) fn distinct<T: PartialEq>(values: impl IntoIterator<Item = T>) -> Vec<T> {
     let mut out: Vec<T> = Vec::new();
     for value in values {
@@ -766,9 +748,8 @@ mod tests {
         }
     }
 
-    /// The ungated target is a flavour name like any other, and a gated entry
-    /// is not in it. Nothing golden covers this: the build args are the only
-    /// consumer, and they are handed to a backend.
+    /// The backend-only build arguments have no golden, so this test owns
+    /// ungated filtering.
     #[test]
     fn a_gated_entry_is_out_of_the_ungated_target() {
         assert!(in_target(&entry(None), NO_FLAVOUR));
