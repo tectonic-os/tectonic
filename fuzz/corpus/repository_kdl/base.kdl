@@ -1,0 +1,1 @@
+gbase { image "example.invalid/fuzz:1" about "Fuzz" family "fedora" bootloader "grub2" }

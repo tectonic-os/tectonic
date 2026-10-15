@@ -1,0 +1,3 @@
+fschema-version 1
+description "Fuzz"
+supports "fedora"

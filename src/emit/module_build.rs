@@ -386,10 +386,19 @@ fn shell(value: &str) -> String {
 /// the repository is already configured.
 fn repo_id(file: &Path) -> Option<String> {
     let text = std::fs::read_to_string(file).ok()?;
+    repo_id_in(&text)
+}
+
+fn repo_id_in(text: &str) -> Option<String> {
     text.lines()
         .find_map(|line| line.trim().strip_prefix("REPO_ID=").map(str::trim))
         .map(|value| value.trim_matches('"').to_string())
         .filter(|value| !value.is_empty())
+}
+
+#[cfg(feature = "fuzzing")]
+pub fn fuzz_repo_id(text: &str) {
+    let _ = repo_id_in(text);
 }
 
 #[cfg(test)]

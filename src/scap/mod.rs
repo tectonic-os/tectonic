@@ -3,6 +3,11 @@
 
 mod xml;
 
+#[cfg(feature = "fuzzing")]
+pub fn fuzz_xml(text: &str) {
+    let _ = xml::scan(text, |_| {});
+}
+
 use crate::diag::{Issue, Issues, Source, Span};
 use crate::emit::plan::of_target;
 use crate::model::image::{Entry, Image, List, NO_FLAVOUR};

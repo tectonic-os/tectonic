@@ -963,6 +963,22 @@ fn names(preset: &str, verb: &str, unit: &str) -> bool {
     })
 }
 
+#[cfg(feature = "fuzzing")]
+pub fn fuzz_readers(text: &str) {
+    for line in text.lines() {
+        let _ = mount_not_found(line);
+        let _ = man_page_missing(line);
+        let _ = about_another_unit(line, "fuzz.service");
+        let _ = classify(line);
+    }
+    let _ = unexpected(text, "fuzz.service", &["mount-not-found"]);
+    let _ = found(text);
+    let _ = assign(text, &[("NAME", "fuzz".to_string())]);
+    let _ = opens_luks(text);
+    let _ = missing_presets(text, &["fuzz.service".to_string()]);
+    let _ = names(text, "enable", "fuzz.service");
+}
+
 /// Whether `dir` holds a file named `unit`, at any depth.
 fn find_unit(dir: &Path, unit: &str) -> bool {
     let Ok(entries) = fs::read_dir(dir) else {

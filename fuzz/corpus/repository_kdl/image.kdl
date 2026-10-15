@@ -1,0 +1,2 @@
+eschema-version 1
+image { name "Fuzz" base "example.invalid/fuzz:1" { family "fedora" } modules {} }

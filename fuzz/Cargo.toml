@@ -1,0 +1,76 @@
+[package]
+name = "tect-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+license = "Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.tect]
+path = ".."
+features = ["fuzzing"]
+
+# Use independent workspace for fuzzers
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "repository_kdl"
+path = "fuzz_targets/repository_kdl.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "kdl_rewrites"
+path = "fuzz_targets/kdl_rewrites.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "provenance_record"
+path = "fuzz_targets/provenance_record.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "module_scripts"
+path = "fuzz_targets/module_scripts.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "build_arguments"
+path = "fuzz_targets/build_arguments.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "scap_xml"
+path = "fuzz_targets/scap_xml.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "runtime_readers"
+path = "fuzz_targets/runtime_readers.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "repository_script"
+path = "fuzz_targets/repository_script.rs"
+test = false
+doc = false
+bench = false
