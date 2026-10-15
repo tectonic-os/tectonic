@@ -1596,6 +1596,11 @@ fn append(
     std::fs::write(file, text).map_err(|err| format!("{}: {err}", file.display()))
 }
 
+#[cfg(feature = "fuzzing")]
+pub fn fuzz_rewrite(file: &Path) {
+    let _ = append(file, "fuzz", &[("modules", None)], "module \"fuzz\"");
+}
+
 /// A fresh image needs the family adapter and every provider required by its
 /// base, so one question offers both groups.
 fn wanted<'a>(

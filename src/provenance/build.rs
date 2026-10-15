@@ -47,6 +47,10 @@ pub fn base(reference: &str) -> Option<String> {
             &format!("docker://{reference}"),
         ],
     )?;
+    resolved_base(reference, &digest)
+}
+
+fn resolved_base(reference: &str, digest: &str) -> Option<String> {
     // Keeping the tag records what was requested, while the digest controls
     // what a pull retrieves.
     digest
@@ -60,6 +64,10 @@ pub fn clone_commit(url: &str, version: &str) -> Option<String> {
         return Some(version.to_lowercase());
     }
     let listed = output("git", &["ls-remote", url, version])?;
+    listed_commit(&listed)
+}
+
+fn listed_commit(listed: &str) -> Option<String> {
     let sha = listed.split_whitespace().next()?;
     (sha.len() == 40).then(|| sha.to_lowercase())
 }
@@ -156,6 +164,17 @@ fn record(env: &dyn Fn(&str) -> Option<String>) -> Json {
         // not get.
         ("verified", Json::Null),
     ])
+}
+
+#[cfg(feature = "fuzzing")]
+pub fn fuzz_arguments(raw: &str) {
+    let env = |name: &str| match name {
+        "MODULE_HASHES" | "ASSET_RESOLUTIONS" => Some(raw.to_string()),
+        _ => None,
+    };
+    let _ = record(&env).render();
+    let _ = resolved_base("example.invalid/fuzz:1", raw);
+    let _ = listed_commit(raw);
 }
 
 pub fn write() -> Result<(), String> {

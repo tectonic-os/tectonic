@@ -1,0 +1,1 @@
+hcapability "fuzz" { path "/usr/bin/fuzz" }
