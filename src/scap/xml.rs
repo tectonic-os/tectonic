@@ -337,7 +337,7 @@ mod tests {
         assert!(scan("<root><![CDATA[text]]></root>", |_| {}).is_ok());
         assert!(scan("<![CDATA[ ]]><root/>", |_| {}).is_err());
         for text in ["<1root/>", "<root!/> "] {
-            let refused = scan(text, |_| {}).err().expect("an invalid XML name");
+            let refused = scan(text, |_| {}).expect_err("an invalid XML name");
             assert!(refused.contains("qualified name"), "{text:?}: {refused}");
         }
         assert!(scan("<root bad:name:again='value'/>", |_| {}).is_err());

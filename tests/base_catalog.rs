@@ -1,4 +1,9 @@
-use std::path::{Path, PathBuf};
+#![expect(
+    clippy::unwrap_used,
+    reason = "a test helper panics on a failed step, which fails the calling test"
+)]
+
+use std::path::PathBuf;
 use tect::diag::{Issues, Span};
 use tect::model::remote::{At, Collection, Kind as SourceKind};
 
@@ -329,13 +334,15 @@ fn create_image_surfaces_an_unreadable_base_file() {
 
     // When: image collection reads the declared catalog.
     let error = tect::create::Image::collect(
-        &root,
+        tect::create::Home {
+            root: &root,
+            repo: "Example",
+            url: None,
+            sources_text: "",
+        },
         Some("Example".to_string()),
         Some("example.invalid/base:1".to_string()),
-        "Example",
-        None,
         "a name argument",
-        "",
         tect::create::Field::Image,
         None,
         &common::prompt::Prompt::silent(),

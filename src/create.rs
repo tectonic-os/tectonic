@@ -266,13 +266,15 @@ impl Repo {
                     };
                 match wanted {
                     true => Some(Image::collect(
-                        &root,
+                        Home {
+                            root: &root,
+                            repo: &name,
+                            url,
+                            sources_text: &crate::init::sources_block(&libraries.chosen),
+                        },
                         given.image.clone(),
                         given.base.clone(),
-                        &name,
-                        url,
                         "`--image`",
-                        &crate::init::sources_block(&libraries.chosen),
                         from,
                         held,
                         prompt,
@@ -689,23 +691,32 @@ pub struct Image {
     names_default: Option<String>,
 }
 
+/// The repository that a scaffolded image is written into.
+pub struct Home<'a> {
+    pub root: &'a Path,
+    pub repo: &'a str,
+    pub url: Option<String>,
+    pub sources_text: &'a str,
+}
+
 impl Image {
     /// A missing image name falls back to the repository name. Existing images
-    /// already carry the repository URL. `sources_text` is the `sources` block
-    /// a repository not written yet is about to get, which is the only thing a
-    /// scaffolded image can offer modules against.
+    /// already carry the repository URL.
     pub fn collect(
-        root: &Path,
+        home: Home,
         name: Option<String>,
         base: Option<String>,
-        repo: &str,
-        url: Option<String>,
         flag: &str,
-        sources_text: &str,
         from: Field,
         prev: Option<&Self>,
         prompt: &Prompt,
     ) -> Result<Self, String> {
+        let Home {
+            root,
+            repo,
+            url,
+            sources_text,
+        } = home;
         let name = match prev {
             Some(prev) if from > Field::Image => prev.name.clone(),
             _ => prompt.line(
@@ -1221,7 +1232,7 @@ impl Listing {
         let named: Vec<String> = targets.iter().map(ToString::to_string).collect();
 
         let chosen: Vec<usize> = match given.is_empty() {
-            true => match ask(&list, &targets, prompt)? {
+            true => match ask(list, &targets, prompt)? {
                 common::ui::Answer::Cancelled => return Ok(Self::Cancelled),
                 common::ui::Answer::Chosen(chosen) => chosen,
             },

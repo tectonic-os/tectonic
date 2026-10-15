@@ -540,6 +540,23 @@ struct Member {
     dest: PathBuf,
 }
 
+/// What the user asked `import module` or `copy module` for.
+pub struct Request<'a> {
+    pub name: Option<String>,
+    pub images: Vec<String>,
+    pub datastream: Option<&'a Path>,
+    pub place: Place,
+    pub dependencies: bool,
+}
+
+/// Holds the module names that one import module or copy module run adds,
+/// their summaries and the image listing that receives them.
+struct Listed<'a> {
+    listing: &'a Listing,
+    names: &'a [String],
+    declares: &'a [crate::parse::module::Summary],
+}
+
 /// What the command does with the members it collected, which is the whole of
 /// the difference between `import` and `copy`.
 #[derive(Clone, Copy, PartialEq)]
@@ -604,16 +621,19 @@ impl Module {
     /// its claims would have the images measured against. `place` decides only
     /// what `write` does at the end.
     pub fn collect(
-        name: Option<String>,
+        request: Request,
         root: &Path,
         sources: &[Collection],
         enforce: bool,
-        images: Vec<String>,
-        datastream: Option<&Path>,
-        place: Place,
-        dependencies: bool,
         prompt: &Prompt,
     ) -> Result<Self, Error> {
+        let Request {
+            name,
+            images,
+            datastream,
+            place,
+            dependencies,
+        } = request;
         let (list, _) = crate::model::image::List::load(root);
         // An import is nothing but a line in an image, so with no image there
         // is nothing for it to be. A copy leaves a module in the repository
@@ -664,9 +684,11 @@ impl Module {
             root,
             sources,
             &list,
-            &listing,
-            &named,
-            &declares,
+            &Listed {
+                listing: &listing,
+                names: &named,
+                declares: &declares,
+            },
             dependencies,
             prompt,
         )?
@@ -871,12 +893,15 @@ fn short(
     root: &Path,
     sources: &[Collection],
     list: &crate::model::image::List,
-    listing: &Listing,
-    names: &[String],
-    declares: &[crate::parse::module::Summary],
+    listed: &Listed,
     dependencies: bool,
     prompt: &Prompt,
 ) -> Result<Vec<String>, String> {
+    let &Listed {
+        listing,
+        names,
+        declares,
+    } = listed;
     let targets: Vec<(&crate::model::image::Image, Option<&str>)> = listing
         .targets()
         .iter()
@@ -1268,13 +1293,15 @@ image {
         )
         .unwrap();
         let result = Module::collect(
-            Some("nosuch".into()),
+            Request {
+                name: Some("nosuch".into()),
+                images: Vec::new(),
+                datastream: None,
+                place: Place::Reference,
+                dependencies: false,
+            },
             &root,
             &[],
-            false,
-            Vec::new(),
-            None,
-            Place::Reference,
             false,
             &Prompt::silent(),
         );
@@ -1307,13 +1334,15 @@ image {
         let sources = [collection("one", "collection")];
 
         let result = Module::collect(
-            Some("new".into()),
+            Request {
+                name: Some("new".into()),
+                images: vec!["example".into()],
+                datastream: None,
+                place: Place::Reference,
+                dependencies: false,
+            },
             &root,
             &sources,
-            false,
-            vec!["example".into()],
-            None,
-            Place::Reference,
             false,
             &Prompt::silent(),
         );

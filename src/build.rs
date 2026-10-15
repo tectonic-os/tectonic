@@ -274,13 +274,15 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
         }
         build_uki(
             root,
-            program,
-            &containerfile,
-            &build_args,
-            &secrets,
-            &target,
-            &tags,
-            &labels,
+            &Invocation {
+                program,
+                containerfile: &containerfile,
+                build_args: &build_args,
+                secrets: &secrets,
+                target: &target,
+                tags: &tags,
+                labels: &labels,
+            },
         )?;
         return Ok(Stopped::Built);
     }
@@ -390,21 +392,31 @@ fn scratch_tag(kind: &str, target: &str) -> String {
     format!("localhost/tect-uki-{kind}:{tag}-{}", std::process::id())
 }
 
+struct Invocation<'a> {
+    program: &'a str,
+    containerfile: &'a Path,
+    build_args: &'a [String],
+    secrets: &'a [(String, String)],
+    target: &'a str,
+    tags: &'a [String],
+    labels: &'a [String],
+}
+
 /// A UKI target builds twice: the split image, the storage digest `bootc
 /// install` will compare, and the image sealed with it. The generated tail's
 /// `ARG COMPOSEFS_DIGEST` is what carries the digest into the seal. Nothing
 /// reaches the user's tags until the sealed image's own digest, its embedded
 /// cmdline and the skeleton's validation have all passed.
-fn build_uki(
-    root: &Path,
-    program: &str,
-    containerfile: &Path,
-    build_args: &[String],
-    secrets: &[(String, String)],
-    target: &str,
-    tags: &[String],
-    labels: &[String],
-) -> Result<(), String> {
+fn build_uki(root: &Path, invocation: &Invocation) -> Result<(), String> {
+    let &Invocation {
+        program,
+        containerfile,
+        build_args,
+        secrets,
+        target,
+        tags,
+        labels,
+    } = invocation;
     // The generated file is repository-relative and `buildah` resolves it
     // under the process's own directory, which need not be the repository.
     let root = fs::canonicalize(root).map_err(|err| format!("{}: {err}", root.display()))?;

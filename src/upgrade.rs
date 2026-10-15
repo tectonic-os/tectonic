@@ -179,6 +179,7 @@ pub fn run() -> Result<(), String> {
         Ordering::Less => println!("tect: running {running}, at {}", here.display()),
     }
 
+    // SAFETY: geteuid takes no argument and always succeeds.
     let euid = unsafe { libc::geteuid() };
     let plan = plan(
         &latest,

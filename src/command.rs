@@ -1379,7 +1379,7 @@ pub fn topic(path: &str) -> Topic {
 }
 
 /// `rows` in the order of `TOPICS`, each group keeping the order of the tree.
-pub fn grouped<'a>(rows: &'a [Row]) -> Vec<(Topic, Vec<&'a Row>)> {
+pub fn grouped(rows: &[Row]) -> Vec<(Topic, Vec<&Row>)> {
     TOPICS
         .iter()
         .map(|&at| {

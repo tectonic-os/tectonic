@@ -285,26 +285,13 @@ fn open(here: &Context) -> Result<Option<PathBuf>, Error> {
 /// `import module` and `copy module` use the same collection, questions
 /// and the same offers, differing only in where the members land.
 fn module_from_collection(
-    name: Option<String>,
+    request: crate::import::Request,
     root: &std::path::Path,
     list: &crate::model::image::List,
-    images: Vec<String>,
-    datastream: Option<&std::path::Path>,
-    place: crate::import::Place,
-    dependencies: bool,
     prompt: &Prompt,
 ) -> Result<(), Error> {
-    let module = crate::import::Module::collect(
-        name,
-        root,
-        &list.sources,
-        list.audit_enforce,
-        images,
-        datastream,
-        place,
-        dependencies,
-        prompt,
-    )?;
+    let module =
+        crate::import::Module::collect(request, root, &list.sources, list.audit_enforce, prompt)?;
     let wrote = module.write(root, &list.sources)?;
     if !wrote.is_empty() {
         crate::create::report(root, &wrote);
@@ -413,13 +400,15 @@ pub fn dispatch(
                 )
             });
             let wrote = crate::create::Image::collect(
-                &root,
+                crate::create::Home {
+                    root: &root,
+                    repo: &repo,
+                    url,
+                    sources_text: "",
+                },
                 name,
                 base,
-                &repo,
-                url,
                 "a name argument",
-                "",
                 crate::create::Field::Image,
                 None,
                 prompt,
@@ -481,13 +470,15 @@ pub fn dispatch(
             let name = one_name(rest, name)?;
             let (root, list) = collection_repo(here)?;
             module_from_collection(
-                name,
+                crate::import::Request {
+                    name,
+                    images,
+                    datastream: datastream.as_deref(),
+                    place: crate::import::Place::Reference,
+                    dependencies,
+                },
                 &root,
                 &list,
-                images,
-                datastream.as_deref(),
-                crate::import::Place::Reference,
-                dependencies,
                 prompt,
             )?;
             Ok(ExitCode::SUCCESS)
@@ -496,13 +487,15 @@ pub fn dispatch(
             let name = one_name(rest, name)?;
             let (root, list) = collection_repo(here)?;
             module_from_collection(
-                name,
+                crate::import::Request {
+                    name,
+                    images,
+                    datastream: datastream.as_deref(),
+                    place: crate::import::Place::Vendored,
+                    dependencies,
+                },
                 &root,
                 &list,
-                images,
-                datastream.as_deref(),
-                crate::import::Place::Vendored,
-                dependencies,
                 prompt,
             )?;
             Ok(ExitCode::SUCCESS)

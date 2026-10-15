@@ -425,7 +425,7 @@ impl Why {
         match (&self.content, &self.built) {
             (None, None) => out.push(Part::Text("Nothing hashed it.".into())),
             (declared, built) => {
-                let mut rows = vec![(vec!["declared".into(), hash(declared)], false)];
+                let mut rows = vec![(vec!["declared".into(), hash(declared.as_deref())], false)];
                 if let Some(built) = built {
                     rows.push((
                         vec!["observed by the build".into(), format!("`{built}`")],
@@ -657,7 +657,7 @@ fn clone_dir(url: &str) -> &str {
         .trim_end_matches(".git")
 }
 
-fn hash(value: &Option<String>) -> String {
+fn hash(value: Option<&str>) -> String {
     match value {
         Some(hash) => format!("`{hash}`"),
         None => "nothing".to_string(),

@@ -127,13 +127,15 @@ fn create_into(name: &str, root: &Path) {
     let silent = common::prompt::Prompt::silent();
 
     tect::create::Image::collect(
-        &here,
+        tect::create::Home {
+            root: &here,
+            repo: "example",
+            url: None,
+            sources_text: "",
+        },
         Some("Server".into()),
         Some("quay.io/fedora/fedora-bootc:44".into()),
-        "example",
-        None,
         "a name argument",
-        "",
         tect::create::Field::Image,
         None,
         &silent,
@@ -177,13 +179,15 @@ fn create_into(name: &str, root: &Path) {
     let (list, issues, _) = tect::declarations(&here);
     assert!(issues.is_empty(), "{}", issues.plain());
     tect::import::Module::collect(
-        Some("upstream/fedora-family".into()),
+        tect::import::Request {
+            name: Some("upstream/fedora-family".into()),
+            images: vec!["example".into(), "server".into()],
+            datastream: None,
+            place: tect::import::Place::Reference,
+            dependencies: false,
+        },
         &here,
         &list.sources,
-        false,
-        vec!["example".into(), "server".into()],
-        None,
-        tect::import::Place::Reference,
         false,
         &silent,
     )
@@ -443,7 +447,7 @@ fn why_unbuilt(root: &Path) {
     .unwrap();
     out.push_str("==== and the same module in an image that does build it\n");
     out.push_str(
-        &tect::run(Command::Why, Some("flatpak"), &here)
+        tect::run(Command::Why, Some("flatpak"), &here)
             .stdout
             .split("## What it exchanges")
             .next()

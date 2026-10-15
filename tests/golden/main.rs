@@ -7,6 +7,11 @@
 //! the tool as a path from the package root, so tests run in any order and the
 //! path a diagnostic prints is the same on any machine.
 
+#![expect(
+    clippy::unwrap_used,
+    reason = "a test helper panics on a failed step, which fails the calling test"
+)]
+
 mod docs;
 mod flows;
 mod harness;

@@ -325,11 +325,15 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
     }
     let needs_default = match command {
         Command::Summary | Command::Sbom => target_arg.is_none(),
-        Command::Graph | Command::GraphJson | Command::Section => image_arg.is_none(),
-        Command::Why | Command::WhyJson => false,
-        Command::Coverage | Command::CoverageJson => image_arg.is_none(),
+        Command::Graph
+        | Command::GraphJson
+        | Command::Section
+        | Command::Coverage
+        | Command::CoverageJson => image_arg.is_none(),
         Command::Plan => true,
-        Command::Check | Command::Generate | Command::Verify => false,
+        Command::Why | Command::WhyJson | Command::Check | Command::Generate | Command::Verify => {
+            false
+        }
     };
     if needs_default {
         if let Some(issue) = list.no_default() {

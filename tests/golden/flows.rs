@@ -1705,13 +1705,15 @@ fn setup_import_edit_guards(flow: &Flow) {
     let (list, issues, _) = tect::declarations(&root);
     assert!(issues.is_empty(), "{}", issues.plain());
     let declined = tect::import::Module::collect(
-        Some("upstream/flatpak".into()),
+        tect::import::Request {
+            name: Some("upstream/flatpak".into()),
+            images: Vec::new(),
+            datastream: None,
+            place: tect::import::Place::Reference,
+            dependencies: false,
+        },
         &root,
         &list.sources,
-        false,
-        Vec::new(),
-        None,
-        tect::import::Place::Reference,
         false,
         &common::prompt::Prompt::silent(),
     )
@@ -1721,13 +1723,15 @@ fn setup_import_edit_guards(flow: &Flow) {
     assert!(declined.contains("--image"), "{declined}");
 
     tect::import::Module::collect(
-        Some("upstream/flatpak".into()),
+        tect::import::Request {
+            name: Some("upstream/flatpak".into()),
+            images: vec!["example".into()],
+            datastream: None,
+            place: tect::import::Place::Reference,
+            dependencies: false,
+        },
         &root,
         &list.sources,
-        false,
-        vec!["example".into()],
-        None,
-        tect::import::Place::Reference,
         false,
         &common::prompt::Prompt::silent(),
     )
@@ -1742,13 +1746,15 @@ fn setup_import_edit_guards(flow: &Flow) {
     // file. A module gated to two flavours is listed under each, so only an
     // overlap is one.
     let twice = tect::import::Module::collect(
-        Some("upstream/flatpak".into()),
+        tect::import::Request {
+            name: Some("upstream/flatpak".into()),
+            images: vec!["example".into()],
+            datastream: None,
+            place: tect::import::Place::Reference,
+            dependencies: false,
+        },
         &root,
         &list.sources,
-        false,
-        vec!["example".into()],
-        None,
-        tect::import::Place::Reference,
         false,
         &common::prompt::Prompt::silent(),
     )

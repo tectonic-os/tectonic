@@ -237,7 +237,7 @@ impl Recorded {
 fn holds(declared: &Declared, bytes: &[u8]) -> Result<(), String> {
     let text = String::from_utf8_lossy(bytes);
     let (ok, wanted) = match (declared.generator.as_str(), declared.profile.as_deref()) {
-        ("cosign", _) => (
+        ("cosign", _) | ("openssl", Some("pcr-signing")) => (
             text.starts_with("-----BEGIN PUBLIC KEY-----"),
             "a PEM public key".to_string(),
         ),
@@ -248,10 +248,6 @@ fn holds(declared: &Declared, bytes: &[u8]) -> Result<(), String> {
                     .any(|p| kind.starts_with(p))
             }),
             "an OpenSSH public key line".to_string(),
-        ),
-        ("openssl", Some("pcr-signing")) => (
-            text.starts_with("-----BEGIN PUBLIC KEY-----"),
-            "a PEM public key".to_string(),
         ),
         _ => match declared.format.as_str() {
             // A DER certificate is an ASN.1 SEQUENCE, so it opens 0x30.
