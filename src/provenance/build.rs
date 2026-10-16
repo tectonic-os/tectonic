@@ -24,7 +24,11 @@ fn env(name: &str) -> Option<String> {
 /// Failed, missing and empty commands all yield `None` because audit
 /// enforcement decides whether an absent resolution is fatal.
 fn output(program: &str, args: &[&str]) -> Option<String> {
-    let out = Command::new(program).args(args).output().ok()?;
+    stdout(Command::new(program).args(args))
+}
+
+fn stdout(command: &mut Command) -> Option<String> {
+    let out = command.output().ok()?;
     if !out.status.success() {
         return None;
     }
@@ -63,7 +67,22 @@ pub fn clone_commit(url: &str, version: &str) -> Option<String> {
     if version.len() == 40 && version.chars().all(|c| c.is_ascii_hexdigit()) {
         return Some(version.to_lowercase());
     }
-    let listed = output("git", &["ls-remote", url, version])?;
+    // An asset URL reaches `git` unchecked, so the command refuses the `ext::`
+    // transport whatever the user's git config allows.
+    // `GIT_ALLOW_PROTOCOL` overrides `-c`, so the command does not inherit it.
+    // `--` makes a URL that starts with a dash a repository argument.
+    let listed = stdout(
+        Command::new("git")
+            .args([
+                "-c",
+                "protocol.ext.allow=never",
+                "ls-remote",
+                "--",
+                url,
+                version,
+            ])
+            .env_remove("GIT_ALLOW_PROTOCOL"),
+    )?;
     listed_commit(&listed)
 }
 
@@ -189,6 +208,70 @@ pub fn write() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn scratch(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("tect-{name}.{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("a scratch directory");
+        dir
+    }
+
+    /// Names the environment variable that carries the asset URL to
+    /// `clone_commit_in_the_calling_environment`.
+    const ASSET_URL: &str = "TECT_TEST_ASSET_URL";
+
+    /// Git refuses `ext::` by default. The child test binary runs where a git
+    /// config and `GIT_ALLOW_PROTOCOL` both allow it, so only `clone_commit`
+    /// keeps the `ext::` command from running.
+    #[test]
+    fn an_ext_asset_url_runs_no_command_where_git_allows_the_transport() {
+        let dir = scratch("ext-transport");
+        let config = dir.join("gitconfig");
+        std::fs::write(&config, "[protocol \"ext\"]\n\tallow = always\n").expect("a git config");
+        let marker = dir.join("ran");
+        let child = Command::new(std::env::current_exe().expect("the test binary"))
+            .args([
+                "provenance::build::tests::clone_commit_in_the_calling_environment",
+                "--exact",
+                "--ignored",
+            ])
+            .env(ASSET_URL, format!("ext::touch {}", marker.display()))
+            .env("GIT_CONFIG_GLOBAL", &config)
+            .env("GIT_ALLOW_PROTOCOL", "ext")
+            .output()
+            .expect("the test binary runs");
+        let report = String::from_utf8_lossy(&child.stdout);
+        assert!(
+            child.status.success() && report.contains("1 passed"),
+            "{report}"
+        );
+        assert!(!marker.exists(), "git ran the ext:: command");
+        std::fs::remove_dir_all(&dir).expect("the scratch directory is removed");
+    }
+
+    /// If the parent test did not set the URL, then the run is a plain
+    /// `--ignored` pass and has nothing to resolve.
+    #[test]
+    #[ignore = "an_ext_asset_url_runs_no_command_where_git_allows_the_transport runs it"]
+    fn clone_commit_in_the_calling_environment() {
+        let Ok(url) = std::env::var(ASSET_URL) else {
+            return;
+        };
+        assert_eq!(clone_commit(&url, "main"), None);
+    }
+
+    /// Without `--`, git reads this URL as `--upload-pack` and runs its command.
+    /// The selector is a path in the scratch directory, because that command
+    /// also touches it.
+    #[test]
+    fn an_asset_url_shaped_like_an_option_runs_no_command() {
+        let dir = scratch("dash-url");
+        let marker = dir.join("ran");
+        let url = format!("--upload-pack=touch {}", marker.display());
+        let selector = dir.join("selector").display().to_string();
+        assert_eq!(clone_commit(&url, &selector), None);
+        assert!(!marker.exists(), "git ran the --upload-pack command");
+        std::fs::remove_dir_all(&dir).expect("the scratch directory is removed");
+    }
 
     #[test]
     fn the_record_names_the_digest_and_says_whether_anything_was_enforced() {
