@@ -13,6 +13,10 @@ pub struct Disk {
     /// Key kind to every module declaring it and what each declaration says,
     /// which is where `create key` learns everything but the kind.
     pub keys: BTreeMap<String, Vec<(String, Key)>>,
+    /// Key kind to the module whose declaration of it the manifest refuses, and
+    /// the refusals rendered. `create key` then names the value to fix
+    /// instead of a module to import.
+    pub refused_keys: BTreeMap<String, (String, String)>,
     /// Collected filename to the module that collects it, so a contribution
     /// whose consumer is not enabled can name what to enable.
     pub collectors: BTreeMap<String, String>,
@@ -44,7 +48,7 @@ impl Disk {
     }
 
     fn walk(root: &Path, collected: &[String]) -> Self {
-        let mut out = Disk::default();
+        let mut out = Self::default();
 
         let modules = layout::modules(root);
         let found = layout::module_dirs(
@@ -93,9 +97,10 @@ impl Disk {
                     // checked, not here.
                     "key" => {
                         let src = Source::new(manifest.display().to_string(), text.clone());
-                        let Some(key) =
-                            crate::parse::module::parse_key(node, &src, &mut Issues::default())
+                        let mut refused = Issues::default();
+                        let Some(key) = crate::parse::module::parse_key(node, &src, &mut refused)
                         else {
+                            out.refuse_key(args().next(), &name, &doc, &src, refused);
                             continue;
                         };
                         out.keys
@@ -108,6 +113,27 @@ impl Disk {
             }
         }
         out
+    }
+}
+
+impl Disk {
+    /// Keeps the first module that declares `kind` with a refused key. A key
+    /// with no kind has nothing `create key` can name.
+    fn refuse_key(
+        &mut self,
+        kind: Option<&str>,
+        module: &str,
+        doc: &KdlDocument,
+        src: &Source,
+        mut refused: Issues,
+    ) {
+        let Some(kind) = kind else {
+            return;
+        };
+        crate::parse::schema::check_doc(doc, &crate::parse::module::MODULE, src, &mut refused);
+        self.refused_keys
+            .entry(kind.to_string())
+            .or_insert_with(|| (module.to_string(), refused.plain()));
     }
 }
 

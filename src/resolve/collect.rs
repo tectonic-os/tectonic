@@ -108,6 +108,10 @@ pub fn resolve_collects(
                             into,
                         });
                 }
+                // An enabled collector whose `collects` was refused has
+                // already reported it, and adding it to the image fixes
+                // nothing.
+                None if image.modules().any(|enabled| enabled.dir == *collector) => {}
                 None => issues.push(
                     Issue::new(
                         format!(

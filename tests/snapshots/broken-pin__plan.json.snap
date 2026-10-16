@@ -85,7 +85,7 @@ source: tests/golden/harness.rs
               "dir": ".remote/loose",
               "flavour": null,
               "variant": null,
-              "remote": null,
+              "remote": "HEAD",
               "description": "",
               "options": {},
               "provides": [],

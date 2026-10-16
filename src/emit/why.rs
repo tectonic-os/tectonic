@@ -21,7 +21,7 @@ pub struct Fetch {
 
 impl Fetch {
     fn of(name: &str, pin: &Evidence) -> Self {
-        Fetch {
+        Self {
             name: name.to_string(),
             locator: pin.url.clone(),
             selector: pin.version.clone(),
@@ -284,6 +284,10 @@ fn listed(names: &[String]) -> String {
 }
 
 impl Why {
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the report sections are pushed in the order the user reads them"
+    )]
     pub fn parts(&self, terminal: bool) -> Vec<Part> {
         let mut out = vec![Part::Heading(self.path.clone())];
         if !self.description.is_empty() {
@@ -387,9 +391,10 @@ impl Why {
                                         .map(|name| format!("`{name}`"))
                                         .collect::<Vec<_>>()
                                         .join(", "),
-                                    repo.as_ref()
-                                        .map(|repo| format!("`{repo}`"))
-                                        .unwrap_or_else(|| "default".into()),
+                                    repo.as_ref().map_or_else(
+                                        || "default".into(),
+                                        |repo| format!("`{repo}`"),
+                                    ),
                                 ],
                                 false,
                             )

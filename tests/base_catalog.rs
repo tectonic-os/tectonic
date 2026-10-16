@@ -391,3 +391,44 @@ fn one_name_leaves_the_family_it_coerces() {
     assert_eq!(base.bootloaders, ["grub2", "systemd"]);
     assert!(!base.signed);
 }
+
+/// Which row wins would otherwise depend on the order `repo.kdl` lists the
+/// sources in, so only a row that differs is reported.
+#[test]
+fn a_capability_two_libraries_describe_differently_is_reported() {
+    let library = Library::new("two-capabilities");
+    let source = |name: &str, path: &str| {
+        std::fs::write(
+            library.at(name).join("capabilities.kdl"),
+            format!("capability \"ssh\" {{\n    path \"{path}\"\n}}\n"),
+        )
+        .unwrap();
+        Collection {
+            kind: SourceKind::Capabilities,
+            name: name.to_string(),
+            at: At::Dir(format!("library/{name}")),
+            span: Span::default(),
+        }
+    };
+    let same = source("same", "/usr/sbin/sshd");
+    let other = source("other", "/usr/bin/ssh");
+
+    let mut issues = Issues::default();
+    tect::base::capabilities(
+        &library.root,
+        &[source("core", "/usr/sbin/sshd"), same],
+        &mut issues,
+    );
+    assert!(issues.is_empty(), "{}", issues.plain());
+
+    tect::base::capabilities(
+        &library.root,
+        &[source("core", "/usr/sbin/sshd"), other],
+        &mut issues,
+    );
+    let said = flat(&issues.plain());
+    assert!(
+        said.contains("capability `ssh` is described by two libraries"),
+        "{said}"
+    );
+}

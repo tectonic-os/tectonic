@@ -142,7 +142,7 @@ fn this_target(named: Option<&str>, scope: &crate::emit::why::Scope) -> Result<(
         Scope::Built(name) => Err(Error::Invocation(format!(
             "this image was built as `{name}`, so it cannot answer for `{named}`"
         ))),
-        _ => Err(Error::Invocation(
+        Scope::Repository | Scope::EveryTarget => Err(Error::Invocation(
             "the build record does not name a target, so this image can answer only for \
              itself"
                 .to_string(),
@@ -308,6 +308,10 @@ fn collection_repo(here: &Context) -> Result<(PathBuf, crate::model::image::List
     Ok((root, list))
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "one match arm per verb keeps the command surface in one place"
+)]
 pub fn dispatch(
     verb: Verb,
     name: &str,
@@ -360,10 +364,7 @@ pub fn dispatch(
     match verb {
         Verb::Upgrade => {
             if let [word, ..] = rest {
-                return Err(Error::Invocation(format!(
-                    "`{}` does not take {word}",
-                    name
-                )));
+                return Err(Error::Invocation(format!("`{name}` does not take {word}")));
             }
             crate::upgrade::run()?;
             Ok(ExitCode::SUCCESS)
@@ -449,12 +450,11 @@ pub fn dispatch(
             let Some(root) = open(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
             };
-            if let Some(scripts) = crate::create::Scripts::collect(&root, rest, &[], prompt)? {
-                let wrote = scripts.apply(&root)?;
-                crate::create::report(&root, &wrote);
-                if !wrote.is_empty() {
-                    println!("{}", crate::copy::SCRIPTS_NEXT);
-                }
+            let scripts = crate::create::Scripts::collect(&root, rest, &[], prompt)?;
+            let wrote = scripts.apply(&root)?;
+            crate::create::report(&root, &wrote);
+            if !wrote.is_empty() {
+                println!("{}", crate::copy::SCRIPTS_NEXT);
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -502,10 +502,7 @@ pub fn dispatch(
         }
         Verb::SetWorkflows => {
             if let [word, ..] = rest {
-                return Err(Error::Invocation(format!(
-                    "`{}` does not take {word}",
-                    name
-                )));
+                return Err(Error::Invocation(format!("`{name}` does not take {word}")));
             }
             let Some(root) = open(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
@@ -591,7 +588,7 @@ pub fn dispatch(
         }
         Verb::SetClaims => {
             let named = one_name(rest, name)?.ok_or_else(|| {
-                Error::Invocation(format!("`{}` takes the module to claim for", name))
+                Error::Invocation(format!("`{name}` takes the module to claim for"))
             })?;
             let Some(root) = open(here)? else {
                 return Ok(ExitCode::from(REPO_ERROR));
@@ -867,6 +864,10 @@ fn coverage(
     Ok(())
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "every reading command shares one load, report and exit sequence"
+)]
 fn reading(
     verb: Verb,
     name: &str,
@@ -939,7 +940,17 @@ fn reading(
                 let known: Vec<String> = loaded.list.images.iter().map(|i| i.id.clone()).collect();
                 (copy::WHICH_IMAGE, known.clone(), known)
             }
-            _ => {
+            Command::Plan
+            | Command::Check
+            | Command::Generate
+            | Command::Verify
+            | Command::Section
+            | Command::Graph
+            | Command::GraphJson
+            | Command::Summary
+            | Command::Sbom
+            | Command::Why
+            | Command::WhyJson => {
                 let known = crate::emit::why::known(&loaded.list);
                 let shown = crate::emit::why::display(&known);
                 (copy::WHICH_MODULE, known, shown)
@@ -1062,7 +1073,7 @@ fn reading(
     if matches!(command, Command::Coverage | Command::CoverageJson) {
         if let Some(table) = run.parts.iter().find_map(|part| match part {
             crate::emit::Part::Table(table) => Some(table),
-            _ => None,
+            crate::emit::Part::Heading(_) | crate::emit::Part::Text(_) => None,
         }) {
             eprintln!(
                 "tect: {} of {} rules are unclaimed",
@@ -1103,7 +1114,7 @@ fn fits(parts: &[Part]) -> bool {
     let room = common::ui::width();
     parts.iter().all(|part| match part {
         Part::Table(table) => room >= common::ui::table::floor(table.header, &table.rows),
-        _ => true,
+        Part::Heading(_) | Part::Text(_) => true,
     })
 }
 

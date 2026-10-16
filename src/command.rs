@@ -60,75 +60,75 @@ impl Verb {
     /// the page itself.
     pub fn schema(self) -> Option<(&'static str, Area, &'static str)> {
         match self {
-            Verb::CreateRepo => Some(("repository&nbsp;layout", Area::Repository, "")),
-            Verb::CreateImage => Some(("`image.kdl`", Area::Image, "")),
-            Verb::CreateFlavour => Some((
+            Self::CreateRepo => Some(("repository&nbsp;layout", Area::Repository, "")),
+            Self::CreateImage => Some(("`image.kdl`", Area::Image, "")),
+            Self::CreateFlavour => Some((
                 "`image.kdl`&nbsp;›&nbsp;`flavours`",
                 Area::Image,
                 "image-flavours",
             )),
-            Verb::CreateModule => Some(("`module.kdl`", Area::Module, "")),
-            Verb::CreateKey | Verb::SetKey => {
+            Self::CreateModule => Some(("`module.kdl`", Area::Module, "")),
+            Self::CreateKey | Self::SetKey => {
                 Some(("`module.kdl`&nbsp;›&nbsp;`key`", Area::Module, "key"))
             }
-            Verb::CreateScripts => Some(("`scripts/`", Area::Repository, "")),
-            Verb::ImportModule => Some((
+            Self::CreateScripts => Some(("`scripts/`", Area::Repository, "")),
+            Self::ImportModule => Some((
                 "`image.kdl`&nbsp;›&nbsp;`source`",
                 Area::Image,
                 "image-modules-source",
             )),
-            Verb::CopyModule => Some(("`provenance.kdl`", Area::Provenance, "")),
-            Verb::SetWorkflows => Some((
+            Self::CopyModule => Some(("`provenance.kdl`", Area::Provenance, "")),
+            Self::SetWorkflows => Some((
                 "`repo.kdl`&nbsp;›&nbsp;`workflows`",
                 Area::Repo,
                 "workflows",
             )),
-            Verb::SetLibrary => Some(("`repo.kdl`&nbsp;›&nbsp;`sources`", Area::Repo, "sources")),
-            Verb::SetConforms | Verb::Coverage => Some((
+            Self::SetLibrary => Some(("`repo.kdl`&nbsp;›&nbsp;`sources`", Area::Repo, "sources")),
+            Self::SetConforms | Self::Coverage => Some((
                 "`image.kdl`&nbsp;›&nbsp;`conforms`",
                 Area::Image,
                 "image-conforms",
             )),
-            Verb::SetClaims => Some((
+            Self::SetClaims => Some((
                 "`module.kdl`&nbsp;›&nbsp;`satisfies`",
                 Area::Module,
                 "satisfies",
             )),
-            Verb::Generate => Some(("`generated/`", Area::Repository, "")),
-            Verb::FetchModules => Some((
+            Self::Generate => Some(("`generated/`", Area::Repository, "")),
+            Self::FetchModules => Some((
                 "`image.kdl`&nbsp;›&nbsp;`pin`",
                 Area::Image,
                 "image-modules-module-pin",
             )),
-            Verb::OsRelease => Some(("`image.kdl`&nbsp;›&nbsp;`image`", Area::Image, "image")),
-            Verb::Fetch => Some(("`module.kdl`&nbsp;›&nbsp;`asset`", Area::Module, "asset")),
-            Verb::ValidateImage => Some((
+            Self::OsRelease => Some(("`image.kdl`&nbsp;›&nbsp;`image`", Area::Image, "image")),
+            Self::Fetch => Some(("`module.kdl`&nbsp;›&nbsp;`asset`", Area::Module, "asset")),
+            Self::ValidateImage => Some((
                 "`module.kdl`&nbsp;›&nbsp;`allow-verify`",
                 Area::Module,
                 "allow-verify",
             )),
-            Verb::Upgrade
-            | Verb::Check
-            | Verb::Build
-            | Verb::VmBuild
-            | Verb::VmRun
-            | Verb::VmSpawn
-            | Verb::Section
-            | Verb::Graph
-            | Verb::Why
-            | Verb::Plan
-            | Verb::Verify
-            | Verb::Summary
-            | Verb::Sbom
-            | Verb::Scap
-            | Verb::ScapContent
-            | Verb::ScapRules
-            | Verb::ScapTailoring
-            | Verb::RegistryNamespace
-            | Verb::RegistryRef
-            | Verb::Recipe
-            | Verb::BuildRecord
-            | Verb::CreateGit => None,
+            Self::Upgrade
+            | Self::Check
+            | Self::Build
+            | Self::VmBuild
+            | Self::VmRun
+            | Self::VmSpawn
+            | Self::Section
+            | Self::Graph
+            | Self::Why
+            | Self::Plan
+            | Self::Verify
+            | Self::Summary
+            | Self::Sbom
+            | Self::Scap
+            | Self::ScapContent
+            | Self::ScapRules
+            | Self::ScapTailoring
+            | Self::RegistryNamespace
+            | Self::RegistryRef
+            | Self::Recipe
+            | Self::BuildRecord
+            | Self::CreateGit => None,
         }
     }
 }
@@ -224,17 +224,17 @@ pub const TOPICS: [Topic; 11] = [
 impl Topic {
     pub fn heading(self) -> &'static str {
         match self {
-            Topic::Tool => "CLI tool",
-            Topic::Repository => "Repository",
-            Topic::Image => "Image",
-            Topic::Modules => "Modules",
-            Topic::Keys => "Keys",
-            Topic::Check => "Check and generate",
-            Topic::Build => "Build and boot",
-            Topic::Ci => "CI",
-            Topic::Inspect => "Inspect",
-            Topic::Audit => "Audit",
-            Topic::Layer => "Inside a build",
+            Self::Tool => "CLI tool",
+            Self::Repository => "Repository",
+            Self::Image => "Image",
+            Self::Modules => "Modules",
+            Self::Keys => "Keys",
+            Self::Check => "Check and generate",
+            Self::Build => "Build and boot",
+            Self::Ci => "CI",
+            Self::Inspect => "Inspect",
+            Self::Audit => "Audit",
+            Self::Layer => "Inside a build",
         }
     }
 }
@@ -1076,8 +1076,10 @@ fn placeholder(arg: &clap::Arg) -> String {
     let name = arg
         .get_value_names()
         .and_then(|names| names.first())
-        .map(|name| name.to_string().to_lowercase())
-        .unwrap_or_else(|| arg.get_id().to_string());
+        .map_or_else(
+            || arg.get_id().to_string(),
+            |name| name.to_string().to_lowercase(),
+        );
     let many = arg
         .get_num_args()
         .is_some_and(|range| range.max_values() > 1);

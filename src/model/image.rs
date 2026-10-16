@@ -290,11 +290,11 @@ pub enum NetRule {
 }
 
 impl NetRule {
-    pub fn of(word: &str) -> Option<NetRule> {
+    pub fn of(word: &str) -> Option<Self> {
         match word {
-            "allow" => Some(NetRule::Allow),
-            "strict" => Some(NetRule::Strict),
-            "deny" => Some(NetRule::Deny),
+            "allow" => Some(Self::Allow),
+            "strict" => Some(Self::Strict),
+            "deny" => Some(Self::Deny),
             _ => None,
         }
     }

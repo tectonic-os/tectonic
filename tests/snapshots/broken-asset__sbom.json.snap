@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 {
   "packages": [
@@ -26,12 +26,6 @@ source: tests/golden.rs
       "name": "no-tracking",
       "downloadLocation": "https://example.com/download/v{tag}/tool.tar.gz; rm -rf /",
       "filesAnalyzed": false,
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": ""
-        }
-      ],
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
       "copyrightText": "NOASSERTION",

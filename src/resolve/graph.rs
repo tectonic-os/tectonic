@@ -110,6 +110,10 @@ fn satisfied_by(index: &Index, image: &Image, name: &str) -> String {
 }
 
 /// Single pass over the resolved graph.
+#[expect(
+    clippy::too_many_lines,
+    reason = "every graph check reads the provider maps the function builds first"
+)]
 pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
     let mut offered: BTreeMap<&str, Vec<&Module>> = BTreeMap::new();
     for module in image.modules() {
@@ -312,6 +316,13 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
             if base_caps.contains_key(decl.name.as_str()) {
                 continue;
             }
+            if !offered.contains_key(decl.name.as_str())
+                && image
+                    .modules()
+                    .any(|declaring| declaring.refused_keys.contains(&decl.name))
+            {
+                continue;
+            }
 
             let Some(providers) = offered.get(decl.name.as_str()) else {
                 issues.push(
@@ -355,22 +366,24 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
                 continue;
             }
             if let Some(providers) = offered.get(decl.name.as_str()) {
-                if let Some(provider) = providers.first() {
-                    if let Some(provider_flavour) = &provider.flavour {
-                        if module.flavour.as_ref() != Some(provider_flavour) {
-                            issues.push(
-                                Issue::new(
-                                    format!(
-                                        "`{}` builds after `{}`, which only `{}` provides and only on the `{provider_flavour}` flavour",
-                                        module.path, decl.name, provider.path
-                                    ),
-                                    &module.src,
-                                )
-                                .at(decl.span, "ineffective on every other target")
-                                .help("either gate this module to the same flavour, or move the provider out of the flavour block"),
-                            );
-                        }
-                    }
+                let gated = providers
+                    .first()
+                    .and_then(|provider| Some((provider, provider.flavour.as_ref()?)))
+                    .filter(|(_, provider_flavour)| {
+                        module.flavour.as_ref() != Some(provider_flavour)
+                    });
+                if let Some((provider, provider_flavour)) = gated {
+                    issues.push(
+                        Issue::new(
+                            format!(
+                                "`{}` builds after `{}`, which only `{}` provides and only on the `{provider_flavour}` flavour",
+                                module.path, decl.name, provider.path
+                            ),
+                            &module.src,
+                        )
+                        .at(decl.span, "ineffective on every other target")
+                        .help("either gate this module to the same flavour, or move the provider out of the flavour block"),
+                    );
                 }
                 continue;
             }

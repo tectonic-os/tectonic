@@ -733,8 +733,8 @@ impl Module {
     }
 
     /// A module that declares nothing, with what its directory holds.
-    fn empty(path: &str, dir_rel: &str, dir: &Path, src: &Source, issues: &mut Issues) -> Module {
-        Module {
+    fn empty(path: &str, dir_rel: &str, dir: &Path, src: &Source, issues: &mut Issues) -> Self {
+        Self {
             path: path.to_string(),
             dir: dir_rel.to_string(),
             description: String::new(),
@@ -756,6 +756,7 @@ impl Module {
             contributes: Vec::new(),
             modes: Vec::new(),
             keys: Vec::new(),
+            refused_keys: Vec::new(),
             secrets: Vec::new(),
             args: Vec::new(),
             options: Vec::new(),
@@ -942,7 +943,7 @@ impl Module {
                     if module.fragment.is_none() {
                         issues.push(
                             Issue::new(
-                                format!("`{}` declares `fragment` but ships no Containerfile.inc", path),
+                                format!("`{path}` declares `fragment` but ships no Containerfile.inc"),
                                 src,
                             )
                             .at(node.name().span(), "nothing to place")
@@ -978,13 +979,16 @@ impl Module {
                         }
                     }
                 }
-                "key" => {
-                    if let Some(key) = parse_key(node, src, issues) {
+                "key" => match parse_key(node, src, issues) {
+                    Some(key) => {
                         if !module.keys.iter().any(|k| k.kind == key.kind) {
                             module.keys.push(key);
                         }
                     }
-                }
+                    None => module
+                        .refused_keys
+                        .extend(string_arg(node).map(key_capability)),
+                },
                 "packages" => module.parse_packages(node, gate, src, issues),
                 "package-groups" => module.parse_package_groups(node, gate, src, issues),
                 "copr" => module.parse_copr(node, gate, src, issues),
@@ -1014,7 +1018,7 @@ impl Module {
     }
 
     fn rest(
-        mut module: Module,
+        mut module: Self,
         path: &str,
         root: &Path,
         dir: &Path,
@@ -1145,8 +1149,7 @@ impl Module {
                 issues.push(
                     Issue::new(
                         format!(
-                            "`{}` declares `{kind} \"{name}\"` with no standard layer to carry it",
-                            path
+                            "`{path}` declares `{kind} \"{name}\"` with no standard layer to carry it"
                         ),
                         src,
                     )

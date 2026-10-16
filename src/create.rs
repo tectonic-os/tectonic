@@ -308,7 +308,7 @@ impl Repo {
             Some(prev) if from > Field::Scripts => prev.scripts.clone(),
             _ => {
                 let held = prev.map_or(&[SKELETON_FILE][..], |prev| &prev.scripts.chosen[..]);
-                Scripts::collect(&root, &[], held, prompt)?.unwrap_or_default()
+                Scripts::collect(&root, &[], held, prompt)?
             }
         };
         Ok(Self {
@@ -444,7 +444,7 @@ impl Libraries {
 
     /// A first run opens on every default. A second opens on the answer held,
     /// so a re-entry at this row does not silently take the defaults back.
-    pub fn collect(held: Option<&Libraries>, prompt: &Prompt) -> Result<Self, String> {
+    pub fn collect(held: Option<&Self>, prompt: &Prompt) -> Result<Self, String> {
         let every = Self::every();
         let options: Vec<Choice> = every
             .iter()
@@ -522,7 +522,7 @@ impl Scripts {
         names: &[&str],
         held: &[&str],
         prompt: &Prompt,
-    ) -> Result<Option<Self>, String> {
+    ) -> Result<Self, String> {
         let open: Vec<_> = offered()
             .into_iter()
             .filter(|(name, _, _)| !root.join(layout::SCRIPTS).join(name).exists())
@@ -545,7 +545,7 @@ impl Scripts {
                     )),
                 })
                 .collect::<Result<Vec<_>, String>>()?;
-            return Ok(Some(Self { chosen }));
+            return Ok(Self { chosen });
         }
         let options: Vec<Choice> = open
             .iter()
@@ -558,11 +558,11 @@ impl Scripts {
             .map(|(at, _)| at)
             .collect();
         let Answer::Chosen(chosen) = prompt.choose_many(copy::SCRIPTS, &options, &on)? else {
-            return Ok(None);
+            unreachable!("choose_many answers with a choice or fails")
         };
-        Ok(Some(Self {
+        Ok(Self {
             chosen: chosen.iter().map(|at| open[*at].0).collect(),
-        }))
+        })
     }
 
     fn row(&self) -> (Field, &'static str, String) {
@@ -1442,16 +1442,15 @@ impl Listing {
                     if taken.is_empty() {
                         continue;
                     }
-                    if let Some((_, added)) =
-                        wrote.iter_mut().find(|(file, _)| *file == target.file)
-                    {
-                        for name in taken {
-                            if !added.contains(&name) {
-                                added.push(name);
-                            }
-                        }
-                    } else {
+                    let Some((_, added)) = wrote.iter_mut().find(|(file, _)| *file == target.file)
+                    else {
                         wrote.push((target.file.clone(), taken));
+                        continue;
+                    };
+                    for name in taken {
+                        if !added.contains(&name) {
+                            added.push(name);
+                        }
                     }
                 }
                 Ok(wrote
@@ -1812,10 +1811,7 @@ fn git_init(root: &Path) -> Result<(), String> {
     // The push line, remote and workflows all require the `main` branch.
     match quietly(Command::new("git").args(["init", "-b", "main"]).arg(root)).status() {
         Ok(status) if status.success() => Ok(()),
-        Ok(status) => Err(format!(
-            "`git init` exited {}",
-            status.code().unwrap_or_default()
-        )),
+        Ok(status) => Err(format!("`git init` failed: {status}")),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Err(
             "`git` is not installed, and it is what initialises the repository: \
              install it from your platform's git package"
@@ -1849,10 +1845,7 @@ fn create_remote(owner: &str, id: &str) -> Result<(), String> {
         .status()
     {
         Ok(status) if status.success() => Ok(()),
-        Ok(status) => Err(format!(
-            "`gh repo create` exited {}",
-            status.code().unwrap_or_default()
-        )),
+        Ok(status) => Err(format!("`gh repo create` failed: {status}")),
         Err(err) => Err(format!("gh: {err}")),
     }
 }

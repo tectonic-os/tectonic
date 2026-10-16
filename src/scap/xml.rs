@@ -5,7 +5,7 @@ use quick_xml::events::{BytesDecl, BytesStart, Event as XmlEvent};
 use quick_xml::{Reader, XmlVersion};
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Event {
+pub(super) enum Event {
     Open {
         name: String,
         attrs: Vec<(String, String)>,
@@ -16,7 +16,7 @@ pub enum Event {
     Text(String),
 }
 
-pub fn scan(text: &str, mut emit: impl FnMut(Event)) -> Result<(), String> {
+pub(super) fn scan(text: &str, mut emit: impl FnMut(Event)) -> Result<(), String> {
     let mut reader = Reader::from_str(text);
     reader.config_mut().enable_all_checks(true);
     let mut text = String::new();
@@ -259,11 +259,11 @@ fn is_xml_space(found: char) -> bool {
     matches!(found, ' ' | '\t' | '\n' | '\r')
 }
 
-pub fn local(name: &str) -> &str {
+pub(super) fn local(name: &str) -> &str {
     name.rsplit_once(':').map_or(name, |(_, local)| local)
 }
 
-pub fn attr<'a>(attrs: &'a [(String, String)], name: &str) -> Option<&'a str> {
+pub(super) fn attr<'a>(attrs: &'a [(String, String)], name: &str) -> Option<&'a str> {
     attrs
         .iter()
         .find(|(found, _)| local(found) == name)

@@ -1,5 +1,6 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
+assertion_line: 50
 ---
 ==== generated/lib/apparmor-helpers.sh
 ==== generated/lib/dkms-helpers.sh
@@ -896,6 +897,16 @@ RUN --mount=type=bind,from=ctx,source=/modules/core/unclaimed,target=/ctx/module
     --mount=type=tmpfs,target=/tmp \
     bash /ctx/module.sh
 
+# ---- core/shipper ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/shipper,target=/ctx/modules/core/shipper \
+    --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/generated/broken-collect/modules/core/shipper.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/module.sh
+
 # ---- flavour gate ----
 ARG FLAVOUR
 
@@ -993,6 +1004,13 @@ export MODDIR
 set -euxo pipefail
 
 MODDIR=/ctx/modules/core/unclaimed
+export MODDIR
+==== generated/broken-collect/modules/core/shipper.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/shipper
 export MODDIR
 ==== generated/broken-collect/finalize.sh
 #!/usr/bin/env bash
@@ -1121,6 +1139,7 @@ graph LR
     m0["core/menu"]
     m1["core/absent"]
     m2["core/unclaimed"]
+    m3["core/shipper"]
 ```
 
 ## Capabilities

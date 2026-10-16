@@ -330,7 +330,11 @@ fn module(list: &List, entry: &Entry, family: &str) -> Json {
         ("variant", Json::optional(entry.variant.clone())),
         (
             "remote",
-            Json::optional(entry.pin(&list.sources).and_then(|pin| pin.version.clone())),
+            Json::optional(
+                entry
+                    .pin(&list.sources)
+                    .map(|pin| pin.selector().to_string()),
+            ),
         ),
         (
             "description",

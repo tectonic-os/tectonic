@@ -261,7 +261,7 @@ fn check_tracker(
             "needs `renovate`, `manual` or `unpinned`",
             "`renovate datasource=\"github-tags\" depName=\"owner/repo\"`, `manual \"why nothing tracks it\"`, or `unpinned \"why a moving ref is trusted here\"`",
         ),
-        _ => (
+        Role::Asset | Role::Module | Role::Record => (
             "needs `renovate` or `manual`",
             "`renovate datasource=\"github-tags\" depName=\"owner/repo\"`, or `manual \"why nothing tracks it\"`",
         ),
@@ -343,7 +343,7 @@ fn check_verifier(
             let help = match role {
                 Role::Collection => "the content hash is what says the archive is the one that was reviewed; `unpinned \"why it is trusted\"` is how a collection following a moving ref says it has none on purpose",
                 Role::Module => "a remote module is arbitrary shell running as root in the build, so the content hash is required, not optional",
-                _ => "every downloaded asset is verified against its pin; one whose url is a git repository is cloned at the commit or tag its version names instead, and declares none",
+                Role::Asset | Role::Record => "every downloaded asset is verified against its pin; one whose url is a git repository is cloned at the commit or tag its version names instead, and declares none",
             };
             if role.archive() || (pin.url.is_some() && !cloned) {
                 issues.push(

@@ -52,16 +52,19 @@ fn package(id: &str, module: &Module, asset: &Asset, url: &str) -> Json {
         ("name", Json::string(&asset.name)),
         ("downloadLocation", Json::string(url)),
         ("filesAnalyzed", Json::Bool(false)),
+    ];
+    // A cloned asset declares no sha256, because the commit its version names
+    // verifies it. An empty checksum would claim a hash nothing checked.
+    fields.extend(asset.pin.sha256.as_ref().map(|sha256| {
         (
             "checksums",
             Json::array([Json::object([
                 ("algorithm", Json::string("SHA256")),
-                (
-                    "checksumValue",
-                    Json::string(asset.pin.sha256.clone().unwrap_or_default()),
-                ),
+                ("checksumValue", Json::string(sha256)),
             ])]),
-        ),
+        )
+    }));
+    fields.extend([
         ("licenseConcluded", Json::string("NOASSERTION")),
         ("licenseDeclared", Json::string("NOASSERTION")),
         ("copyrightText", Json::string("NOASSERTION")),
@@ -73,7 +76,7 @@ fn package(id: &str, module: &Module, asset: &Asset, url: &str) -> Json {
                 module.path
             )),
         ),
-    ];
+    ]);
     if let Some(version) = &asset.pin.version {
         fields.push(("versionInfo", Json::string(version)));
     }

@@ -141,18 +141,6 @@ fn digest(url: &str) -> Result<String, String> {
     }
 }
 
-/// The staging path, removed however this ends, which is the trap `install.sh`
-/// sets. It stands beside its destination so placing the download is a rename
-/// and not a copy begun after the old copy is already gone.
-struct Staged(PathBuf);
-
-impl Drop for Staged {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-        let _ = fs::remove_file(&self.0);
-    }
-}
-
 pub fn run() -> Result<(), String> {
     let arch = std::env::consts::ARCH;
     if !PUBLISHED.contains(&arch) {
@@ -223,7 +211,7 @@ pub fn run() -> Result<(), String> {
             .map_err(|err| format!("{}: {err}\n\n{}", dir.display(), instead(euid)))?;
     }
 
-    let work = Staged(parent.join(format!(".upgrade.{}", std::process::id())));
+    let work = init::Scratch(parent.join(format!(".upgrade.{}", std::process::id())));
     fs::create_dir(&work.0)
         .map_err(|err| format!("{}: {err}\n\n{}", work.0.display(), instead(euid)))?;
     let sha256 = digest(&format!("{}.sha256", plan.url))?;
@@ -239,7 +227,10 @@ pub fn run() -> Result<(), String> {
 
     // Everything that can fail is done before anything is replaced: the
     // download is verified, and the new binary is already beside the old one.
-    let ready = Staged(bindir.join(format!(".tect.{}", std::process::id())));
+    // The staging path is removed however this ends, which is the trap
+    // `install.sh` sets. It stands beside its destination, so placing the
+    // download is a rename and not a copy begun after the old copy is gone.
+    let ready = init::Scratch(bindir.join(format!(".tect.{}", std::process::id())));
     fs::copy(&came, &ready.0)
         .map_err(|err| format!("{}: {err}\n\n{}", ready.0.display(), instead(euid)))?;
     fs::set_permissions(&ready.0, fs::Permissions::from_mode(0o755))
@@ -247,7 +238,7 @@ pub fn run() -> Result<(), String> {
 
     // Swapped whole: an asset a release dropped must not survive into every
     // repository created afterwards.
-    let _ = fs::remove_dir_all(&plan.assets);
+    init::remove(&plan.assets)?;
     fs::rename(&assets, &plan.assets).map_err(|err| format!("{}: {err}", plan.assets.display()))?;
     // rename(2), never fs::copy: a running executable is ETXTBSY.
     fs::rename(&ready.0, &plan.bin).map_err(|err| format!("{}: {err}", plan.bin.display()))?;

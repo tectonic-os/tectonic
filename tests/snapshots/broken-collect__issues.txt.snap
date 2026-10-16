@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
   x `collects` needs into=, where the build puts them
    ,-[tests/repos/broken-collect/modules/core/menu/module.kdl:7:1]
@@ -31,3 +31,7 @@ source: tests/golden.rs
    `----
   help: shipping the file is what contributes it; this node only says where it
         lands
+
+  x `core/unclaimed` ships a flatpaks.list but nothing enabled collects it
+  help: `core/flatpaks` collects it; add it to this image, or drop the
+        flatpaks.list

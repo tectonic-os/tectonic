@@ -42,6 +42,9 @@ fn declared(
     };
 
     let mut declaring = disk.keys.remove(&kind).unwrap_or_default();
+    if let (true, Some(held)) = (declaring.is_empty(), disk.refused_keys.get(&kind)) {
+        return Err(refused(&kind, held));
+    }
     if declaring.is_empty() {
         return Err(absent(root, &kind, &disk));
     }
@@ -110,16 +113,18 @@ impl Key {
     }
 
     pub fn apply(&self, root: &Path) -> Result<(), String> {
-        let work = workspace(&self.declared.kind)?;
+        // The workspace holds a copy of the private half until the guard drops.
+        let scratch = crate::init::Scratch(workspace(&self.declared.kind)?);
+        let work = &scratch.0;
         let (public, private) = match (
             self.declared.generator.as_str(),
             self.declared.profile.as_deref(),
         ) {
-            ("cosign", _) => cosign(&work),
-            ("ssh-keygen", _) => ssh(&work, &self.declared.kind),
-            ("openssl", Some("pcr-signing")) => pcr_pair(&work, &self.declared),
+            ("cosign", _) => cosign(work),
+            ("ssh-keygen", _) => ssh(work, &self.declared.kind),
+            ("openssl", Some("pcr-signing")) => pcr_pair(work, &self.declared),
             (_, profile) => openssl(
-                &work,
+                work,
                 &self.declared,
                 self.cn.as_deref().unwrap_or_default(),
                 profile,
@@ -130,7 +135,6 @@ impl Key {
         println!("wrote {}", shown(root, &self.public));
         install(&private, &self.private, 0o600)?;
         println!("wrote {}", shown(root, &self.private));
-        let _ = std::fs::remove_dir_all(&work);
 
         print!("{}", self.next(root));
         warn_unignored(root);
@@ -274,6 +278,9 @@ fn holds(declared: &Declared, bytes: &[u8]) -> Result<(), String> {
 /// Which key, where the command named none.
 fn which(command: &str, disk: &Disk, prompt: &Prompt) -> Result<String, String> {
     let kinds: Vec<&String> = disk.keys.keys().collect();
+    if let (true, Some((kind, held))) = (kinds.is_empty(), disk.refused_keys.first_key_value()) {
+        return Err(refused(kind, held));
+    }
     if kinds.is_empty() {
         return Err(undeclared("", disk));
     }
@@ -318,6 +325,14 @@ fn provider(
                 })
         }
     }
+}
+
+/// The module already declares the key, so importing one fixes nothing.
+fn refused(kind: &str, (module, refusals): &(String, String)) -> String {
+    format!(
+        "The {module} module declares the {kind} key, and its manifest refuses it.\n\n{}",
+        refusals.trim_end()
+    )
 }
 
 /// Nothing here declares the kind: which module in the declared collections
@@ -538,10 +553,7 @@ fn install(from: &Path, to: &Path, mode: u32) -> Result<(), String> {
 fn finish(mut command: Command, tool: &str, install: &str) -> Result<(), String> {
     match command.status() {
         Ok(status) if status.success() => Ok(()),
-        Ok(status) => Err(format!(
-            "`{tool}` exited {}",
-            status.code().unwrap_or_default()
-        )),
+        Ok(status) => Err(format!("`{tool}` failed: {status}")),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Err(format!(
             "`{tool}` is not installed, and it is what generates this key: {install}"
         )),

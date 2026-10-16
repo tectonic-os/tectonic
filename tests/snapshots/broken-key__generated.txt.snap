@@ -1,5 +1,6 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
+assertion_line: 50
 ---
 ==== generated/lib/apparmor-helpers.sh
 ==== generated/lib/dkms-helpers.sh
@@ -881,6 +882,16 @@ RUN --mount=type=bind,from=ctx,source=/modules/core/keys,target=/ctx/modules/cor
     --mount=type=tmpfs,target=/tmp \
     bash /ctx/module.sh
 
+# ---- core/signer ----
+RUN --mount=type=bind,from=ctx,source=/modules/core/signer,target=/ctx/modules/core/signer \
+    --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
+    --mount=type=bind,from=ctx,source=/generated/broken-key/modules/core/signer.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
+    --mount=type=cache,target=/var/cache \
+    --mount=type=cache,target=/var/log \
+    --mount=type=tmpfs,target=/tmp \
+    bash /ctx/module.sh
+
 # ---- flavour gate ----
 ARG FLAVOUR
 
@@ -967,6 +978,13 @@ MODDIR=/ctx/modules/core/keys
 export MODDIR
 
 install -D -m 0644 -- '/ctx/keys/usr/share/secureboot/sb_cert.der' '/usr/share/secureboot/sb_cert.der'
+==== generated/broken-key/modules/core/signer.sh
+#!/usr/bin/env bash
+# GENERATED FILE, do not edit.
+set -euxo pipefail
+
+MODDIR=/ctx/modules/core/signer
+export MODDIR
 ==== generated/broken-key/finalize.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
@@ -1092,18 +1110,30 @@ right.
 graph LR
     base["quay.io/fedora/fedora-bootc:44"]
     m0["core/keys"]
+    m1["core/signer"]
 ```
 
 ## Capabilities
 
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
+| `cosign-key` | capability |  | `core/signer` |  |
 | `rechunking` | capability | `base` |  |  |
 | `secureboot-key` | file | `core/keys` |  |  |
 ==== generated/broken-key/graph.json
 {
   "image": "broken-key",
   "capabilities": [
+    {
+      "name": "cosign-key",
+      "kind": "capability",
+      "build_only": false,
+      "provider": null,
+      "required_by": [
+        "core/signer"
+      ],
+      "after": []
+    },
     {
       "name": "rechunking",
       "kind": "capability",

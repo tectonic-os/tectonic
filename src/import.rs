@@ -299,24 +299,20 @@ pub(crate) fn tree(root: &Path, collection: &Collection) -> Result<PathBuf, Stri
 
     std::fs::create_dir_all(&cache).map_err(|err| format!("{}: {err}", cache.display()))?;
     let work = cache.join(format!(".{key}.fetching.{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&work);
-    let fetched = fetch_git(remote, &work);
-    if let Err(err) = fetched {
-        let _ = std::fs::remove_dir_all(&work);
-        return Err(format!("`{}`: {err}", collection.name));
-    }
-    let fetched = work.join("tree");
-    let _ = std::fs::remove_dir_all(&dir);
+    crate::init::remove(&work)?;
+    let work = crate::init::Scratch(work);
+    fetch_git(remote, &work.0).map_err(|err| format!("`{}`: {err}", collection.name))?;
+    crate::init::remove(&dir)?;
+    let fetched = work.0.join("tree");
     std::fs::rename(&fetched, &dir).map_err(|err| format!("{}: {err}", dir.display()))?;
-    let _ = std::fs::remove_dir_all(&work);
     match &remote.sha256 {
         Some(sha256) => {
             crate::init::put(&pin, &format!("{sha256}\n"))?;
-            let _ = std::fs::remove_file(&run);
+            crate::init::remove(&run)?;
         }
         None => {
             crate::init::put(&run, &format!("{this_run}\n"))?;
-            let _ = std::fs::remove_file(&pin);
+            crate::init::remove(&pin)?;
         }
     }
     Ok(dir)
@@ -324,7 +320,7 @@ pub(crate) fn tree(root: &Path, collection: &Collection) -> Result<PathBuf, Stri
 
 fn source_key(remote: &crate::provenance::Evidence) -> Result<String, String> {
     let url = remote.url.as_deref().ok_or("source has no Git URL")?;
-    let selector = remote.version.as_deref().unwrap_or("HEAD");
+    let selector = remote.selector();
     cache_key(url, selector)
 }
 
@@ -368,7 +364,7 @@ fn git_ok(repo: &Path, args: &[&str]) -> Result<std::process::Output, String> {
 
 fn fetch_git(remote: &crate::provenance::Evidence, work: &Path) -> Result<(), String> {
     let url = remote.url.as_deref().ok_or("source has no Git URL")?;
-    let selector = remote.version.as_deref().unwrap_or("HEAD");
+    let selector = remote.selector();
     // `git archive` resolves a relative `--output` under the bare repository it
     // runs in, so every path here has to be absolute first.
     let work = {
@@ -412,8 +408,7 @@ fn fetch_git(remote: &crate::provenance::Evidence, work: &Path) -> Result<(), St
         let got = crate::runtime::sha256_file(&archive)?;
         if &got != expected {
             return Err(format!(
-                "{} at {selector}\n  expected sha256 {expected}\n  got      sha256 {got}",
-                url
+                "{url} at {selector}\n  expected sha256 {expected}\n  got      sha256 {got}"
             ));
         }
     }
@@ -793,7 +788,7 @@ impl Module {
                 // not the repository's and no line is drawn for it.
                 Place::Reference => {
                     let dir = root.join(&member.dest);
-                    let _ = std::fs::remove_dir_all(&dir);
+                    crate::init::remove(&dir)?;
                     crate::init::copy_tree(&member.from.dir, &dir)?;
                 }
                 Place::Vendored => wrote.extend(

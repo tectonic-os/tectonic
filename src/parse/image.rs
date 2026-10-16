@@ -635,11 +635,9 @@ impl Image {
                     for inner in kids(node) {
                         match inner.name().value() {
                             "module" => {
-                                if let Some(entry) =
-                                    self.parse_entry(inner, Some(name.clone()), None, issues)
-                                {
-                                    self.entries.push(entry);
-                                }
+                                let entry =
+                                    self.parse_entry(inner, Some(name.clone()), None, issues);
+                                self.entries.extend(entry);
                             }
                             "source" => self.parse_source(inner, Some(name.clone()), issues),
                             _ => {}

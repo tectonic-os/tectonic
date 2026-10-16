@@ -31,10 +31,10 @@ pub struct Say {
 
 impl Say {
     /// Nothing to say: the shape allows it, or allows it silently.
-    pub const NONE: Say = Say::new("", "", "");
+    pub const NONE: Self = Self::new("", "", "");
 
-    pub const fn new(text: &'static str, label: &'static str, help: &'static str) -> Say {
-        Say { text, label, help }
+    pub const fn new(text: &'static str, label: &'static str, help: &'static str) -> Self {
+        Self { text, label, help }
     }
 
     const fn silent(&self) -> bool {
@@ -116,7 +116,7 @@ pub struct Node {
     pub props: &'static [Prop],
     /// A property not in `props`.
     pub prop_say: Say,
-    pub children: &'static [Node],
+    pub children: &'static [Self],
     /// A child not in `children`.
     pub child_say: Say,
     /// Behaviour the schema reference states after its tables, one sentence
@@ -145,8 +145,8 @@ pub struct Node {
 }
 
 impl Node {
-    pub const fn new(name: &'static str, desc: &'static str) -> Node {
-        Node {
+    pub const fn new(name: &'static str, desc: &'static str) -> Self {
+        Self {
             name,
             desc,
             about: "",
@@ -171,38 +171,38 @@ impl Node {
         }
     }
 
-    pub const fn scaffolds(mut self, names: &'static [&'static str]) -> Node {
+    pub const fn scaffolds(mut self, names: &'static [&'static str]) -> Self {
         self.scaffolds = names;
         self
     }
 
-    pub const fn about(mut self, about: &'static str) -> Node {
+    pub const fn about(mut self, about: &'static str) -> Self {
         self.about = about;
         self
     }
 
-    pub const fn example(mut self, example: &'static str) -> Node {
+    pub const fn example(mut self, example: &'static str) -> Self {
         self.example = example;
         self
     }
 
-    pub const fn minimal(mut self) -> Node {
+    pub const fn minimal(mut self) -> Self {
         self.minimal = true;
         self
     }
 
-    pub const fn pick(mut self) -> Node {
+    pub const fn pick(mut self) -> Self {
         self.minimal = true;
         self.pick = true;
         self
     }
 
-    pub const fn notes(mut self, notes: &'static [&'static str]) -> Node {
+    pub const fn notes(mut self, notes: &'static [&'static str]) -> Self {
         self.notes = notes;
         self
     }
 
-    pub const fn values(mut self, values: &'static [(&'static str, &'static str)]) -> Node {
+    pub const fn values(mut self, values: &'static [(&'static str, &'static str)]) -> Self {
         self.values = values;
         self
     }
@@ -210,45 +210,45 @@ impl Node {
     pub const fn lists(
         mut self,
         lists: &'static [(&'static str, &'static [&'static str])],
-    ) -> Node {
+    ) -> Self {
         self.lists = lists;
         self
     }
 
-    pub const fn arg(mut self, arg: Arg, say: Say) -> Node {
+    pub const fn arg(mut self, arg: Arg, say: Say) -> Self {
         self.arg = arg;
         self.arg_say = say;
         self
     }
 
-    pub const fn once(mut self, help: &'static str) -> Node {
+    pub const fn once(mut self, help: &'static str) -> Self {
         self.once = true;
         self.dup_help = help;
         self
     }
 
-    pub const fn unique(mut self, say: Say) -> Node {
+    pub const fn unique(mut self, say: Say) -> Self {
         self.unique = say;
         self
     }
 
-    pub const fn missing(mut self, say: Say) -> Node {
+    pub const fn missing(mut self, say: Say) -> Self {
         self.missing = say;
         self
     }
 
-    pub const fn empty(mut self, say: Say) -> Node {
+    pub const fn empty(mut self, say: Say) -> Self {
         self.empty = say;
         self
     }
 
-    pub const fn props(mut self, props: &'static [Prop], say: Say) -> Node {
+    pub const fn props(mut self, props: &'static [Prop], say: Say) -> Self {
         self.props = props;
         self.prop_say = say;
         self
     }
 
-    pub const fn children(mut self, children: &'static [Node], say: Say) -> Node {
+    pub const fn children(mut self, children: &'static [Self], say: Say) -> Self {
         self.children = children;
         self.child_say = say;
         self
@@ -360,7 +360,7 @@ pub fn check(node: &KdlNode, schema: &Node, src: &Source, issues: &mut Issues) {
                     // A closed set is about the value, which is the thing not in it.
                     let about = match prop.kind {
                         Kind::One(_) => entry.value().as_string().unwrap_or(key),
-                        _ => key,
+                        Kind::Str | Kind::Bool | Kind::Int(..) => key,
                     };
                     prop.say.raise(about, entry.span(), src, issues);
                 }

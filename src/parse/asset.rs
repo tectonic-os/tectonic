@@ -52,8 +52,10 @@ pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Asset>
     let pin = kids(node)
         .iter()
         .find(|child| child.name().value() == "pin")
-        .map(|child| read(child, Role::Asset, src, issues))
-        .unwrap_or_else(|| Evidence::new(span));
+        .map_or_else(
+            || Evidence::new(span),
+            |child| read(child, Role::Asset, src, issues),
+        );
 
     Some(Asset { name, pin, span })
 }
