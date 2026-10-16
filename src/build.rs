@@ -36,6 +36,10 @@ pub enum Stopped {
 /// Fetches, verifies, then builds. A single-pass build replaces this process
 /// with the backend and returns only when the repository is wrong; a UKI
 /// target's two passes run to completion and return [`Stopped::Built`].
+#[expect(
+    clippy::too_many_lines,
+    reason = "each build step reads the values the steps before it resolved"
+)]
 pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
     let backend = match opts.backend.clone().or_else(|| env("BUILD_BACKEND")) {
         None => "buildah".to_string(),
@@ -128,6 +132,9 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
         .collect();
 
     let namespace = crate::registry::namespace(root);
+    if let Err(err) = &namespace {
+        eprintln!("tect: {err}; the image carries no IMAGE_REGISTRY");
+    }
 
     // Resolved here rather than emitted as an image identity ARG: a flavour may
     // declare its own, and the generated file is one per image.
@@ -274,13 +281,15 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
         }
         build_uki(
             root,
-            program,
-            &containerfile,
-            &build_args,
-            &secrets,
-            &target,
-            &tags,
-            &labels,
+            &Invocation {
+                program,
+                containerfile: &containerfile,
+                build_args: &build_args,
+                secrets: &secrets,
+                target: &target,
+                tags: &tags,
+                labels: &labels,
+            },
         )?;
         return Ok(Stopped::Built);
     }
@@ -390,21 +399,31 @@ fn scratch_tag(kind: &str, target: &str) -> String {
     format!("localhost/tect-uki-{kind}:{tag}-{}", std::process::id())
 }
 
+struct Invocation<'a> {
+    program: &'a str,
+    containerfile: &'a Path,
+    build_args: &'a [String],
+    secrets: &'a [(String, String)],
+    target: &'a str,
+    tags: &'a [String],
+    labels: &'a [String],
+}
+
 /// A UKI target builds twice: the split image, the storage digest `bootc
 /// install` will compare, and the image sealed with it. The generated tail's
 /// `ARG COMPOSEFS_DIGEST` is what carries the digest into the seal. Nothing
 /// reaches the user's tags until the sealed image's own digest, its embedded
 /// cmdline and the skeleton's validation have all passed.
-fn build_uki(
-    root: &Path,
-    program: &str,
-    containerfile: &Path,
-    build_args: &[String],
-    secrets: &[(String, String)],
-    target: &str,
-    tags: &[String],
-    labels: &[String],
-) -> Result<(), String> {
+fn build_uki(root: &Path, invocation: &Invocation) -> Result<(), String> {
+    let &Invocation {
+        program,
+        containerfile,
+        build_args,
+        secrets,
+        target,
+        tags,
+        labels,
+    } = invocation;
     // The generated file is repository-relative and `buildah` resolves it
     // under the process's own directory, which need not be the repository.
     let root = fs::canonicalize(root).map_err(|err| format!("{}: {err}", root.display()))?;
@@ -483,7 +502,7 @@ fn build_uki(
         )?;
         Ok(digest)
     })();
-    let _ = fs::remove_file(&seal_file);
+    crate::init::tidy(&seal_file);
     let digest = match sealed {
         Ok(digest) => {
             remove_image(program, &split_tag);
@@ -682,9 +701,25 @@ fn lower_hex(byte: u8) -> bool {
 }
 
 /// Best effort: the split image is scratch, and pass two has everything it
-/// needs out of it.
+/// needs out of it. An image left behind holds container storage, so the user
+/// is told which one.
 fn remove_image(program: &str, tag: &str) {
-    let _ = Command::new(program).args(["rmi", "--force", tag]).output();
+    match Command::new(program).args(["rmi", "--force", tag]).output() {
+        // A tag the failed pass never wrote is already removed.
+        Ok(out) if out.status.success() || !image_exists(program, tag) => {}
+        Ok(out) => eprintln!(
+            "tect: `{program} rmi --force {tag}` failed: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ),
+        Err(err) => eprintln!("tect: `{program} rmi --force {tag}`: {err}"),
+    }
+}
+
+fn image_exists(program: &str, tag: &str) -> bool {
+    Command::new(program)
+        .args(["image", "inspect", tag])
+        .output()
+        .is_ok_and(|out| out.status.success())
 }
 
 /// Whether the embedded cmdline carries the digest pass two sealed.

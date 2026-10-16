@@ -1,8 +1,8 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 1 module, the ungated set.
 
 | Module | Description | Options | Satisfies | Refuses |
 | --- | --- | --- | --- | --- |
-| `loose` `remote=` |  |  |  |  |
+| `loose` `remote=HEAD` |  |  |  |  |

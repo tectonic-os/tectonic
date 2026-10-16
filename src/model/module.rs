@@ -188,6 +188,10 @@ pub struct Module {
     /// Keys this module declares. Each one's `public` is a contract path,
     /// derived.
     pub keys: Vec<Key>,
+    /// The `<kind>-key` capability of every key the schema or `parse_key`
+    /// refused. The refusal is already reported, so a module that requires the
+    /// key gets no second report naming the declaring module as missing.
+    pub refused_keys: Vec<String>,
     /// Build inputs the field sets cover, so that needing a secret or a build
     /// arg does not force a module to hand-write a whole RUN block.
     pub secrets: Vec<Decl>,
@@ -245,7 +249,7 @@ pub struct Access {
 }
 
 impl Access {
-    pub const OPEN: Access = Access {
+    pub const OPEN: Self = Self {
         packages: true,
         scripts: true,
     };

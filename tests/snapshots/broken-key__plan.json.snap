@@ -1,5 +1,6 @@
 ---
 source: tests/golden/harness.rs
+assertion_line: 50
 ---
 {
   "schema_version": 1,
@@ -42,6 +43,10 @@ source: tests/golden/harness.rs
           "rechunking"
         ],
         "witnesses": {
+          "cosign-key": [
+            "/usr/bin/cosign-key",
+            "/usr/sbin/cosign-key"
+          ],
           "rechunking": [
             "/usr/bin/rechunking",
             "/usr/sbin/rechunking"
@@ -84,6 +89,32 @@ source: tests/golden/harness.rs
               "coprs": [],
               "provenance": {
                 "content": "22d8fbdd05af345e915e6e85e257e6dd0f3973a02e6e85b82550a2b57c95f5a8",
+                "repo": false,
+                "source": null,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": [],
+              "refuses": []
+            },
+            {
+              "path": "core/signer",
+              "dir": "core/signer",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Requires a key whose declaration is refused",
+              "options": {},
+              "provides": [],
+              "requires": [
+                "cosign-key"
+              ],
+              "files": {},
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "content": "c44a8a26f1b200e41b9257b3cd35d5710ab781dd28c8b818e01bfe439405d404",
                 "repo": false,
                 "source": null,
                 "pin": null,

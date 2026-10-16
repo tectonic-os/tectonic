@@ -1,5 +1,6 @@
 ---
 source: tests/golden/harness.rs
+assertion_line: 50
 ---
 {
   "schema_version": 1,
@@ -128,6 +129,30 @@ source: tests/golden/harness.rs
               "coprs": [],
               "provenance": {
                 "content": "f90e0f0f628fe28779464aedc0b53480def0bdcbe5ec3b40237bc8a99c0623dd",
+                "repo": false,
+                "source": null,
+                "pin": null,
+                "imported": null
+              },
+              "satisfies": [],
+              "refuses": []
+            },
+            {
+              "path": "core/shipper",
+              "dir": "core/shipper",
+              "flavour": null,
+              "variant": null,
+              "remote": null,
+              "description": "Ships a file whose collector is enabled but refused",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "files": {},
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "content": "86308a307e7aadc5ab9b3aa8a86bf4e82bc341e3e8eff0348898374e535fbd45",
                 "repo": false,
                 "source": null,
                 "pin": null,

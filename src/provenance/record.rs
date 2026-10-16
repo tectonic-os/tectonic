@@ -91,8 +91,10 @@ pub fn read(dir: &Path, issues: &mut Issues) -> Option<Record> {
     let pin = kids(node)
         .iter()
         .find(|n| n.name().value() == "pin")
-        .map(|n| evidence::read(n, Role::Record, &src, issues))
-        .unwrap_or_else(|| Evidence::new(node.name().span().into()));
+        .map_or_else(
+            || Evidence::new(node.name().span().into()),
+            |n| evidence::read(n, Role::Record, &src, issues),
+        );
 
     Some(Record {
         collection: string_arg(node).unwrap_or_default().to_string(),

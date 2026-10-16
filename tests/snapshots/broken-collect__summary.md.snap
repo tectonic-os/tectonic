@@ -1,10 +1,12 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
+assertion_line: 50
 ---
-3 modules, the ungated set.
+4 modules, the ungated set.
 
 | Module | Description | Options | Satisfies | Refuses |
 | --- | --- | --- | --- | --- |
 | `core/menu` | Collects a file, but declares no destination for it |  |  |  |
 | `core/absent` | Contributes a file it does not ship, twice, out of range |  |  |  |
 | `core/unclaimed` | Ships a collected filename nothing in this image collects |  |  |  |
+| `core/shipper` | Ships a file whose collector is enabled but refused |  |  |  |

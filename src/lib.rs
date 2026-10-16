@@ -257,11 +257,15 @@ pub fn run(command: Command, arg: Option<&str>, root: &Path) -> Run {
     run_loaded(command, arg, root, load(root))
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "every command reads the loaded declarations through one sequence"
+)]
 pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loaded: Loaded) -> Run {
     let (target_arg, image_arg, module_arg) = match command.arg() {
         Some(Arg::Target) => (arg, None, None),
         Some(Arg::Module) => (None, None, arg),
-        _ => (None, arg, None),
+        Some(Arg::Image) | None => (None, arg, None),
     };
     let Loaded {
         list,
@@ -288,7 +292,18 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
                 provenance::record::modified(root),
             )
         }
-        _ => (Vec::new(), Vec::new()),
+        Command::Plan
+        | Command::Generate
+        | Command::Verify
+        | Command::Section
+        | Command::Graph
+        | Command::GraphJson
+        | Command::Summary
+        | Command::Sbom
+        | Command::Why
+        | Command::WhyJson
+        | Command::Coverage
+        | Command::CoverageJson => (Vec::new(), Vec::new()),
     };
     if list.audit_enforce {
         for name in &modified {
@@ -325,11 +340,15 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
     }
     let needs_default = match command {
         Command::Summary | Command::Sbom => target_arg.is_none(),
-        Command::Graph | Command::GraphJson | Command::Section => image_arg.is_none(),
-        Command::Why | Command::WhyJson => false,
-        Command::Coverage | Command::CoverageJson => image_arg.is_none(),
+        Command::Graph
+        | Command::GraphJson
+        | Command::Section
+        | Command::Coverage
+        | Command::CoverageJson => image_arg.is_none(),
         Command::Plan => true,
-        Command::Check | Command::Generate | Command::Verify => false,
+        Command::Why | Command::WhyJson | Command::Check | Command::Generate | Command::Verify => {
+            false
+        }
     };
     if needs_default {
         if let Some(issue) = list.no_default() {
@@ -436,7 +455,18 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
                         parts = graph.parts();
                         graph.markdown()
                     }
-                    _ => graph.json().render(),
+                    Command::Plan
+                    | Command::Check
+                    | Command::Generate
+                    | Command::Verify
+                    | Command::Section
+                    | Command::GraphJson
+                    | Command::Summary
+                    | Command::Sbom
+                    | Command::Why
+                    | Command::WhyJson
+                    | Command::Coverage
+                    | Command::CoverageJson => graph.json().render(),
                 }
             }
             None => String::new(),
@@ -457,7 +487,18 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
                             parts = why.parts(true);
                             why.markdown()
                         }
-                        _ => why.json().render(),
+                        Command::Plan
+                        | Command::Check
+                        | Command::Generate
+                        | Command::Verify
+                        | Command::Section
+                        | Command::Graph
+                        | Command::GraphJson
+                        | Command::Summary
+                        | Command::Sbom
+                        | Command::WhyJson
+                        | Command::Coverage
+                        | Command::CoverageJson => why.json().render(),
                     },
                     // Listed, but its manifest never loaded — which is already
                     // an issue above. A module that was not read has nothing

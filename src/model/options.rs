@@ -18,14 +18,14 @@ impl Value {
     pub fn as_string(&self) -> Option<&str> {
         match self {
             Self::String(s) => Some(s),
-            _ => None,
+            Self::Bool(_) | Self::Integer(_) | Self::Float(_) | Self::Null => None,
         }
     }
 
     pub fn as_bool(&self) -> Option<bool> {
         match self {
             Self::Bool(b) => Some(*b),
-            _ => None,
+            Self::String(_) | Self::Integer(_) | Self::Float(_) | Self::Null => None,
         }
     }
 }

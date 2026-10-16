@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
   x `collects` needs into=, where the build puts them
    ,-[tests/repos/broken-collect/modules/core/menu/module.kdl:7:1]
@@ -23,17 +23,6 @@ source: tests/golden.rs
         whole range there is
 
   x `core/absent` orders a justfile.inc it does not ship
-   ,-[tests/repos/broken-collect/modules/core/absent/module.kdl:7:1]
- 6 | 
- 7 | contributes "justfile.inc" priority=90000
-   : ^^^^^|^^^^^
-   :      `-- nothing to order
- 8 | contributes "justfile.inc" priority=100
-   `----
-  help: shipping the file is what contributes it; this node only says where it
-        lands
-
-  x `core/absent` orders a justfile.inc it does not ship
    ,-[tests/repos/broken-collect/modules/core/absent/module.kdl:8:1]
  7 | contributes "justfile.inc" priority=90000
  8 | contributes "justfile.inc" priority=100
@@ -42,3 +31,7 @@ source: tests/golden.rs
    `----
   help: shipping the file is what contributes it; this node only says where it
         lands
+
+  x `core/unclaimed` ships a flatpaks.list but nothing enabled collects it
+  help: `core/flatpaks` collects it; add it to this image, or drop the
+        flatpaks.list

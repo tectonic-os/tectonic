@@ -1,4 +1,9 @@
-use std::path::{Path, PathBuf};
+#![expect(
+    clippy::unwrap_used,
+    reason = "a test helper panics on a failed step, which fails the calling test"
+)]
+
+use std::path::PathBuf;
 use tect::diag::{Issues, Span};
 use tect::model::remote::{At, Collection, Kind as SourceKind};
 
@@ -329,13 +334,15 @@ fn create_image_surfaces_an_unreadable_base_file() {
 
     // When: image collection reads the declared catalog.
     let error = tect::create::Image::collect(
-        &root,
+        tect::create::Home {
+            root: &root,
+            repo: "Example",
+            url: None,
+            sources_text: "",
+        },
         Some("Example".to_string()),
         Some("example.invalid/base:1".to_string()),
-        "Example",
-        None,
         "a name argument",
-        "",
         tect::create::Field::Image,
         None,
         &common::prompt::Prompt::silent(),
@@ -383,4 +390,45 @@ fn one_name_leaves_the_family_it_coerces() {
     assert_eq!(base.requires, ["bootc-base"]);
     assert_eq!(base.bootloaders, ["grub2", "systemd"]);
     assert!(!base.signed);
+}
+
+/// Which row wins would otherwise depend on the order `repo.kdl` lists the
+/// sources in, so only a row that differs is reported.
+#[test]
+fn a_capability_two_libraries_describe_differently_is_reported() {
+    let library = Library::new("two-capabilities");
+    let source = |name: &str, path: &str| {
+        std::fs::write(
+            library.at(name).join("capabilities.kdl"),
+            format!("capability \"ssh\" {{\n    path \"{path}\"\n}}\n"),
+        )
+        .unwrap();
+        Collection {
+            kind: SourceKind::Capabilities,
+            name: name.to_string(),
+            at: At::Dir(format!("library/{name}")),
+            span: Span::default(),
+        }
+    };
+    let same = source("same", "/usr/sbin/sshd");
+    let other = source("other", "/usr/bin/ssh");
+
+    let mut issues = Issues::default();
+    tect::base::capabilities(
+        &library.root,
+        &[source("core", "/usr/sbin/sshd"), same],
+        &mut issues,
+    );
+    assert!(issues.is_empty(), "{}", issues.plain());
+
+    tect::base::capabilities(
+        &library.root,
+        &[source("core", "/usr/sbin/sshd"), other],
+        &mut issues,
+    );
+    let said = flat(&issues.plain());
+    assert!(
+        said.contains("capability `ssh` is described by two libraries"),
+        "{said}"
+    );
 }

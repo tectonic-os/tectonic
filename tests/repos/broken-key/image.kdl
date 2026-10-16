@@ -10,5 +10,6 @@ image {
 
     modules {
         module "core/keys"
+        module "core/signer"
     }
 }

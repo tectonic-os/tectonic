@@ -571,6 +571,10 @@ fn flow_case(flow: &Flow) {
         "flow-key-kinds" => setup_key_kinds(flow),
         "flow-key-undeclared" => setup_key_undeclared(flow),
         "flow-key-no-kind" => setup_key_no_kind(flow),
+        "flow-key-refused" => {
+            setup_key_refused(flow, &["--root", ".", "create", "key", "secureboot"])
+        }
+        "flow-key-refused-no-kind" => setup_key_refused(flow, &["--root", ".", "create", "key"]),
         target => panic!("no flow case for {target}"),
     }
 }
@@ -1705,13 +1709,15 @@ fn setup_import_edit_guards(flow: &Flow) {
     let (list, issues, _) = tect::declarations(&root);
     assert!(issues.is_empty(), "{}", issues.plain());
     let declined = tect::import::Module::collect(
-        Some("upstream/flatpak".into()),
+        tect::import::Request {
+            name: Some("upstream/flatpak".into()),
+            images: Vec::new(),
+            datastream: None,
+            place: tect::import::Place::Reference,
+            dependencies: false,
+        },
         &root,
         &list.sources,
-        false,
-        Vec::new(),
-        None,
-        tect::import::Place::Reference,
         false,
         &common::prompt::Prompt::silent(),
     )
@@ -1721,13 +1727,15 @@ fn setup_import_edit_guards(flow: &Flow) {
     assert!(declined.contains("--image"), "{declined}");
 
     tect::import::Module::collect(
-        Some("upstream/flatpak".into()),
+        tect::import::Request {
+            name: Some("upstream/flatpak".into()),
+            images: vec!["example".into()],
+            datastream: None,
+            place: tect::import::Place::Reference,
+            dependencies: false,
+        },
         &root,
         &list.sources,
-        false,
-        vec!["example".into()],
-        None,
-        tect::import::Place::Reference,
         false,
         &common::prompt::Prompt::silent(),
     )
@@ -1742,13 +1750,15 @@ fn setup_import_edit_guards(flow: &Flow) {
     // file. A module gated to two flavours is listed under each, so only an
     // overlap is one.
     let twice = tect::import::Module::collect(
-        Some("upstream/flatpak".into()),
+        tect::import::Request {
+            name: Some("upstream/flatpak".into()),
+            images: vec!["example".into()],
+            datastream: None,
+            place: tect::import::Place::Reference,
+            dependencies: false,
+        },
         &root,
         &list.sources,
-        false,
-        vec!["example".into()],
-        None,
-        tect::import::Place::Reference,
         false,
         &common::prompt::Prompt::silent(),
     )
@@ -2077,6 +2087,20 @@ fn setup_key_undeclared(flow: &Flow) {
     );
 }
 
+/// A local module declares the key with a size the schema refuses. The
+/// module is already in the repository, so importing it fixes nothing.
+fn setup_key_refused(flow: &Flow, args: &[&str]) {
+    let target = flow.target;
+    let root = flow.repo("flow-key");
+    std::fs::create_dir_all(root.join("modules/signed-kernel")).unwrap();
+    std::fs::write(
+        root.join("modules/signed-kernel/module.kdl"),
+        KEYHOLDER.replace("bits=4096", "bits=1024"),
+    )
+    .unwrap();
+    flow.run(target, &root, None, args);
+}
+
 /// Runs with no kind named and nothing to prompt from.
 fn setup_key_no_kind(flow: &Flow) {
     let target = flow.target;
@@ -2152,6 +2176,8 @@ flow_cases! {
     flow_key_absent => "flow-key-absent",
     flow_key_kinds => "flow-key-kinds",
     flow_key_no_kind => "flow-key-no-kind",
+    flow_key_refused => "flow-key-refused",
+    flow_key_refused_no_kind => "flow-key-refused-no-kind",
     flow_key_undeclared => "flow-key-undeclared",
     flow_module_in_flavour => "flow-module-in-flavour",
     flow_module_taken => "flow-module-taken",

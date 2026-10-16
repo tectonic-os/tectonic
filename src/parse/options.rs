@@ -106,9 +106,7 @@ pub fn parse_option(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option
     // The grammar reports an absent or unknown `type=` and an absent `default`.
     let ty = prop(node, "type").and_then(OptType::parse)?;
 
-    let Some(default) = child(node, "default").map(args) else {
-        return None;
-    };
+    let default = child(node, "default").map(args)?;
 
     check_values(&name, ty, &default, src, node.name().span().into(), issues);
 

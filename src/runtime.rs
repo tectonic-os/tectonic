@@ -210,27 +210,23 @@ pub fn fetch(args: &[&str]) -> Result<(), String> {
         ("bin", [name]) => install_bin(url, sha256, name, name),
         ("bin", [name, inner]) => install_bin(url, sha256, name, inner),
         ("rpm", []) => {
-            let rpm = scratch(url);
-            verified(url, Some(sha256), &rpm)?;
-            let status = run("dnf", &["install", "-y", &rpm.to_string_lossy()])?;
-            let _ = fs::remove_file(&rpm);
-            status
+            let rpm = crate::init::Scratch(scratch(url));
+            verified(url, Some(sha256), &rpm.0)?;
+            run("dnf", &["install", "-y", &rpm.0.to_string_lossy()])?
         }
         ("deb", []) => {
-            let deb = scratch(url);
-            verified(url, Some(sha256), &deb)?;
+            let deb = crate::init::Scratch(scratch(url));
+            verified(url, Some(sha256), &deb.0)?;
             // apt over dpkg, so the package's dependencies are resolved.
-            let status = run(
+            run(
                 "apt-get",
                 &[
                     "install",
                     "-y",
                     "--no-install-recommends",
-                    &deb.to_string_lossy(),
+                    &deb.0.to_string_lossy(),
                 ],
-            )?;
-            let _ = fs::remove_file(&deb);
-            status
+            )?
         }
         _ => Err(FETCH_USAGE.to_string()),
     }
@@ -281,7 +277,7 @@ fn verified(url: &str, sha256: Option<&str>, dest: &Path) -> Result<(), String> 
     };
     let got = sha256_file(dest)?;
     if got != sha256.to_lowercase() {
-        let _ = fs::remove_file(dest);
+        crate::init::tidy(dest);
         return Err(format!(
             "{url}\n  expected sha256 {sha256}\n  got      sha256 {got}"
         ));
@@ -295,8 +291,9 @@ pub(crate) fn extract(
     dir: &Path,
     extra: &[&str],
 ) -> Result<(), String> {
-    let archive = scratch(url);
-    verified(url, sha256, &archive)?;
+    let archive = crate::init::Scratch(scratch(url));
+    let archive = &archive.0;
+    verified(url, sha256, archive)?;
     fs::create_dir_all(dir).map_err(|err| format!("{}: {err}", dir.display()))?;
 
     let path = archive.to_string_lossy().into_owned();
@@ -313,26 +310,26 @@ pub(crate) fn extract(
     };
     args.extend_from_slice(extra);
 
-    let status = run(program, &args)?;
-    let _ = fs::remove_file(&archive);
-    status
+    run(program, &args)?
 }
 
 fn install_bin(url: &str, sha256: &str, name: &str, inner: &str) -> Result<(), String> {
     let dest = PathBuf::from("/usr/bin").join(name);
-    let tmp = PathBuf::from(format!("/tmp/fetch-bin.{}.{name}", std::process::id()));
+    let tmp = crate::init::Scratch(PathBuf::from(format!(
+        "/tmp/fetch-bin.{}.{name}",
+        std::process::id()
+    )));
+    let tmp = &tmp.0;
 
     if [".zip", ".tar.gz", ".tgz", ".tar.xz", ".tar.zst"]
         .iter()
         .any(|ext| url.ends_with(ext))
     {
-        extract(url, Some(sha256), &tmp, &[])?;
+        extract(url, Some(sha256), tmp, &[])?;
         install(&tmp.join(inner), &dest)?;
-        let _ = fs::remove_dir_all(&tmp);
     } else {
-        verified(url, Some(sha256), &tmp)?;
-        install(&tmp, &dest)?;
-        let _ = fs::remove_file(&tmp);
+        verified(url, Some(sha256), tmp)?;
+        install(tmp, &dest)?;
     }
     Ok(())
 }
@@ -424,9 +421,10 @@ fn kernel_version() -> Option<String> {
     match env("FAMILY").as_deref() {
         Some("debian" | "ubuntu") => modules_dir(),
         _ => {
-            let package = fs::read_to_string("/usr/lib/kernel-build/kernel-package")
-                .map(|text| text.trim().to_string())
-                .unwrap_or_else(|_| "kernel-core".to_string());
+            let package = fs::read_to_string("/usr/lib/kernel-build/kernel-package").map_or_else(
+                |_| "kernel-core".to_string(),
+                |text| text.trim().to_string(),
+            );
             match output(
                 "rpm",
                 &["-q", "--qf", "%{VERSION}-%{RELEASE}.%{ARCH}", &package],
@@ -516,21 +514,19 @@ fn output(program: &str, args: &[&str]) -> Result<(bool, String), String> {
 /// Naming no output would make `objcopy` rewrite the UKI in place and
 /// invalidate the signature this same check verifies.
 fn section_bytes(uki: &str, name: &str) -> Option<Vec<u8>> {
-    let at = std::env::temp_dir().join(format!("tect-{name}"));
+    let at = crate::init::Scratch(std::env::temp_dir().join(format!("tect-{name}")));
+    let at = &at.0;
     let out = Command::new("objcopy")
         .args(["-O", "binary", "--only-section", name])
         .arg(uki)
-        .arg(&at)
+        .arg(at)
         .stdin(Stdio::null())
         .output()
         .ok()?;
     if !out.status.success() {
-        let _ = fs::remove_file(&at);
         return None;
     }
-    let bytes = fs::read(&at).ok();
-    let _ = fs::remove_file(&at);
-    bytes
+    fs::read(at).ok()
 }
 
 fn signed_by(path: &Path, cert: &str, report: &mut Report) {
@@ -666,6 +662,10 @@ fn validate_boot_chain(report: &mut Report) {
 const SIGNED_MARKER: &str = "/usr/share/secureboot/signed";
 const PCR_POLICY: &str = "/usr/share/secureboot/pcr-policy.pem";
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "the checks run and print in the order the build log shows them"
+)]
 pub fn validate_image() -> Result<(), String> {
     let mut report = Report { failures: 0 };
 

@@ -77,7 +77,7 @@ impl Tracker {
     pub fn reason(&self) -> Option<String> {
         match self {
             Self::Manual(why) | Self::Unpinned(why) => Some(why.clone()),
-            _ => None,
+            Self::Renovate { .. } | Self::None => None,
         }
     }
 }
@@ -98,7 +98,7 @@ pub struct Evidence {
 
 impl Evidence {
     pub fn new(span: Span) -> Self {
-        Evidence {
+        Self {
             url: None,
             version: None,
             sha256: None,
@@ -116,6 +116,11 @@ impl Evidence {
             Some(version) => url.replace("{version}", version),
             None => url.clone(),
         })
+    }
+
+    /// A collection that names no version follows the remote's `HEAD`.
+    pub fn selector(&self) -> &str {
+        self.version.as_deref().unwrap_or("HEAD")
     }
 
     /// Whether the content is a git clone, which is what makes the commit the

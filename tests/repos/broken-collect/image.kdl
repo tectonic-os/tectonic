@@ -12,5 +12,6 @@ image {
         module "core/menu"
         module "core/absent"
         module "core/unclaimed"
+        module "core/shipper"
     }
 }

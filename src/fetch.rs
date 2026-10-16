@@ -59,31 +59,33 @@ pub fn modules(root: &Path, list: &List) -> Result<Vec<String>, String> {
             continue;
         }
 
+        // A stamp left beside a tree that a failed copy cut short would say
+        // the partial tree is current, so it goes before the copy starts.
+        crate::init::remove(&stamp)?;
         let mut tmp = None;
         let source = match &pin.from {
             From::Collection { dir, .. } => dir.clone(),
             From::Archive { url, sha256, path } => {
                 let work = layout::out(root).join(format!("fetch-module.{}", std::process::id()));
-                let _ = fs::remove_dir_all(&work);
-                crate::runtime::extract(url, sha256.as_deref(), &work, &["--strip-components=1"])?;
-                let source = match path.is_empty() {
-                    true => work.clone(),
-                    false => work.join(path),
-                };
-                tmp = Some(work);
-                source
+                crate::init::remove(&work)?;
+                let work = tmp.insert(crate::init::Scratch(work));
+                crate::runtime::extract(
+                    url,
+                    sha256.as_deref(),
+                    &work.0,
+                    &["--strip-components=1"],
+                )?;
+                match path.is_empty() {
+                    true => work.0.clone(),
+                    false => work.0.join(path),
+                }
             }
         };
-        let placed = place(&source, &dir, pin);
-        if let Some(tmp) = tmp {
-            let _ = fs::remove_dir_all(tmp);
-        }
-        placed?;
+        place(&source, &dir, pin)?;
+        drop(tmp);
 
         if let Some(stamped) = pin.stamped() {
             crate::init::put(&stamp, &format!("{stamped}\n"))?;
-        } else {
-            let _ = fs::remove_file(&stamp);
         }
         said.push(match &pin.from {
             From::Collection { verified: None, .. } => {
@@ -130,7 +132,7 @@ fn place(source: &Path, dir: &Path, pin: &Pin) -> Result<(), String> {
             }
         ));
     }
-    let _ = fs::remove_dir_all(dir);
+    crate::init::remove(dir)?;
     crate::init::copy_tree(source, dir).map(drop)
 }
 
@@ -162,10 +164,9 @@ fn pins(root: &Path, list: &List) -> Result<Vec<Pin>, String> {
                         };
                         let (git_ref, verified) = match &collection.at {
                             At::Dir(_) => ("local".into(), None),
-                            At::Git(remote) => (
-                                remote.version.clone().unwrap_or_default(),
-                                Some(!remote.unpinned()),
-                            ),
+                            At::Git(remote) => {
+                                (remote.selector().to_string(), Some(!remote.unpinned()))
+                            }
                         };
                         let stamp = collection.pin().and_then(|remote| {
                             remote.sha256.as_ref().map(|sha256| {

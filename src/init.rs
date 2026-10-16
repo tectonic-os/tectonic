@@ -196,6 +196,38 @@ pub fn write(
     Ok(wrote)
 }
 
+/// Removes a file or a tree. An absent path is already removed.
+pub(crate) fn remove(path: &Path) -> Result<(), String> {
+    let removed = match fs::symlink_metadata(path) {
+        Ok(meta) if meta.is_dir() => fs::remove_dir_all(path),
+        Ok(_) => fs::remove_file(path),
+        Err(err) => Err(err),
+    };
+    match removed {
+        Err(err) if err.kind() != std::io::ErrorKind::NotFound => {
+            Err(format!("{}: {err}", path.display()))
+        }
+        Ok(()) | Err(_) => Ok(()),
+    }
+}
+
+/// Removes a path the command no longer needs. A path that stays is named to
+/// the user, because it can hold a private key or a partial download.
+pub(crate) fn tidy(path: &Path) {
+    if let Err(err) = remove(path) {
+        eprintln!("tect: {err}; remove it by hand");
+    }
+}
+
+/// A path that `tidy` removes however the command ends, early returns included.
+pub(crate) struct Scratch(pub(crate) PathBuf);
+
+impl Drop for Scratch {
+    fn drop(&mut self) {
+        tidy(&self.0);
+    }
+}
+
 pub(crate) fn put(path: &Path, text: &str) -> Result<(), String> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir).map_err(|err| format!("{}: {err}", dir.display()))?;
@@ -241,6 +273,43 @@ fn copy_below(from: &Path, to: &Path, under: &Path, skip: &[&str]) -> Result<Vec
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_absent_path_is_already_removed() {
+        let at = std::env::temp_dir().join(format!("tect-absent-{}", std::process::id()));
+        assert_eq!(remove(&at), Ok(()));
+    }
+
+    /// A directory the user cannot write keeps its entries, which is the
+    /// leftover the calling command has to hear about.
+    #[test]
+    fn a_removal_that_fails_names_the_path() {
+        use std::os::unix::fs::PermissionsExt as _;
+        // Root ignores the directory mode, so the failure cannot be forced as
+        // root.
+        // SAFETY: geteuid takes no argument and always succeeds.
+        if unsafe { libc::geteuid() } == 0 {
+            return;
+        }
+        let root = std::env::temp_dir().join(format!("tect-held-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let file = root.join("private.key");
+        put(&file, "secret").unwrap();
+        fs::set_permissions(&root, fs::Permissions::from_mode(0o500)).unwrap();
+        let said = remove(&file);
+        fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
+        let _ = fs::remove_dir_all(&root);
+        let said = said.expect_err("a read-only directory keeps its file");
+        assert!(said.contains("private.key"), "{said}");
+    }
+
+    #[test]
+    fn a_scratch_tree_is_gone_once_its_guard_drops() {
+        let root = std::env::temp_dir().join(format!("tect-scratch-{}", std::process::id()));
+        put(&root.join("inner/private.key"), "secret").unwrap();
+        drop(Scratch(root.clone()));
+        assert!(!root.exists());
+    }
 
     /// The table is what `create repo` copies, and a copy edited since is said.
     #[test]

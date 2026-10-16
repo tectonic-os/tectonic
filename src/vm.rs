@@ -80,6 +80,8 @@ pub fn run(
 /// Where the media is assembled, which is also where the disk it writes lands.
 const BOOTISO: &str = "out/bootiso";
 
+type Documents = Vec<(&'static str, String)>;
+
 /// The build context `vm.sh` hands `podman build`, and the recipe tacklebox
 /// assembles the media from. Neither is a `generate` output: both depend on
 /// `--target`, `--tag` and `$IMAGE_REGISTRY`, which are build-time.
@@ -88,7 +90,7 @@ fn documents(
     name: &str,
     image: &str,
     imgref: &str,
-) -> Result<Vec<(&'static str, String)>, String> {
+) -> Result<Documents, String> {
     use crate::emit::recipe;
     // `targetImgref` is the installed machine's update origin, so a medium
     // built against a local namespace would write `localhost/...` into a
@@ -148,7 +150,7 @@ fn staged_list(root: &Path) -> crate::model::image::List {
 
 /// The documents a staged medium carries, and the live environment its image
 /// builds. The writes are separate so a test runs the same read the media does.
-fn staged(root: &Path, opts: &Options) -> Result<(String, Vec<(&'static str, String)>), String> {
+fn staged(root: &Path, opts: &Options) -> Result<(String, Documents), String> {
     let list = staged_list(root);
     let target = target(&list, opts)
         .ok_or("no target to build an installer iso for; name one with `--target`")?;
