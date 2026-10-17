@@ -241,9 +241,8 @@ pub const REPO: Node = Node::new("repo",
             .children(&[
                 Node::new("enforce", "Whether a failed provenance check stops the command that runs it.").example("#true")
                     .arg(Arg::Bool, Say::new("`enforce` needs #true or #false", "not a boolean",
-                        "`enforce #true` makes an unverified import, a module edited since \
-                         import, a base that will not resolve and an unstamped build into \
-                         errors"))
+                        "`enforce #true` makes each failed provenance check an error, and \
+                         the `repo.kdl` reference lists the checks"))
                     .once("")
                     .values(&[
                         ("`#true`", "A failed check is an error, and the command stops."),
@@ -254,9 +253,11 @@ pub const REPO: Node = Node::new("repo",
                         ("Each check runs in the command named before it:", &[
                             "`tect import module` and `tect copy module`: the collection is \
                              pinned to a tag and its hash.",
-                            "`tect check`: each imported module still matches its import record.",
+                            "`tect check`: each copied module still matches the record it was \
+                             copied with.",
                             "`tect build`: the base tag resolves to a manifest digest.",
                             "`tect build`: the repository is at a commit.",
+                            "`tect build`: each cloned asset resolves to a commit.",
                             "`tect scap`: the scan report passes every rule of the profile.",
                         ]),
                     ])

@@ -509,9 +509,10 @@ Accepts: *boolean*
 Each check runs in the command named before it:
 
 - `tect import module` and `tect copy module`: the collection is pinned to a tag and its hash.
-- `tect check`: each imported module still matches its import record.
+- `tect check`: each copied module still matches the record it was copied with.
 - `tect build`: the base tag resolves to a manifest digest.
 - `tect build`: the repository is at a commit.
+- `tect build`: each cloned asset resolves to a commit.
 - `tect scap`: the scan report passes every rule of the profile.
 
 | Value | Effect |

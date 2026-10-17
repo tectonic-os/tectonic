@@ -405,12 +405,7 @@ fn fetch_git(remote: &crate::provenance::Evidence, work: &Path) -> Result<(), St
         ],
     )?;
     if let Some(expected) = &remote.sha256 {
-        let got = crate::runtime::sha256_file(&archive)?;
-        if &got != expected {
-            return Err(format!(
-                "{url} at {selector}\n  expected sha256 {expected}\n  got      sha256 {got}"
-            ));
-        }
+        crate::runtime::match_sha256(&archive, expected, &format!("{url} at {selector}"))?;
     }
     std::fs::create_dir_all(&tree).map_err(|err| format!("{}: {err}", tree.display()))?;
     let out = std::process::Command::new("tar")

@@ -1,6 +1,5 @@
 ---
 source: tests/golden/harness.rs
-assertion_line: 50
 ---
 ==== generated/lib/apparmor-helpers.sh
 ==== generated/lib/dkms-helpers.sh
@@ -656,6 +655,25 @@ build_iso() {
     # building the live environment as root is what puts both images there
     # without a second copy. `load_rootful` brings the payload across.
     load_rootful
+
+    # The installer compares the payload with this ID before it writes a disk.
+    # tacklebox copies the payload out of root's store as OCI. Converting a
+    # Docker-format image rewrites its config, which the ID hashes, so the
+    # payload becomes OCI here and tacklebox's copy keeps the ID.
+    local manifest image_id
+    manifest="$(sudoif podman image inspect --format '{{.ManifestType}}' "$ref")" \
+        || die "cannot read the manifest type of ${ref} from root's store"
+    if [ "$manifest" != "application/vnd.oci.image.manifest.v1+json" ]; then
+        sudoif skopeo copy --quiet --format oci \
+            "containers-storage:${ref}" "containers-storage:${ref}" \
+            || die "cannot store ${ref} as OCI in root's store"
+    fi
+    image_id="$(sudoif podman image inspect --format '{{.Id}}' "$ref")" \
+        || die "cannot read the image ID of ${ref} from root's store"
+    if ! [[ "$image_id" =~ ^[0-9a-f]{64}$ ]]; then
+        die "podman named no image ID for ${ref}: ${image_id}"
+    fi
+    printf '%s\n' "$image_id" > "${staged}/image-id"
 
     # Written beside the media and moved onto it last, so a failed build leaves
     # the iso that was already there.

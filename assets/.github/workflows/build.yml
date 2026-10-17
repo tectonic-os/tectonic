@@ -634,22 +634,15 @@ jobs:
         if: env.PUBLISH == 'true'
         env:
           SOURCE_TAG: ${{ steps.rechunk.outputs.tag || 'raw' }}
+        # The image lands under `unverified` alone. The published tags follow
+        # its verification. Signing addresses the digest, so a concurrent run
+        # that moves `unverified` does not change what this run signs.
         run: |
-          digest=""
-          while IFS= read -r tag; do
-            [ -n "$tag" ] || continue
-            if [ -z "$digest" ]; then
-              sudo skopeo copy --retry-times 5 \
-                "containers-storage:localhost/${IMAGE_NAME}:${SOURCE_TAG}" \
-                "docker://${tag}" --digestfile "${RUNNER_TEMP}/digestfile"
-              digest="$(cat "${RUNNER_TEMP}/digestfile")"
-            else
-              sudo skopeo copy --retry-times 5 \
-                "docker://${IMAGE_REGISTRY}/${IMAGE_NAME}@${digest}" \
-                "docker://${tag}"
-            fi
-          done <<< "${{ steps.metadata.outputs.tags }}"
-          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+          sudo skopeo copy --retry-times 5 \
+            "containers-storage:localhost/${IMAGE_NAME}:${SOURCE_TAG}" \
+            "docker://${IMAGE_REGISTRY}/${IMAGE_NAME}:unverified" \
+            --digestfile "${RUNNER_TEMP}/digestfile"
+          echo "digest=$(cat "${RUNNER_TEMP}/digestfile")" >> "$GITHUB_OUTPUT"
 
       - name: Report disk usage
         if: env.PUBLISH == 'true'
@@ -712,6 +705,16 @@ jobs:
             "${IMAGE_DIGEST}" > /dev/null
           cosign verify-attestation --key "$key" --type spdxjson \
             --insecure-ignore-tlog=true "${IMAGE_DIGEST}" > /dev/null
+
+      - name: Publish the verified tags
+        if: env.PUBLISH == 'true'
+        run: |
+          while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            sudo skopeo copy --retry-times 5 \
+              "docker://${IMAGE_REGISTRY}/${IMAGE_NAME}@${{ steps.push.outputs.digest }}" \
+              "docker://${tag}"
+          done <<< "${{ steps.metadata.outputs.tags }}"
 
 
   scan:
