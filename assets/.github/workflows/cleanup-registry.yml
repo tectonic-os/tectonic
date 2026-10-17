@@ -60,11 +60,15 @@ jobs:
           for pkg in "${packages[@]}"; do
             echo "== ${pkg}"
             versions="$(list_versions "${pkg}")" || continue
+            # A version tagged `unverified` alone failed its verification or is
+            # still being signed. It holds no kept slot, and it is deleted once
+            # the next push leaves it untagged.
             deletions="$(printf '%s' "${versions}" | jq -s 'add' | jq -r --argjson keep "${KEEP}" '
               def is_sig: test("^sha256-[0-9a-f]{64}\\.(sig|att)$");
               map({id, name, created_at, tags: .metadata.container.tags})
               | map(. + {kind: (if (.tags | length) == 0 then "untagged"
                                 elif (.tags | all(is_sig)) then "sig"
+                                elif .tags == ["unverified"] then "unverified"
                                 else "image" end)})
               | (map(select(.kind == "image")) | sort_by(.created_at) | reverse) as $images
               | (($images[:$keep] + ($images | map(select(.tags | index("latest"))))) | unique_by(.id)) as $keepimg

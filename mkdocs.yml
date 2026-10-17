@@ -42,6 +42,7 @@ nav:
   - Project:
       - Changelog: changelog.md
       - Contributing: contributing.md
+      - Threat model: threat-model.md
 
 # A strict build fails on these warnings, so a new generated page must join the nav and every anchor must resolve.
 validation:

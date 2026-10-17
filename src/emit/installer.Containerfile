@@ -154,6 +154,9 @@ RUN set -eux; \
 # The recipe is baked in at a fixed path because this layer is where the target
 # is already known.
 COPY recipe.json /usr/share/tectonic/install-recipe.json
+# The installer refuses a payload whose ID differs from this one. `vm.sh` reads
+# it from the store that tacklebox copies the payload out of.
+COPY image-id /usr/share/tectonic/image-id
 
 # Tacklebox writes the payload to LiveOS/store.squashfs.img and mounts the media
 # at /run/initramfs/live, but ships no unit to mount the store. No path

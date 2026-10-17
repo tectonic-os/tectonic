@@ -102,11 +102,37 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
         (None, None) => None,
     };
     let source_commit = record::source_commit(root);
+    // A cloned asset's verifier is the commit its selector names, which only
+    // the remote can answer.
+    let mut resolutions = Vec::new();
+    let mut unresolved = Vec::new();
+    for (module, asset) in pinned(&modules) {
+        let Some(url) = asset.pin.url.as_deref().filter(|_| asset.pin.cloned()) else {
+            continue;
+        };
+        let named = format!("`{}` asset `{}`", module.path, asset.name);
+        let Some(version) = asset.pin.version.as_deref() else {
+            unresolved.push(format!("{named} names no `version` to resolve"));
+            continue;
+        };
+        match record::clone_commit(url, version) {
+            Some(commit) => {
+                resolutions.push(format!("{}|{}|{version}|{commit}", module.path, asset.name))
+            }
+            None => unresolved.push(format!(
+                "{named} did not resolve {version} to a commit at {url}"
+            )),
+        }
+    }
     crate::provenance::enforce_build(
         list.audit_enforce,
         resolved_base.as_deref(),
         source_commit.as_deref(),
+        &unresolved,
     )?;
+    for why in &unresolved {
+        eprintln!("tect: {why}, so the build record leaves it out");
+    }
     if let Some(declared) = &declared_base {
         match &resolved_base {
             Some(resolved) => eprintln!("tect: base {declared} -> {resolved}"),
@@ -117,19 +143,6 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
     }
     let resolved_base = resolved_base.unwrap_or_else(|| declared_base.clone().unwrap_or_default());
     let source_commit = source_commit.unwrap_or_default();
-
-    // A cloned asset's verifier is the commit its selector names, which only
-    // the remote can answer.
-    let resolutions: Vec<String> = pinned(&modules)
-        .into_iter()
-        .filter(|(_, asset)| asset.pin.cloned())
-        .filter_map(|(module, asset)| {
-            let url = asset.pin.url.as_deref()?;
-            let version = asset.pin.version.as_deref()?;
-            let commit = record::clone_commit(url, version)?;
-            Some(format!("{}|{}|{version}|{commit}", module.path, asset.name))
-        })
-        .collect();
 
     let namespace = crate::registry::namespace(root);
     if let Err(err) = &namespace {
@@ -599,14 +612,14 @@ fn validate_argv(root: &Path, tag: &str, build_args: &[String]) -> Vec<String> {
     let mut argv: Vec<String> = vec![
         "run".to_string(),
         "--rm".to_string(),
-        "--security-opt".to_string(),
-        "label=disable".to_string(),
         "--tmpfs".to_string(),
         "/tmp".to_string(),
         "--tmpfs".to_string(),
         "/run".to_string(),
         "-v".to_string(),
-        format!("{}:/ctx/tect:ro", tool.display()),
+        // `z` relabels the staged tool so the container reads it under its
+        // SELinux confinement. The file is the build's own copy.
+        format!("{}:/ctx/tect:ro,z", tool.display()),
         "--entrypoint".to_string(),
         "/ctx/tect".to_string(),
     ];
@@ -979,7 +992,10 @@ mod tests {
             .any(|w| w[0] == "-e" && w[1] == "CONTRACT_FILES=a b"));
         assert_eq!(argv[argv.len() - 2], "example:latest");
         assert_eq!(argv[argv.len() - 1], "validate-image");
-        assert!(argv.iter().any(|arg| arg == "/repo/out/tect:/ctx/tect:ro"));
+        assert!(argv
+            .iter()
+            .any(|arg| arg == "/repo/out/tect:/ctx/tect:ro,z"));
+        assert!(!argv.iter().any(|arg| arg == "label=disable"));
     }
 
     /// Pass two carries the split image and the digest beyond the ordinary

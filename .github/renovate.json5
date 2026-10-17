@@ -13,6 +13,10 @@
   "rebaseWhen": "never",
   "timezone": "Etc/UTC",
   "schedule": ["before 6am"],
+  // Renovate proposes a release only after it has stood for a week, so a
+  // compromised release can be yanked before an automerge takes it. Renovate
+  // holds back a release that carries no timestamp.
+  "minimumReleaseAge": "7 days",
 
   "packageRules": [
     {
