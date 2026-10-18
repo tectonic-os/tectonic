@@ -1,0 +1,9 @@
+---
+source: tests/golden/harness.rs
+---
+Tectonic v{version}
+
+Error: `flatpak` is exclusive, and `flathub` already provides it in `Example`; run `tect import module` in a terminal to replace it.
+
+Run 'tect --help' to list the commands
+==== exit 1

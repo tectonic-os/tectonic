@@ -472,9 +472,11 @@ fn provenance(list: &List, entry: &Entry) -> Json {
             match module.and_then(|m| m.imported.as_ref()) {
                 None => Json::Null,
                 Some(record) => Json::object([
-                    ("collection", Json::string(&record.collection)),
+                    ("library", Json::string(&record.library)),
+                    ("path", Json::string(&record.upstream)),
                     ("content", Json::string(&record.content)),
                     ("pin", record.pin.json()),
+                    ("tracked", Json::Bool(record.tracked)),
                 ]),
             },
         ),

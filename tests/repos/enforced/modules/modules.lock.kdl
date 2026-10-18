@@ -1,0 +1,8 @@
+module "one/hello" {
+    library "one"
+    path "hello"
+    url "https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz"
+    component-version "v1.0.0"
+    content "0000000000000000000000000000000000000000000000000000000000000000"
+    track
+}

@@ -263,7 +263,6 @@ fn run() -> Result<ExitCode, Error> {
             | Verb::SetKey
             | Verb::SetLibrary
             | Verb::ImportModule
-            | Verb::CopyModule
             | Verb::Check
     ) {
         banner(false);

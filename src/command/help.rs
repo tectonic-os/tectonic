@@ -148,53 +148,52 @@ pub(super) const CREATE_MODULE_NOTES: &str = r#"> [!NOTE]
 > No image is an answer. The module exists, and no image lists it yet. Leaving
 > the picker writes nothing."#;
 
-pub(super) const IMPORT_MODULE: &str = r#"Lists a module from a collection in an image, without a copy in the
-repository. The image's `source` block names the module, and a fetch puts it in
-`modules/.remote/`. Use it for a module that a collection maintains.
+pub(super) const IMPORT_MODULE: &str = r#"Copies a module from a library into `modules/<name>`, and records it in
+`modules/modules.lock.kdl`: the library, the module's path there, the
+library's revision and the content hash. The repository holds the copy, so a
+fetch never changes it.
 
 It asks, in order:
 
-1. Choose the modules.
-2. Choose the images and flavours that list them.
-3. Choose whether to add the modules that they require.
-4. Choose whether to generate the CI workflows that they make runnable.
-5. If they claim benchmark rules, choose a profile to measure the image
-   against."#;
+1. Choose the image or flavour the modules are for, or none.
+2. Choose the modules. A module that the image's base family cannot build is
+   listed as unavailable, with the reason beside it.
+3. If the repository already holds a module at that path, choose to list the
+   local module or to import the library's under another name. The name
+   offered is `<name>@1`.
+4. Choose whether to add the modules that they require.
+5. If a module provides a capability that an entry in the image declares
+   exclusive, or the other way round, choose to replace that entry or cancel.
+6. Choose whether to generate the CI workflows that they make runnable.
+7. If they claim benchmark rules, choose a profile to measure the image
+   against.
+8. Choose whether the copies track upstream."#;
 
 pub(super) const IMPORT_MODULE_NOTES: &str = r#"> [!WARNING]
-> A pinned collection is downloaded once and checked against its hash. An
-> `unpinned` collection is downloaded each time with no check, and
+> A pinned library is downloaded once and checked against its hash. An
+> `unpinned` library is downloaded each time with no check, and
 > `audit { enforce #true }` refuses it.
 
 > [!NOTE]
-> If `repo.kdl` declares no `sources`, the command uses the default module
-> collection supplied with `tect` and adds that declaration to `repo.kdl`.
+> If `repo.kdl` declares no `sources`, then the command refuses and prints the
+> `sources` block that `tect create repo` writes.
 >
-> A bare name is searched for in every collection. `<owner>/<name>` picks
-> between two collections that both hold it.
+> A bare name is searched for in every library. `<owner>/<name>` picks
+> between two libraries that both hold it.
 >
-> It refuses a module that the image already lists.
+> It refuses a module that the image already lists, and a module that the
+> image's base family cannot build.
+>
+> A tracked copy carries `track` in its lock entry. An untracked copy is the
+> repository's own, and its entry keeps where it came from.
+>
+> Without a terminal, the copies are tracked, and an image lists them only
+> where `--image` names one. A named module at a path the repository already
+> holds is refused, and so is an exclusive clash. A provider that
+> `--dependencies` brings is listed as the repository holds it.
 >
 > If the user declines a required module, then the file stays valid, and
 > `tect check` names the import that would satisfy it."#;
-
-pub(super) const COPY_MODULE: &str = r#"Copies a module from a collection into `modules/<name>`, and records where it
-came from in `provenance.kdl`. The repository owns the copy, so no fetch or pin
-changes it. Use it for a collection module that the user wants to change.
-
-It asks the same questions as `tect import module`."#;
-
-pub(super) const COPY_MODULE_NOTES: &str = r#"> [!NOTE]
-> If `repo.kdl` declares no `sources`, the command uses the default module
-> collection supplied with `tect` and adds that declaration to `repo.kdl`.
->
-> A required module that it brings in is copied too.
->
-> No image is an answer. The copy is in the repository whether an image lists
-> it or not.
->
-> If `modules/<name>` exists, then it refuses and names the collection that the
-> existing module came from."#;
 
 pub(super) const CREATE_GIT: &str = r#"Puts the directory under git control, so a hand-written repository is under
 version control before its first commit. It writes the `.gitignore` that

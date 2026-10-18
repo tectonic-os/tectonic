@@ -7,13 +7,15 @@ use std::collections::{BTreeMap, BinaryHeap};
 
 /// The build order, as list indices.
 pub fn sort(image: &Image, issues: &mut Issues) -> Vec<usize> {
-    let mut offered: BTreeMap<&str, usize> = BTreeMap::new();
+    // Many modules may provide one capability, and a module that needs it
+    // builds after every one of them.
+    let mut offered: BTreeMap<&str, Vec<usize>> = BTreeMap::new();
     for (index, entry) in image.entries.iter().enumerate() {
         let Some(module) = &entry.module else {
             continue;
         };
         for decl in &module.provides {
-            offered.entry(decl.name.as_str()).or_insert(index);
+            offered.entry(decl.name.as_str()).or_default().push(index);
         }
     }
 
@@ -24,7 +26,7 @@ pub fn sort(image: &Image, issues: &mut Issues) -> Vec<usize> {
             continue;
         };
         for decl in &module.requires {
-            if let Some(&provider) = offered.get(decl.name.as_str()) {
+            for &provider in offered.get(decl.name.as_str()).into_iter().flatten() {
                 if provider != index {
                     waits_on[index].push(provider);
                 }
@@ -39,13 +41,12 @@ pub fn sort(image: &Image, issues: &mut Issues) -> Vec<usize> {
             .map(|decl| decl.name.as_str())
             .chain(module.policies.iter().copied());
         for name in soft {
-            let Some(&provider) = offered.get(name) else {
-                continue;
-            };
-            let drags_below_gate =
-                entry.flavour.is_none() && image.entries[provider].flavour.is_some();
-            if provider != index && !drags_below_gate {
-                waits_on[index].push(provider);
+            for &provider in offered.get(name).into_iter().flatten() {
+                let drags_below_gate =
+                    entry.flavour.is_none() && image.entries[provider].flavour.is_some();
+                if provider != index && !drags_below_gate {
+                    waits_on[index].push(provider);
+                }
             }
         }
         waits_on[index].sort_unstable();

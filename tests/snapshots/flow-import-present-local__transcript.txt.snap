@@ -1,0 +1,13 @@
+---
+source: tests/golden/harness.rs
+---
+Tectonic v{version}
+
+  1) Add the local `browser` to `Example`
+  2) Import it under another name
+`browser` is already in this repository. [1-2, 0 for none]: 1
+
+
+example/
+└── ~ example.image.kdl  browser added to modules
+==== exit 0

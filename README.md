@@ -94,7 +94,7 @@ workstation/
 └── workstation.image.kdl
 ```
 
-Optionally import a module from a collection declared by the repository:
+Optionally copy a module from a library the repository declares:
 
 ```sh
 tect import module

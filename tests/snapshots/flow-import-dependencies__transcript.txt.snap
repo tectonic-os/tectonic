@@ -1,0 +1,20 @@
+---
+source: tests/golden/harness.rs
+---
+Tectonic v{version}
+
+
+example/
+├── modules/
+│   ├── browser/
+│   │   └── + module.kdl
+│   ├── flatpak/
+│   │   ├── files/
+│   │   │   └── usr/
+│   │   │       └── share/
+│   │   │           └── example/
+│   │   │               └── + remotes.list
+│   │   └── + module.kdl
+│   └── + modules.lock.kdl
+└── ~ example.image.kdl  flatpak and browser added to modules
+==== exit 0

@@ -42,8 +42,7 @@ Every command takes these options, before or after its own words. [`tect`](#tect
 | Command | Description | Schema |
 | --- | --- | --- |
 | [`tect create module [name]`](#tect-create-module) | write a module, and offer to list it in an image | [`module.kdl`](schema/module.md) |
-| [`tect import module [name]`](#tect-import-module) | reference a module from a collection repo.kdl declares | [`image.kdl`&nbsp;›&nbsp;`source`](schema/image.md#image-modules-source) |
-| [`tect copy module [name]`](#tect-copy-module) | copy a collection module into this repository | [`provenance.kdl`](schema/provenance.md) |
+| [`tect import module [name]`](#tect-import-module) | copy a module from a library repo.kdl declares into this repository | [`modules.lock.kdl`](schema/lock.md) |
 | [`tect fetch modules`](#tect-fetch-modules) | fetch every out-of-tree module the images reference | [`image.kdl`&nbsp;›&nbsp;`pin`](schema/image.md#image-modules-module-pin) |
 
 ### Keys
@@ -528,18 +527,26 @@ It asks for one step:
 
 ## `tect import module`
 
-Lists a module from a collection in an image, without a copy in the
-repository. The image's `source` block names the module, and a fetch puts it in
-`modules/.remote/`. Use it for a module that a collection maintains.
+Copies a module from a library into `modules/<name>`, and records it in
+`modules/modules.lock.kdl`: the library, the module's path there, the
+library's revision and the content hash. The repository holds the copy, so a
+fetch never changes it.
 
 It asks, in order:
 
-1. Choose the modules.
-2. Choose the images and flavours that list them.
-3. Choose whether to add the modules that they require.
-4. Choose whether to generate the CI workflows that they make runnable.
-5. If they claim benchmark rules, choose a profile to measure the image
+1. Choose the image or flavour the modules are for, or none.
+2. Choose the modules. A module that the image's base family cannot build is
+   listed as unavailable, with the reason beside it.
+3. If the repository already holds a module at that path, choose to list the
+   local module or to import the library's under another name. The name
+   offered is `<name>@1`.
+4. Choose whether to add the modules that they require.
+5. If a module provides a capability that an entry in the image declares
+   exclusive, or the other way round, choose to replace that entry or cancel.
+6. Choose whether to generate the CI workflows that they make runnable.
+7. If they claim benchmark rules, choose a profile to measure the image
    against.
+8. Choose whether the copies track upstream.
 
 **Usage:** `tect import module [OPTIONS] [name]`
 
@@ -549,80 +556,48 @@ It asks, in order:
 
 | Option | Description |
 | --- | --- |
-| `--image <name>` | list the module in this image or flavour; repeatable |
+| `--image <name>` | list the module in this image or flavour |
 | `--datastream <file>` | the SCAP content the profile offer is read out of; the family's installed copy by default, and no content is no offer |
 | `--dependencies` | add provider modules for dependencies the selected modules require |
 
-**Schema:** [`image.kdl`&nbsp;›&nbsp;`source`](schema/image.md#image-modules-source)
-
-**What it writes:**
-
-```text
-example/
-└── ~ example.image.kdl  browser added to modules
-```
-
-> [!WARNING]
-> A pinned collection is downloaded once and checked against its hash. An
-> `unpinned` collection is downloaded each time with no check, and
-> `audit { enforce #true }` refuses it.
-
-> [!NOTE]
-> If `repo.kdl` declares no `sources`, the command uses the default module
-> collection supplied with `tect` and adds that declaration to `repo.kdl`.
->
-> A bare name is searched for in every collection. `<owner>/<name>` picks
-> between two collections that both hold it.
->
-> It refuses a module that the image already lists.
->
-> If the user declines a required module, then the file stays valid, and
-> `tect check` names the import that would satisfy it.
-
-## `tect copy module`
-
-Copies a module from a collection into `modules/<name>`, and records where it
-came from in `provenance.kdl`. The repository owns the copy, so no fetch or pin
-changes it. Use it for a collection module that the user wants to change.
-
-It asks the same questions as `tect import module`.
-
-**Usage:** `tect copy module [OPTIONS] [name]`
-
-| Argument | Description |
-| --- | --- |
-| `<name>` | one module, as `<name>` or `<owner>/<name>` |
-
-| Option | Description |
-| --- | --- |
-| `--image <name>` | list the module in this image or flavour; repeatable |
-| `--datastream <file>` | the SCAP content the profile offer is read out of; the family's installed copy by default, and no content is no offer |
-| `--dependencies` | add provider modules for dependencies the selected modules require |
-
-**Schema:** [`provenance.kdl`](schema/provenance.md)
+**Schema:** [`modules.lock.kdl`](schema/lock.md)
 
 **What it writes:**
 
 ```text
 example/
 ├── modules/
-│   └── browser/
-│       ├── + module.kdl
-│       └── + provenance.kdl
+│   ├── browser/
+│   │   └── + module.kdl
+│   └── + modules.lock.kdl
 └── ~ example.image.kdl  browser added to modules
 ```
 
+> [!WARNING]
+> A pinned library is downloaded once and checked against its hash. An
+> `unpinned` library is downloaded each time with no check, and
+> `audit { enforce #true }` refuses it.
+
 > [!NOTE]
-> If `repo.kdl` declares no `sources`, the command uses the default module
-> collection supplied with `tect` and adds that declaration to `repo.kdl`.
+> If `repo.kdl` declares no `sources`, then the command refuses and prints the
+> `sources` block that `tect create repo` writes.
 >
-> A required module that it brings in is copied too.
+> A bare name is searched for in every library. `<owner>/<name>` picks
+> between two libraries that both hold it.
 >
-> No image is an answer. The copy is in the repository whether an image lists
-> it or not.
+> It refuses a module that the image already lists, and a module that the
+> image's base family cannot build.
 >
-> If `modules/<name>` exists, then it refuses and names the collection that the
-> existing module came from.
+> A tracked copy carries `track` in its lock entry. An untracked copy is the
+> repository's own, and its entry keeps where it came from.
+>
+> Without a terminal, the copies are tracked, and an image lists them only
+> where `--image` names one. A named module at a path the repository already
+> holds is refused, and so is an exclusive clash. A provider that
+> `--dependencies` brings is listed as the repository holds it.
+>
+> If the user declines a required module, then the file stays valid, and
+> `tect check` names the import that would satisfy it.
 
 ## `tect set workflows`
 
@@ -707,6 +682,10 @@ It asks, in order:
 
 ```text
 example/
+├── modules/
+│   ├── sshd/
+│   │   └── + module.kdl
+│   └── + modules.lock.kdl
 └── ~ example.image.kdl  measured against `standard`, and sshd added to modules
 ```
 

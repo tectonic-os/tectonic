@@ -36,7 +36,7 @@ nav:
       - Modules:
           - Layout: schema/modules.md
           - module.kdl: schema/module.md
-          - provenance.kdl: schema/provenance.md
+          - modules.lock.kdl: schema/lock.md
       - Assets:
           - Base images: schema/bases.md
   - Project:

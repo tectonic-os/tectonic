@@ -14,7 +14,6 @@ modules/<module-name>/
         ├── finalize.sh
         ├── module.kdl
         ├── module.sh
-        ├── provenance.kdl
         └── repo
 ```
 
@@ -30,7 +29,6 @@ modules/<module-name>/
 | `apparmor/` | AppArmor profiles. If the image provides `apparmor-policy`, then the build validates them and places them in `/etc/apparmor.d`. |
 | `<family>/` | The files of the module that apply to one base family. |
 | `<collected file>` | A part of a file that another module collects. The build stages it for that module. |
-| `provenance.kdl` | Where a copied module came from, which `tect copy module` writes. See [`provenance.kdl`](provenance.md). |
 
 A policy directory follows these rules:
 

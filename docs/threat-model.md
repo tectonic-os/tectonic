@@ -26,9 +26,9 @@ the control for that code.
   lists each check and its command. `src/provenance/mod.rs` `enforce_build`
   refuses a build whose base did not resolve to a digest, and a build from a
   tree with no commit.
-- Under enforcement, `tect check` refuses a copied module that no longer
-  matches the record it was copied with (`src/lib.rs`). A module whose
-  `provenance.kdl` is removed belongs to the repository and is not checked.
+- Under enforcement, `tect check` refuses an imported module that no longer
+  matches its entry in `modules/modules.lock.kdl` (`src/lib.rs`). A module
+  whose entry is removed belongs to the repository and is not checked.
   `tect build` does not run this check. See *Known gaps*.
 - The `security-policy { network }` rule decides which generated module steps
   reach the network. `src/emit/containerfile.rs` runs a closed step with

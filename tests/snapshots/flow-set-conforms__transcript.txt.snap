@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 A `conforms` turns the scan on: every build measures `example` against the profile and publishes the score.
 
@@ -12,5 +12,9 @@ Yes
 
 
 example/
+├── modules/
+│   ├── sshd/
+│   │   └── + module.kdl
+│   └── + modules.lock.kdl
 └── ~ example.image.kdl  measured against `standard`, and sshd added to modules
 ==== exit 0

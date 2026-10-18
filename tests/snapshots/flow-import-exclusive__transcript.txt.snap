@@ -1,0 +1,25 @@
+---
+source: tests/golden/harness.rs
+---
+Tectonic v{version}
+
+  1) Replace `flathub`
+  2) Cancel
+`flatpak` is exclusive, and `flathub` already provides it in `Example`. [1-2, 0 for none]: 1
+
+Track upstream for `flatpak`? (Yes/No)
+Yes
+
+
+example/
+├── modules/
+│   ├── flatpak/
+│   │   ├── files/
+│   │   │   └── usr/
+│   │   │       └── share/
+│   │   │           └── example/
+│   │   │               └── + remotes.list
+│   │   └── + module.kdl
+│   └── + modules.lock.kdl
+└── ~ example.image.kdl  flatpak added to modules, and flathub removed
+==== exit 0

@@ -142,7 +142,7 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "d35629d288e2a4927d7e7dce1f778279d301a7a16a6fb1207e03a1c3f1a509c6",
+                "content": "6886009e87c2b9f16b766edd764750dddf1fd0c0b1309d4c51a6541279e41b19",
                 "repo": false,
                 "source": null,
                 "pin": null,

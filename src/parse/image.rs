@@ -309,6 +309,31 @@ pub fn block_close(kdl: &str, image: &str, chain: &[(&str, Option<&str>)]) -> Op
     kdl[..span.offset + span.len].rfind('}')
 }
 
+/// Finds the span of the `module` node that lists `name` inside the blocks
+/// `chain` names, under the image called `image`.
+pub fn entry_span(
+    kdl: &str,
+    image: &str,
+    chain: &[(&str, Option<&str>)],
+    name: &str,
+) -> Option<Span> {
+    let doc: KdlDocument = kdl.parse().ok()?;
+    let mut node = doc
+        .nodes()
+        .iter()
+        .filter(|node| node.name().value() == "image")
+        .find(|node| text(node, "name") == image)?;
+    for (block, arg) in chain {
+        node = kids(node).iter().find(|node| {
+            node.name().value() == *block && (arg.is_none() || string_arg(node) == *arg)
+        })?;
+    }
+    kids(node)
+        .iter()
+        .find(|node| node.name().value() == "module" && string_arg(node) == Some(name))
+        .map(|node| node.span().into())
+}
+
 /// The span an image's `conforms` declaration takes, which is the node itself
 /// where there is one and an empty span where the next one would go: in front
 /// of `base`, which is where the schema lists it. `None` only when the file

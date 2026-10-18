@@ -3,8 +3,20 @@ source: tests/golden/harness.rs
 ---
 Tectonic v{version}
 
-`upstream/flatpak` overwrites `/usr/share/example/remotes.list`, which `editor` also ships — declare `overrides "/usr/share/example/remotes.list"` in `upstream/flatpak` to take the replacement, or rename one of the two
+Track upstream for `flatpak`? (Yes/No)
+Yes
+
+`flatpak` overwrites `/usr/share/example/remotes.list`, which `editor` also ships — declare `overrides "/usr/share/example/remotes.list"` in `flatpak` to take the replacement, or rename one of the two
 
 example/
+├── modules/
+│   ├── flatpak/
+│   │   ├── files/
+│   │   │   └── usr/
+│   │   │       └── share/
+│   │   │           └── example/
+│   │   │               └── + remotes.list
+│   │   └── + module.kdl
+│   └── ~ modules.lock.kdl  flatpak recorded
 └── ~ example.image.kdl  flatpak added to modules
 ==== exit 0

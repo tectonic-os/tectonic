@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 ==== markdown
 # one/hello
@@ -33,9 +33,9 @@ A claim the tool records rather than certifies. The scan is what confirms it.
 
 | Collection | Locator | Selector | Verifier | Tracker |
 | --- | --- | --- | --- | --- |
-| `one` | https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3 | renovate |
+| `one` | https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | not declared | none |
 
-**It has been edited since it was imported.** Forking a module is legitimate; what the record buys is that the fork is visible.
+**It has been edited since it was imported.** Forking a module is legitimate; what the lock buys is that the fork is visible.
 
 ## What it pulls in
 
@@ -95,8 +95,8 @@ It enables one, in `modules/one/hello/repo`. There is no grammar for that file, 
       "name": "collection",
       "locator": "https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz",
       "selector": "v1.0.0",
-      "verifier": "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3",
-      "tracker": "renovate"
+      "verifier": null,
+      "tracker": "none"
     }
   },
   "modified": true,
@@ -149,9 +149,9 @@ A claim the tool records rather than certifies. The scan is what confirms it.
 
 | Collection | Locator | Selector | Verifier | Tracker |
 | --- | --- | --- | --- | --- |
-| `one` | https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3 | renovate |
+| `one` | https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | not declared | none |
 
-**It has been edited since it was imported.** Forking a module is legitimate; what the record buys is that the fork is visible.
+**It has been edited since it was imported.** Forking a module is legitimate; what the lock buys is that the fork is visible.
 
 ## What it pulls in
 
@@ -179,6 +179,6 @@ consumer, hello
 
 | Collection | Locator | Selector | Verifier | Tracker |
 | --- | --- | --- | --- | --- |
-| `one` | https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3 | renovate |
+| `one` | https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | not declared | none |
 
-**It has been edited since it was imported.** Forking a module is legitimate; what the record buys is that the fork is visible.
+**It has been edited since it was imported.** Forking a module is legitimate; what the lock buys is that the fork is visible.
