@@ -44,9 +44,9 @@ what each build resolved.
   requirements that apply across the repository. Modules declare what they
   need, while the repository owner decides what the build permits. Defaults
   remain permissive unless the owner opts into stricter policy.
-- **Verifiable provenance.** Imported and copied modules retain their origin
-  and content hash. Declared downloads add relationships to CI-generated SBOMs
-  that ordinary image scanners cannot infer.
+- **Verifiable provenance.** Imported modules retain their origin and
+  content hash in the module lock. Declared downloads add relationships to
+  CI-generated SBOMs that ordinary image scanners cannot infer.
 - **Audit support.** Modules can map SCAP claims to the features that implement
   them. Generated reports keep declared coverage separate from results
   verified by a scan.
@@ -94,7 +94,7 @@ workstation/
 └── workstation.image.kdl
 ```
 
-Optionally import a module from a collection declared by the repository:
+Optionally copy a module from a library the repository declares:
 
 ```sh
 tect import module
@@ -146,7 +146,7 @@ The full documentation is at
 - [Image schema](docs/schema/image.md)
 - [Module layout](docs/schema/modules.md)
 - [Module schema](docs/schema/module.md)
-- [Provenance schema](docs/schema/provenance.md)
+- [Module lock schema](docs/schema/lock.md)
 - [Base catalog schema](docs/schema/bases.md)
 
 The schema references are generated from the same definitions that `tect`

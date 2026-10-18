@@ -181,9 +181,8 @@ fn create_into(name: &str, root: &Path) {
     tect::import::Module::collect(
         tect::import::Request {
             name: Some("upstream/fedora-family".into()),
-            images: vec!["example".into(), "server".into()],
+            image: Some("example".into()),
             datastream: None,
-            place: tect::import::Place::Reference,
             dependencies: false,
         },
         &here,
@@ -194,6 +193,15 @@ fn create_into(name: &str, root: &Path) {
     .unwrap_or_else(|err| panic!("{}", err.message()))
     .apply(&here, &list.sources)
     .unwrap();
+    // One import names one image, and an unattended second import of a held
+    // path is refused, so the second image lists the copy by hand.
+    let server = root.join("server.image.kdl");
+    let listed = std::fs::read_to_string(&server).unwrap().replace(
+        "        module \"my-editor\"\n",
+        "        module \"my-editor\"\n        module \"fedora-family\"\n",
+    );
+    assert!(listed.contains("module \"fedora-family\""), "{listed}");
+    std::fs::write(&server, listed).unwrap();
 
     let mut out = String::new();
     for file in [
@@ -214,7 +222,7 @@ fn create_into(name: &str, root: &Path) {
     assert_golden(name, "create.txt", &out);
 }
 
-/// `copy module`, against two collections on this machine: what one name
+/// `import module`, against two collections on this machine: what one name
 /// resolves to, what a name both of them carry does, and that the tree it wrote
 /// checks like any other module.
 fn copied(name: &str, root: &Path) {
@@ -252,22 +260,24 @@ fn copied(name: &str, root: &Path) {
         "upstream/nosuch",
         "flatpak",
     ] {
-        out.push_str(&format!("==== copy {wanted}\n"));
-        let module = tect::import::split(wanted).1;
-        match tect::import::find(&here, &sources, wanted, false) {
+        out.push_str(&format!("==== import {wanted}\n"));
+        let imported = tect::import::Module::collect(
+            tect::import::Request {
+                name: Some(wanted.to_string()),
+                image: None,
+                datastream: None,
+                dependencies: false,
+            },
+            &here,
+            &sources,
+            false,
+            &common::prompt::Prompt::silent(),
+        )
+        .map_err(|err| err.message().to_string())
+        .and_then(|module| module.apply(&here, &sources));
+        match imported {
+            Ok(()) => out.push_str("copied\n"),
             Err(message) => out.push_str(&format!("{message}\n")),
-            Ok(found) if found.len() > 1 => {
-                let owners: Vec<&str> = found.iter().map(|f| f.owner.as_str()).collect();
-                out.push_str(&format!("ambiguous: {}\n", owners.join(", ")));
-            }
-            Ok(found) => {
-                match tect::import::destination(&here, &found[0], module).and_then(|dest| {
-                    tect::import::vendor(&here, &sources, &found[0], &dest).map(|_| dest)
-                }) {
-                    Ok(dest) => out.push_str(&format!("copied {}\n", dest.display())),
-                    Err(message) => out.push_str(&format!("{message}\n")),
-                }
-            }
         }
     }
 
@@ -280,8 +290,8 @@ fn copied(name: &str, root: &Path) {
     out.extend(written);
 
     out.push_str(&format!(
-        "==== the record\n{}",
-        std::fs::read_to_string(root.join("modules/flatpak/provenance.kdl")).unwrap()
+        "==== the lock\n{}",
+        std::fs::read_to_string(root.join("modules/modules.lock.kdl")).unwrap()
     ));
     out.push_str(&format!(
         "==== check\n{}",
@@ -289,7 +299,7 @@ fn copied(name: &str, root: &Path) {
     ));
     out.push_str(&format!(
         "==== modified\n{:?}\n",
-        tect::provenance::record::modified(&here)
+        tect::provenance::lock::modified(&here)
     ));
 
     // Forking an imported module is legitimate, so the edit is reported. A
@@ -297,7 +307,7 @@ fn copied(name: &str, root: &Path) {
     std::fs::write(root.join("modules/flatpak/module.sh"), "echo forked\n").unwrap();
     out.push_str(&format!(
         "==== modified after an edit\n{:?}\n{}",
-        tect::provenance::record::modified(&here),
+        tect::provenance::lock::modified(&here),
         tect::run(Command::Check, None, &here).issues.plain()
     ));
     assert_golden(name, "import.txt", &out);

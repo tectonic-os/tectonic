@@ -3,13 +3,14 @@ source: tests/golden/harness.rs
 ---
 Tectonic v{version}
 
+  1) example  Example
+  2) None, only add it to the repository
+Which image is this for? [1-2, 0 for none]: 1
+
   1) namesakes/apps/client  An app client with a namesake (requires flatpak)
   2) namesakes/desktop/client  A desktop client with a namesake (requires flatpak)
   3) namesakes/flatpak  The provider for both namesake clients
 Which modules? [1-3, several, 0 for none]: 1 2
-
-List it in example? (Yes/No)
-Yes
 
 The selected modules have dependencies not currently provided by the images:
 
@@ -24,7 +25,20 @@ The selected modules have dependencies not currently provided by the images:
 Add these provider modules now? (Yes/No)
 Yes
 
+Track upstream for `flatpak`, `apps/client` and `desktop/client`? (Yes/No)
+Yes
+
 
 example/
+├── modules/
+│   ├── apps/
+│   │   └── client/
+│   │       └── + module.kdl
+│   ├── desktop/
+│   │   └── client/
+│   │       └── + module.kdl
+│   ├── flatpak/
+│   │   └── + module.kdl
+│   └── + modules.lock.kdl
 └── ~ example.image.kdl  flatpak, apps/client and desktop/client added to modules
 ==== exit 0

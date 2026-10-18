@@ -221,11 +221,6 @@ const WRITTEN: &[Written] = &[
         file: None,
     },
     Written {
-        words: "copy module",
-        flow: "flow-copy-module",
-        file: None,
-    },
-    Written {
         words: "set workflows",
         flow: "flow-set-workflows",
         file: None,

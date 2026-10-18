@@ -7,7 +7,15 @@ Tectonic v{version}
   2) namesake/sandbox/coredumps
 `coredumps` names more than one module; which one [1-2, 0 for none]: 1
 
+Track upstream for `hardening/coredumps`? (Yes/No)
+Yes
+
 
 example/
+├── modules/
+│   ├── hardening/
+│   │   └── coredumps/
+│   │       └── + module.kdl
+│   └── + modules.lock.kdl
 └── ~ example.image.kdl  hardening/coredumps added to modules
 ==== exit 0

@@ -75,8 +75,9 @@ pub fn kdl_rewrites(text: &str) {
 
 pub fn provenance_record(text: &str) {
     let root = root("record");
-    write(&root.path().join(crate::provenance::record::RECORD), text);
-    let _ = crate::provenance::record::read(root.path(), &mut Issues::default());
+    write(&crate::layout::lock(root.path()), text);
+    let _ = crate::provenance::lock::read(root.path());
+    crate::provenance::lock::validate(root.path(), &mut Issues::default());
 }
 
 pub fn module_scripts(text: &str) {

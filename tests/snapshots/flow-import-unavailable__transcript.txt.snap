@@ -1,0 +1,31 @@
+---
+source: tests/golden/harness.rs
+---
+Tectonic v{version}
+
+  1) example  Example
+  2) None, only add it to the repository
+Which image is this for? [1-2, 0 for none]: 1
+
+  1) (unavailable) upstream/browser  supports fedora; this image is debian
+  2) (unavailable) upstream/custom-kernel  supports fedora; this image is debian
+  3) upstream/debian-family  apt and its state directories, which every deb build layer reaches for
+  4) (unavailable) upstream/fedora-family  supports fedora; this image is debian
+  5) (unavailable) upstream/flatpak  supports fedora; this image is debian
+  6) (unavailable) upstream/needs-family  supports fedora; this image is debian
+  7) (unavailable) upstream/signature-policy  supports fedora; this image is debian
+Which modules? [1-7, several, 0 for none]: 3
+
+Track upstream for `debian-family`? (Yes/No)
+Yes
+
+
+example/
+├── modules/
+│   ├── debian-family/
+│   │   ├── lib/
+│   │   │   └── + family.sh
+│   │   └── + module.kdl
+│   └── + modules.lock.kdl
+└── ~ example.image.kdl  debian-family added to modules
+==== exit 0

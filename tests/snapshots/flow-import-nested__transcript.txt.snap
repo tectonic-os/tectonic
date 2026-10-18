@@ -3,13 +3,22 @@ source: tests/golden/harness.rs
 ---
 Tectonic v{version}
 
+  1) example  Example
+  2) None, only add it to the repository
+Which image is this for? [1-2, 0 for none]: 1
+
   1) grouped/hardening/coredumps  Coredump lockdown, from a collection that groups what it holds
 Which modules? [1, 0 for none]: 1
 
-List it in example? (Yes/No)
+Track upstream for `hardening/coredumps`? (Yes/No)
 Yes
 
 
 example/
+├── modules/
+│   ├── hardening/
+│   │   └── coredumps/
+│   │       └── + module.kdl
+│   └── + modules.lock.kdl
 └── ~ example.image.kdl  hardening/coredumps added to modules
 ==== exit 0

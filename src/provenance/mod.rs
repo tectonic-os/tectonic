@@ -9,7 +9,7 @@
 
 pub mod build;
 pub mod evidence;
-pub mod record;
+pub mod lock;
 
 use crate::diag::Span;
 use common::json::Json;

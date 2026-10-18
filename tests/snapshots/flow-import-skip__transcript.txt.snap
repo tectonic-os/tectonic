@@ -12,8 +12,14 @@ The selected modules have dependencies not currently provided by the images:
 Add these provider modules now? (Yes/No)
 Yes
 
+Track upstream for `browser`? (Yes/No)
+Yes
+
 
 example/
-├── ~ example.image.kdl  browser added to modules
+├── modules/
+│   ├── browser/
+│   │   └── + module.kdl
+│   └── ~ modules.lock.kdl  browser recorded
 └── ~ server.image.kdl  flatpak and browser added to modules
 ==== exit 0

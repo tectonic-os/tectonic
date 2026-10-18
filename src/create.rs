@@ -1212,12 +1212,62 @@ pub struct Listed {
     flavour: Option<String>,
 }
 
+impl Listed {
+    fn of(list: &crate::model::image::List, target: &crate::model::image::Target) -> Self {
+        let image = list
+            .images
+            .iter()
+            .find(|image| image.id == target.image)
+            .expect("a target names an image the list holds");
+        Self {
+            file: PathBuf::from(image.src.name()),
+            image: image.name.clone(),
+            flavour: match target.flavour == crate::model::image::NO_FLAVOUR {
+                true => None,
+                false => Some(target.flavour.clone()),
+            },
+        }
+    }
+}
+
 impl Listing {
     /// Duplicate checks run per module because one answer can select several
     /// images.
     pub fn collect(root: &Path, given: Vec<String>, prompt: &Prompt) -> Result<Self, String> {
         let list = crate::model::image::List::editable(root).map_err(|issues| issues.plain())?;
         Self::collect_from(&list, given, prompt)
+    }
+
+    /// Asks which one image or flavour an import is for. The last row answers
+    /// none, which leaves the import in the repository and lists it nowhere.
+    pub fn target(root: &Path, given: Option<String>, prompt: &Prompt) -> Result<Self, String> {
+        let list = crate::model::image::List::editable(root).map_err(|issues| issues.plain())?;
+        if list.images.is_empty() {
+            return Ok(Self::NoImage);
+        }
+        let targets = list.targets();
+        let at = match given {
+            Some(name) => targets
+                .iter()
+                .position(|known| known.to_string() == name)
+                .ok_or_else(|| {
+                    let named: Vec<String> = targets.iter().map(ToString::to_string).collect();
+                    format!(
+                        "`{name}` is not a declared image; there is {}",
+                        named.join(", ")
+                    )
+                })?,
+            None => {
+                let mut rows = target_rows(&list, &targets);
+                rows.push(Choice::new(copy::TARGET_NONE, ""));
+                match prompt.choose(copy::TARGET_IMAGE, &rows)? {
+                    None => return Ok(Self::Declined { asked: false }),
+                    Some(at) if at == targets.len() => return Ok(Self::Declined { asked: true }),
+                    Some(at) => at,
+                }
+            }
+        };
+        Ok(Self::In(vec![Listed::of(&list, &targets[at])]))
     }
 
     fn collect_from(
@@ -1281,22 +1331,7 @@ impl Listing {
             false => Self::In(
                 chosen
                     .iter()
-                    .map(|at| {
-                        let target = &targets[*at];
-                        let image = list
-                            .images
-                            .iter()
-                            .find(|image| image.id == target.image)
-                            .expect("a target names an image the list holds");
-                        Listed {
-                            file: PathBuf::from(image.src.name()),
-                            image: image.name.clone(),
-                            flavour: match target.flavour == crate::model::image::NO_FLAVOUR {
-                                true => None,
-                                false => Some(target.flavour.clone()),
-                            },
-                        }
-                    })
+                    .map(|at| Listed::of(list, &targets[*at]))
                     .collect(),
             ),
         })
@@ -1458,10 +1493,7 @@ impl Listing {
                     .map(|(file, added)| {
                         (
                             file,
-                            Change::Updated(format!(
-                                "{} added to modules",
-                                crate::import::said(&added)
-                            )),
+                            Change::Updated(format!("{} added to modules", crate::said(&added))),
                         )
                     })
                     .collect())
@@ -1525,6 +1557,15 @@ fn ask(
             false => Vec::new(),
         }));
     }
+    prompt.choose_many(copy::LIST_IN_IMAGES, &target_rows(list, targets), &[])
+}
+
+/// Draws a flavour under its image, and an image beside its display name where
+/// that differs from its id.
+fn target_rows(
+    list: &crate::model::image::List,
+    targets: &[crate::model::image::Target],
+) -> Vec<Choice> {
     let mut ungated = 0;
     let mut rows: Vec<Choice> = Vec::new();
     for (at, target) in targets.iter().enumerate() {
@@ -1544,7 +1585,7 @@ fn ask(
             });
         rows.push(Choice::new(label, named));
     }
-    prompt.choose_many(copy::LIST_IN_IMAGES, &rows, &[])
+    rows
 }
 
 fn listed_in<'a>(
@@ -1603,6 +1644,43 @@ fn append(
         false => (close, format!("{} ", declaration.replace('\n', " "))),
     };
     text.insert_str(at, &line);
+    std::fs::write(file, text).map_err(|err| format!("{}: {err}", file.display()))
+}
+
+/// Removes the line that lists `name` in one image, and keeps every other byte
+/// in place. A node that shares its line with another one loses only its own
+/// text.
+pub(crate) fn unlist(
+    file: &Path,
+    image: &str,
+    flavour: Option<&str>,
+    source: Option<&str>,
+    name: &str,
+) -> Result<(), String> {
+    let mut text =
+        std::fs::read_to_string(file).map_err(|err| format!("{}: {err}", file.display()))?;
+    let span = crate::parse::image::entry_span(&text, image, &listed_in(flavour, source), name)
+        .ok_or_else(|| format!("{} does not list `{name}` in `{image}`", file.display()))?;
+    let from = span.offset;
+    // A node's span stops before its `;`, which goes with it on a shared line.
+    let after = &text[span.offset + span.len..];
+    let to = match after.trim_start_matches([' ', '\t']).strip_prefix(';') {
+        Some(rest) => text.len() - rest.trim_start_matches([' ', '\t']).len(),
+        None => span.offset + span.len,
+    };
+    let start = text[..from].rfind('\n').map_or(0, |at| at + 1);
+    let end = text[to..].find('\n').map_or(text.len(), |at| to + at + 1);
+    let alone = text[start..from].trim().is_empty() && text[to..end].trim().is_empty();
+    // The last node on a shared line takes the blanks in front of it too.
+    let last = text[to..end].trim().is_empty();
+    match (alone, last) {
+        (true, _) => text.replace_range(start..end, ""),
+        (false, true) => {
+            let from = text[..from].trim_end_matches([' ', '\t']).len();
+            text.replace_range(from..to, "");
+        }
+        (false, false) => text.replace_range(from..to, ""),
+    }
     std::fs::write(file, text).map_err(|err| format!("{}: {err}", file.display()))
 }
 
@@ -2215,6 +2293,33 @@ image {
             "{written}"
         );
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn unlisting_removes_only_the_named_entry() {
+        let root = std::env::temp_dir().join(format!("tect-unlist-{}", std::process::id()));
+        let file = root.join("image.kdl");
+        crate::init::put(
+            &file,
+            "image {\n    name \"one\"\n    modules {\n        module \"kept\"; module \"trailing\"\n        module \"gone\"\n        flavour \"dev\" { module \"inline\"; module \"also\" }\n    }\n}\n",
+        )
+        .unwrap();
+
+        unlist(&file, "one", None, None, "gone").unwrap();
+        unlist(&file, "one", Some("dev"), None, "inline").unwrap();
+        unlist(&file, "one", None, None, "trailing").unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&file).unwrap(),
+            "image {\n    name \"one\"\n    modules {\n        module \"kept\";\n        flavour \"dev\" { module \"also\" }\n    }\n}\n"
+        );
+        assert!(crate::parse::image::block_close(
+            &std::fs::read_to_string(&file).unwrap(),
+            "one",
+            &[("modules", None)]
+        )
+        .is_some());
+        assert!(unlist(&file, "one", None, None, "absent").is_err());
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

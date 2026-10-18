@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
   x invalid capability name `boot policy`
    ,-[tests/repos/broken-graph/image.kdl:8:9]
@@ -39,7 +39,7 @@ source: tests/golden.rs
  8 | provides "rechunking"
    : ^^^^|^^^
    :     `-- already provided by the base
- 9 | provides "shell-tools"
+ 9 | provides "shell-tools" exclusive=#true
    `----
   help: a module the base covers entirely is suppressed instead. This one also
         provides `shell-tools`, so its layer still builds and would provision
@@ -61,12 +61,12 @@ source: tests/golden.rs
   x `shell-tools` is provided by more than one enabled module
    ,-[tests/repos/broken-graph/modules/core/two/module.kdl:9:1]
  8 | provides "rechunking"
- 9 | provides "shell-tools"
+ 9 | provides "shell-tools" exclusive=#true
    : ^^^^|^^^
    :     `-- also provided elsewhere
    `----
-  help: provided by: core/two, core/three. Enable one provider, so that what
-        satisfies a requirement is never ambiguous
+  help: provided by: core/two, core/three. `core/two` declares it `exclusive`,
+        so enable one provider
 
   x `quay.io/fedora/fedora-bootc:44` requires `bootc-base`, which nothing
   | enabled provides

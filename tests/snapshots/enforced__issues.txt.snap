@@ -1,6 +1,6 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
-  x `modules/one/hello` no longer matches the record it was imported with
+  x `modules/one/hello` no longer matches its entry in the module lock
   help: `audit { enforce #true }` makes a fork an error; re-import it, or drop
-        the `provenance.kdl` beside its manifest to own the module outright
+        its entry from `modules/modules.lock.kdl` to own the module outright

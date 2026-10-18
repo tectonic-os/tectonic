@@ -3,7 +3,14 @@ source: tests/golden/harness.rs
 ---
 Tectonic v{version}
 
+Track upstream for `browser`? (Yes/No)
+Yes
+
 
 example/
+├── modules/
+│   ├── browser/
+│   │   └── + module.kdl
+│   └── + modules.lock.kdl
 └── ~ example.image.kdl  browser added to modules
 ==== exit 0

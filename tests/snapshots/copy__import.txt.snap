@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 ==== the registry
 upstream
@@ -13,30 +13,39 @@ upstream/fedora-family  dnf5 and its plugins, which every fedora build layer rea
 upstream/flatpak  Flatpak client and a daily update timer
 upstream/needs-family  A module that needs the family adapter under it (requires build-environment)
 upstream/signature-policy  Sigstore signature verification for the image's own updates
-==== copy flatpak
-copied modules/flatpak
-==== copy browser
-ambiguous: community, upstream
-==== copy upstream/browser
-copied modules/browser
-==== copy community/browser
-`browser` was copied from `upstream`; refusing the namesake from `community`
-==== copy nosuch
+==== import flatpak
+copied
+==== import browser
+`browser` names more than one module; name which one, as `community/browser`
+==== import upstream/browser
+copied
+==== import community/browser
+`browser` is already in this repository; run `tect import module` in a terminal to list the local `browser` or import the library's under another name
+==== import nosuch
 no module called `nosuch` in upstream, community
-==== copy upstream/nosuch
+==== import upstream/nosuch
 no module called `nosuch` in upstream
-==== copy flatpak
-`flatpak` was already copied from `upstream`
+==== import flatpak
+`flatpak` is already in this repository; run `tect import module` in a terminal to list the local `flatpak` or import the library's under another name
 ==== the tree
 modules/.gitkeep
 modules/browser/module.kdl
-modules/browser/provenance.kdl
 modules/flatpak/files/usr/share/example/remotes.list
 modules/flatpak/module.kdl
-modules/flatpak/provenance.kdl
-==== the record
-imported "upstream" {
+modules/modules.lock.kdl
+==== the lock
+module "browser" {
+    library "upstream"
+    path "browser"
+    content "a34ddf304dea07b9b7483d3fdad6b23af36f7709b2a8400e360624888b91d44f"
+    track
+}
+
+module "flatpak" {
+    library "upstream"
+    path "flatpak"
     content "458f87fc5f85d09877f75b41f4be3613cf7e38c9a78d7e3e4ec365a2e6aab6ce"
+    track
 }
 ==== check
 ==== modified

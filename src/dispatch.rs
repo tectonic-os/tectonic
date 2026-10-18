@@ -101,10 +101,10 @@ fn answers() -> String {
         .into_iter()
         .map(|label| format!("`tect {label}`"))
         .collect();
-    match rows.split_last() {
-        Some((last, [])) => format!("{last} answers"),
-        Some((last, rest)) => format!("{} and {last} answer", rest.join(", ")),
-        None => "nothing answers".to_string(),
+    match rows.len() {
+        0 => "nothing answers".to_string(),
+        1 => format!("{} answers", crate::said(&rows)),
+        _ => format!("{} answer", crate::said(&rows)),
     }
 }
 
@@ -282,23 +282,6 @@ fn open(here: &Context) -> Result<Option<PathBuf>, Error> {
     Ok((!refused).then_some(root))
 }
 
-/// `import module` and `copy module` use the same collection, questions
-/// and the same offers, differing only in where the members land.
-fn module_from_collection(
-    request: crate::import::Request,
-    root: &std::path::Path,
-    list: &crate::model::image::List,
-    prompt: &Prompt,
-) -> Result<(), Error> {
-    let module =
-        crate::import::Module::collect(request, root, &list.sources, list.audit_enforce, prompt)?;
-    let wrote = module.write(root, &list.sources)?;
-    if !wrote.is_empty() {
-        crate::create::report(root, &wrote);
-    }
-    Ok(())
-}
-
 fn collection_repo(here: &Context) -> Result<(PathBuf, crate::model::image::List), Error> {
     let root = repo_root(here)?;
     // These commands only need source declarations and image nodes to make a
@@ -469,35 +452,19 @@ pub fn dispatch(
         Verb::ImportModule => {
             let name = one_name(rest, name)?;
             let (root, list) = collection_repo(here)?;
-            module_from_collection(
+            let module = crate::import::Module::collect(
                 crate::import::Request {
                     name,
-                    images,
+                    image: images.last().cloned(),
                     datastream: datastream.as_deref(),
-                    place: crate::import::Place::Reference,
                     dependencies,
                 },
                 &root,
-                &list,
+                &list.sources,
+                list.audit_enforce,
                 prompt,
             )?;
-            Ok(ExitCode::SUCCESS)
-        }
-        Verb::CopyModule => {
-            let name = one_name(rest, name)?;
-            let (root, list) = collection_repo(here)?;
-            module_from_collection(
-                crate::import::Request {
-                    name,
-                    images,
-                    datastream: datastream.as_deref(),
-                    place: crate::import::Place::Vendored,
-                    dependencies,
-                },
-                &root,
-                &list,
-                prompt,
-            )?;
+            module.apply(&root, &list.sources)?;
             Ok(ExitCode::SUCCESS)
         }
         Verb::SetWorkflows => {
@@ -1133,4 +1100,24 @@ fn rendered(parts: &[Part]) -> String {
         .collect::<Vec<_>>()
         .join("\n\n")
         + "\n"
+}
+
+#[cfg(test)]
+mod tests {
+    /// The sentence names every command a host answers, and its verb agrees
+    /// with how many there are.
+    #[test]
+    fn the_host_sentence_names_each_command_and_agrees_in_number() {
+        let labels = crate::command::host_labels();
+        let said = super::answers();
+        for label in &labels {
+            assert!(said.contains(&format!("`tect {label}`")), "{said}");
+        }
+        let verb = match labels.len() {
+            0 => "nothing answers",
+            1 => " answers",
+            _ => " answer",
+        };
+        assert!(said.ends_with(verb), "{said}");
+    }
 }

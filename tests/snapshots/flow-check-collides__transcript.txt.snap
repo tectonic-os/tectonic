@@ -3,12 +3,12 @@ source: tests/golden/harness.rs
 ---
 Tectonic v{version}
 
-  × `upstream/flatpak` overwrites `/usr/share/example/remotes.list`, which
-  │ `editor` also ships
+  × `flatpak` overwrites `/usr/share/example/remotes.list`, which `editor`
+  │ also ships
   help: overlays are copied in build order, so this one wins and the other
         file never reaches the image. Rename one of the two, or declare
         `overrides "/usr/share/example/remotes.list"` here if replacing it is
         the point
 
-tect: 1 problem in ./modules/.remote/upstream/flatpak/module.kdl; none in ./example.image.kdl, ./repo.kdl
+tect: 1 problem in ./modules/flatpak/module.kdl; none in ./example.image.kdl, ./repo.kdl
 ==== exit 2

@@ -46,7 +46,7 @@ fatal: transport 'https' not allowed; what is offered below is only what is alre
   2) [x] build-disk  builds a disk image with bootc-image-builder
   3) [x] base-sig-probe  measures what each base signs and ships, and fixes it
   4) [x] cleanup-registry  prunes old versions of the images off the registry
-  5) [ ] kernel-freshness  needs a module taking a KERNEL arg
+  5) [ ] (unavailable) kernel-freshness  needs a module taking a KERNEL arg
   6) [x] smoke-test  installs the image to a disk and boots it under qemu
 Which workflows? [1-6, several, 0 for none]: 
 

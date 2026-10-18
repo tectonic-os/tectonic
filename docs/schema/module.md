@@ -104,9 +104,12 @@ Accepts: *list of strings*
 | --- | --- | --- |
 | `file=` (optional) | *string* | The absolute path that witnesses the one capability that the node names. It is needed only if the witness is neither `/usr/bin/<name>` nor `/usr/sbin/<name>`. |
 | `build-only=` (optional) | *boolean* | Whether the `file` exists only while the build runs. |
+| `exclusive=` (optional) | *boolean* | Whether a second enabled provider of the capabilities that the node names conflicts with this one. |
 
 > [!NOTE]
 > The build checks the finished image for the witness file.
+>
+> Many enabled modules may provide one capability. If one of them declares it `exclusive=#true`, then `tect check` refuses a second provider, and `tect import module` asks whether to replace the first.
 >
 > A capability name is lower-case letters, digits and dashes, and starts with a letter. The generated graph writes the name unquoted into a mermaid label and a markdown table cell.
 

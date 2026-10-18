@@ -85,8 +85,8 @@ pub struct Run {
     /// Collections following a moving ref, which is what makes the repository
     /// build a different tree tomorrow. `check`'s alone.
     pub unpinned: Vec<String>,
-    /// Imported modules whose content no longer matches the record beside them.
-    /// Forking one is legitimate, so this is a read-out; `check`'s alone.
+    /// Names the imported modules whose content no longer matches their lock
+    /// entry. Forking one is legitimate, so only `check` reads it out.
     pub modified: Vec<String>,
     /// Modules whose Containerfile fragment a closed script rule does not
     /// reach. The rule is narrower than its name, so `check` says where.
@@ -283,13 +283,14 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
             // Reading the catalog is what reports two libraries describing one
             // base, and `check` is where the repository is answered for.
             let _ = base::catalog(root, &list.sources, &mut issues);
+            provenance::lock::validate(root, &mut issues);
             (
                 list.sources
                     .iter()
                     .filter(|c| c.unpinned())
                     .map(|c| c.name.clone())
                     .collect(),
-                provenance::record::modified(root),
+                provenance::lock::modified(root),
             )
         }
         Command::Plan
@@ -309,12 +310,12 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
         for name in &modified {
             issues.push(
                 Issue::new(
-                    format!("`{name}` no longer matches the record it was imported with"),
+                    format!("`{name}` no longer matches its entry in the module lock"),
                     &list.repo_src,
                 )
                 .help(
-                    "`audit { enforce #true }` makes a fork an error; re-import it, or drop the \
-                     `provenance.kdl` beside its manifest to own the module outright",
+                    "`audit { enforce #true }` makes a fork an error; re-import it, or drop its \
+                     entry from `modules/modules.lock.kdl` to own the module outright",
                 ),
             );
         }
@@ -695,6 +696,15 @@ fn difference(found: &str, generated: &str) -> (diag::Span, String) {
 
 /// Every file under `dir`, deepest last and sorted, so a run reports them in
 /// the same order twice.
+/// Joins a list the way a sentence reads it, as `a, b and c`.
+pub(crate) fn said(items: &[String]) -> String {
+    match items.split_last() {
+        None => String::new(),
+        Some((last, [])) => last.clone(),
+        Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
+    }
+}
+
 pub(crate) fn tracked(dir: &Path) -> Vec<PathBuf> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();

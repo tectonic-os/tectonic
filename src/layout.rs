@@ -198,14 +198,16 @@ pub const IMAGE_FILE: &str = "image.kdl";
 pub const IMAGE_SUFFIX: &str = ".image.kdl";
 /// What a module declares about itself.
 pub const MODULE_FILE: &str = "module.kdl";
-/// What `copy module` writes beside a vendored module.kdl, never into it.
-pub const RECORD_FILE: &str = "provenance.kdl";
+/// Holds what `import module` records of each module it copied in. It sits at
+/// the root of `modules/`, so no module directory holds a file outside its own
+/// hash.
+pub const LOCK_FILE: &str = "modules.lock.kdl";
 
 /// Where the `tect` build stage copies the binary from, so every layer mounts
 /// the release the repository is pinned to.
 pub const MOUNTED: &str = "out/tect";
-/// Where a fetched collection is unpacked. Under `out/`, which is ignored: the
-/// selected member is referenced or copied from here.
+/// Holds each fetched library, unpacked. `import module` copies the chosen
+/// member from here, and `out/` is ignored.
 pub const SOURCES_CACHE: &str = "out/sources";
 /// What a fetched tree hashed to, kept out of the tree it describes so nothing
 /// under `modules/` is tool-written state.
@@ -225,6 +227,11 @@ pub fn as_image_file(name: &str) -> String {
 
 pub fn modules(root: &Path) -> PathBuf {
     root.join(MODULES)
+}
+
+/// Locates the lock of every imported module.
+pub fn lock(root: &Path) -> PathBuf {
+    modules(root).join(LOCK_FILE)
 }
 
 /// One module's directory, by its path relative to `modules/`.
@@ -310,8 +317,11 @@ pub const REPOSITORY: Tree = Tree {
             what: "The images of the repository. See [`image.kdl`](image.md)." },
         Place { path: &["<name>", IMAGE_SUFFIX], writer: "`tect create image`, then the user", tracked: true,
             what: "More images. The name in front of the suffix is decorative." },
-        Place { path: &[MODULES, "/"], writer: "the user, `tect create module` or `tect copy module`", tracked: true,
+        Place { path: &[MODULES, "/"], writer: "the user, `tect create module` or `tect import module`", tracked: true,
             what: "The modules of the repository, one directory each. See [Modules](modules.md)." },
+        Place { path: &[MODULES, "/", LOCK_FILE], writer: "`tect import module`", tracked: true,
+            what: "Where each imported module came from, and what its content hashed to. See \
+                [`modules.lock.kdl`](lock.md)." },
         Place { path: &[MODULES, "/", crate::model::remote::REMOTE_DIR, "/"], writer: "`tect`", tracked: false,
             what: "The modules that an image pins from another repository, fetched and verified \
                 against their hash." },
@@ -330,7 +340,7 @@ pub const REPOSITORY: Tree = Tree {
         Place { path: &[OUT, "/"], writer: "`tect`", tracked: false,
             what: "Local exports, caches and scratch. `tect` reads nothing here as a declaration." },
         Place { path: &[SOURCES_CACHE, "/"], writer: "`tect`", tracked: false,
-            what: "The collections that `tect` fetches. An imported module is read from here." },
+            what: "The libraries that `tect import module` fetches and copies a module from." },
         Place { path: &["disk_config/"], writer: "`tect create repo`, then the user", tracked: true,
             what: "The settings that bootc-image-builder reads when it builds a Fedora or RHEL disk \
                 image. `disk.toml` sets the smallest size of `/`." },
@@ -380,9 +390,6 @@ pub const MODULE_DIR: Tree = Tree {
         Place { path: &["<collected file>"], writer: "", tracked: true,
             what: "A part of a file that another module collects. The build stages it for that \
                 module." },
-        Place { path: &[RECORD_FILE], writer: "", tracked: true,
-            what: "Where a copied module came from, which `tect copy module` writes. See \
-                [`provenance.kdl`](provenance.md)." },
     ],
     lists: &[
         ("A policy directory follows these rules:", &[

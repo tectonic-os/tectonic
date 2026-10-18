@@ -3,20 +3,28 @@ source: tests/golden/harness.rs
 ---
 Tectonic v{version}
 
+  1) example  Example
+  2) None, only add it to the repository
+Which image is this for? [1-2, 0 for none]: 1
+
   1) community/browser  A browser, from the second collection (requires flatpak)
   2) upstream/browser  A browser, from the first collection
   3) upstream/custom-kernel  A kernel the image pins, swapped in over the base's own
-  4) upstream/debian-family  apt and its state directories, which every deb build layer reaches for
+  4) (unavailable) upstream/debian-family  supports debian, ubuntu; this image is fedora
   5) upstream/fedora-family  dnf5 and its plugins, which every fedora build layer reaches for
   6) upstream/flatpak  Flatpak client and a daily update timer
   7) upstream/needs-family  A module that needs the family adapter under it (requires build-environment)
   8) upstream/signature-policy  Sigstore signature verification for the image's own updates
 Which modules? [1-8, several, 0 for none]: 2
 
-List it in example? (Yes/No)
+Track upstream for `browser`? (Yes/No)
 Yes
 
 
 example/
+├── modules/
+│   ├── browser/
+│   │   └── + module.kdl
+│   └── + modules.lock.kdl
 └── ~ example.image.kdl  browser added to modules
 ==== exit 0

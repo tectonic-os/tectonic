@@ -1,18 +1,26 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 Tectonic v{version}
 
-List it in example? (Yes/No)
-Yes
+  1) example  Example
+  2) None, only add it to the repository
+Which image is this for? [1-2, 0 for none]: 1
 
 `kernel-freshness` tracks the kernel a module pins, and proposes a bump
 
 Generate the workflows this makes runnable? (Yes/No)
 Yes
 
+Track upstream for `custom-kernel`? (Yes/No)
+Yes
+
 
 example/
+├── modules/
+│   ├── custom-kernel/
+│   │   └── + module.kdl
+│   └── + modules.lock.kdl
 ├── ~ example.image.kdl  custom-kernel added to modules
 └── ~ repo.kdl  the workflows it generates
 ==== exit 0

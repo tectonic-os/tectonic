@@ -337,9 +337,23 @@ Now run:
 tect import module
 ```
 
-You will be prompted with a populated list of modules from the default module
-library. Scroll to the `desktop-environment` section, expand it with the →
-key, and toggle `kde-plasma` with the space bar:
+The first prompt asks which image the modules are for. Select `workstation-2`
+and press enter:
+
+```ansi
+Which image is this for?
+  workstation-1
+> workstation-2
+  None, only add it to the repository
+↑↓ navigate • ⏎  select • Esc cancel
+```
+
+You will then be prompted with a populated list of modules from the default
+module library. A module that cannot build on the image's base family is
+listed with the reason beside it, and cannot be selected. Tab hides and shows
+those modules. Scroll to the
+`desktop-environment` section, expand it with the → key, and toggle
+`kde-plasma` with the space bar:
 
 ```ansi
 Which modules?
@@ -351,16 +365,7 @@ Which modules?
     [ ] tectonic-modules/desktop-environment/krunner-bazaar
   [ ] ▸ fedora
   [ ] ▸ hardening
-↑↓ navigate • ←/→ open • ␣ toggle • ⏎  confirm • Esc cancel
-```
-
-At the next prompt, select `workstation-2` and press enter to confirm:
-
-```ansi
-Which images list it?
-  [ ] workstation-1
-> [x] workstation-2
-↑↓ navigate • ␣ toggle • ⏎  confirm • Esc cancel
+↑↓ • ←/→ open • ␣ toggle • ⇥ hide • ⏎  confirm • Esc cancel
 ```
 
 You will then be prompted to add the `build-environment` that this module
@@ -375,6 +380,15 @@ The selected modules have dependencies not currently provided by the images:
     provider module: fedora/build-environment
 
 Add these provider modules now?
+> Yes
+  No
+↑↓ navigate • ⏎  confirm • Esc cancel
+```
+
+The last prompt asks whether the copies track their library. Select Yes:
+
+```ansi
+Track upstream for `fedora/build-environment` and `desktop-environment/kde-plasma`?
 > Yes
   No
 ↑↓ navigate • ⏎  confirm • Esc cancel
@@ -400,32 +414,25 @@ image {
     }
 
     modules {
-        source "tectonic-modules" {
-            module "fedora/build-environment"
-            module "desktop-environment/kde-plasma"
-        }
+        module "fedora/build-environment"
+        module "desktop-environment/kde-plasma"
     }
 }
 ```
 
-Imported modules are placed inside a `source` node named for the library they
-came from.
+The import copies each module into `modules/`, at its path in the library,
+and the image lists it like a module you wrote yourself.
+`modules/modules.lock.kdl` records the library each copy came from and what
+its content hashed to, so `tect check` shows a copy that was edited since. The
+entry of a tracked copy carries `track`.
 
-Notice that a `modules/.remote/tectonic-modules` directory now exists. It is
-an untracked fetch cache, under a directory named for the library source, and
-not an editing surface. `tect generate` refreshes an unpinned module from the
-library; use `tect copy module` before modifying one.
-
-#### Copying modules from a library
-
-If you wish to modify a module from a library, use `tect copy module`. It
-works the same as `tect import module`, except that it saves an unlinked copy
-under `modules/` and adds it to image files like a module you wrote yourself.
-A `provenance.kdl` beside the copy records where it came from.
+If `modules/` already holds a module at that path, then the import asks
+whether to list the module you hold or to import the library's under another
+name, such as `desktop-environment/kde-plasma@1`.
 
 #### Module manifests
 
-Looking at `modules/.remote/tectonic-modules/desktop-environment/kde-plasma`,
+Looking at `modules/desktop-environment/kde-plasma`,
 you will see it contains a `module.kdl` file. This is a module manifest. It
 includes the following nodes:
 
@@ -630,8 +637,7 @@ tect import module flatpak --image workstation-2
 tect import module apps/bazaar --image workstation-2
 ```
 
-The cached Flatpak `module.kdl` at
-`modules/.remote/tectonic-modules/flatpak` holds:
+The Flatpak `module.kdl` at `modules/flatpak` holds:
 
 <!-- kdl-fragment -->
 ```kdl
@@ -640,8 +646,7 @@ collects "flatpaks.list" into="/usr/share/flatpak-defaults/apps.list" priority=5
 provides "flatpak"
 ```
 
-The cached Bazaar module at
-`modules/.remote/tectonic-modules/apps/bazaar` has a manifest that requires
+The Bazaar module at `modules/apps/bazaar` has a manifest that requires
 `flatpak` and `display-manager`, and a `flatpaks.list` file holding:
 
 ```text
@@ -653,7 +658,7 @@ io.github.kolunmi.Bazaar
 A module can provide build helper scripts to every other module with the
 `helpers` node in `module.kdl`.
 
-For example, the cached `fedora/build-environment` module provides
+For example, the `fedora/build-environment` module provides
 `lib/family.sh`, which other modules use to install packages with the right
 command for the family.
 

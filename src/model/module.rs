@@ -3,7 +3,7 @@
 use crate::diag::{Source, Span};
 use crate::model::asset::Asset;
 use crate::model::options::{Opt, Variant};
-use crate::provenance::record::Record;
+use crate::provenance::lock::Record;
 
 /// A batch of names keyed to a base family, with an optional repo to enable
 /// for just this install. Ordinary packages and package groups have the same
@@ -164,6 +164,9 @@ pub struct Module {
     pub supports: Vec<String>,
     /// Capabilities.
     pub provides: Vec<Decl>,
+    /// Names each provided capability that this module declares exclusive. A
+    /// second enabled provider of one of them is a conflict.
+    pub exclusive: Vec<String>,
     pub requires: Vec<Decl>,
     /// Soft: ordering and cache preference, never fails.
     pub after: Vec<Decl>,
@@ -220,12 +223,10 @@ pub struct Module {
     /// Where the fragment goes relative to the generated block.
     pub fragment_position: Position,
     pub standard_layer: bool,
-    /// What the module directory hashes to, every file in it except the import
-    /// record. `plan.json` carries it, so `verify` fails on an edit that was
-    /// never regenerated.
+    /// Holds what the module directory hashes to. `plan.json` carries it, so
+    /// `verify` fails on an edit that was never regenerated.
     pub content: Option<String>,
-    /// The record `copy module` left inside it, for a module that was copied
-    /// in.
+    /// Holds the lock entry of a module that `import module` copied in.
     pub imported: Option<Record>,
     /// Whether it ships a `repo` file, which enables a third-party package
     /// repository inside the layer. There is no grammar for one: it is shell

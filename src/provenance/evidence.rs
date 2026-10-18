@@ -129,9 +129,6 @@ pub enum Role {
     Module,
     /// A module collection references and copies resolve against.
     Collection,
-    /// The record `copy module` wrote: the collection as it stood then, read
-    /// back, so nothing about it is diagnosed twice.
-    Record,
 }
 
 impl Role {
@@ -140,14 +137,14 @@ impl Role {
         match self {
             Self::Asset => "an asset",
             Self::Module => "a module pin",
-            Self::Collection | Self::Record => "a collection",
+            Self::Collection => "a collection",
         }
     }
 
     /// Whether the content is downloaded as one archive, which is what makes a
     /// subtree path and a tar extension mean anything.
     fn archive(self) -> bool {
-        matches!(self, Self::Module | Self::Collection | Self::Record)
+        matches!(self, Self::Module | Self::Collection)
     }
 }
 
@@ -192,7 +189,7 @@ pub fn read(node: &KdlNode, role: Role, src: &Source, issues: &mut Issues) -> Ev
             "unpinned" => {
                 answers.push(("unpinned", at));
                 pin.tracker = Tracker::Unpinned(value.clone().unwrap_or_default());
-                if role != Role::Collection && role != Role::Record {
+                if role != Role::Collection {
                     issues.push(
                         Issue::new(format!("{} cannot be `unpinned`", role.word()), src)
                             .at(at, "nothing would verify what arrived")
@@ -233,10 +230,6 @@ pub fn read(node: &KdlNode, role: Role, src: &Source, issues: &mut Issues) -> Ev
         previous = Some(kind);
     }
 
-    if role == Role::Record {
-        return pin;
-    }
-
     check_tracker(&answers, version_span, role, span, src, issues);
     check_verifier(&pin, &answers, role, span, src, issues);
     check_locator(&pin, role, src, issues);
@@ -261,7 +254,7 @@ fn check_tracker(
             "needs `renovate`, `manual` or `unpinned`",
             "`renovate datasource=\"github-tags\" depName=\"owner/repo\"`, `manual \"why nothing tracks it\"`, or `unpinned \"why a moving ref is trusted here\"`",
         ),
-        Role::Asset | Role::Module | Role::Record => (
+        Role::Asset | Role::Module => (
             "needs `renovate` or `manual`",
             "`renovate datasource=\"github-tags\" depName=\"owner/repo\"`, or `manual \"why nothing tracks it\"`",
         ),
@@ -343,7 +336,7 @@ fn check_verifier(
             let help = match role {
                 Role::Collection => "the content hash is what says the archive is the one that was reviewed; `unpinned \"why it is trusted\"` is how a collection following a moving ref says it has none on purpose",
                 Role::Module => "a remote module is arbitrary shell running as root in the build, so the content hash is required, not optional",
-                Role::Asset | Role::Record => "every downloaded asset is verified against its pin; one whose url is a git repository is cloned at the commit or tag its version names instead, and declares none",
+                Role::Asset => "every downloaded asset is verified against its pin; one whose url is a git repository is cloned at the commit or tag its version names instead, and declares none",
             };
             if role.archive() || (pin.url.is_some() && !cloned) {
                 issues.push(

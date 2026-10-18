@@ -202,20 +202,16 @@ pub const REPO: Node = Node::new("repo",
                 "The `conforms` of each image decides whether SCAP content exists to scan.",
             ]),
         Node::new("sources",
-            "The module, base-image and capability libraries this repository reads.").about("Lists typed libraries that this repository reads from a local directory or fetches from an HTTPS Git repository. A `modules` source feeds imports and copies. A `base-images` source is the base catalog. A `capabilities` source locates the paths that witness a capability. Every source declares exactly one of `dir` and `url`: `dir` names a directory on this machine, and `url` names an HTTPS Git repository.").scaffolds(&["modules", "base-images", "capabilities"])
+            "The module, base-image and capability libraries this repository reads.").about("Lists typed libraries that this repository reads from a local directory or fetches from an HTTPS Git repository. A `modules` source feeds imports. A `base-images` source is the base catalog. A `capabilities` source locates the paths that witness a capability. Every source declares exactly one of `dir` and `url`: `dir` names a directory on this machine, and `url` names an HTTPS Git repository.").scaffolds(&["modules", "base-images", "capabilities"])
             .once("a second block would split one registry in two")
             .empty(Say::new("`sources` has no sources in it", "empty block",
                 "omit the block entirely; a repository that reads no library declares nothing here"))
             .children(&SOURCES, Say::new("unknown node `{}` in `sources`", "not part of the schema",
                 "a source is `modules`, `base-images` or `capabilities`, each named by the alias \
                  its content uses"))
-            .lists(&[
-                ("A module from a collection reaches the repository in one of two ways:", &[
-                    "`tect import module` references the module under the name of its \
-                     collection.",
-                    "`tect copy module` puts the module unqualified at `modules/<name>`, and \
-                     `provenance.kdl` records the collection.",
-                ]),
+            .notes(&[
+                "`tect import module` copies a module from a `modules` source to \
+                 `modules/<name>`, and `modules/modules.lock.kdl` records the source.",
             ]),
         Node::new("manifest",
             "Whether a build stamps the generated manifest onto the image as an OCI label.").about("The build writes a manifest of what went into the image into the image itself. This block decides whether the build also stamps an OCI label that points at that file, so a tool that reads image labels can find it.")
@@ -251,10 +247,10 @@ pub const REPO: Node = Node::new("repo",
                     ])
                     .lists(&[
                         ("Each check runs in the command named before it:", &[
-                            "`tect import module` and `tect copy module`: the collection is \
-                             pinned to a tag and its hash.",
-                            "`tect check`: each copied module still matches the record it was \
-                             copied with.",
+                            "`tect import module`: the library is pinned to a tag and its \
+                             hash.",
+                            "`tect check`: each imported module still matches its entry in the \
+                             module lock.",
                             "`tect build`: the base tag resolves to a manifest digest.",
                             "`tect build`: the repository is at a commit.",
                             "`tect build`: each cloned asset resolves to a commit.",
