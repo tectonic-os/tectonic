@@ -2,6 +2,24 @@
 
 Each release's section is written from the typed subjects on `main`.
 
+## 0.6.52 (2026-10-19)
+
+### Features
+
+- add the threat model and close trust gaps (#33)
+- import: copy modules and record them in a lock (#34)
+
+### Fixes
+
+- refuse the ext transport for asset pins (#30)
+- lint audit (#31)
+- order nothing for an after with no provider (#35)
+
+### Dependencies
+
+- deps: bump common (#26)
+- deps: bump common (#32)
+
 ## 0.6.51 (2026-10-10)
 
 ### Features
