@@ -68,6 +68,91 @@ image {
     let _ = std::fs::remove_dir_all(root);
 }
 
+/// A module `signed` that declares `line` for `secureboot-key`, which nothing in
+/// the image provides, listed before a module `plain`.
+fn unprovided(dir: &str, line: &str) -> PathBuf {
+    let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(dir);
+    let _ = std::fs::remove_dir_all(&root);
+    for module in ["signed", "plain"] {
+        std::fs::create_dir_all(root.join("modules").join(module))
+            .expect("the test target directory is writable");
+    }
+    std::fs::write(root.join("repo.kdl"), "schema-version 1\nname \"After\"\n")
+        .expect("the test target directory is writable");
+    std::fs::write(
+        root.join("image.kdl"),
+        r#"schema-version 1
+
+image {
+    name "After"
+    base "example" { family "fedora" }
+    modules {
+        module "signed"
+        module "plain"
+    }
+}
+"#,
+    )
+    .expect("the test target directory is writable");
+    std::fs::write(
+        root.join("modules/signed/module.kdl"),
+        format!(
+            "schema-version 1\n\ndescription \"Signs when a key exists\"\nsupports \"fedora\"\n{line} \"secureboot-key\"\n"
+        ),
+    )
+    .expect("the test target directory is writable");
+    std::fs::write(
+        root.join("modules/plain/module.kdl"),
+        "schema-version 1\n\ndescription \"Orders nothing\"\nsupports \"fedora\"\n",
+    )
+    .expect("the test target directory is writable");
+    root
+}
+
+/// Whether the graph's capability table marks the `secureboot-key` row as a
+/// defect.
+fn key_row_is_a_defect(root: &std::path::Path) -> bool {
+    tect::run(Command::Graph, None, root)
+        .parts
+        .into_iter()
+        .find_map(|part| match part {
+            tect::emit::Part::Table(table) if table.title == "Capabilities" => table
+                .rows
+                .into_iter()
+                .find(|(cells, _)| cells[0] == "secureboot-key")
+                .map(|(_, defect)| defect),
+            _ => None,
+        })
+        .expect("the capability table holds a secureboot-key row")
+}
+
+/// A module that signs with a key when one exists declares the order without
+/// requiring the key's provider.
+#[test]
+fn after_with_no_provider_orders_nothing() {
+    let root = unprovided("after-no-provider", "after");
+    assert_eq!(tect::run(Command::Check, None, &root).issues.plain(), "");
+    let plan = tect::run(Command::Plan, None, &root).stdout;
+    let at = |name: &str| plan.find(&format!("\"path\": \"{name}\"")).unwrap();
+    assert!(at("signed") < at("plain"), "{plan}");
+    let _ = std::fs::remove_dir_all(root);
+}
+
+/// The graph agrees with `check`, which accepts the same `after`.
+#[test]
+fn graph_does_not_flag_an_after_with_no_provider() {
+    let root = unprovided("after-no-provider-graph", "after");
+    assert!(!key_row_is_a_defect(&root));
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn graph_flags_a_requires_with_no_provider() {
+    let root = unprovided("requires-no-provider-graph", "requires");
+    assert!(key_row_is_a_defect(&root));
+    let _ = std::fs::remove_dir_all(root);
+}
+
 /// A module shipping a MAC profile builds after whoever provides the MAC, even
 /// though it declares no `requires` for it: the profile is emitted against
 /// whatever the image carries, so the module supports families with a different
@@ -115,7 +200,7 @@ image {
     let at = |name: &str| plan.find(&format!("\"path\": \"{name}\"")).unwrap();
     assert!(at("apparmor") < at("yubikey"), "{plan}");
     // An ordering edge is not a requirement, so nothing is owed and nothing is
-    // said: no `builds after ... which nothing enabled provides`.
+    // said.
     assert_eq!(tect::run(Command::Check, None, &root).issues.plain(), "");
 
     // And with no MAC in the image at all, the profile is never installed, so

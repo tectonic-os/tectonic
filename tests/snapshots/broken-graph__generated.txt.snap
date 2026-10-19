@@ -1163,7 +1163,6 @@ graph LR
 |---|---|---|---|---|
 | `apparmor-policy` | capability |  | `core/one` | `core/one`, `core/two` |
 | `boot policy` | capability | `base` |  |  |
-| `logging` | capability |  |  | `core/one` |
 | `nothing` | capability |  | `core/one` |  |
 | `package-manager` | capability |  | `core/one` |  |
 | `rechunking` | capability | `base` |  |  |
@@ -1193,16 +1192,6 @@ graph LR
       "provider": "base",
       "required_by": [],
       "after": []
-    },
-    {
-      "name": "logging",
-      "kind": "capability",
-      "build_only": false,
-      "provider": null,
-      "required_by": [],
-      "after": [
-        "core/one"
-      ]
     },
     {
       "name": "nothing",

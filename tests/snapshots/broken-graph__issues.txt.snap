@@ -114,19 +114,7 @@ source: tests/golden/harness.rs
  12 | requires "nothing"
     : ^^^^|^^^
     :     `-- unsatisfied
- 13 | after "logging"
     `----
   help: no module in the repository declares `provides "nothing"`, and neither
         does the `base` node in tests/repos/broken-graph/image.kdl. repo.kdl
         declares no `sources`, so there is no collection to import one from
-
-  x `core/one` builds after `logging`, which nothing enabled provides
-    ,-[tests/repos/broken-graph/modules/core/one/module.kdl:13:1]
- 12 | requires "nothing"
- 13 | after "logging"
-    : ^^|^^
-    :   `-- nothing to order after
-    `----
-  help: an `after` orders the build without requiring anything; name a
-        capability the base or an enabled module provides, or make it a
-        `requires` so the missing edge is a requirement

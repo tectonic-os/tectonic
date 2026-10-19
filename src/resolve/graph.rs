@@ -398,39 +398,29 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
         }
     }
 
-    // Nothing else validates `after`, so a dangling one is said here.
+    // If only a gated provider meets an `after`, then the order holds on that
+    // flavour's target alone.
     for module in image.modules() {
         for decl in &module.after {
             if base_caps.contains_key(decl.name.as_str()) {
                 continue;
             }
-            if let Some(providers) = offered.get(decl.name.as_str()) {
-                if let Some(gated) = elsewhere(module, providers) {
-                    issues.push(
-                        Issue::new(
-                            format!(
-                                "`{}` builds after `{}`, which only {gated} provides",
-                                module.path, decl.name
-                            ),
-                            &module.src,
-                        )
-                        .at(decl.span, "ineffective on every other target")
-                        .help("either gate this module to the same flavour, or move the provider out of the flavour block"),
-                    );
-                }
+            let Some(providers) = offered.get(decl.name.as_str()) else {
                 continue;
+            };
+            if let Some(gated) = elsewhere(module, providers) {
+                issues.push(
+                    Issue::new(
+                        format!(
+                            "`{}` builds after `{}`, which only {gated} provides",
+                            module.path, decl.name
+                        ),
+                        &module.src,
+                    )
+                    .at(decl.span, "ineffective on every other target")
+                    .help("either gate this module to the same flavour, or move the provider out of the flavour block"),
+                );
             }
-            issues.push(
-                Issue::new(
-                    format!(
-                        "`{}` builds after `{}`, which nothing enabled provides",
-                        module.path, decl.name
-                    ),
-                    &module.src,
-                )
-                .at(decl.span, "nothing to order after")
-                .help("an `after` orders the build without requiring anything; name a capability the base or an enabled module provides, or make it a `requires` so the missing edge is a requirement"),
-            );
         }
     }
 }

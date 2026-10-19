@@ -18,7 +18,8 @@ const BASE: &str = "base";
 struct Cap {
     file: bool,
     build_only: bool,
-    /// None when nothing enabled provides it, which is already a diagnostic.
+    /// None when nothing enabled provides it. `check` refuses that for a
+    /// `requires` and accepts it for an `after`.
     provider: Option<usize>,
     required_by: Vec<usize>,
     after: Vec<usize>,
@@ -243,7 +244,7 @@ impl<'a> Graph<'a> {
                                 self.plain(&cap.required_by),
                                 self.plain(&cap.after),
                             ],
-                            cap.provider.is_none(),
+                            cap.provider.is_none() && !cap.required_by.is_empty(),
                         )
                     })
                     .collect(),
