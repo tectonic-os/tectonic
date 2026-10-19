@@ -130,7 +130,7 @@ const REQUIRES: Node = Node::new("requires",
 
 #[rustfmt::skip]
 const AFTER: Node = Node::new("after",
-    "A capability that this module builds after, which the module does not require.").example("\"vfio\"")
+    "A capability that this module builds after, which the module does not require.").about("Names a capability that this module builds after. If an enabled module provides it, then `tect` builds this module after that module. If no enabled module provides it, then the `after` orders nothing.").example("\"vfio\"")
     .arg(Arg::Strs, Say::new("`{}` needs a capability name", "nothing named", ""));
 
 #[rustfmt::skip]
@@ -229,8 +229,8 @@ const FAMILY: Node = Node::new("family",
         "`tect` reads every gate whether or not the image builds for it, so the manifest gets \
          the same checks on each family it claims.",
         "The build drops each gated declaration for a family that it does not build. A \
-         Fedora-only `after` does not dangle on a Debian image, and a Debian scan does not map \
-         a Fedora rule number.",
+         Fedora-only `after` does not order the module after a Debian provider, and a Debian \
+         scan does not map a Fedora rule number.",
         "If a gate names a family that the module does not `supports`, then `tect` refuses the \
          gate.",
     ]);
@@ -416,8 +416,8 @@ pub const MODULE: Node = Node::new("module",
     .notes(&[
         "`requires` and `after` decide the build order. The order of the image list only breaks \
          ties.",
-        "If nothing provides a `requires` or an `after`, then `tect check` fails and names every \
-         module that would satisfy it.",
+        "If nothing provides a `requires`, then `tect check` fails and names every module that \
+         would satisfy it.",
     ]);
 
 /// `owner/project` split into its two segments, or None when it is not that.

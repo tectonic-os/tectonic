@@ -45,7 +45,7 @@ packages "htop" "tmux"
 > [!NOTE]
 > `requires` and `after` decide the build order. The order of the image list only breaks ties.
 >
-> If nothing provides a `requires` or an `after`, then `tect check` fails and names every module that would satisfy it.
+> If nothing provides a `requires`, then `tect check` fails and names every module that would satisfy it.
 
 <a id="schema-version"></a>
 
@@ -129,7 +129,7 @@ Accepts: *list of strings*
 
 ## `after` (optional, repeatable)
 
-A capability that this module builds after, which the module does not require.
+Names a capability that this module builds after. If an enabled module provides it, then `tect` builds this module after that module. If no enabled module provides it, then the `after` orders nothing.
 
 ```kdl
 after "vfio"
@@ -815,6 +815,6 @@ Accepts: *list of strings*, then {&nbsp;[fields](#family-fields)&nbsp;}
 >
 > `tect` reads every gate whether or not the image builds for it, so the manifest gets the same checks on each family it claims.
 >
-> The build drops each gated declaration for a family that it does not build. A Fedora-only `after` does not dangle on a Debian image, and a Debian scan does not map a Fedora rule number.
+> The build drops each gated declaration for a family that it does not build. A Fedora-only `after` does not order the module after a Debian provider, and a Debian scan does not map a Fedora rule number.
 >
 > If a gate names a family that the module does not `supports`, then `tect` refuses the gate.

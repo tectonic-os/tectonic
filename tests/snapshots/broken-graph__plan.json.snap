@@ -115,7 +115,7 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "ecdde662c336c9ea66f943f139ab799e4d4d14b65ada51f97b612971487d0a3d",
+                "content": "d59be8e0d9d821d396866a89596a40a2b3c81244406063a0a70ca35cfca1748b",
                 "repo": false,
                 "source": null,
                 "pin": null,
