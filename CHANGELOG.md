@@ -2,6 +2,12 @@
 
 Each release's section is written from the typed subjects on `main`.
 
+## 0.6.53 (2026-10-20)
+
+### Fixes
+
+- emit: relocate /usr/local like /opt (#37)
+
 ## 0.6.52 (2026-10-19)
 
 ### Features
