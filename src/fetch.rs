@@ -46,7 +46,10 @@ impl Pin {
 pub fn modules(root: &Path, list: &List) -> Result<Vec<String>, String> {
     let wanted = names(list);
     let mut said = prune(root, &wanted)?;
-    let pins = pins(root, list)?;
+    let mut pins = pins(root, list)?;
+    // Placing a module removes its directory first.
+    // A module therefore goes before the modules it holds.
+    pins.sort_by(|a, b| a.name.cmp(&b.name));
 
     for pin in &pins {
         let dir = layout::module(root, REMOTE_DIR).join(&pin.name);
@@ -133,7 +136,7 @@ fn place(source: &Path, dir: &Path, pin: &Pin) -> Result<(), String> {
         ));
     }
     crate::init::remove(dir)?;
-    crate::init::copy_tree(source, dir).map(drop)
+    crate::init::copy_module(source, dir).map(drop)
 }
 
 /// Every pin, first declaration wins, so two images pinning one module agree by
@@ -468,6 +471,44 @@ mod tests {
             ["one/hello main is current"]
         );
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// The held module is declared first, so the fetch would place it before
+    /// the module that holds it.
+    #[test]
+    fn a_held_module_survives_its_parent_being_placed() {
+        let root = std::env::temp_dir().join(format!("tect-fetch-held.{}", std::process::id()));
+        let collection = root.join("collection");
+        let _ = std::fs::remove_dir_all(&root);
+        for dir in ["nvidia", "nvidia/cuda"] {
+            crate::init::put(
+                &collection.join(dir).join("module.kdl"),
+                "schema-version 1\n\nsupports \"fedora\"\n",
+            )
+            .unwrap();
+        }
+        crate::init::put(
+            &root.join("repo.kdl"),
+            &format!(
+                "schema-version 1\nname \"Example\"\nsources {{\n    modules \"one\" {{ dir {:?} }}\n}}\n",
+                collection.display()
+            ),
+        )
+        .unwrap();
+        crate::init::put(
+            &root.join("image.kdl"),
+            "schema-version 1\n\nimage {\n    name \"Example\"\n    base \"example.invalid/image\" { family \"fedora\" }\n    modules {\n        source \"one\" { module \"nvidia/cuda\"; module \"nvidia\" }\n    }\n}\n",
+        )
+        .unwrap();
+
+        let (list, issues, _) = crate::declarations(&root);
+        assert!(issues.is_empty(), "{}", issues.plain());
+        super::modules(&root, &list).unwrap();
+        let held = root
+            .join("modules/.remote/one/nvidia/cuda/module.kdl")
+            .is_file();
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(held);
     }
 
     /// A pin named `owner/module` is one tree at that depth, not two.

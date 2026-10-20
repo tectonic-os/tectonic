@@ -174,7 +174,11 @@ pub fn write(
     let mut wrote = copy_tree_except(
         assets,
         root,
-        &["lib", layout::SCRIPTS, layout::WORKFLOW_DIR],
+        &[
+            Path::new("lib"),
+            Path::new(layout::SCRIPTS),
+            Path::new(layout::WORKFLOW_DIR),
+        ],
     )?;
 
     let sources = match sources.is_empty() {
@@ -235,18 +239,26 @@ pub(crate) fn put(path: &Path, text: &str) -> Result<(), String> {
     fs::write(path, text).map_err(|err| format!("{}: {err}", path.display()))
 }
 
+/// Copies one module without the modules it holds of its own.
 /// Answers every file it copied, relative to `to`.
-pub(crate) fn copy_tree(from: &Path, to: &Path) -> Result<Vec<PathBuf>, String> {
-    copy_tree_except(from, to, &[])
+pub(crate) fn copy_module(from: &Path, to: &Path) -> Result<Vec<PathBuf>, String> {
+    let held = layout::held_modules(from);
+    let skip: Vec<&Path> = held.iter().map(PathBuf::as_path).collect();
+    copy_tree_except(from, to, &skip)
 }
 
 /// Copies a tree without the paths in `skip`, which are relative to `from`.
 /// Answers every file it copied, relative to `to`.
-fn copy_tree_except(from: &Path, to: &Path, skip: &[&str]) -> Result<Vec<PathBuf>, String> {
+fn copy_tree_except(from: &Path, to: &Path, skip: &[&Path]) -> Result<Vec<PathBuf>, String> {
     copy_below(from, to, Path::new(""), skip)
 }
 
-fn copy_below(from: &Path, to: &Path, under: &Path, skip: &[&str]) -> Result<Vec<PathBuf>, String> {
+fn copy_below(
+    from: &Path,
+    to: &Path,
+    under: &Path,
+    skip: &[&Path],
+) -> Result<Vec<PathBuf>, String> {
     let dest_dir = to.join(under);
     fs::create_dir_all(&dest_dir).map_err(|err| format!("{}: {err}", dest_dir.display()))?;
     let dir = from.join(under);
@@ -255,7 +267,7 @@ fn copy_below(from: &Path, to: &Path, under: &Path, skip: &[&str]) -> Result<Vec
     for entry in entries {
         let entry = entry.map_err(|err| format!("{}: {err}", dir.display()))?;
         let rel = under.join(entry.file_name());
-        if skip.iter().any(|skip| rel == Path::new(skip)) {
+        if skip.iter().any(|skip| rel == *skip) {
             continue;
         }
         let source = entry.path();
@@ -301,6 +313,28 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
         let said = said.expect_err("a read-only directory keeps its file");
         assert!(said.contains("private.key"), "{said}");
+    }
+
+    #[test]
+    fn a_module_copy_leaves_out_the_modules_it_holds() {
+        let root = std::env::temp_dir().join(format!("tect-copy-held-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let from = root.join("from");
+        put(&from.join(layout::MODULE_FILE), "").unwrap();
+        put(&from.join("module.sh"), "true\n").unwrap();
+        put(&from.join("cuda").join(layout::MODULE_FILE), "").unwrap();
+        put(&from.join("cuda/module.sh"), "true\n").unwrap();
+
+        let mut wrote = copy_module(&from, &root.join("to")).unwrap();
+        wrote.sort();
+        let _ = fs::remove_dir_all(&root);
+        assert_eq!(
+            wrote,
+            [
+                PathBuf::from(layout::MODULE_FILE),
+                PathBuf::from("module.sh")
+            ]
+        );
     }
 
     #[test]

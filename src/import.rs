@@ -148,23 +148,17 @@ fn no_library(sources: &[Collection]) -> Result<(), String> {
     ))
 }
 
-/// Answers every member of a collection by its path in the tree. A member is
-/// a directory with a `module.kdl`. The walk passes over dot directories,
-/// because a collection read out of a working tree carries `.git`.
+/// Answers every member of a collection by its path in the tree.
 fn members(tree: &Path) -> Vec<String> {
-    layout::module_dirs(
-        tree,
-        |path| path.join(layout::MODULE_FILE).is_file(),
-        |name| name.starts_with('.'),
-    )
-    .iter()
-    .map(|path| {
-        path.strip_prefix(tree)
-            .unwrap_or(path)
-            .display()
-            .to_string()
-    })
-    .collect()
+    layout::member_dirs(tree)
+        .iter()
+        .map(|path| {
+            path.strip_prefix(tree)
+                .unwrap_or(path)
+                .display()
+                .to_string()
+        })
+        .collect()
 }
 
 /// Every module every declared collection holds, by name and then by
@@ -635,7 +629,7 @@ fn vendor(
     // entry refuses before anything is written.
     let locked = lock::with(root, record)?;
     let dest = PathBuf::from(layout::MODULES).join(&member.name);
-    let wrote = crate::init::copy_tree(&from.dir, &root.join(&dest))?
+    let wrote = crate::init::copy_module(&from.dir, &root.join(&dest))?
         .into_iter()
         .map(|under| dest.join(under))
         .collect();
@@ -1003,7 +997,7 @@ fn brought(
     let from = found.swap_remove(0);
     let name = from.name.clone();
     Ok(Member {
-        vendor: !layout::module(root, &name).exists(),
+        vendor: !layout::is_module(&layout::module(root, &name)),
         from,
         name,
     })
@@ -1014,7 +1008,7 @@ fn brought(
 /// names the copy. A path the user names is refused while something is there.
 fn member(root: &Path, from: &Found, listing: &Listing, prompt: &Prompt) -> Result<Member, String> {
     let name = from.name.clone();
-    if !layout::module(root, &name).exists() {
+    if !layout::is_module(&layout::module(root, &name)) {
         return Ok(Member {
             from: from.clone(),
             name,
@@ -1027,9 +1021,14 @@ fn member(root: &Path, from: &Found, listing: &Listing, prompt: &Prompt) -> Resu
         options.push(Choice::new(copy::add_local(&name, image), ""));
     }
     options.push(Choice::new(copy::ANOTHER_NAME, ""));
+    let local = lock::hash(&layout::module(root, &name));
+    let same = local.is_some() && local == lock::hash(&from.dir);
     let answer = match prompt.asks() {
         true => prompt.choose(&copy::present(&name), &options)?,
-        false => None,
+        // Without a terminal, the local copy is listed only if it holds what the
+        // library holds. If the local copy is a fork, then the import is refused.
+        // Only the user can choose which copy the image lists.
+        false => (same && image.is_some()).then_some(0),
     };
     match (answer, &image) {
         (Some(0), Some(_)) => Ok(Member {
@@ -1056,6 +1055,11 @@ fn member(root: &Path, from: &Found, listing: &Listing, prompt: &Prompt) -> Resu
                 vendor: true,
             })
         }
+        (None, _) if !same => Err(format!(
+            "`{name}` is already in this repository and differs from the library's; run `tect \
+             import module` in a terminal to list the local `{name}` or import the library's \
+             under another name"
+        )),
         (None, _) => Err(format!(
             "`{name}` is already in this repository; run `tect import module` in a terminal to \
              list the local `{name}` or import the library's under another name"
@@ -1589,6 +1593,27 @@ image {
         assert!(vendor(&root, &[], &member, true).is_err());
         assert!(!root.join("modules/missing").exists());
         assert!(!layout::lock(&root).exists());
+    }
+
+    /// The parent directory exists only because the held module was imported
+    /// first.
+    #[test]
+    fn a_parent_imported_after_its_held_module_is_copied() {
+        let root = std::env::temp_dir().join(format!("tect-held-parent-{}", std::process::id()));
+        crate::init::put(&root.join("library/nvidia/module.kdl"), "").unwrap();
+        crate::init::put(&root.join("library/nvidia/cuda/module.kdl"), "").unwrap();
+        crate::init::put(&root.join("modules/nvidia/cuda/module.kdl"), "").unwrap();
+        let sources = [collection("one", "library")];
+        let found = find(&root, &sources, "nvidia", false)
+            .unwrap()
+            .swap_remove(0);
+        let listing = Listing::collect(&root, Vec::new(), &Prompt::silent()).unwrap();
+
+        let chosen = member(&root, &found, &listing, &Prompt::silent());
+        let offered = brought(&root, &sources, false, "one/nvidia");
+        std::fs::remove_dir_all(root).unwrap();
+        assert!(chosen.unwrap().vendor);
+        assert!(offered.unwrap().vendor);
     }
 
     #[test]

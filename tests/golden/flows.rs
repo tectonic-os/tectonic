@@ -1791,16 +1791,27 @@ fn setup_import_edit_guards(flow: &Flow) {
     assert!(!image.contains("module \"flatpak\""), "{image}");
     assert!(root.join("modules/flatpak/module.kdl").is_file());
 
-    // A path the repository holds is refused without a terminal, because the
-    // user cannot be asked which one the image means.
+    // A fork of the module is refused without a terminal, because the user
+    // cannot be asked which copy the image means.
+    let fork = root.join("modules/flatpak/fork.sh");
+    std::fs::write(&fork, "true\n").unwrap();
     let held = import(Some("example"))
         .err()
         .map(|err| err.message().to_string())
         .unwrap_or_default();
     assert!(
-        held.starts_with("`flatpak` is already in this repository;"),
+        held.starts_with("`flatpak` is already in this repository and differs"),
         "{held}"
     );
+
+    // A copy that matches the library is listed as it is.
+    std::fs::remove_file(&fork).unwrap();
+    import(Some("example"))
+        .unwrap_or_else(|err| panic!("{}", err.message()))
+        .apply(&root, &list.sources)
+        .unwrap();
+    let image = std::fs::read_to_string(root.join("example.image.kdl")).unwrap();
+    assert!(image.contains("module \"flatpak\""), "{image}");
 }
 
 /// Several modules are imported at once, with one listing answer and one of
