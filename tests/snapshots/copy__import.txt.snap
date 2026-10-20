@@ -20,7 +20,7 @@ copied
 ==== import upstream/browser
 copied
 ==== import community/browser
-`browser` is already in this repository; run `tect import module` in a terminal to list the local `browser` or import the library's under another name
+`browser` is already in this repository and differs from the library's; run `tect import module` in a terminal to list the local `browser` or import the library's under another name
 ==== import nosuch
 no module called `nosuch` in upstream, community
 ==== import upstream/nosuch
