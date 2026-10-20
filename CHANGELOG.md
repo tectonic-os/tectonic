@@ -2,6 +2,12 @@
 
 Each release's section is written from the typed subjects on `main`.
 
+## 0.6.54 (2026-10-20)
+
+### Fixes
+
+- import: list a held module and skip nested ones (#39)
+
 ## 0.6.53 (2026-10-20)
 
 ### Fixes
