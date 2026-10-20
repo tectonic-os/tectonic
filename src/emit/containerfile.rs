@@ -158,6 +158,15 @@ pub fn sections(image: &Image, root: &Path) -> (String, String) {
         out,
         "# ---- /opt build root ----\nRUN mv /opt /opt.bak && mkdir /opt\n\n"
     );
+    // The subdirectories match a base whose /usr/local is a real directory.
+    // A module that copies into /usr/local/bin then builds on either base.
+    let _ = write!(
+        out,
+        "# ---- /usr/local build root ----\n\
+         RUN if [ -L /usr/local ]; then mv /usr/local /usr/local.bak && \\\n    \
+         mkdir -p /usr/local/bin /usr/local/etc /usr/local/games /usr/local/include \\\n    \
+         /usr/local/lib /usr/local/lib64 /usr/local/libexec /usr/local/share /usr/local/src; fi\n\n"
+    );
 
     for entry in &image.entries {
         // A module that could not be read is already an issue, and there is

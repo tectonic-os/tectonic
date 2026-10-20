@@ -9,6 +9,11 @@ FROM ${BASE} AS rootfs
 # ---- /opt build root ----
 RUN mv /opt /opt.bak && mkdir /opt
 
+# ---- /usr/local build root ----
+RUN if [ -L /usr/local ]; then mv /usr/local /usr/local.bak && \
+    mkdir -p /usr/local/bin /usr/local/etc /usr/local/games /usr/local/include \
+    /usr/local/lib /usr/local/lib64 /usr/local/libexec /usr/local/share /usr/local/src; fi
+
 # ---- core/hello ----
 RUN --mount=type=bind,from=ctx,source=/modules/core/hello,target=/ctx/modules/core/hello \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \

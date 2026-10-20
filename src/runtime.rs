@@ -95,9 +95,119 @@ fn unexpected<'a>(text: &'a str, unit: &str, allowed: &[&str]) -> Vec<&'a str> {
 }
 
 /// Which path of a contract token is there: `a|b` is one capability found at
-/// either.
-fn found(token: &str) -> Option<&str> {
-    token.split('|').find(|path| Path::new(path).exists())
+/// either. A witness under a relocated tree counts where it will be at boot.
+fn found<'a>(token: &'a str, links: &[Link]) -> Option<&'a str> {
+    token
+        .split('|')
+        .find(|path| resolve(Path::new(path), links).is_some_and(|at| at.exists()))
+}
+
+/// `finalize.sh` declares the boot-time links back into each relocated tree in
+/// these tmpfiles.d files.
+const RELOCATIONS: [&str; 2] = [
+    "/usr/lib/tmpfiles.d/zz-opt-symlinks.conf",
+    "/usr/lib/tmpfiles.d/zz-usrlocal-symlinks.conf",
+];
+
+/// One boot-time link from a relocation map.
+struct Link {
+    path: PathBuf,
+    target: PathBuf,
+    /// At boot, an `L+` line replaces a path that already exists. An `L` line
+    /// leaves that path alone.
+    replaces: bool,
+}
+
+/// Reads the `L` and `L+` lines of one relocation map.
+fn links(text: &str) -> Vec<Link> {
+    text.lines()
+        .filter_map(|line| {
+            let mut fields = line.split_whitespace();
+            let kind = fields.next()?;
+            let path = fields.next()?;
+            let target = fields.nth(4)?;
+            (kind == "L" || kind == "L+").then(|| Link {
+                path: unescape(path),
+                target: unescape(target),
+                replaces: kind == "L+",
+            })
+        })
+        .collect()
+}
+
+/// Undoes the escapes that `finalize.sh` writes into a tmpfiles.d field.
+fn unescape(field: &str) -> PathBuf {
+    use std::os::unix::ffi::OsStringExt as _;
+    let bytes = field.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while let Some(&byte) = bytes.get(i) {
+        let hex = bytes
+            .get(i + 2..i + 4)
+            .and_then(|digits| std::str::from_utf8(digits).ok())
+            .and_then(|digits| u8::from_str_radix(digits, 16).ok());
+        match (byte, bytes.get(i + 1), hex) {
+            (b'\\', Some(b'x'), Some(decoded)) => {
+                out.push(decoded);
+                i += 4;
+            }
+            (b'%', Some(b'%'), _) => {
+                out.push(b'%');
+                i += 2;
+            }
+            _ => {
+                out.push(byte);
+                i += 1;
+            }
+        }
+    }
+    PathBuf::from(std::ffi::OsString::from_vec(out))
+}
+
+/// Follows a path the way the booted system will once systemd-tmpfiles has made
+/// the relocation links. The link paths under /var do not exist during the
+/// image build. A map link stands in for its path wherever the boot would
+/// create it.
+fn resolve(path: &Path, links: &[Link]) -> Option<PathBuf> {
+    // The kernel gives up on a path after this many symlinks.
+    const MAX_HOPS: usize = 40;
+    let parts = |path: &Path| -> Vec<PathBuf> {
+        path.components()
+            .rev()
+            .map(|part| PathBuf::from(part.as_os_str()))
+            .collect()
+    };
+    let mut done = PathBuf::from("/");
+    let mut rest = parts(path);
+    let mut hops = 0;
+    while let Some(part) = rest.pop() {
+        if part == Path::new("..") {
+            done.pop();
+            continue;
+        }
+        if part == Path::new(".") {
+            continue;
+        }
+        let next = done.join(&part);
+        let mapped = links.iter().find(|link| link.path == next);
+        let target = match mapped {
+            Some(link) if link.replaces || fs::symlink_metadata(&next).is_err() => {
+                Some(link.target.clone())
+            }
+            _ => fs::read_link(&next).ok(),
+        };
+        match target {
+            Some(target) => {
+                hops += 1;
+                if hops > MAX_HOPS {
+                    return None;
+                }
+                rest.extend(parts(&target));
+            }
+            None => done = next,
+        }
+    }
+    Some(done)
 }
 
 pub fn class_names() -> String {
@@ -706,31 +816,26 @@ pub fn validate_image() -> Result<(), String> {
         }
     }
 
-    println!("==> /usr/lib/opt symlinks");
-    let tmpfiles = "/usr/lib/tmpfiles.d/zz-opt-symlinks.conf";
-    match fs::read_to_string(tmpfiles) {
-        Ok(text) => {
-            for line in text.lines() {
-                let mut fields = line.split_whitespace();
-                let (Some(kind), Some(path)) = (fields.next(), fields.next()) else {
-                    continue;
-                };
-                if kind != "L+" && kind != "L" {
-                    continue;
-                }
-                let target = fields
-                    .skip(4)
-                    .collect::<Vec<_>>()
-                    .join(" ")
-                    .replace("\\x20", " ");
-                if Path::new(&target).exists() {
-                    println!("    {path} -> {target} ok");
-                } else {
-                    report.fail(format!("{path} -> {target}: target does not exist"));
-                }
+    println!("==> relocation symlinks");
+    let mut relocated: Vec<Link> = Vec::new();
+    for map in RELOCATIONS {
+        match fs::read_to_string(map) {
+            Ok(text) => relocated.extend(links(&text)),
+            // If the base's /usr/local is a real directory, then the image build
+            // writes no usrlocal map.
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                println!("    (no {map})");
             }
+            Err(err) => report.fail(format!("{map}: {err}")),
         }
-        Err(_) => println!("    (no /usr/lib/opt symlinks declared)"),
+    }
+    for link in &relocated {
+        let shown = format!("{} -> {}", link.path.display(), link.target.display());
+        if resolve(&link.target, &relocated).is_some_and(|at| at.exists()) {
+            println!("    {shown} ok");
+        } else {
+            report.fail(format!("{shown}: target does not exist"));
+        }
     }
 
     println!("==> contract files");
@@ -739,7 +844,7 @@ pub fn validate_image() -> Result<(), String> {
         println!("    (none declared)");
     } else {
         for token in contracts.split_whitespace() {
-            match found(token) {
+            match found(token, &relocated) {
                 Some(path) => println!("    {path} ok"),
                 None => report.fail(format!(
                     "{}: the manifest declares it, the image does not have it",
@@ -977,7 +1082,7 @@ pub fn fuzz_readers(text: &str) {
         let _ = classify(line);
     }
     let _ = unexpected(text, "fuzz.service", &["mount-not-found"]);
-    let _ = found(text);
+    let _ = found(text, &links(text));
     let _ = assign(text, &[("NAME", "fuzz".to_string())]);
     let _ = opens_luks(text);
     let _ = missing_presets(text, &["fuzz.service".to_string()]);
@@ -1119,11 +1224,116 @@ mod tests {
         fs::write(&here, "").unwrap();
         let there = here.display().to_string();
         assert_eq!(
-            found(&format!("/nonexistent|{there}")),
+            found(&format!("/nonexistent|{there}"), &[]),
             Some(there.as_str())
         );
-        assert_eq!(found("/nonexistent|/nonexistent/too"), None);
+        assert_eq!(found("/nonexistent|/nonexistent/too", &[]), None);
         fs::remove_file(here).unwrap();
+    }
+
+    /// The fixture holds the image after the /usr/local relocation and before
+    /// the boot creates the links. Nothing exists under the root's `var`. The
+    /// root's name holds a space, so the map carries an escaped path.
+    fn relocated(name: &str) -> (PathBuf, Vec<Link>) {
+        let root = std::env::temp_dir().join(format!("tect {name}-{}", std::process::id()));
+        if root.exists() {
+            fs::remove_dir_all(&root).unwrap();
+        }
+        let store = root.join("usr/lib/usrlocal");
+        fs::create_dir_all(store.join("cuda-13.4/bin")).unwrap();
+        fs::write(store.join("cuda-13.4/bin/nvcc"), "").unwrap();
+        std::os::unix::fs::symlink("cuda-13.4", store.join("cuda")).unwrap();
+        fs::create_dir_all(store.join("bin")).unwrap();
+        fs::write(store.join("bin/mytool"), "").unwrap();
+        std::os::unix::fs::symlink("../var/usrlocal", root.join("usr/local")).unwrap();
+        let at = root.display().to_string().replace(' ', "\\x20");
+        let map = format!(
+            "d {at}/var/usrlocal 0755 root root -\n\
+             d {at}/var/usrlocal/cuda-13.4 0755 root root -\n\
+             L {at}/var/usrlocal/cuda-13.4/bin - - - - {at}/usr/lib/usrlocal/cuda-13.4/bin\n\
+             L {at}/var/usrlocal/cuda - - - - {at}/usr/lib/usrlocal/cuda\n\
+             d {at}/var/usrlocal/bin 0755 root root -\n\
+             L {at}/var/usrlocal/bin/mytool - - - - {at}/usr/lib/usrlocal/bin/mytool\n"
+        );
+        (root, links(&map))
+    }
+
+    #[test]
+    fn a_witness_under_a_whole_entry_link_is_found() {
+        let (root, links) = relocated("whole-entry");
+        let witness = root.join("usr/local/cuda/bin/nvcc").display().to_string();
+        assert_eq!(found(&witness, &links), Some(witness.as_str()));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_witness_under_a_child_link_in_bin_is_found() {
+        let (root, links) = relocated("child-link");
+        let witness = root.join("usr/local/bin/mytool").display().to_string();
+        assert_eq!(found(&witness, &links), Some(witness.as_str()));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_witness_missing_from_the_relocated_tree_is_not_found() {
+        let (root, links) = relocated("missing");
+        let witness = root.join("usr/local/bin/absent").display().to_string();
+        assert_eq!(found(&witness, &links), None);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    /// The base image can leave a path on disk where a relocation map declares
+    /// a link. An `L+` line replaces that path at boot. An `L` line leaves it.
+    fn shadowed(name: &str, verb: &str) -> (PathBuf, Vec<Link>) {
+        let root = std::env::temp_dir().join(format!("tect {name}-{}", std::process::id()));
+        if root.exists() {
+            fs::remove_dir_all(&root).unwrap();
+        }
+        fs::create_dir_all(root.join("var/opt/vendor")).unwrap();
+        fs::create_dir_all(root.join("usr/lib/opt/vendor/bin")).unwrap();
+        fs::write(root.join("usr/lib/opt/vendor/bin/tool"), "").unwrap();
+        let at = root.display().to_string().replace(' ', "\\x20");
+        let links = links(&format!(
+            "{verb} {at}/var/opt/vendor - - - - {at}/usr/lib/opt/vendor\n"
+        ));
+        (root, links)
+    }
+
+    #[test]
+    fn an_l_plus_link_wins_over_a_path_on_disk() {
+        let (root, links) = shadowed("replaces", "L+");
+        let witness = root.join("var/opt/vendor/bin/tool").display().to_string();
+        assert_eq!(found(&witness, &links), Some(witness.as_str()));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn an_l_link_leaves_a_path_on_disk_alone() {
+        let (root, links) = shadowed("leaves", "L");
+        let witness = root.join("var/opt/vendor/bin/tool").display().to_string();
+        assert_eq!(found(&witness, &links), None);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_symlink_loop_resolves_to_nothing() {
+        let root = std::env::temp_dir().join(format!("tect loop-{}", std::process::id()));
+        if root.exists() {
+            fs::remove_dir_all(&root).unwrap();
+        }
+        fs::create_dir_all(&root).unwrap();
+        std::os::unix::fs::symlink(root.join("b"), root.join("a")).unwrap();
+        std::os::unix::fs::symlink(root.join("a"), root.join("b")).unwrap();
+        assert_eq!(resolve(&root.join("a/x"), &[]), None);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_map_field_decodes_every_escape_finalize_writes() {
+        assert_eq!(
+            unescape("/a\\x20b%%c\\x5cd\\x0a"),
+            PathBuf::from("/a b%c\\d\n")
+        );
     }
 
     #[test]
