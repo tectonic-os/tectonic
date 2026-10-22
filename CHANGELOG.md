@@ -2,6 +2,14 @@
 
 Each release's section is written from the typed subjects on `main`.
 
+## 0.6.55 (2026-10-22)
+
+### Features
+
+- build: read no library at generate or build (#41)
+- import: refuse an edited tracked module (#42)
+- fetch: refresh tracked modules from CI (#43)
+
 ## 0.6.54 (2026-10-20)
 
 ### Fixes
