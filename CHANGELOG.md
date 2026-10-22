@@ -2,6 +2,12 @@
 
 Each release's section is written from the typed subjects on `main`.
 
+## 0.6.56 (2026-10-22)
+
+### Fixes
+
+- resolve: count exclusive providers per target (#46)
+
 ## 0.6.55 (2026-10-22)
 
 ### Features
