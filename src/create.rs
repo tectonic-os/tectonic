@@ -1561,7 +1561,7 @@ fn holds<'a>(
     let image = list.images.iter().find(|image| image.name == into.image)?;
     let entry = image.entries.iter().find(|entry| {
         entry.path == name
-            && (into.flavour.is_none() || entry.flavour.is_none() || entry.flavour == into.flavour)
+            && crate::resolve::meet(into.flavour.as_deref(), entry.flavour.as_deref())
     })?;
     Some((image, entry))
 }

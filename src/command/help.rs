@@ -164,8 +164,9 @@ It asks, in order:
    local module or to import the library's under another name. The name
    offered is `<name>@1`.
 4. Choose whether to add the modules that they require.
-5. If a module provides a capability that an entry in the image declares
-   exclusive, or the other way round, choose to replace that entry or cancel.
+5. If a module provides a capability that an entry in the same image or
+   flavour declares exclusive, or the other way round, choose to replace that
+   entry or cancel.
 6. Choose whether to generate the CI workflows that they make runnable.
 7. If they claim benchmark rules, choose a profile to measure the image
    against.

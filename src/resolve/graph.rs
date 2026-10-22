@@ -127,6 +127,23 @@ fn elsewhere(module: &Module, providers: &[&Module]) -> Option<String> {
     Some(crate::said(&named))
 }
 
+/// Finds every provider of one capability that conflicts with another
+/// provider of it.
+fn clashing<'m>(providers: &[&'m Module], declares: &impl Fn(&&Module) -> bool) -> Vec<&'m Module> {
+    let side = |module: &'m Module| (module.flavour.as_deref(), declares(&module));
+    providers
+        .iter()
+        .enumerate()
+        .filter(|&(at, &one)| {
+            providers
+                .iter()
+                .enumerate()
+                .any(|(other_at, &other)| at != other_at && super::conflict(side(one), side(other)))
+        })
+        .map(|(_, &module)| module)
+        .collect()
+}
+
 /// Single pass over the resolved graph.
 #[expect(
     clippy::too_many_lines,
@@ -263,23 +280,30 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
         let declares = |module: &&Module| module.exclusive.iter().any(|name| name == capability);
         // A key kind names one key in the image, so its capability conflicts
         // unless every provider declares the same key.
-        let why = match keyed {
+        let found = match keyed {
             true => (providers.len() > 1 && !same_key(capability, providers)).then(|| {
-                "Enable one provider, so that the image holds one key of this kind".to_string()
+                (
+                    "Enable one provider, so that the image holds one key of this kind".to_string(),
+                    providers.clone(),
+                )
             }),
-            false => super::exclusive(&providers.iter().map(declares).collect::<Vec<bool>>()).then(
-                || {
-                    let holder = providers
+            false => {
+                let clashing = clashing(providers, &declares);
+                (!clashing.is_empty()).then(|| {
+                    let holder = clashing
                         .iter()
                         .find(|module| declares(module))
                         .map_or("", |m| m.path.as_str());
-                    format!("`{holder}` declares it `exclusive`, so enable one provider")
-                },
-            ),
+                    (
+                        format!("`{holder}` declares it `exclusive`, so enable one provider"),
+                        clashing,
+                    )
+                })
+            }
         };
-        if let Some(why) = why {
-            let names: Vec<&str> = providers.iter().map(|m| m.path.as_str()).collect();
-            let first = providers[0];
+        if let Some((why, clashing)) = found {
+            let names: Vec<&str> = clashing.iter().map(|m| m.path.as_str()).collect();
+            let first = clashing[0];
             issues.push(
                 Issue::new(
                     format!("`{capability}` is provided by more than one enabled module"),

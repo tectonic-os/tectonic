@@ -240,6 +240,7 @@ fn offered(
 /// refuse alike.
 struct Fit<'a> {
     image: &'a crate::model::image::Image,
+    flavour: Option<&'a str>,
     index: crate::provider::Index,
 }
 
@@ -251,11 +252,12 @@ impl<'a> Fit<'a> {
         list: &'a crate::model::image::List,
         listing: &'a Listing,
     ) -> Option<Self> {
-        let (named, _) = listing.targets().into_iter().next()?;
+        let (named, flavour) = listing.targets().into_iter().next()?;
         let image = list.images.iter().find(|image| image.name == named)?;
         let disk = crate::parse::disk::Disk::scan(root);
         Some(Self {
             image,
+            flavour,
             index: crate::provider::Index::scan(root, sources, &disk, false),
         })
     }
@@ -285,9 +287,8 @@ impl<'a> Fit<'a> {
 
     /// Names the first capability that the module would make a conflict in the
     /// image, and every entry that already provides it. A module the base
-    /// covers entirely is suppressed, so it never clashes. `check` counts the
-    /// entries of every flavour against each other, so this counts them all
-    /// too, whichever flavour the import is for.
+    /// covers entirely is suppressed, so it never clashes. An entry clashes
+    /// only if it builds into a target with the import, as `check` counts it.
     fn clash(
         &self,
         declares: &crate::parse::module::Summary,
@@ -307,26 +308,26 @@ impl<'a> Fit<'a> {
             return None;
         }
         for capability in &declares.provides {
-            let held: Vec<(&'a crate::model::image::Entry, bool)> = self
+            let import = (self.flavour, declares.exclusive.contains(capability));
+            let held: Vec<&'a crate::model::image::Entry> = self
                 .image
                 .entries
                 .iter()
-                .filter_map(|entry| {
-                    let provider = self.index.at(&entry.path)?;
-                    provider
-                        .declares
-                        .provides
-                        .contains(capability)
-                        .then(|| (entry, provider.declares.exclusive.contains(capability)))
+                .filter(|entry| {
+                    self.index.at(&entry.path).is_some_and(|provider| {
+                        provider.declares.provides.contains(capability)
+                            && crate::resolve::conflict(
+                                import,
+                                (
+                                    entry.flavour.as_deref(),
+                                    provider.declares.exclusive.contains(capability),
+                                ),
+                            )
+                    })
                 })
                 .collect();
-            let mut flags: Vec<bool> = held.iter().map(|(_, exclusive)| *exclusive).collect();
-            flags.push(declares.exclusive.contains(capability));
-            if crate::resolve::exclusive(&flags) {
-                return Some((
-                    capability.clone(),
-                    held.into_iter().map(|(entry, _)| entry).collect(),
-                ));
+            if !held.is_empty() {
+                return Some((capability.clone(), held));
             }
         }
         None
@@ -1495,17 +1496,53 @@ mod tests {
     }
 
     #[test]
-    fn a_holder_in_another_flavour_clashes_as_check_counts_it() {
-        let root = flavoured("clash-flavour", "base \"example\" { family \"fedora\" }");
+    fn a_holder_in_a_sibling_flavour_never_clashes() {
+        let root = flavoured("clash-sibling", "base \"example\" { family \"fedora\" }");
         let (list, _) = crate::model::image::List::load(&root);
         let listing =
             Listing::target(&root, Some("example/prod".into()), &Prompt::silent()).unwrap();
         let fit = Fit::of(&root, &[], &list, &listing).expect("the flavour is the target");
+
+        assert!(fit.clash(&upstream_flatpak()).is_none());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn an_ungated_import_clashes_with_a_holder_in_any_flavour() {
+        let root = flavoured("clash-ungated", "base \"example\" { family \"fedora\" }");
+        let (list, _) = crate::model::image::List::load(&root);
+        let listing = Listing::target(&root, Some("example".into()), &Prompt::silent()).unwrap();
+        let fit = Fit::of(&root, &[], &list, &listing).expect("the image is the target");
         let (capability, held) = fit.clash(&upstream_flatpak()).expect("a clash");
 
         assert_eq!(capability, "flatpak");
         assert_eq!(held.len(), 1);
         assert_eq!(held[0].path, "flathub");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// `plain` is listed first and coexists with the import. Only the
+    /// exclusive `flathub` clashes with it.
+    #[test]
+    fn an_ungated_import_clashes_only_with_an_exclusive_holder() {
+        let root = targeted("clash-plain");
+        crate::init::put(
+            &root.join(layout::IMAGE_FILE),
+            "schema-version 1\n\nimage {\n    name \"example\"\n    base \"example\" { family \"fedora\" }\n    flavours {\n        dev\n        prod\n    }\n    modules {\n        flavour \"prod\" { module \"plain\" }\n        flavour \"dev\" { module \"flathub\" }\n    }\n}\n",
+        )
+        .unwrap();
+        crate::init::put(
+            &root.join("modules/plain/module.kdl"),
+            "schema-version 1\n\nprovides \"flatpak\"\n",
+        )
+        .unwrap();
+        let (list, _) = crate::model::image::List::load(&root);
+        let listing = Listing::target(&root, Some("example".into()), &Prompt::silent()).unwrap();
+        let fit = Fit::of(&root, &[], &list, &listing).expect("the image is the target");
+        let (_, held) = fit.clash(&upstream_flatpak()).expect("a clash");
+
+        let paths: Vec<&str> = held.iter().map(|entry| entry.path.as_str()).collect();
+        assert_eq!(paths, ["flathub"]);
         std::fs::remove_dir_all(root).unwrap();
     }
 
