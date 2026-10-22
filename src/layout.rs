@@ -351,7 +351,7 @@ pub const REPOSITORY: Tree = Tree {
             what: "More images. The name in front of the suffix is decorative." },
         Place { path: &[MODULES, "/"], writer: "the user, `tect create module` or `tect import module`", tracked: true,
             what: "The modules of the repository, one directory each. See [Modules](modules.md)." },
-        Place { path: &[MODULES, "/", LOCK_FILE], writer: "`tect import module`", tracked: true,
+        Place { path: &[MODULES, "/", LOCK_FILE], writer: "`tect import module`, `tect fetch modules` and `tect set module`", tracked: true,
             what: "Where each imported module came from, and what its content hashed to. See \
                 [`modules.lock.kdl`](lock.md)." },
         Place { path: &[KEYS, "/", PUBLIC_KEYS, "/"], writer: "`tect create key` or `tect set key`", tracked: true,
@@ -374,9 +374,10 @@ pub const REPOSITORY: Tree = Tree {
         Place { path: &["disk_config/"], writer: "`tect create repo`, then the user", tracked: true,
             what: "The settings that bootc-image-builder reads when it builds a Fedora or RHEL disk \
                 image. `disk.toml` sets the smallest size of `/`." },
-        Place { path: &[".github/renovate.json5"], writer: "`tect create repo`, then the user", tracked: true,
-            what: "The Renovate settings. Its custom managers keep the `tect` release in `repo.kdl` \
-                and each pin that declares `renovate` current." },
+        Place { path: &[".github/renovate.json5"], writer: "`tect generate`", tracked: true,
+            what: "The Renovate settings, written from the `renovate` block in `repo.kdl`. Its custom \
+                managers keep the `tect` release, the base images, each pin that declares \
+                `renovate` and each image entry's tracked `version` current." },
         Place { path: &[".gitignore"], writer: "`tect create repo`", tracked: true,
             what: "Keeps `keys/private/`, `out/` and `.cache/` out of git." },
     ],

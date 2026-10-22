@@ -300,6 +300,14 @@ pub(super) const SET_KEY_NOTES: &str = r#"> [!WARNING]
 > - `pcr-signing` takes a bare PEM public key.
 > - `ssh-keygen` takes an OpenSSH key line."#;
 
+pub(super) const SET_MODULE: &str = r#"Makes an imported module the repository's own copy. The module stops tracking
+its library, so `tect fetch modules` passes it over, and the user may edit it.
+With no `--untracked`, it asks first. With no terminal, it needs the flag."#;
+
+pub(super) const SET_MODULE_NOTES: &str = r#"> [!NOTE]
+> The lock entry keeps the library, the path and the content hash, so `tect
+> why` still says where the copy came from and reads out each later edit."#;
+
 pub(super) const SET_WORKFLOWS: &str = r#"Chooses the CI workflows that the repository generates, and writes the choice
 into `workflows` in `repo.kdl`. Run `tect generate` next to write the workflow
 files. A workflow that the repository cannot run shows the reason, and the user
@@ -402,8 +410,7 @@ pub(super) const CHECK_NOTES: &str = r#"> [!NOTE]
 
 pub(super) const GENERATE: &str = r#"Writes the build files, and the CI workflows that `repo.kdl` names. Run it
 after a change to a KDL file. `tect build` refuses build files that are not
-current. It fetches the imported modules first, so the build files match the
-collections. It writes:
+current. It reads only the repository's own modules. It writes:
 
 - `generated/<image>/Containerfile`, one for each image
 - `generated/<image>/modules/<module>.sh`, the build script of each module
@@ -411,7 +418,8 @@ collections. It writes:
 - `generated/<image>/graph.md` and `graph.json`, the capability graph
 - `generated/plan.json`
 - `generated/seed.kdl`, if `repo.kdl` names a seedable image
-- each workflow that `workflows` names, under `.github/workflows/`"#;
+- each workflow that `workflows` names, under `.github/workflows/`
+- `.github/renovate.json5`, if `repo.kdl` holds a `renovate` block"#;
 
 pub(super) const GENERATE_NOTES: &str = r#"> [!NOTE]
 > It clears `generated/` first, so the files of a removed image or module go
@@ -504,7 +512,8 @@ document holds the images, the targets of each image, and what each target is
 made of. A script reads a field from it, and derives nothing from a name."#;
 
 pub(super) const VERIFY: &str = r#"Writes every build file again in memory, and compares each one byte for byte
-with what `generated/` holds. It names each file that differs, each file that is
+with what the repository holds: `generated/`, the declared workflows and
+`.github/renovate.json5`. It names each file that differs, each file that is
 missing, and each file under `generated/` that nothing writes. Every build runs
 it first."#;
 
@@ -620,6 +629,22 @@ It runs inside a build:
 - `bin` installs one executable
 - `rpm` installs the package, on an rpm family
 - `deb` installs the package, on a deb family"#;
+
+pub(super) const FETCH_MODULES: &str = r#"Refreshes each tracked module from the library that its lock entry names, as
+`sources` in `repo.kdl` declares that library now. It replaces the module's
+files, and records the new content hash and revision in the lock. A module
+whose library has not moved stays as it is. The scheduled `update-modules`
+workflow runs it and opens a pull request."#;
+
+pub(super) const FETCH_MODULES_NOTES: &str = r#"> [!WARNING]
+> A tracked module whose content no longer matches its lock entry stops the
+> update before anything is written. Undo the edit, or make the copy the
+> repository's own with `tect set module <path> --untracked`.
+
+> [!NOTE]
+> A tracked module whose directory is missing is copied again. A module that
+> another module's directory holds has its own lock entry, so the refresh of
+> the outer module leaves it in place."#;
 
 pub(super) const VALIDATE_IMAGE: &str = r#"Runs every check that a built image has to pass. The build gives it the preset
 files of the enabled modules, and it fails on each one that the image does not

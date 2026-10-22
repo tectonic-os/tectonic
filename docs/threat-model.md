@@ -70,6 +70,13 @@ A collection is a Git repository of modules or base-image catalogs that
   gaps*.
 - A collection is never signature-verified. The hash pin and the review of
   `repo.kdl` are the controls. See *Accepted risks*.
+- A module copy refuses a symbolic link (`src/init.rs` `copy_below`), so a
+  collection cannot copy a file from outside itself into `modules/`. `tect
+  fetch modules` stages the copy first, so a refused copy leaves the module
+  as it was.
+- The `update-modules` workflow runs `tect fetch modules` with a token that
+  can push a branch and open a pull request. What it copies reaches `main`
+  only through the review of that pull request.
 
 ### Assets a module downloads
 
@@ -183,8 +190,8 @@ carries a `// SAFETY:` comment, and the `[lints]` table in
   `--locked`, so CI builds the committed lock and never resolves around it.
 - In the three tool repositories, Renovate proposes a release only after it
   has stood for seven days (`.github/renovate.json5`). The Renovate
-  configuration that `tect` scaffolds into an image repository has no such
-  wait. See *Known gaps*.
+  policy that `tect create repo` writes into an image repository's `repo.kdl`
+  has no such wait. See *Known gaps*.
 
 ## Accepted risks
 
@@ -209,8 +216,8 @@ Each gap is current behaviour that a control does not yet cover.
 - A repository with no `tect-version` takes each new `tect` release on its
   next build, with no warning from `tect check`.
 - A `Containerfile.inc` fragment's `RUN` lines run outside the network rule.
-- The Renovate configuration that `tect` scaffolds merges a pin update with
-  no wait after the release.
+- The Renovate policy that `tect create repo` writes into `repo.kdl` merges a
+  pin update with no wait after the release.
 - A rewrite of the whole installer media, recorded ID included, passes the
   installer's check.
 

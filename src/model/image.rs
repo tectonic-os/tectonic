@@ -177,6 +177,8 @@ pub struct Flavour {
 pub struct Workflow {
     pub name: String,
     pub span: Span,
+    /// Holds the cron line that replaces the one `at` places.
+    pub schedule: Option<String>,
 }
 
 /// One entry in the list: a module, and the decisions the image author makes
@@ -247,6 +249,9 @@ pub struct List {
     pub seed: Option<Seed>,
     /// Whether a build stamps the generated manifest onto the image as an OCI label.
     pub manifest_label: bool,
+    /// Holds the JSON members that the `renovate` block maps to. If the block
+    /// is absent, then `generate` writes no Renovate settings.
+    pub renovate: Option<Vec<(String, common::json::Json)>>,
     /// Whether a provenance fact that is missing or does not match is an error.
     /// Every fact is recorded either way.
     pub audit_enforce: bool,

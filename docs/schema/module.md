@@ -382,8 +382,8 @@ fragment position="after"
 Lets an image change how this module builds, such as which fonts it installs. The module declares the option with a type and a default, and each image can set its own value.
 
 ```kdl
-option "fonts" type="list" {
-    default "JetBrainsMono" "FiraCode"
+option "version" type="string" {
+    default "128.0"
 }
 ```
 
@@ -399,6 +399,7 @@ Accepts: *string*, then {&nbsp;[fields](#option-fields)&nbsp;}
 | --- | --- | --- |
 | [`description`](#option-description) (optional) | *string* | What the option does. |
 | [`default`](#option-default) (required) | *list of strings* | The value that the module builds with if no image sets one. |
+| [`renovate`](#option-renovate) (optional) |  | What keeps the value of a `version` option current. |
 
 > [!NOTE]
 > Every declared option reaches the layer of its module as `OPT_<NAME>`. `<NAME>` is the option name in upper case, and each dash becomes an underscore.
@@ -412,8 +413,8 @@ Accepts: *string*, then {&nbsp;[fields](#option-fields)&nbsp;}
 What the option does.
 
 ```kdl
-option "fonts" type="list" {
-    description "Nerd Font families to install"
+option "version" type="string" {
+    description "The Firefox release to install"
 }
 ```
 
@@ -426,12 +427,30 @@ Accepts: *string*
 The value that the module builds with if no image sets one.
 
 ```kdl
-option "fonts" type="list" {
-    default "JetBrainsMono" "FiraCode"
+option "version" type="string" {
+    default "128.0"
 }
 ```
 
 Accepts: *list of strings*
+
+<a id="option-renovate"></a>
+
+### `renovate` (optional)
+
+Names where Renovate looks up new versions of the software that a `version` option installs. `tect generate` writes one Renovate manager for each image entry that sets the option, so Renovate updates the value in the image file and the module stays as it is.
+
+```kdl
+option "version" type="string" {
+    renovate datasource="repology" depName="fedora_rawhide/firefox"
+}
+```
+
+| Property | Accepts | Description |
+| --- | --- | --- |
+| `datasource=` (required) | *string* | The Renovate datasource that publishes the versions. |
+| `depName=` (required) | *string* | The name that the datasource knows the software by. |
+| `extractVersion=` (optional) | *string* | The pattern that extracts the version from what the datasource reports. |
 
 <a id="variant"></a>
 

@@ -1254,9 +1254,101 @@ graph LR
   "overrides": [],
   "suppressed": []
 }
+==== .github/renovate.json5
+// `tect generate` writes this file from the `renovate` block in repo.kdl.
+// `tect verify` byte-compares it, so the policy is changed in repo.kdl.
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+
+  "rebaseWhen": "never",
+  "timezone": "Etc/UTC",
+  "extends": [
+    "config:best-practices"
+  ],
+  "schedule": [
+    "* 0-5 * * *"
+  ],
+  "packageRules": [
+    {
+      "groupName": "scheduled updates",
+      "automerge": true,
+      "matchPackageNames": [
+        "*"
+      ]
+    },
+    {
+      "pinDigests": false,
+      "matchPackageNames": [
+        "quay.io/fedora/fedora-bootc"
+      ]
+    }
+  ],
+
+  // `tect generate` writes the workflows and `tect verify` byte-compares
+  // them, so a bump inside one is reverted by the next regeneration.
+  "ignorePaths": [".github/workflows/**"],
+
+  // A generated Containerfile sits under its image's own directory, which the
+  // dockerfile manager does not recognise, and its FROM has to bump with the
+  // declaration below.
+  "dockerfile": {
+    "managerFilePatterns": ["/^generated/[^/]+/Containerfile$/"],
+  },
+
+  "customManagers": [
+    {
+      "customType": "regex",
+      // The tag carries the version, so the leading v comes back off.
+      "description": "The pinned build tool release",
+      "managerFilePatterns": ["/^repo\\.kdl$/"],
+      "extractVersionTemplate": "^v(?<version>.+)$",
+      "matchStrings": [
+        "// renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s*\\ntect-version \"(?<currentValue>[^\"]+)\"",
+      ],
+    },
+    {
+      "customType": "regex",
+      // Every root .kdl but repo.kdl is an image declaring its own base, so
+      // the pattern is the layout rather than one file name.
+      // The digest is optional because the catalog offers a tag and pinning one
+      // is the repository's decision; with `currentDigest` matched, Renovate
+      // bumps whichever half is written.
+      "description": "Base image reference in an image file",
+      "managerFilePatterns": ["/^[^/]+\\.kdl$/"],
+      "datasourceTemplate": "docker",
+      "matchStrings": [
+        "base \"(?<depName>[^\":]+):(?<currentValue>[^\"@]+)(?:@(?<currentDigest>sha256:[0-9a-f]{64}))?\"",
+      ],
+    },
+    {
+      "customType": "regex",
+      // Every asset pin spells its tracker the same way, so one manager covers
+      // them all. RE2 has no negative lookahead. The leading-lowercase rule
+      // excludes an underscore-prefixed module directory.
+      "description": "Version-tagged pins",
+      "managerFilePatterns": [
+        "/^modules/([a-z][^/]*/)?[a-z][^/]*/module\\.kdl$/",
+      ],
+      "matchStrings": [
+        "renovate datasource=\"(?<datasource>github-releases|github-tags)\" depName=\"(?<depName>[^\"]+)\"(?: extractVersion=\"(?<extractVersion>[^\"]+)\")?\\s*\\n\\s*version \"(?<currentValue>[^\"]+)\"",
+      ],
+    },
+    {
+      "customType": "regex",
+      "description": "Commit-pinned asset pins in module.kdl",
+      "managerFilePatterns": ["/^modules/([a-z][^/]*/)?[a-z][^/]*/module\\.kdl$/"],
+      "matchStrings": [
+        "renovate datasource=\"(?<datasource>git-refs)\" depName=\"(?<depName>[^\"]+)\"\\s*\\n\\s*version \"(?<currentDigest>[^\"]+)\"",
+      ],
+      // The regex manager requires a currentValue even for a digest-only pin.
+      "currentValueTemplate": "master",
+    },
+  ],
+}
 ==== generated/plan.json
 ==== .github/workflows/build.yml
 ==== .github/workflows/build-disk.yml
 ==== .github/workflows/base-sig-probe.yml
 ==== .github/workflows/cleanup-registry.yml
 ==== .github/workflows/smoke-test.yml
+==== .github/workflows/update-modules.yml

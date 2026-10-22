@@ -37,8 +37,6 @@ Which files to keep in scripts/? [1-5, several, 0 for none]: 1
 initialised a git repository in example
 
 example/
-├── .github/
-│   └── + renovate.json5
 ├── disk_config/
 │   └── + disk.toml
 ├── modules/

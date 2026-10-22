@@ -43,6 +43,8 @@ Every command takes these options, before or after its own words. [`tect`](#tect
 | --- | --- | --- |
 | [`tect create module [name]`](#tect-create-module) | write a module, and offer to list it in an image | [`module.kdl`](schema/module.md) |
 | [`tect import module [name]`](#tect-import-module) | copy a module from a library repo.kdl declares into this repository | [`modules.lock.kdl`](schema/lock.md) |
+| [`tect set module [path]`](#tect-set-module) | make an imported module the repository's own | [`modules.lock.kdl`](schema/lock.md) |
+| [`tect fetch modules [path]...`](#tect-fetch-modules) | refresh each tracked module from its library | [`modules.lock.kdl`](schema/lock.md) |
 
 ### Keys
 
@@ -213,8 +215,6 @@ It asks, in order:
 
 ```text
 example/
-├── .github/
-│   └── + renovate.json5
 ├── disk_config/
 │   └── + disk.toml
 ├── modules/
@@ -800,6 +800,28 @@ It asks, in order:
 > - `pcr-signing` takes a bare PEM public key.
 > - `ssh-keygen` takes an OpenSSH key line.
 
+## `tect set module`
+
+Makes an imported module the repository's own copy. The module stops tracking
+its library, so `tect fetch modules` passes it over, and the user may edit it.
+With no `--untracked`, it asks first. With no terminal, it needs the flag.
+
+**Usage:** `tect set module [OPTIONS] [path]`
+
+| Argument | Description |
+| --- | --- |
+| `<path>` | the module, by its path under `modules/` |
+
+| Option | Description |
+| --- | --- |
+| `--untracked` | stop tracking its library, without asking |
+
+**Schema:** [`modules.lock.kdl`](schema/lock.md)
+
+> [!NOTE]
+> The lock entry keeps the library, the path and the content hash, so `tect
+> why` still says where the copy came from and reads out each later edit.
+
 ## `tect check`
 
 Reads every file in the repository and reports each problem at the line that
@@ -828,8 +850,7 @@ the flavours and the listed modules that the base already provides.
 
 Writes the build files, and the CI workflows that `repo.kdl` names. Run it
 after a change to a KDL file. `tect build` refuses build files that are not
-current. It fetches the imported modules first, so the build files match the
-collections. It writes:
+current. It reads only the repository's own modules. It writes:
 
 - `generated/<image>/Containerfile`, one for each image
 - `generated/<image>/modules/<module>.sh`, the build script of each module
@@ -838,6 +859,7 @@ collections. It writes:
 - `generated/plan.json`
 - `generated/seed.kdl`, if `repo.kdl` names a seedable image
 - each workflow that `workflows` names, under `.github/workflows/`
+- `.github/renovate.json5`, if `repo.kdl` holds a `renovate` block
 
 **Usage:** `tect generate`
 
@@ -1085,7 +1107,8 @@ made of. A script reads a field from it, and derives nothing from a name.
 ## `tect verify`
 
 Writes every build file again in memory, and compares each one byte for byte
-with what `generated/` holds. It names each file that differs, each file that is
+with what the repository holds: `generated/`, the declared workflows and
+`.github/renovate.json5`. It names each file that differs, each file that is
 missing, and each file under `generated/` that nothing writes. Every build runs
 it first.
 
@@ -1211,7 +1234,9 @@ It runs inside a build:
 - `rpm` installs the package, on an rpm family
 - `deb` installs the package, on a deb family
 
-**Usage:** `tect fetch <what> <url> <sha256> [target] [extra]...`
+**Usage:** `tect fetch <what> <url> <sha256> [target] [extra]...
+       fetch [what] [url] [sha256] [target] [extra]... <COMMAND>`
+
 
 | Argument | Description |
 | --- | --- |
@@ -1222,6 +1247,32 @@ It runs inside a build:
 | `<extra>` | for `tree`, more arguments to tar; for `bin`, the file inside the archive |
 
 **Schema:** [`module.kdl`&nbsp;›&nbsp;`asset`](schema/module.md#asset)
+
+## `tect fetch modules`
+
+Refreshes each tracked module from the library that its lock entry names, as
+`sources` in `repo.kdl` declares that library now. It replaces the module's
+files, and records the new content hash and revision in the lock. A module
+whose library has not moved stays as it is. The scheduled `update-modules`
+workflow runs it and opens a pull request.
+
+**Usage:** `tect fetch modules [path]...`
+
+| Argument | Description |
+| --- | --- |
+| `<path>` | the modules, by their path under `modules/`; every tracked module if absent |
+
+**Schema:** [`modules.lock.kdl`](schema/lock.md)
+
+> [!WARNING]
+> A tracked module whose content no longer matches its lock entry stops the
+> update before anything is written. Undo the edit, or make the copy the
+> repository's own with `tect set module <path> --untracked`.
+
+> [!NOTE]
+> A tracked module whose directory is missing is copied again. A module that
+> another module's directory holds has its own lock entry, so the refresh of
+> the outer module leaves it in place.
 
 ## `tect registry namespace`
 

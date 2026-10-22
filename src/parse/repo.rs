@@ -10,6 +10,7 @@ use crate::parse::schema::{check_doc, Arg, Kind, Node, Prop, Say, FILE_SCHEMA_VE
 use crate::parse::{
     bool_arg, check_sha256, child, int_arg, kids, prop, prop_span, string_arg, syntax_issue,
 };
+use common::json::Json;
 use kdl::{KdlDocument, KdlNode};
 use std::path::Path;
 
@@ -71,7 +72,7 @@ const NETWORK: Node = Node::new("network", "The rule that decides whether each s
 /// repo.kdl's grammar, and the whole of it.
 #[rustfmt::skip]
 pub const REPO: Node = Node::new("repo",
-    "What is true of the repository as a whole, apart from its images.").about("`repo.kdl` sits at the root of the repository and holds what applies to every image in it: which `tect` release builds it, where its modules come from, which CI workflows run and which security rules every image follows. The images themselves live in image files beside it.").scaffolds(&["schema-version", "name", "sources", "workflows"])
+    "What is true of the repository as a whole, apart from its images.").about("`repo.kdl` sits at the root of the repository and holds what applies to every image in it: which `tect` release builds it, where its modules come from, which CI workflows run and which security rules every image follows. The images themselves live in image files beside it.").scaffolds(&["schema-version", "name", "sources", "workflows", "renovate"])
     .children(&[
         Node::new("schema-version", "The schema release that this repository is written against.").about("The schema version tells `tect` which reader to use for the repository. A repository written against an earlier release keeps building, because the version picks the reader. `tect create repo` writes it, and `tect` never changes it.").example("1")
             .arg(Arg::Int, Say::new("`{}` needs a number", "not a version", "`schema-version 1`"))
@@ -191,15 +192,37 @@ pub const REPO: Node = Node::new("repo",
                 Node::new("", "One workflow, which the stem of its file names.").example("build")
                     .arg(Arg::None, Say::new("a workflow takes no arguments", "unexpected value",
                         "the file stem is the node name: `smoke-test`"))
-                    .props(&[], Say::new("unknown workflow property `{}`", "not part of the schema",
-                        "a workflow is named and nothing else; `at` on the block moves every \
-                         schedule at once")),
+                    .props(&[
+                        Prop { name: "schedule", kind: Kind::Str,
+                            desc: "The cron line that this workflow runs on, in UTC. It replaces \
+                                the schedule that `at` places.",
+                            say: Say::new("`{}` must be a cron line", "not a string",
+                                "`update-modules schedule=\"30 5 * * 1\"`"),
+                            missing: Say::NONE },
+                    ], Say::new("unknown workflow property `{}`", "not part of the schema",
+                        "a workflow takes `schedule`; `at` on the block moves every schedule at \
+                         once")),
             ], Say::NONE)
             .notes(&[
                 "`tect generate` writes only the workflows named here. After a tool upgrade, it \
                  rewrites each named workflow.",
                 "`tect set workflows` edits this block.",
                 "The `conforms` of each image decides whether SCAP content exists to scan.",
+            ]),
+        Node::new("renovate", "The Renovate policy that `tect generate` writes into `.github/renovate.json5`.").about("Says when Renovate opens its pull requests and how it groups and merges them. The block is Renovate's own configuration in KDL. `tect generate` adds the custom managers that match the files it writes, and one manager for each image entry that sets a tracked `version`.").example("rebaseWhen=\"never\"").scaffolds(&[""])
+            .once("a second block would split one policy in two")
+            .children(&[
+                Node::new("", "One Renovate setting, named as Renovate names it.").example("schedule \"* 0-5 * * *\""),
+            ], Say::NONE)
+            .notes(&[
+                "A property is a scalar setting. The arguments of a child are an array, because \
+                 Renovate wants array syntax for a list of one.",
+                "The properties and named children of a child are an object. A block of `-` \
+                 children is an array, and each `-` holds one value or one object.",
+                "`$schema`, `ignorePaths`, `dockerfile` and `customManagers` belong to `tect \
+                 generate`, and the block refuses them.",
+                "If the block is absent, then `tect generate` writes no `.github/renovate.json5`, \
+                 and leaves one the user wrote in place.",
             ]),
         Node::new("sources",
             "The module and base-image libraries this repository reads.").about("Lists typed libraries that this repository reads from a local directory or fetches from an HTTPS Git repository. A `modules` source feeds imports. A `base-images` source is the base catalog. Every source declares exactly one of `dir` and `url`: `dir` names a directory on this machine, and `url` names an HTTPS Git repository.").scaffolds(&["modules", "base-images"])
@@ -461,6 +484,7 @@ impl List {
             pr_image_id: None,
             seed: None,
             manifest_label: false,
+            renovate: None,
             audit_enforce: false,
             network: Network::default(),
             schema_version: None,
@@ -576,6 +600,7 @@ impl List {
             match (is_repo, node.name().value()) {
                 (false, "image") => self.parse_image(node, src, issues),
                 (true, "workflows") => self.parse_workflows(node, src, issues),
+                (true, "renovate") => self.renovate = Some(renovate(node, src, issues)),
                 (true, "sources") => self.parse_sources(node, src, issues),
                 (true, "default-image") => {
                     self.default_image_id = string_arg(node).map(str::to_string);
@@ -817,7 +842,25 @@ impl List {
                 continue;
             }
 
-            self.workflows.push(Workflow { name, span });
+            let schedule = prop(node, "schedule").map(str::to_string);
+            if let Some(line) = schedule.as_deref().filter(|line| !is_cron(line)) {
+                issues.push(
+                    Issue::new(format!("`{line}` is not a cron line"), src)
+                        .at(
+                            prop_span(node, "schedule").unwrap_or(span),
+                            "not five fields",
+                        )
+                        .help(
+                            "five fields of digits, names, `*`, `/`, `,` and `-`, as \
+                             `30 5 * * 1` runs at 05:30 UTC each Monday",
+                        ),
+                );
+            }
+            self.workflows.push(Workflow {
+                name,
+                span,
+                schedule,
+            });
         }
     }
 
@@ -852,11 +895,236 @@ impl List {
     }
 }
 
+/// The Renovate settings that `generate` writes itself.
+/// A key of the same name in the `renovate` block would replace them.
+const RENOVATE_OWNED: [&str; 4] = ["$schema", "ignorePaths", "dockerfile", "customManagers"];
+
+/// `renovate rebaseWhen="never" { schedule "* 0-5 * * *" }` maps to the JSON
+/// members Renovate reads. A property is a scalar member. A child's arguments
+/// are an array, because Renovate wants array syntax for a one-item list.
+fn renovate(block: &KdlNode, src: &Source, issues: &mut Issues) -> Vec<(String, Json)> {
+    let names = block
+        .entries()
+        .iter()
+        .filter_map(|entry| entry.name().map(|name| (name.value(), entry.span())))
+        .chain(
+            kids(block)
+                .iter()
+                .map(|child| (child.name().value(), child.name().span())),
+        );
+    for (name, span) in names {
+        if RENOVATE_OWNED.contains(&name) {
+            issues.push(
+                Issue::new(format!("`{name}` belongs to `tect generate`"), src)
+                    .at(span, "the generated settings carry it")
+                    .help(
+                        "`tect generate` writes `$schema`, `ignorePaths`, `dockerfile` and \
+                         `customManagers` to match the files it writes",
+                    ),
+            );
+        }
+    }
+    renovate_object(block, src, issues)
+}
+
+/// Maps the node to one JSON object. Its properties come first, then its
+/// children by name.
+fn renovate_object(node: &KdlNode, src: &Source, issues: &mut Issues) -> Vec<(String, Json)> {
+    let mut members: Vec<(String, Json)> = Vec::new();
+    let mut add = |name: &str, span: miette::SourceSpan, value: Json, issues: &mut Issues| {
+        if members.iter().any(|(held, _)| held == name) {
+            issues.push(
+                Issue::new(format!("`{name}` is declared twice"), src)
+                    .at(span, "a JSON object holds one member of each name"),
+            );
+            return;
+        }
+        members.push((name.to_string(), value));
+    };
+    for entry in node.entries() {
+        if let Some(name) = entry.name() {
+            let value = json_value(entry.value(), entry.span(), src, issues);
+            add(name.value(), entry.span(), value, issues);
+        }
+    }
+    for child in kids(node) {
+        let name = child.name().value();
+        if name == "-" {
+            issues.push(
+                Issue::new("a `-` item sits beside named members", src)
+                    .at(child.name().span(), "an array item")
+                    .help(
+                        "a block of `-` items is an array, and a block of named nodes is an object",
+                    ),
+            );
+            continue;
+        }
+        let value = renovate_member(child, src, issues);
+        add(name, child.name().span(), value, issues);
+    }
+    members
+}
+
+/// Maps one named member. Arguments and a block of `-` items each map to an
+/// array. Properties and named children map to an object.
+fn renovate_member(node: &KdlNode, src: &Source, issues: &mut Issues) -> Json {
+    let args: Vec<Json> = node
+        .entries()
+        .iter()
+        .filter(|entry| entry.name().is_none())
+        .map(|entry| json_value(entry.value(), entry.span(), src, issues))
+        .collect();
+    let props = node.entries().iter().any(|entry| entry.name().is_some());
+    let children = kids(node);
+    let name = node.name().value();
+    if !args.is_empty() {
+        if props || !children.is_empty() {
+            issues.push(
+                Issue::new(format!("`{name}` holds both values and members"), src)
+                    .at(
+                        node.name().span(),
+                        "arguments are an array, members are an object",
+                    )
+                    .help(
+                        "give it arguments for an array, or properties and children for an object",
+                    ),
+            );
+        }
+        return Json::Array(args);
+    }
+    if !props && !children.is_empty() && children.iter().all(|c| c.name().value() == "-") {
+        return Json::Array(
+            children
+                .iter()
+                .map(|item| renovate_item(item, src, issues))
+                .collect(),
+        );
+    }
+    if !props && children.is_empty() {
+        issues.push(
+            Issue::new(format!("`{name}` holds no value"), src)
+                .at(node.name().span(), "nothing to map")
+                .help("give it arguments for an array, or properties and children for an object"),
+        );
+    }
+    Json::Object(renovate_object(node, src, issues))
+}
+
+/// Maps one `-` item of an array. The item holds one value or one object.
+fn renovate_item(node: &KdlNode, src: &Source, issues: &mut Issues) -> Json {
+    let args: Vec<&kdl::KdlEntry> = node
+        .entries()
+        .iter()
+        .filter(|entry| entry.name().is_none())
+        .collect();
+    match args.as_slice() {
+        [] => Json::Object(renovate_object(node, src, issues)),
+        [one] if node.entries().len() == 1 && kids(node).is_empty() => {
+            json_value(one.value(), one.span(), src, issues)
+        }
+        _ => {
+            issues.push(
+                Issue::new("a `-` item holds one value or one object", src)
+                    .at(node.name().span(), "more than one")
+                    .help("write `- \"value\"`, or `- key=\"value\" { ... }` for an object"),
+            );
+            Json::Null
+        }
+    }
+}
+
+/// Maps a KDL value to JSON. JSON has no infinity and no NaN, so those are
+/// refused.
+fn json_value(
+    value: &kdl::KdlValue,
+    span: miette::SourceSpan,
+    src: &Source,
+    issues: &mut Issues,
+) -> Json {
+    match value {
+        kdl::KdlValue::String(text) => Json::string(text.as_str()),
+        kdl::KdlValue::Bool(flag) => Json::Bool(*flag),
+        kdl::KdlValue::Null => Json::Null,
+        kdl::KdlValue::Integer(_) | kdl::KdlValue::Float(_) => {
+            match Json::parse(&value.to_string()) {
+                Ok(number) => number,
+                Err(_) => {
+                    issues.push(
+                        Issue::new(format!("`{value}` is not a JSON number"), src)
+                            .at(span, "JSON has no infinity or NaN"),
+                    );
+                    Json::Null
+                }
+            }
+        }
+    }
+}
+
 /// `HH:MM`, as cron's hour and minute.
 pub fn time(value: &str) -> Option<(u32, u32)> {
     let (hour, minute) = value.split_once(':')?;
     let (hour, minute) = (hour.parse().ok()?, minute.parse().ok()?);
     (hour < 24 && minute < 60).then_some((hour, minute))
+}
+
+/// Holds each cron field's range and the names it accepts, in field order.
+const CRON_FIELDS: [(u32, u32, &[&str]); 5] = [
+    (0, 59, &[]),
+    (0, 23, &[]),
+    (1, 31, &[]),
+    (
+        1,
+        12,
+        &[
+            "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
+        ],
+    ),
+    (0, 6, &["sun", "mon", "tue", "wed", "thu", "fri", "sat"]),
+];
+
+/// Answers whether `line` is a cron line that GitHub accepts. The line is
+/// written between single quotes in the workflow YAML, so a quote never passes.
+pub fn is_cron(line: &str) -> bool {
+    let fields: Vec<&str> = line.split(' ').collect();
+    fields.len() == CRON_FIELDS.len()
+        && fields
+            .iter()
+            .zip(CRON_FIELDS)
+            .all(|(field, (low, high, names))| {
+                field.split(',').all(|part| {
+                    let (range, step) = match part.split_once('/') {
+                        Some((range, step)) => (range, Some(step)),
+                        None => (part, None),
+                    };
+                    let value = |text: &str| {
+                        text.parse::<u32>().is_ok_and(|n| (low..=high).contains(&n))
+                            || names.contains(&text.to_ascii_lowercase().as_str())
+                    };
+                    let range_ok = range == "*"
+                        || match range.split_once('-') {
+                            Some((from, to)) => value(from) && value(to),
+                            None => value(range),
+                        };
+                    range_ok && step.is_none_or(|step| step.parse::<u32>().is_ok_and(|n| n > 0))
+                })
+            })
+}
+
+/// Answers each workflow in the `workflows` block that declares a cron line
+/// `schedule`, so a rewrite of the block keeps it.
+pub fn workflow_schedules(text: &str) -> Vec<(String, String)> {
+    let Ok(doc) = text.parse::<KdlDocument>() else {
+        return Vec::new();
+    };
+    doc.nodes()
+        .iter()
+        .filter(|n| n.name().value() == "workflows")
+        .flat_map(kids)
+        .filter_map(|node| {
+            let line = prop(node, "schedule").filter(|line| is_cron(line))?;
+            Some((node.name().value().to_string(), line.to_string()))
+        })
+        .collect()
 }
 
 /// Where the `workflows` block sits, for the one command that rewrites a node
@@ -1100,6 +1368,137 @@ colour "blue"
             issues.contains("`push` is not a publish cadence"),
             "{issues}"
         );
+    }
+
+    /// Resolves the workflows `text` declares for a repository that can run
+    /// every shipped workflow.
+    fn workflows(text: &str) -> (Vec<crate::resolve::workflow::Declared>, String) {
+        let mut list = List::empty(Path::new("."));
+        let mut issues = Issues::default();
+        list.parse_file(
+            &Source::new(layout::REPO_FILE, text),
+            text,
+            true,
+            &mut issues,
+        );
+        let basis = crate::resolve::workflow::Basis {
+            selinux: true,
+            kernel: true,
+        };
+        let declared = crate::resolve::workflow::resolve(&list, &basis, &mut issues);
+        (declared, issues.plain())
+    }
+
+    #[test]
+    fn a_declared_schedule_replaces_the_one_at_places() {
+        let (declared, said) = workflows(
+            "schema-version 1\nworkflows {\n    build\n    update-modules schedule=\"0 3 * * 0\"\n}\n",
+        );
+        assert!(said.is_empty(), "{said}");
+        let schedule = |file: &str| {
+            declared
+                .iter()
+                .find(|declared| declared.file == file)
+                .and_then(|declared| declared.schedule.clone())
+        };
+        assert_eq!(schedule("update-modules.yml").as_deref(), Some("0 3 * * 0"));
+        assert_eq!(schedule("build.yml").as_deref(), Some("30 12 * * *"));
+    }
+
+    #[test]
+    fn a_schedule_on_a_workflow_with_none_is_refused() {
+        let (_, said) =
+            workflows("schema-version 1\nworkflows {\n    build-disk schedule=\"0 3 * * 0\"\n}\n");
+        assert!(said.contains("`build-disk` runs on no schedule"), "{said}");
+    }
+
+    #[test]
+    fn a_schedule_that_is_not_a_cron_line_is_refused() {
+        for line in [
+            "0 3 * *",
+            "0 3 * * '1'",
+            "0  3 * * 1",
+            "0 25 * * 1",
+            "0 0-25 * * 1",
+            "0 3 * * 1/0",
+        ] {
+            let (_, said) = workflows(&format!(
+                "schema-version 1\nworkflows {{\n    build schedule=\"{line}\"\n}}\n"
+            ));
+            assert!(said.contains("is not a cron line"), "{line}: {said}");
+        }
+        assert!(is_cron("*/15 0-5 * * MON,FRI"));
+        assert!(is_cron("30 5 1-15/2 jan-jun 0"));
+    }
+
+    fn renovate_of(text: &str) -> (Option<String>, String) {
+        let text = format!("schema-version 1\n{text}");
+        let mut list = List::empty(Path::new("."));
+        let mut issues = Issues::default();
+        list.parse_file(
+            &Source::new(layout::REPO_FILE, text.as_str()),
+            &text,
+            true,
+            &mut issues,
+        );
+        let json = list.renovate.map(|members| Json::Object(members).render());
+        (json, issues.plain())
+    }
+
+    #[test]
+    fn a_renovate_block_maps_to_renovate_json() {
+        let (json, said) = renovate_of(
+            "renovate rebaseWhen=\"never\" limit=2 {\n    schedule \"* 0-5 * * *\"\n    \
+             packageRules {\n        - automerge=#true {\n            matchPackageNames \"*\"\n        \
+             }\n    }\n    lockFileMaintenance enabled=#true\n    extends {\n        - \"a\"\n    }\n}\n",
+        );
+        assert!(said.is_empty(), "{said}");
+        let expected = Json::parse(
+            r#"{"rebaseWhen": "never", "limit": 2, "schedule": ["* 0-5 * * *"],
+                "packageRules": [{"automerge": true, "matchPackageNames": ["*"]}],
+                "lockFileMaintenance": {"enabled": true}, "extends": ["a"]}"#,
+        )
+        .unwrap()
+        .render();
+        assert_eq!(json.as_deref(), Some(expected.as_str()));
+    }
+
+    #[test]
+    fn a_repository_with_no_renovate_block_has_no_policy() {
+        assert_eq!(renovate_of("").0, None);
+    }
+
+    #[test]
+    fn the_renovate_block_refuses_what_does_not_map() {
+        for (text, refusal) in [
+            (
+                "renovate {\n    customManagers \"x\"\n}\n",
+                "belongs to `tect generate`",
+            ),
+            (
+                "renovate {\n    a \"x\"\n    - \"y\"\n}\n",
+                "sits beside named members",
+            ),
+            (
+                "renovate {\n    a \"x\" {\n        b \"y\"\n    }\n}\n",
+                "holds both values and members",
+            ),
+            ("renovate {\n    a\n}\n", "holds no value"),
+            (
+                "renovate {\n    a \"x\"\n    a \"y\"\n}\n",
+                "is declared twice",
+            ),
+            (
+                "renovate {\n    a {\n        - \"x\" \"y\"\n    }\n}\n",
+                "holds one value or one object",
+            ),
+            ("renovate {\n    a #inf\n}\n", "is not a JSON number"),
+            ("renovate {\n    a {\n        - \"x\" y=1\n    }\n}\n", "holds one value or one object"),
+            ("renovate {\n    a {\n        - \"x\" {\n            b \"y\"\n        }\n    }\n}\n", "holds one value or one object"),
+        ] {
+            let (_, said) = renovate_of(text);
+            assert!(said.contains(refusal), "{text}: {said}");
+        }
     }
 
     #[test]

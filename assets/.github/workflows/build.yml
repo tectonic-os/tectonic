@@ -67,7 +67,7 @@ jobs:
 
           base="$(git merge-base "origin/${BASE_REF}" HEAD)"
           changed="$(git diff --name-only "$base" HEAD \
-            | grep -E '^(repo\.kdl|modules/.*/module\.kdl|modules\.kdl)$' || true)"
+            | grep -E '^([^/]+\.kdl|modules/.*/module\.kdl)$' || true)"
           if [ -z "$changed" ]; then
             echo "No manifest changed against ${BASE_REF}, nothing to do."
             exit 0

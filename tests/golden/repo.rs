@@ -642,6 +642,7 @@ repo_cases! {
     optional_metadata => "optional-metadata",
     past_schema => "past-schema",
     refused => "refused",
+    renovate => "renovate",
     seeding => "seeding",
     signing => "signing",
     suppressed => "suppressed",

@@ -113,6 +113,12 @@ pub const SHIPPED: &[Shipped] = &[
         Needs::Nothing,
         Some((-9, "1"))
     ),
+    shipped!(
+        "update-modules",
+        "refreshes tracked modules and opens a pull request",
+        Needs::Nothing,
+        Some((-7, "1"))
+    ),
 ];
 
 pub fn find(stem: &str) -> Option<&'static Shipped> {
@@ -218,6 +224,16 @@ pub fn resolve(list: &List, basis: &Basis, issues: &mut Issues) -> Vec<Declared>
             );
             continue;
         };
+        if declared.schedule.is_some() && shipped.at.is_none() {
+            issues.push(
+                Issue::new(
+                    format!("`{}` runs on no schedule", declared.name),
+                    &list.repo_src,
+                )
+                .at(declared.span, "`schedule` has nothing to replace")
+                .help("drop `schedule` from it"),
+            );
+        }
         if !shipped.met(basis) {
             issues.push(
                 Issue::new(
@@ -232,13 +248,18 @@ pub fn resolve(list: &List, basis: &Basis, issues: &mut Issues) -> Vec<Declared>
 
     SHIPPED
         .iter()
-        .filter(|shipped| list.workflows.iter().any(|w| w.name == shipped.stem))
-        .map(|shipped| Declared {
-            file: shipped.file(),
-            schedule: shipped
-                .at
-                .map(|(offset, day)| cron(list.workflows_at, offset, day)),
-            body: shipped.body,
+        .filter_map(|shipped| {
+            let declared = list.workflows.iter().find(|w| w.name == shipped.stem)?;
+            Some(Declared {
+                file: shipped.file(),
+                schedule: shipped.at.map(|(offset, day)| {
+                    declared
+                        .schedule
+                        .clone()
+                        .unwrap_or_else(|| cron(list.workflows_at, offset, day))
+                }),
+                body: shipped.body,
+            })
         })
         .collect()
 }

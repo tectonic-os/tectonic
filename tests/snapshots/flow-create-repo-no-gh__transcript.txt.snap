@@ -47,7 +47,8 @@ fatal: transport 'https' not allowed; what is offered below is only what is alre
   4) [x] cleanup-registry  prunes old versions of the images off the registry
   5) [ ] (unavailable) kernel-freshness  needs a module taking a KERNEL arg
   6) [x] smoke-test  installs the image to a disk and boots it under qemu
-Which workflows? [1-6, several, 0 for none]: 
+  7) [x] update-modules  refreshes tracked modules and opens a pull request
+Which workflows? [1-7, several, 0 for none]: 
 
 Publish images only on scheduled builds? (Yes/No)
 No
@@ -67,8 +68,6 @@ Which files to keep in scripts/? [1-5, several, 0 for none]: 1
 initialised a git repository in example
 
 example/
-├── .github/
-│   └── + renovate.json5
 ├── disk_config/
 │   └── + disk.toml
 ├── modules/

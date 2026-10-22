@@ -1,0 +1,12 @@
+schema-version 1
+
+description "An editor whose image entry leaves the version at its default"
+
+supports "fedora"
+
+packages "vim-enhanced"
+
+option "version" type="string" {
+    default "9.1"
+    renovate datasource="repology" depName="fedora_rawhide/vim" extractVersion="^(?<version>.+)-"
+}

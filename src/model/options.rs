@@ -53,6 +53,16 @@ pub struct Opt {
     pub ty: OptType,
     pub default: Vec<Value>,
     pub span: Span,
+    /// Holds what keeps a `version` option's value current.
+    pub renovate: Option<VersionTracker>,
+}
+
+/// The Renovate datasource that an image entry's `version` value is looked
+/// up in. Only the module knows which package the value versions.
+pub struct VersionTracker {
+    pub datasource: String,
+    pub dep_name: String,
+    pub extract_version: Option<String>,
 }
 
 pub struct Variant {

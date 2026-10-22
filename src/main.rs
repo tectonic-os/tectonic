@@ -112,6 +112,7 @@ fn flags(matches: &ArgMatches) -> Result<dispatch::Flags, Error> {
         no_cache_from: switch("no_cache_from"),
         rebuild: switch("rebuild"),
         dependencies: switch("dependencies"),
+        untracked: switch("untracked"),
     })
 }
 
