@@ -72,7 +72,7 @@ pub fn provenance_record(text: &str) {
     let root = root("record");
     write(&crate::layout::lock(root.path()), text);
     let _ = crate::provenance::lock::read(root.path());
-    crate::provenance::lock::validate(root.path(), &mut Issues::default());
+    crate::provenance::lock::check(root.path(), &mut Issues::default());
 }
 
 pub fn module_scripts(text: &str) {

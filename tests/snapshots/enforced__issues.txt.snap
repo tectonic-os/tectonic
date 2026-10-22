@@ -1,6 +1,4 @@
 ---
 source: tests/golden/harness.rs
 ---
-  x `modules/one/hello` no longer matches its entry in the module lock
-  help: `audit { enforce #true }` makes a fork an error; re-import it, or drop
-        its entry from `modules/modules.lock.kdl` to own the module outright
+

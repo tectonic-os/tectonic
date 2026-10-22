@@ -35,7 +35,7 @@ A claim the tool records rather than certifies. The scan is what confirms it.
 | --- | --- | --- | --- | --- |
 | `one` | https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | not declared | none |
 
-**It has been edited since it was imported.** Forking a module is legitimate; what the lock buys is that the fork is visible.
+**It has been edited since it was imported.** It is the repository's own copy, and the lock entry records where it came from.
 
 ## What it pulls in
 
@@ -97,7 +97,8 @@ It enables one, in `modules/one/hello/repo`. There is no grammar for that file, 
       "selector": "v1.0.0",
       "verifier": null,
       "tracker": "none"
-    }
+    },
+    "tracked": false
   },
   "modified": true,
   "fetches": [
@@ -151,7 +152,7 @@ A claim the tool records rather than certifies. The scan is what confirms it.
 | --- | --- | --- | --- | --- |
 | `one` | https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | not declared | none |
 
-**It has been edited since it was imported.** Forking a module is legitimate; what the lock buys is that the fork is visible.
+**It has been edited since it was imported.** It is the repository's own copy, and the lock entry records where it came from.
 
 ## What it pulls in
 
@@ -181,4 +182,4 @@ consumer, hello
 | --- | --- | --- | --- | --- |
 | `one` | https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | not declared | none |
 
-**It has been edited since it was imported.** Forking a module is legitimate; what the lock buys is that the fork is visible.
+**It has been edited since it was imported.** It is the repository's own copy, and the lock entry records where it came from.

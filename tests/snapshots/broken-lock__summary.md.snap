@@ -1,0 +1,10 @@
+---
+source: tests/golden/harness.rs
+---
+3 modules, the ungated set.
+
+| Module | Description | Options | Satisfies | Refuses |
+| --- | --- | --- | --- | --- |
+| `fedora-family` | dnf5 and its plugins, which every fedora build layer reaches for |  |  |  |
+| `core/edited` | A module the lock records as imported |  |  |  |
+| `core/owned` | A module the lock records as imported |  |  |  |

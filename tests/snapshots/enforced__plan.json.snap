@@ -135,7 +135,7 @@ source: tests/golden/harness.rs
                     "path": null,
                     "resolved": "https://github.com/owner/modules/archive/refs/tags/v1.0.0.tar.gz"
                   },
-                  "tracked": true
+                  "tracked": false
                 }
               },
               "satisfies": [

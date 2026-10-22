@@ -422,8 +422,10 @@ image {
 The import copies each module into `modules/`, at its path in the library,
 and the image lists it like a module you wrote yourself.
 `modules/modules.lock.kdl` records the library each copy came from and what
-its content hashed to, so `tect check` shows a copy that was edited since. The
-entry of a tracked copy carries `track`.
+its content hashed to. The entry of a tracked copy carries `track`. A tracked
+copy is immutable: if it no longer matches its entry, then `tect check`,
+`tect generate` and `tect build` refuse it. An untracked copy is yours to edit, and `tect why` shows that it
+was edited.
 
 If `modules/` already holds a module at that path, then the import asks
 whether to list the module you hold or to import the library's under another
