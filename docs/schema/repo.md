@@ -21,10 +21,6 @@ sources {
         url "https://github.com/tectonic-os/library"
         path "base-images/core"
     }
-    capabilities "core" {
-        url "https://github.com/tectonic-os/library"
-        path "capabilities"
-    }
 }
 ```
 
@@ -37,7 +33,7 @@ sources {
 | [`pr-image`](#pr-image) (optional) | *string* | The image a pull request builds. |
 | [`seed`](#seed) (optional) | *string* | The image that this repository publishes as a starting point for a new repository. |
 | [`workflows`](#workflows) (optional) | {&nbsp;[fields](#workflows-fields)&nbsp;} | The CI workflows that `tect generate` writes into `.github/workflows/`. |
-| [`sources`](#sources) (optional) | {&nbsp;[fields](#sources-fields)&nbsp;} | The module, base-image and capability libraries this repository reads. |
+| [`sources`](#sources) (optional) | {&nbsp;[fields](#sources-fields)&nbsp;} | The module and base-image libraries this repository reads. |
 | [`manifest`](#manifest) (optional) | {&nbsp;[fields](#manifest-fields)&nbsp;} | Whether a build stamps the generated manifest onto the image as an OCI label. |
 | [`audit`](#audit) (optional) | {&nbsp;[fields](#audit-fields)&nbsp;} | How the repository treats a provenance check that fails. |
 | [`security-policy`](#security-policy) (optional) | optionally {&nbsp;[fields](#security-policy-fields)&nbsp;} | The security rules that the repository sets for every image it defines. |
@@ -205,7 +201,7 @@ workflows at="12:30" {
 
 ## `sources` (optional)
 
-Lists typed libraries that this repository reads from a local directory or fetches from an HTTPS Git repository. A `modules` source feeds imports. A `base-images` source is the base catalog. A `capabilities` source locates the paths that witness a capability. Every source declares exactly one of `dir` and `url`: `dir` names a directory on this machine, and `url` names an HTTPS Git repository.
+Lists typed libraries that this repository reads from a local directory or fetches from an HTTPS Git repository. A `modules` source feeds imports. A `base-images` source is the base catalog. Every source declares exactly one of `dir` and `url`: `dir` names a directory on this machine, and `url` names an HTTPS Git repository.
 
 ```kdl
 sources {
@@ -221,7 +217,6 @@ Accepts: {&nbsp;[fields](#sources-fields)&nbsp;}
 | --- | --- | --- |
 | [`modules`](#sources-modules) (optional,&nbsp;repeatable) | *string*, then optionally {&nbsp;[fields](#sources-modules-fields)&nbsp;} | A module library that imports and copies resolve against. |
 | [`base-images`](#sources-base-images) (optional,&nbsp;repeatable) | *string*, then optionally {&nbsp;[fields](#sources-base-images-fields)&nbsp;} | A base-image library that the base catalog is read out of. |
-| [`capabilities`](#sources-capabilities) (optional,&nbsp;repeatable) | *string*, then optionally {&nbsp;[fields](#sources-capabilities-fields)&nbsp;} | A capability library that locates capability witness paths. |
 
 > [!NOTE]
 > `tect import module` copies a module from a `modules` source to `modules/<name>`, and `modules/modules.lock.kdl` records the source.
@@ -388,47 +383,6 @@ sources {
 
 Accepts: *string*
 
-<a id="sources-capabilities"></a>
-
-### `capabilities` (optional, repeatable)
-
-A capability library that locates capability witness paths.
-
-```kdl
-sources {
-    capabilities "core"
-}
-```
-
-Accepts: *string*, then optionally {&nbsp;[fields](#sources-capabilities-fields)&nbsp;}
-
-<a id="sources-capabilities-fields"></a>
-
-| Field | Accepts | Description |
-| --- | --- | --- |
-| [`dir`](#sources-modules-dir) (optional) | *string* | The local directory that holds this source. |
-| [`url`](#sources-modules-url) (optional) | *string* | The HTTPS Git repository that holds this source. |
-| [`path`](#sources-capabilities-path) (optional) | *string* | The directory inside the Git repository that holds this capability library. |
-| [`version`](#sources-modules-version) (optional) | *string* | The branch, tag or commit that selects the repository tree. |
-| [`sha256`](#sources-modules-sha256) (optional) | *string* | The hash of the canonical tar archive for the selected commit. |
-| [`unpinned`](#sources-modules-unpinned) (optional) | *string* | Why this source follows a ref without a verified archive hash. |
-
-<a id="sources-capabilities-path"></a>
-
-#### `path` (optional)
-
-The directory inside the Git repository that holds this capability library.
-
-```kdl
-sources {
-    capabilities "core" {
-        path "capabilities"
-    }
-}
-```
-
-Accepts: *string*
-
 <a id="manifest"></a>
 
 ## `manifest` (optional)
@@ -506,7 +460,7 @@ Accepts: *boolean*
 
 Each check runs in the command named before it:
 
-- `tect import module`: the library is pinned to a tag and its hash.
+- `tect import module`, `tect create image` and `tect set conforms`: the library a module is copied from is pinned to a tag and its hash.
 - `tect check`: each imported module still matches its entry in the module lock.
 - `tect build`: the base tag resolves to a manifest digest.
 - `tect build`: the repository is at a commit.

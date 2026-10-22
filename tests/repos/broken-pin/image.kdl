@@ -15,5 +15,8 @@ image {
                 path "/etc/passwd"
             }
         }
+        source "one" {
+            module "remote"
+        }
     }
 }

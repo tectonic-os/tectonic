@@ -29,7 +29,7 @@ fn write(path: &Path, text: &str) {
 
 pub fn repository_kdl(kind: u8, text: &str) {
     let root = root(&kind.to_string());
-    match kind % 5 {
+    match kind % 4 {
         0 => {
             write(&root.path().join("repo.kdl"), text);
             let _ = List::load(root.path());
@@ -52,15 +52,10 @@ pub fn repository_kdl(kind: u8, text: &str) {
             write(&root.path().join("modules/fuzz/module.kdl"), text);
             let _ = crate::load(root.path());
         }
-        3 => {
+        _ => {
             let path = root.path().join("fuzz.base.kdl");
             write(&path, text);
             let _ = crate::parse::bases::read_base(&path, &mut Issues::default());
-        }
-        _ => {
-            let path = root.path().join("capabilities.kdl");
-            write(&path, text);
-            let _ = crate::parse::bases::read_capabilities(&path, &mut Issues::default());
         }
     }
 }

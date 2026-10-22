@@ -93,28 +93,6 @@ jobs:
             echo "tect ${version}: hash updated."
           fi
 
-          if grep -qE '^[^/]+\.kdl$' <<< "$changed"; then
-            while IFS='|' read -r name _ ref pinned url _ file; do
-              if ! curl -fsSL --retry 3 "$url" -o "${RUNNER_TEMP}/module"; then
-                echo "::error file=${file}::${name} ${ref}: ${url} did not download. A version whose archive URL does not follow from it needs the pin url in ${file} updated by hand."
-                exit 1
-              fi
-              actual="$(sha256sum "${RUNNER_TEMP}/module" | cut -d' ' -f1)"
-              rm -f "${RUNNER_TEMP}/module"
-
-              if [ "$actual" = "$pinned" ]; then
-                echo "${name} ${ref}: hash already matches."
-                continue
-              fi
-              sed -i "s/sha256 \"${pinned}\"/sha256 \"${actual}\"/" "${file}"
-              fixed+=("${name} ${ref}")
-              echo "${name} ${ref}: hash updated."
-            done < <(./scripts/tect.sh plan --json | jq -r '.remotes[]
-              | [.name, .dir, .pin.selector, .pin.verifier, .pin.resolved,
-                 (.pin.path // ""), .file] | join("|")')
-          fi
-
-          ./scripts/tect.sh fetch modules
           while IFS='|' read -r module name file version pinned from url; do
             grep -qxF "$file" <<< "$changed" || continue
             [ -n "$pinned" ] || continue
@@ -243,7 +221,6 @@ jobs:
           ref: ${{ needs.checksums.outputs.ref }}
       - id: set
         run: |
-          ./scripts/tect.sh fetch modules
           selection='[.images[].targets[].name]'
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             selection='[.pr_target]'
@@ -289,7 +266,6 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
-          ./scripts/tect.sh fetch modules
           ./scripts/tect.sh plan --json > "${RUNNER_TEMP}/plan.json"
           jq -e --arg t "$TARGET" '.images[] | select([.targets[].name] | index($t))' \
             "${RUNNER_TEMP}/plan.json" > "${RUNNER_TEMP}/image.json"
@@ -758,7 +734,6 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
-          ./scripts/tect.sh fetch modules
           datastream="$(./scripts/tect.sh scap content --target "$TARGET")"
           {
             echo "datastream=${datastream}"

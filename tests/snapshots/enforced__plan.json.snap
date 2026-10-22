@@ -17,7 +17,6 @@ source: tests/golden/harness.rs
   "audit": {
     "enforce": true
   },
-  "remotes": [],
   "assets": [
     {
       "module": "one/hello",
@@ -53,18 +52,39 @@ source: tests/golden/harness.rs
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
+        "scap_content": "",
         "signed": false,
         "provides": [
           "rechunking"
         ],
         "witnesses": {
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
           "hello": [
             "/usr/bin/hello",
             "/usr/sbin/hello"
           ],
-          "rechunking": [
-            "/usr/bin/rechunking",
-            "/usr/sbin/rechunking"
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
           ]
         },
         "requires": [],
@@ -86,10 +106,8 @@ source: tests/golden/harness.rs
           "modules": [
             {
               "path": "one/hello",
-              "dir": "one/hello",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "An imported module edited since it was imported",
               "options": {},
               "provides": [
@@ -103,8 +121,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "d477d22a5a9ba3d0aaca5011b7ec83b4ed58c73e068a592c838d096f797f7df7",
                 "repo": true,
-                "source": null,
-                "pin": null,
                 "imported": {
                   "library": "one",
                   "path": "hello",
@@ -142,10 +158,8 @@ source: tests/golden/harness.rs
             },
             {
               "path": "core/consumer",
-              "dir": "core/consumer",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "Requires what the imported module provides",
               "options": {},
               "provides": [],
@@ -159,8 +173,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "7f1beedd549fe62f7457c43e77c670975f02338aba11de6dca4b56b754e09f1c",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],

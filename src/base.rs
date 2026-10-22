@@ -1,8 +1,8 @@
-//! The declared base-image and capability libraries: what family each base
-//! belongs to, what it ships and what a capability's presence is read from.
+//! The declared base-image libraries: what family each base belongs to and
+//! what it ships. The witness of each capability is a table in this file.
 //!
-//! Nothing is compiled in. A repository declares the libraries it reads, and a
-//! declared library that is not on this machine describes nothing.
+//! A repository declares the libraries it reads, and a declared library that
+//! is not on this machine describes nothing.
 
 use crate::diag::{Issue, Issues, Span};
 use crate::model::remote::{Collection, Kind as SourceKind};
@@ -10,9 +10,6 @@ use std::path::{Path, PathBuf};
 
 /// The suffix of one base's file inside a base-images library.
 pub const BASE_SUFFIX: &str = ".base.kdl";
-
-/// The file one capabilities library holds.
-pub const CAPABILITIES_FILE: &str = "capabilities.kdl";
 
 /// The repository every default library is read from.
 pub const LIBRARY_URL: &str = "https://github.com/tectonic-os/library";
@@ -57,35 +54,33 @@ impl Base {
     }
 }
 
-/// Where a capability's presence is read. A row with no path and no family
-/// block names an abstract capability, which nothing witnesses.
+/// Holds where the build reads a capability's presence. A row with no path
+/// names an abstract capability. Nothing witnesses an abstract capability.
 pub struct Capability {
-    pub name: String,
-    /// The path every family reads, where the row carries one.
-    pub path: Option<String>,
-    /// The families that read a different path, each block naming one or more
-    /// families and the path they share.
-    pub families: Vec<(Vec<String>, String)>,
-    pub span: Span,
+    pub name: &'static str,
+    pub path: Option<&'static str>,
 }
 
-impl Capability {
-    /// The path that witnesses this capability on `family`: the block that
-    /// names the family, else the bare path. None for an abstract row.
-    fn path_for(&self, family: &str) -> Option<&str> {
-        self.families
-            .iter()
-            .find(|(families, _)| families.iter().any(|named| named == family))
-            .map(|(_, path)| path.as_str())
-            .or(self.path.as_deref())
-    }
-
-    /// Whether two rows describe one name the same way, which is what makes
-    /// one of them worth reporting.
-    fn same_as(&self, other: &Self) -> bool {
-        self.path == other.path && self.families == other.families
-    }
-}
+/// Holds the witness of each capability a base can ship. A base's `provides`
+/// carries names only, so the tool holds the path that proves each one. The
+/// build reads a witness from this table or a `file=` alone. Only the base
+/// probe falls back to `/usr/bin/<name>` and `/usr/sbin/<name>`. The table is
+/// compiled in because `generate` reads no library.
+#[rustfmt::skip]
+pub const CAPABILITIES: [Capability; 10] = [
+    Capability { name: "ssh", path: Some("/usr/sbin/sshd") },
+    Capability { name: "initramfs-generation", path: Some("/usr/bin/dracut") },
+    Capability { name: "selinux-policy", path: Some("/usr/sbin/semodule") },
+    Capability { name: "flatpak", path: Some("/usr/bin/flatpak") },
+    Capability { name: "bootc", path: Some("/usr/bin/bootc") },
+    Capability { name: "bootupctl", path: Some("/usr/bin/bootupctl") },
+    Capability { name: "podman", path: Some("/usr/bin/podman") },
+    Capability { name: "crun", path: Some("/usr/bin/crun") },
+    Capability { name: "rechunking", path: None },
+    // No filesystem path can witness what is inside an initramfs. The final
+    // image check opens the initramfs instead.
+    Capability { name: "luks-initramfs", path: None },
+];
 
 /// One library this repository reads by default, which `create repo` offers
 /// and `set library` adds by its kind alone.
@@ -99,7 +94,7 @@ pub struct DefaultLibrary {
     pub about: &'static str,
 }
 
-pub const DEFAULT_LIBRARIES: [DefaultLibrary; 3] = [
+pub const DEFAULT_LIBRARIES: [DefaultLibrary; 2] = [
     DefaultLibrary {
         kind: SourceKind::Modules,
         alias: "tectonic-modules",
@@ -111,12 +106,6 @@ pub const DEFAULT_LIBRARIES: [DefaultLibrary; 3] = [
         alias: "core",
         path: "base-images/core",
         about: "Fedora, CentOS, RHEL, AlmaLinux, Rocky, Debian and Ubuntu",
-    },
-    DefaultLibrary {
-        kind: SourceKind::Capabilities,
-        alias: "core",
-        path: "capabilities",
-        about: "Where each capability's witness is read",
     },
 ];
 
@@ -131,28 +120,23 @@ pub fn default_library(kind: SourceKind) -> &'static DefaultLibrary {
 /// Where a name found by default is looked for, in order.
 const DEFAULT_DIRS: [&str; 2] = ["/usr/bin", "/usr/sbin"];
 
-/// The paths that witness `name` on `family`: the claim's own `file=`, else
-/// the capability row, and nothing else. A name with neither is abstract, so
-/// no build stops on it and no boilerplate is owed for it.
-pub fn witness(
-    name: &str,
-    family: &str,
-    own: Option<&str>,
-    rows: &[Capability],
-) -> Option<Vec<String>> {
+/// The paths that witness `name`: the claim's own `file=`, else the table row,
+/// and nothing else. A name with neither is abstract, so no build stops on it
+/// and no boilerplate is owed for it.
+pub fn witness(name: &str, own: Option<&str>) -> Option<Vec<String>> {
     if let Some(own) = own {
         return Some(vec![own.to_string()]);
     }
-    let row = rows.iter().find(|row| row.name == name)?;
-    row.path_for(family).map(|path| vec![path.to_string()])
+    let row = CAPABILITIES.iter().find(|row| row.name == name)?;
+    row.path.map(|path| vec![path.to_string()])
 }
 
 /// The paths a probe of a base reads: the witness chain, or the conventional
 /// directories where no row names the capability at all. An abstract row
 /// suppresses the fallback.
-pub fn probe(name: &str, family: &str, rows: &[Capability]) -> Option<Vec<String>> {
-    match rows.iter().any(|row| row.name == name) {
-        true => witness(name, family, None, rows),
+pub fn probe(name: &str) -> Option<Vec<String>> {
+    match CAPABILITIES.iter().any(|row| row.name == name) {
+        true => witness(name, None),
         false => Some(
             DEFAULT_DIRS
                 .iter()
@@ -165,19 +149,46 @@ pub fn probe(name: &str, family: &str, rows: &[Capability]) -> Option<Vec<String
 /// The runtime catalog: what every declared base-images library on this
 /// machine holds. A source that is not there describes nothing.
 pub fn catalog(root: &Path, sources: &[Collection], issues: &mut Issues) -> Vec<Base> {
-    load(root, sources, issues).bases
+    let mut bases: Vec<Base> = Vec::new();
+    let mut declared: Vec<(String, String)> = Vec::new();
+    for collection in sources
+        .iter()
+        .filter(|collection| collection.kind == SourceKind::BaseImages)
+    {
+        let Some(dir) = crate::import::cached(root, collection) else {
+            continue;
+        };
+        let dir = dir.join(collection.subtree().unwrap_or(""));
+        for path in base_files(&dir) {
+            let Some((base, src)) = crate::parse::bases::read_base(&path, issues) else {
+                continue;
+            };
+            if let Some((_, first)) = declared.iter().find(|(image, _)| *image == base.image) {
+                issues.push(
+                    Issue::new(
+                        format!("`{}` is described by two base files", base.image),
+                        &src,
+                    )
+                    .at(base.span, format!("`{first}` describes it too"))
+                    .help(
+                        "one image reference is one base: two files would each write a \
+                         different family and a different `provides` into an image \
+                         scaffolded on it, and which one did would depend on the order the \
+                         sources are read in",
+                    ),
+                );
+                continue;
+            }
+            declared.push((base.image.clone(), path.display().to_string()));
+            bases.push(base);
+        }
+    }
+    bases
 }
 
-/// The capability rows of the same libraries: two libraries describing one
-/// name differently are refused, and one that is not there describes nothing.
-pub fn capabilities(root: &Path, sources: &[Collection], issues: &mut Issues) -> Vec<Capability> {
-    load(root, sources, issues).capabilities
-}
-
-/// Brings every declared base-image and capability library that is not on
-/// this machine onto it, for a command that reads a catalog while the user can
-/// wait. A failure is the caller's to report: what is already cached stays
-/// readable.
+/// Brings every declared base-image library that is not on this machine onto
+/// it, for a command that reads a catalog while the user can wait. A failure
+/// is the caller's to report: what is already cached stays readable.
 pub fn fetch(root: &Path, sources: &[Collection]) -> Result<(), String> {
     for collection in sources
         .iter()
@@ -188,96 +199,6 @@ pub fn fetch(root: &Path, sources: &[Collection]) -> Result<(), String> {
         }
     }
     Ok(())
-}
-
-struct Loaded {
-    bases: Vec<Base>,
-    capabilities: Vec<Capability>,
-}
-
-fn load(root: &Path, sources: &[Collection], issues: &mut Issues) -> Loaded {
-    let mut bases: Vec<Base> = Vec::new();
-    let mut capabilities: Vec<Capability> = Vec::new();
-    let mut declared: Vec<(String, String)> = Vec::new();
-    let mut named: Vec<(String, String)> = Vec::new();
-
-    for collection in sources {
-        if collection.kind == SourceKind::Modules {
-            continue;
-        }
-        let Some(dir) = crate::import::cached(root, collection) else {
-            continue;
-        };
-        let dir = dir.join(collection.subtree().unwrap_or(""));
-        match collection.kind {
-            SourceKind::Modules => {}
-            SourceKind::BaseImages => {
-                for path in base_files(&dir) {
-                    let Some((base, src)) = crate::parse::bases::read_base(&path, issues) else {
-                        continue;
-                    };
-                    if let Some((_, first)) =
-                        declared.iter().find(|(image, _)| *image == base.image)
-                    {
-                        issues.push(
-                            Issue::new(
-                                format!("`{}` is described by two base files", base.image),
-                                &src,
-                            )
-                            .at(base.span, format!("`{first}` describes it too"))
-                            .help(
-                                "one image reference is one base: two files would each write a \
-                                 different family and a different `provides` into an image \
-                                 scaffolded on it, and which one did would depend on the order the \
-                                 sources are read in",
-                            ),
-                        );
-                        continue;
-                    }
-                    declared.push((base.image.clone(), path.display().to_string()));
-                    bases.push(base);
-                }
-            }
-            SourceKind::Capabilities => {
-                let path = dir.join(CAPABILITIES_FILE);
-                let Some((read, src)) = crate::parse::bases::read_capabilities(&path, issues)
-                else {
-                    continue;
-                };
-                for row in read {
-                    if let Some((_, first)) = named.iter().find(|(name, _)| *name == row.name) {
-                        if capabilities
-                            .iter()
-                            .find(|known| known.name == row.name)
-                            .is_some_and(|known| !known.same_as(&row))
-                        {
-                            issues.push(
-                                Issue::new(
-                                    format!(
-                                        "capability `{}` is described by two libraries",
-                                        row.name
-                                    ),
-                                    &src,
-                                )
-                                .at(row.span, format!("`{first}` reads it elsewhere"))
-                                .help(
-                                    "one name is read at one path; which row won would depend \
-                                     on the order repo.kdl lists the sources in",
-                                ),
-                            );
-                        }
-                        continue;
-                    }
-                    named.push((row.name.clone(), path.display().to_string()));
-                    capabilities.push(row);
-                }
-            }
-        }
-    }
-    Loaded {
-        bases,
-        capabilities,
-    }
 }
 
 /// Every `*.base.kdl` file in one library, in name order.

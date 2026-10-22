@@ -1,6 +1,5 @@
 ---
 source: tests/golden/harness.rs
-assertion_line: 50
 ---
 {
   "schema_version": 1,
@@ -18,7 +17,6 @@ assertion_line: 50
   "audit": {
     "enforce": false
   },
-  "remotes": [],
   "assets": [],
   "images": [
     {
@@ -38,14 +36,35 @@ assertion_line: 50
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
+        "scap_content": "",
         "signed": false,
         "provides": [
           "rechunking"
         ],
         "witnesses": {
-          "rechunking": [
-            "/usr/bin/rechunking",
-            "/usr/sbin/rechunking"
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
           ]
         },
         "requires": [],
@@ -67,10 +86,8 @@ assertion_line: 50
           "modules": [
             {
               "path": "core/menu",
-              "dir": "core/menu",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "Collects a file, but declares no destination for it",
               "options": {},
               "provides": [],
@@ -82,8 +99,6 @@ assertion_line: 50
               "provenance": {
                 "content": "d61620eebc2ebd47dec3bc2c395eae8fc4ce59172c96fe0f80699552b5e2d7fe",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -91,10 +106,8 @@ assertion_line: 50
             },
             {
               "path": "core/absent",
-              "dir": "core/absent",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "Contributes a file it does not ship, twice, out of range",
               "options": {},
               "provides": [],
@@ -106,8 +119,6 @@ assertion_line: 50
               "provenance": {
                 "content": "d286fb683ef1945097a02ff0b4272eb398c0477fd8552723ade8fdeed36dcaf0",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -115,10 +126,8 @@ assertion_line: 50
             },
             {
               "path": "core/unclaimed",
-              "dir": "core/unclaimed",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "Ships a collected filename nothing in this image collects",
               "options": {},
               "provides": [],
@@ -130,8 +139,6 @@ assertion_line: 50
               "provenance": {
                 "content": "f90e0f0f628fe28779464aedc0b53480def0bdcbe5ec3b40237bc8a99c0623dd",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -139,10 +146,8 @@ assertion_line: 50
             },
             {
               "path": "core/shipper",
-              "dir": "core/shipper",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "Ships a file whose collector is enabled but refused",
               "options": {},
               "provides": [],
@@ -154,8 +159,6 @@ assertion_line: 50
               "provenance": {
                 "content": "86308a307e7aadc5ab9b3aa8a86bf4e82bc341e3e8eff0348898374e535fbd45",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],

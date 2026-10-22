@@ -1,8 +1,0 @@
----
-source: tests/golden.rs
----
-1 module, the ungated set.
-
-| Module | Description | Options | Satisfies | Refuses |
-| --- | --- | --- | --- | --- |
-| `loose` `remote=main` |  |  |  |  |

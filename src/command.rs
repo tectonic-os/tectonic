@@ -39,7 +39,6 @@ pub enum Verb {
     Verify,
     Summary,
     Sbom,
-    FetchModules,
     Scap,
     ScapContent,
     ScapRules,
@@ -89,11 +88,6 @@ impl Verb {
                 "satisfies",
             )),
             Self::Generate => Some(("`generated/`", Area::Repository, "")),
-            Self::FetchModules => Some((
-                "`image.kdl`&nbsp;›&nbsp;`pin`",
-                Area::Image,
-                "image-modules-module-pin",
-            )),
             Self::OsRelease => Some(("`image.kdl`&nbsp;›&nbsp;`image`", Area::Image, "image")),
             Self::Fetch => Some(("`module.kdl`&nbsp;›&nbsp;`asset`", Area::Module, "asset")),
             Self::ValidateImage => Some((
@@ -157,7 +151,6 @@ pub const ALL: &[Verb] = &[
     Verb::Verify,
     Verb::Summary,
     Verb::Sbom,
-    Verb::FetchModules,
     Verb::Scap,
     Verb::ScapContent,
     Verb::ScapRules,
@@ -365,13 +358,6 @@ const SURFACE: &[(&str, Verb, Family, bool, Topic)] = &[
         Topic::Inspect,
     ),
     ("sbom", Verb::Sbom, Family::Script, false, Topic::Inspect),
-    (
-        "fetch modules",
-        Verb::FetchModules,
-        Family::Script,
-        false,
-        Topic::Modules,
-    ),
     (
         "scap content",
         Verb::ScapContent,
@@ -618,10 +604,8 @@ pub enum Surface {
         base_scan: Option<PathBuf>,
     },
     /// download one payload, verify it, and place it
-    #[command(long_about = help::FETCH, subcommand_negates_reqs = true)]
+    #[command(long_about = help::FETCH)]
     Fetch {
-        #[command(subcommand)]
-        sub: Option<FetchWhat>,
         /// the kind of payload, which is `file`, `tree`, `bin`, `rpm` or `deb`
         #[arg(value_name = "what", required = true)]
         what: Option<String>,
@@ -780,10 +764,10 @@ pub enum SetWhat {
     /// choose the CI this repository generates
     #[command(long_about = help::SET_WORKFLOWS, after_long_help = help::SET_WORKFLOWS_NOTES)]
     Workflows,
-    /// add a module, base-image or capability library
+    /// add a module or base-image library
     #[command(long_about = help::SET_LIBRARY)]
     Library {
-        /// the kind of library: `base-images`, `capabilities` or `modules`
+        /// the kind of library: `base-images` or `modules`
         #[arg(value_name = "kind")]
         kind: Option<String>,
     },
@@ -901,13 +885,6 @@ pub enum ScapWhat {
         #[arg(num_args(0..), value_name = "number")]
         number: Vec<String>,
     },
-}
-
-#[derive(Subcommand)]
-pub enum FetchWhat {
-    /// fetch every out-of-tree module the images reference
-    #[command(long_about = help::FETCH_MODULES, after_long_help = help::FETCH_MODULES_NOTES)]
-    Modules,
 }
 
 #[derive(Subcommand)]
@@ -1167,8 +1144,8 @@ into each image.
 
 - On the user's machine, it scaffolds the repository and its images, modules and keys. It \
 checks the KDL files, writes the build files, and builds and boots an image.
-- In CI, the generated workflows call it to fetch modules, write the build files, build and \
-publish each image, and scan it.
+- In CI, the generated workflows call it to write the build files, build and publish each \
+image, and scan it.
 - Inside a build, the generated Containerfile calls it to write the image identity, record \
 what the build resolved and check the finished image. A module script can call `tect fetch` \
 to download a payload and check it against its hash.
@@ -1484,7 +1461,6 @@ impl Verb {
             | Self::VmBuild
             | Self::VmRun
             | Self::VmSpawn
-            | Self::FetchModules
             | Self::Scap
             | Self::ScapContent
             | Self::ScapRules
@@ -1599,10 +1575,7 @@ mod tests {
     }
 
     #[test]
-    fn fetch_takes_its_three_positionals_unless_a_noun_does() {
-        Cli::command()
-            .try_get_matches_from(["tect", "fetch", "modules"])
-            .expect("the noun negates the required positionals");
+    fn fetch_takes_its_three_positionals() {
         let error = Cli::command()
             .try_get_matches_from(["tect", "fetch", "file"])
             .expect_err("the bare form needs its url and sha256");

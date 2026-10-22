@@ -17,7 +17,6 @@ source: tests/golden/harness.rs
   "audit": {
     "enforce": false
   },
-  "remotes": [],
   "assets": [],
   "images": [
     {
@@ -40,9 +39,35 @@ source: tests/golden/harness.rs
       "base": {
         "image": "docker.io/library/debian:forky",
         "family": "debian",
+        "scap_content": "",
         "signed": false,
         "provides": [],
-        "witnesses": {},
+        "witnesses": {
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
+          ]
+        },
         "requires": [],
         "satisfies": []
       },
@@ -62,10 +87,8 @@ source: tests/golden/harness.rs
           "modules": [
             {
               "path": "core/luks",
-              "dir": "core/luks",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "The LUKS initramfs witness, carried by a module and not by the base",
               "options": {},
               "provides": [
@@ -79,8 +102,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "ccdf0059176c186c6137140022550f05625abce0bda4226971635e96aa13aa49",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],

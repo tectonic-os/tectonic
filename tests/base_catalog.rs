@@ -197,78 +197,29 @@ fn two_files_describing_one_image_are_refused_naming_both() {
 }
 
 #[test]
-fn a_capability_family_block_overrides_the_default_path() {
-    // Given: a capabilities library whose row reads one path on debian.
-    let library = Library::new("family-capability");
-    let capabilities = library.at("core");
-    std::fs::write(
-        capabilities.join("capabilities.kdl"),
-        r#"capability "ssh" {
-    path "/usr/sbin/sshd"
-    family "debian" "ubuntu" {
-        path "/usr/bin/ssh"
-    }
-}
-"#,
-    )
-    .unwrap();
-    let source = Collection {
-        kind: SourceKind::Capabilities,
-        name: "core".to_string(),
-        at: At::Dir("library/core".to_string()),
-        span: Span::default(),
-    };
-
-    // When: the rows are read and one family resolves the name.
-    let mut issues = Issues::default();
-    let rows = tect::base::capabilities(&library.root, &[source], &mut issues);
-    assert!(issues.is_empty(), "{}", issues.plain());
-    assert_eq!(rows.len(), 1);
-
-    // Then: the named families read the override and the rest the default.
+fn an_abstract_row_suppresses_the_conventional_probe() {
+    // The chain finds nothing for the abstract name, and the probe reads the
+    // conventional directories for a name no row names at all.
+    assert_eq!(tect::base::witness("rechunking", None), None);
+    assert_eq!(tect::base::probe("rechunking"), None);
     assert_eq!(
-        tect::base::witness("ssh", "debian", None, &rows),
-        Some(vec!["/usr/bin/ssh".to_string()])
-    );
-    assert_eq!(
-        tect::base::witness("ssh", "fedora", None, &rows),
-        Some(vec!["/usr/sbin/sshd".to_string()])
-    );
-    // A claim's own path wins over every row.
-    assert_eq!(
-        tect::base::witness("ssh", "fedora", Some("/opt/ssh"), &rows),
-        Some(vec!["/opt/ssh".to_string()])
+        tect::base::probe("crun-wrapper"),
+        Some(vec![
+            "/usr/bin/crun-wrapper".to_string(),
+            "/usr/sbin/crun-wrapper".to_string()
+        ])
     );
 }
 
 #[test]
-fn an_abstract_row_suppresses_the_conventional_probe() {
-    // Given: an abstract row and a name no row carries.
-    let library = Library::new("abstract-capability");
-    let core = library.at("core");
-    std::fs::write(core.join("capabilities.kdl"), "capability \"rechunking\"\n").unwrap();
-    let source = Collection {
-        kind: SourceKind::Capabilities,
-        name: "core".to_string(),
-        at: At::Dir("library/core".to_string()),
-        span: Span::default(),
-    };
-    let mut issues = Issues::default();
-    let rows = tect::base::capabilities(&library.root, &[source], &mut issues);
-
-    // Then: the chain finds nothing for the abstract name, and the probe reads
-    // the conventional directories for a name no row names at all.
+fn a_claims_own_path_wins_over_the_row() {
     assert_eq!(
-        tect::base::witness("rechunking", "fedora", None, &rows),
-        None
+        tect::base::witness("ssh", None),
+        Some(vec!["/usr/sbin/sshd".to_string()])
     );
-    assert_eq!(tect::base::probe("rechunking", "fedora", &rows), None);
     assert_eq!(
-        tect::base::probe("crun", "fedora", &rows),
-        Some(vec![
-            "/usr/bin/crun".to_string(),
-            "/usr/sbin/crun".to_string()
-        ])
+        tect::base::witness("ssh", Some("/opt/ssh")),
+        Some(vec!["/opt/ssh".to_string()])
     );
 }
 
@@ -390,45 +341,4 @@ fn one_name_leaves_the_family_it_coerces() {
     assert_eq!(base.requires, ["bootc-base"]);
     assert_eq!(base.bootloaders, ["grub2", "systemd"]);
     assert!(!base.signed);
-}
-
-/// Which row wins would otherwise depend on the order `repo.kdl` lists the
-/// sources in, so only a row that differs is reported.
-#[test]
-fn a_capability_two_libraries_describe_differently_is_reported() {
-    let library = Library::new("two-capabilities");
-    let source = |name: &str, path: &str| {
-        std::fs::write(
-            library.at(name).join("capabilities.kdl"),
-            format!("capability \"ssh\" {{\n    path \"{path}\"\n}}\n"),
-        )
-        .unwrap();
-        Collection {
-            kind: SourceKind::Capabilities,
-            name: name.to_string(),
-            at: At::Dir(format!("library/{name}")),
-            span: Span::default(),
-        }
-    };
-    let same = source("same", "/usr/sbin/sshd");
-    let other = source("other", "/usr/bin/ssh");
-
-    let mut issues = Issues::default();
-    tect::base::capabilities(
-        &library.root,
-        &[source("core", "/usr/sbin/sshd"), same],
-        &mut issues,
-    );
-    assert!(issues.is_empty(), "{}", issues.plain());
-
-    tect::base::capabilities(
-        &library.root,
-        &[source("core", "/usr/sbin/sshd"), other],
-        &mut issues,
-    );
-    let said = flat(&issues.plain());
-    assert!(
-        said.contains("capability `ssh` is described by two libraries"),
-        "{said}"
-    );
 }

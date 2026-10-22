@@ -7,7 +7,7 @@
 `tect` runs in three places:
 
 - On the user's machine, it scaffolds the repository and its images, modules and keys. It checks the KDL files, writes the build files, and builds and boots an image.
-- In CI, the generated workflows call it to fetch modules, write the build files, build and publish each image, and scan it.
+- In CI, the generated workflows call it to write the build files, build and publish each image, and scan it.
 - Inside a build, the generated Containerfile calls it to write the image identity, record what the build resolved and check the finished image. A module script can call `tect fetch` to download a payload and check it against its hash.
 
 ## Global options
@@ -28,7 +28,7 @@ Every command takes these options, before or after its own words. [`tect`](#tect
 | [`tect create repo [name]`](#tect-create-repo) | start a repository of images | [repository&nbsp;layout](schema/repository.md) |
 | [`tect create git`](#tect-create-git) | initialise git and the ignore file in a directory |  |
 | [`tect create scripts [name]...`](#tect-create-scripts) | keep a copy of a script tect supplies in scripts/ | [`scripts/`](schema/repository.md) |
-| [`tect set library [kind]`](#tect-set-library) | add a module, base-image or capability library | [`repo.kdl`&nbsp;›&nbsp;`sources`](schema/repo.md#sources) |
+| [`tect set library [kind]`](#tect-set-library) | add a module or base-image library | [`repo.kdl`&nbsp;›&nbsp;`sources`](schema/repo.md#sources) |
 
 ### Image
 
@@ -43,7 +43,6 @@ Every command takes these options, before or after its own words. [`tect`](#tect
 | --- | --- | --- |
 | [`tect create module [name]`](#tect-create-module) | write a module, and offer to list it in an image | [`module.kdl`](schema/module.md) |
 | [`tect import module [name]`](#tect-import-module) | copy a module from a library repo.kdl declares into this repository | [`modules.lock.kdl`](schema/lock.md) |
-| [`tect fetch modules`](#tect-fetch-modules) | fetch every out-of-tree module the images reference | [`image.kdl`&nbsp;›&nbsp;`pin`](schema/image.md#image-modules-module-pin) |
 
 ### Keys
 
@@ -250,8 +249,7 @@ example/
 
 Puts the directory under git control, so a hand-written repository is under
 version control before its first commit. It writes the `.gitignore` that
-ignores `keys/private/`, `out/` and `modules/.remote/`, unless one is already
-there.
+ignores `keys/private/`, `out/` and `.cache/`, unless one is already there.
 
 It refuses a directory that git already tracks, because a repository does not
 nest.
@@ -275,7 +273,9 @@ It asks, in order:
 2. Choose the base from the catalog. If `--base` names a base outside the
    catalog, then choose its family.
 3. If the base needs modules that the image does not list, such as the family
-   adapter, choose whether to add them from the declared collections.
+   adapter, choose whether to add them from the declared collections. Each
+   one is copied into `modules/` and recorded in `modules/modules.lock.kdl`. A
+   module the repository already holds is listed as it is.
 
 **Usage:** `tect create image [OPTIONS] [name]`
 
@@ -294,6 +294,12 @@ It asks, in order:
 
 ```text
 example/
+├── modules/
+│   ├── fedora-family/
+│   │   ├── lib/
+│   │   │   └── + family.sh
+│   │   └── + module.kdl
+│   └── + modules.lock.kdl
 ├── + beta.image.kdl
 └── ~ repo.kdl  example set as the default image
 ```
@@ -360,6 +366,7 @@ image {
         family "fedora"
         provides "rechunking" "initramfs-generation" "luks-initramfs" "selinux-policy" "ssh" "bootc" "bootupctl" "podman" "crun"
         signed #false
+        scap-content "ssg-fedora-ds.xml"
     }
 
     layout {
@@ -648,7 +655,7 @@ It asks, in order:
 
 | Argument | Description |
 | --- | --- |
-| `<kind>` | the kind of library: `base-images`, `capabilities` or `modules` |
+| `<kind>` | the kind of library: `base-images` or `modules` |
 
 **Schema:** [`repo.kdl`&nbsp;›&nbsp;`sources`](schema/repo.md#sources)
 
@@ -875,8 +882,8 @@ that are current.
 | `--no-cache-from` | do not import the layer cache |
 
 > [!NOTE]
-> It fetches nothing and writes no build file. Run `tect fetch modules` and
-> `tect generate` first, or `tect vm run --rebuild` to run all three.
+> It fetches nothing and writes no build file. Run `tect generate` first, or
+> `tect vm run --rebuild` to run both.
 >
 > `$TAGS` adds tags and `$LABELS` adds OCI labels. `$IMAGE_VERSION` is stamped
 > into the image, and is today's date in UTC by default.
@@ -897,9 +904,9 @@ missing. `spawn` boots it with systemd-vmspawn, which cannot boot an `iso`.
 **Usage:** `tect vm [COMMAND]`
 
 > [!NOTE]
-> `--rebuild` runs `tect fetch modules`, `tect generate` and `tect build` in
-> that order first. Without it, nothing is fetched, written or built, and the
-> existing disk boots.
+> `--rebuild` runs `tect generate` and `tect build` in that order first.
+> Without it, nothing is fetched, written or built, and the existing disk
+> boots.
 >
 > It runs `vm.sh`, from `scripts/` if the repository keeps a copy, else from
 > `generated/scripts/`. The script asks for sudo, because it reads the image out
@@ -1203,9 +1210,7 @@ It runs inside a build:
 - `rpm` installs the package, on an rpm family
 - `deb` installs the package, on a deb family
 
-**Usage:** `tect fetch <what> <url> <sha256> [target] [extra]...
-       fetch [what] [url] [sha256] [target] [extra]... <COMMAND>`
-
+**Usage:** `tect fetch <what> <url> <sha256> [target] [extra]...`
 
 | Argument | Description |
 | --- | --- |
@@ -1216,23 +1221,6 @@ It runs inside a build:
 | `<extra>` | for `tree`, more arguments to tar; for `bin`, the file inside the archive |
 
 **Schema:** [`module.kdl`&nbsp;›&nbsp;`asset`](schema/module.md#asset)
-
-## `tect fetch modules`
-
-Fetches every module that the images import, checks each one that has a hash,
-and puts it under `modules/.remote/`. `tect generate` and the build read the
-modules from there.
-
-**Usage:** `tect fetch modules`
-
-**Schema:** [`image.kdl`&nbsp;›&nbsp;`pin`](schema/image.md#image-modules-module-pin)
-
-> [!NOTE]
-> A module already at its pin stays. A module that no image references any more
-> is removed.
->
-> It reads the declarations, and not the resolved plan, so it runs before the
-> modules it fetches can be read.
 
 ## `tect registry namespace`
 

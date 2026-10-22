@@ -320,7 +320,7 @@ pub fn check_network(
                         .help(reopen),
                     );
                 }
-                let dir = crate::layout::module(root, entry.dir());
+                let dir = crate::layout::module(root, &entry.path);
                 if let Some((script, verb)) = installer(&dir, base_family) {
                     issues.push(
                         Issue::new(

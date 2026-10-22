@@ -10,8 +10,5 @@ image {
 
     modules {
         module "fedora-family"
-        source "tectonic-os" {
-            module "hello"
-        }
     }
 }

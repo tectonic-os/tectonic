@@ -4,7 +4,7 @@ use crate::diag::{Issue, Issues, Source, Span};
 use crate::model::asset::Asset;
 use crate::parse::schema::{Arg, Node, Say};
 use crate::parse::{kids, string_arg};
-use crate::provenance::evidence::{read, Role, PIN};
+use crate::provenance::evidence::{read, PIN};
 use crate::provenance::Evidence;
 use kdl::KdlNode;
 
@@ -52,10 +52,7 @@ pub fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Asset>
     let pin = kids(node)
         .iter()
         .find(|child| child.name().value() == "pin")
-        .map_or_else(
-            || Evidence::new(span),
-            |child| read(child, Role::Asset, src, issues),
-        );
+        .map_or_else(|| Evidence::new(span), |child| read(child, src, issues));
 
     Some(Asset { name, pin, span })
 }

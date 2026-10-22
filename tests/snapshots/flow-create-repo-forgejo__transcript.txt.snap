@@ -25,8 +25,7 @@ Added forge.example.org/someone/example as the origin repo
 
   1) [x] modules "tectonic-modules"  Feature modules for many use cases
   2) [x] base-images "core"  Fedora, CentOS, RHEL, AlmaLinux, Rocky, Debian and Ubuntu
-  3) [x] capabilities "core"  Where each capability's witness is read
-Included libraries [1-3, several, 0 for none]: 
+Included libraries [1-2, several, 0 for none]: 
 
 Define an image now? (Yes/No)
 Yes

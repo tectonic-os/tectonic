@@ -79,14 +79,7 @@ pub fn find(
         if owner.is_some_and(|owner| owner != collection.name) {
             continue;
         }
-        if enforce && collection.unpinned() {
-            return Err(format!(
-                "`{}` follows a moving ref with no `sha256`, so using it is verified \
-                 against nothing; `audit {{ enforce #true }}` makes that an error. Pin the \
-                 collection to a tag and its hash, or drop the enforcement",
-                collection.name
-            ));
-        }
+        verified(collection, enforce)?;
         searched.push(&collection.name);
         let tree = tree(root, collection)?.join(collection.subtree().unwrap_or(""));
         if tree.join(module).join(layout::MODULE_FILE).is_file() {
@@ -130,6 +123,21 @@ pub fn find(
         ));
     }
     Ok(found)
+}
+
+/// Refuses an unpinned collection under `audit { enforce #true }`, because
+/// nothing verifies what it holds. Every path that copies a member in asks
+/// this first.
+fn verified(collection: &Collection, enforce: bool) -> Result<(), String> {
+    if enforce && collection.unpinned() {
+        return Err(format!(
+            "`{}` follows a moving ref with no `sha256`, so using it is verified against \
+             nothing; `audit {{ enforce #true }}` makes that an error. Pin the collection to a \
+             tag and its hash, or drop the enforcement",
+            collection.name
+        ));
+    }
+    Ok(())
 }
 
 /// Refuses a repository that declares no module library, and shows the block
@@ -304,7 +312,7 @@ impl<'a> Fit<'a> {
                 .entries
                 .iter()
                 .filter_map(|entry| {
-                    let provider = self.index.at(&entry.dir())?;
+                    let provider = self.index.at(&entry.path)?;
                     provider
                         .declares
                         .provides
@@ -353,8 +361,7 @@ impl<'a> Fit<'a> {
                     file: PathBuf::from(self.image.src.name()),
                     image: self.image.name.clone(),
                     flavour: entry.flavour.clone(),
-                    source: entry.source.clone(),
-                    name: entry.name().to_string(),
+                    name: entry.path.clone(),
                 })
                 .collect()),
             Some(_) => Err(format!(
@@ -375,7 +382,6 @@ struct Unlisted {
     file: PathBuf,
     image: String,
     flavour: Option<String>,
-    source: Option<String>,
     name: String,
 }
 
@@ -423,6 +429,66 @@ pub fn cached(root: &Path, collection: &Collection) -> Option<PathBuf> {
         }
     };
     dir.is_dir().then_some(dir)
+}
+
+/// Answers the member `owner/name` from the tree that the provider index read.
+/// Nothing is fetched, so an offer vendors the same files it showed the user.
+pub(crate) fn cached_member(
+    root: &Path,
+    sources: &[Collection],
+    enforce: bool,
+    owner: &str,
+    name: &str,
+) -> Result<Option<Found>, String> {
+    let Some(collection) = sources
+        .iter()
+        .find(|source| source.kind == SourceKind::Modules && source.name == owner)
+    else {
+        return Ok(None);
+    };
+    verified(collection, enforce)?;
+    let Some(tree) = cached(root, collection) else {
+        return Ok(None);
+    };
+    let dir = tree.join(collection.subtree().unwrap_or("")).join(name);
+    Ok(dir.join(layout::MODULE_FILE).is_file().then(|| Found {
+        owner: owner.to_string(),
+        name: name.to_string(),
+        dir,
+    }))
+}
+
+/// Copies each member in under its local name and records it in the lock. The
+/// returned tree lines name each copy and the lock.
+pub(crate) fn vendor_all(
+    root: &Path,
+    sources: &[Collection],
+    members: &[(&Found, &str)],
+    tracked: bool,
+) -> Result<Vec<(PathBuf, Change)>, String> {
+    let existed = layout::lock(root).exists();
+    let mut wrote: Vec<(PathBuf, Change)> = Vec::new();
+    for (from, name) in members {
+        wrote.extend(
+            vendor(root, sources, from, name, tracked)?
+                .into_iter()
+                .map(|path| (path, Change::Created)),
+        );
+    }
+    if !members.is_empty() {
+        let names: Vec<String> = members
+            .iter()
+            .map(|(_, name)| (*name).to_string())
+            .collect();
+        wrote.push((
+            PathBuf::from(layout::MODULES).join(layout::LOCK_FILE),
+            match existed {
+                true => Change::Updated(format!("{} recorded", said(&names))),
+                false => Change::Created,
+            },
+        ));
+    }
+    Ok(wrote)
 }
 
 /// The source's tree on this machine: the directory it already is, or the
@@ -590,18 +656,18 @@ fn fetch_git(remote: &crate::provenance::Evidence, work: &Path) -> Result<(), St
     Ok(())
 }
 
-/// Copies the module in and records it in the lock. The repository is a
-/// working tree, so committing what this wrote is the user's.
+/// Copies the module in under its local name and records it in the lock. The
+/// repository is a working tree, so committing what this wrote is the user's.
 fn vendor(
     root: &Path,
     sources: &[Collection],
-    member: &Member,
+    from: &Found,
+    name: &str,
     tracked: bool,
 ) -> Result<Vec<PathBuf>, String> {
     // The copy is the one moment a verifiable record is guaranteed, so a tree
     // that cannot be hashed refuses before anything is written. The source and
     // the copy are the same files, so the two hashes are the same value.
-    let from = &member.from;
     let content = lock::hash(&from.dir).ok_or_else(|| {
         format!(
             "{} cannot be hashed, so nothing can record what was copied",
@@ -618,7 +684,7 @@ fn vendor(
         pin.version.clone_from(&library.version);
     }
     let record = lock::Record {
-        path: member.name.clone(),
+        path: name.to_string(),
         library: from.owner.clone(),
         upstream: from.name.clone(),
         pin,
@@ -628,7 +694,7 @@ fn vendor(
     // The lock is rendered before the copy, so a lock that cannot take the
     // entry refuses before anything is written.
     let locked = lock::with(root, record)?;
-    let dest = PathBuf::from(layout::MODULES).join(&member.name);
+    let dest = PathBuf::from(layout::MODULES).join(name);
     let wrote = crate::init::copy_module(&from.dir, &root.join(&dest))?
         .into_iter()
         .map(|under| dest.join(under))
@@ -780,7 +846,7 @@ impl Module {
             }
         }
         for member in &chosen {
-            listing.refuse_duplicate(&list, &member.name, None)?;
+            listing.refuse_duplicate(&list, &member.name)?;
         }
         let named: Vec<String> = chosen.iter().map(|member| member.name.clone()).collect();
 
@@ -814,7 +880,7 @@ impl Module {
                 // and removed once.
                 let held: Vec<&crate::model::image::Entry> = held
                     .into_iter()
-                    .filter(|entry| !unlisted.iter().any(|gone| gone.name == entry.name()))
+                    .filter(|entry| !unlisted.iter().any(|gone| gone.name == entry.path))
                     .collect();
                 if !held.is_empty() {
                     unlisted.extend(fit.settle(&capability, &held, prompt)?);
@@ -893,37 +959,23 @@ impl Module {
         root: &Path,
         sources: &[Collection],
     ) -> Result<Vec<(PathBuf, Change)>, String> {
-        let mut wrote: Vec<(PathBuf, Change)> = Vec::new();
-        let existed = layout::lock(root).exists();
-        let mut recorded: Vec<String> = Vec::new();
-        for member in self.members.iter().filter(|member| member.vendor) {
-            wrote.extend(
-                vendor(root, sources, member, self.tracked)?
-                    .into_iter()
-                    .map(|path| (path, Change::Created)),
-            );
-            recorded.push(member.name.clone());
-        }
-        if !recorded.is_empty() {
-            wrote.push((
-                PathBuf::from(layout::MODULES).join(layout::LOCK_FILE),
-                match existed {
-                    true => Change::Updated(format!("{} recorded", said(&recorded))),
-                    false => Change::Created,
-                },
-            ));
-        }
-        let listed: Vec<(&str, Option<&str>)> = self
+        let copies: Vec<(&Found, &str)> = self
             .members
             .iter()
-            .map(|member| (member.name.as_str(), None))
+            .filter(|member| member.vendor)
+            .map(|member| (&member.from, member.name.as_str()))
+            .collect();
+        let mut wrote = vendor_all(root, sources, &copies, self.tracked)?;
+        let listed: Vec<&str> = self
+            .members
+            .iter()
+            .map(|member| member.name.as_str())
             .collect();
         for gone in &self.unlisted {
             crate::create::unlist(
                 &root.join(&gone.file),
                 &gone.image,
                 gone.flavour.as_deref(),
-                gone.source.as_deref(),
                 &gone.name,
             )?;
         }
@@ -1197,7 +1249,7 @@ fn image_has(
         || image.entries.iter().any(|entry| {
             (entry.flavour.is_none() || entry.flavour.as_deref() == flavour)
                 && index
-                    .at(&entry.dir())
+                    .at(&entry.path)
                     .is_some_and(|held| held.declares.provides.iter().any(|has| has == want))
         })
 }
@@ -1244,8 +1296,8 @@ fn measured(
     let Some(first) = images.first() else {
         return Ok(Vec::new());
     };
-    let family = first.base.as_ref().map_or("", |base| base.family.as_str());
-    let Ok(path) = crate::scap::content_path(family, datastream) else {
+    let (scap_content, family) = crate::scap::named_by(first.base.as_ref());
+    let Ok(path) = crate::scap::content_path(scap_content, family, datastream) else {
         return Ok(Vec::new());
     };
     let content = match crate::scap::content_of(&path) {
@@ -1494,6 +1546,34 @@ mod tests {
         assert!(refused.starts_with("no module chosen"), "{refused}");
     }
 
+    /// The base offer in `create image` vendors through this lookup, so it has
+    /// to refuse what `find` refuses.
+    #[test]
+    fn an_enforced_lookup_refuses_an_unpinned_library() {
+        let mut pin = crate::provenance::Evidence::new(crate::diag::Span::default());
+        pin.url = Some("https://host/owner/library.git".into());
+        pin.version = Some("main".into());
+        // A pinned-by-directory library sorts first, so a lookup that took the
+        // first library would answer it instead of the unpinned one.
+        let sources = [
+            collection("other", "elsewhere"),
+            Collection {
+                kind: SourceKind::Modules,
+                name: "one".into(),
+                at: At::Git(pin),
+                span: crate::diag::Span::default(),
+            },
+        ];
+        let root = Path::new("/nonexistent");
+        let refused = cached_member(root, &sources, true, "one", "hello")
+            .err()
+            .expect("enforcement refuses an unpinned library");
+        assert!(refused.contains("follows a moving ref"), "{refused}");
+        assert!(cached_member(root, &sources, false, "one", "hello")
+            .unwrap()
+            .is_none());
+    }
+
     #[test]
     fn a_copy_from_a_fetched_library_records_its_url_and_revision() {
         let root = std::env::temp_dir().join(format!("tect-vendor-pin-{}", std::process::id()));
@@ -1510,16 +1590,12 @@ mod tests {
                 span: crate::diag::Span::default(),
             },
         ];
-        let member = Member {
-            from: Found {
-                owner: "one".into(),
-                name: "hello".into(),
-                dir: root.join("library/hello"),
-            },
+        let from = Found {
+            owner: "one".into(),
             name: "hello".into(),
-            vendor: true,
+            dir: root.join("library/hello"),
         };
-        vendor(&root, &sources, &member, false).unwrap();
+        vendor(&root, &sources, &from, "hello", false).unwrap();
         let entry = lock::entry(&root, "hello").expect("the copy is recorded");
 
         assert_eq!(
@@ -1580,17 +1656,13 @@ image {
     fn an_unhashable_copy_writes_nothing() {
         let root =
             std::env::temp_dir().join(format!("tect-unhashable-copy-{}", std::process::id()));
-        let member = Member {
-            from: Found {
-                owner: "one".into(),
-                name: "missing".into(),
-                dir: root.join("missing"),
-            },
+        let from = Found {
+            owner: "one".into(),
             name: "missing".into(),
-            vendor: true,
+            dir: root.join("missing"),
         };
 
-        assert!(vendor(&root, &[], &member, true).is_err());
+        assert!(vendor(&root, &[], &from, "missing", true).is_err());
         assert!(!root.join("modules/missing").exists());
         assert!(!layout::lock(&root).exists());
     }

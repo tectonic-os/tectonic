@@ -30,7 +30,7 @@ pub fn hooks<'a>(image: &'a Image, root: &Path) -> Vec<(&'a Entry, Vec<String>)>
         .iter()
         .filter(|entry| entry.module.is_some())
         .filter_map(|entry| {
-            let dir = layout::modules(root).join(entry.dir());
+            let dir = layout::modules(root).join(&entry.path);
             let found: Vec<String> = std::iter::once(String::new())
                 .chain(
                     layout::family_dirs(&dir, family)
@@ -72,7 +72,7 @@ rm -rf {dest}.d
     }
 
     for (entry, scripts) in hooks {
-        let dir = format!("/ctx/modules/{}", entry.dir());
+        let dir = format!("/ctx/modules/{}", entry.path);
         let sourced: String = scripts
             .iter()
             .map(|script| format!("source {dir}/{script}\n"))

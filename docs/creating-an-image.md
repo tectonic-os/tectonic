@@ -76,7 +76,7 @@ layout](https://tectonic-os.github.io/tectonic/schema/repository/) schema.
 > [!NOTE]
 > `tect create git` puts the directory under git control and writes the
 > `.gitignore` this repository keeps, which ignores `keys/private/`, `out/`
-> and `modules/.remote/`. A directory that is already inside a git repository
+> and `.cache/`. A directory that is already inside a git repository
 > is refused, because a repository does not nest.
 
 > [!NOTE]
@@ -198,6 +198,7 @@ base "quay.io/fedora/fedora-bootc:44" {
     family "fedora"
     provides "rechunking" "initramfs-generation" "luks-initramfs" "selinux-policy" "ssh" "bootc" "bootupctl" "podman" "crun"
     signed #false
+    scap-content "ssg-fedora-ds.xml"
 }
 ```
 
@@ -205,7 +206,8 @@ base "quay.io/fedora/fedora-bootc:44" {
 
 The `family` node allows modules to gate compatibility with different Linux
 families. The `provides` node declares capabilities baked into the base image
-that modules might require.
+that modules might require. The `scap-content` node names the benchmark
+content that a compliance scan of the image reads.
 
 ## Adding modules
 
@@ -318,10 +320,6 @@ sources {
         url "https://github.com/tectonic-os/library"
         path "base-images/core"
     }
-    capabilities "core" {
-        url "https://github.com/tectonic-os/library"
-        path "capabilities"
-    }
     modules "tectonic-modules" {
         url "https://github.com/tectonic-os/library"
         path "modules"
@@ -407,6 +405,7 @@ image {
         family "fedora"
         provides "rechunking" "initramfs-generation" "luks-initramfs" "selinux-policy" "ssh" "bootc" "bootupctl" "podman" "crun"
         signed #false
+        scap-content "ssg-fedora-ds.xml"
     }
 
     layout {

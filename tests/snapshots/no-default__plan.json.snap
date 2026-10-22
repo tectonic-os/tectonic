@@ -17,7 +17,6 @@ source: tests/golden/harness.rs
   "audit": {
     "enforce": false
   },
-  "remotes": [],
   "assets": [],
   "images": [
     {
@@ -37,14 +36,35 @@ source: tests/golden/harness.rs
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
+        "scap_content": "",
         "signed": false,
         "provides": [
           "rechunking"
         ],
         "witnesses": {
-          "rechunking": [
-            "/usr/bin/rechunking",
-            "/usr/sbin/rechunking"
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
           ]
         },
         "requires": [],
@@ -66,10 +86,8 @@ source: tests/golden/harness.rs
           "modules": [
             {
               "path": "core/shared",
-              "dir": "core/shared",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "A module both images in this repository enable",
               "options": {},
               "provides": [
@@ -84,8 +102,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "644e04194a52bd7fa6a63998dd8ac8661fbae8cdc88a1acc0e8814a7bff2f4d6",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -121,18 +137,39 @@ source: tests/golden/harness.rs
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
+        "scap_content": "",
         "signed": false,
         "provides": [
           "rechunking"
         ],
         "witnesses": {
-          "rechunking": [
-            "/usr/bin/rechunking",
-            "/usr/sbin/rechunking"
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
           ],
           "shell-tools": [
             "/usr/bin/shell-tools",
             "/usr/sbin/shell-tools"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
           ]
         },
         "requires": [],
@@ -174,10 +211,8 @@ source: tests/golden/harness.rs
           "modules": [
             {
               "path": "core/shared",
-              "dir": "core/shared",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "A module both images in this repository enable",
               "options": {},
               "provides": [
@@ -192,8 +227,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "644e04194a52bd7fa6a63998dd8ac8661fbae8cdc88a1acc0e8814a7bff2f4d6",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -232,10 +265,8 @@ source: tests/golden/harness.rs
           "modules": [
             {
               "path": "core/shared",
-              "dir": "core/shared",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "A module both images in this repository enable",
               "options": {},
               "provides": [
@@ -250,8 +281,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "644e04194a52bd7fa6a63998dd8ac8661fbae8cdc88a1acc0e8814a7bff2f4d6",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -290,10 +319,8 @@ source: tests/golden/harness.rs
           "modules": [
             {
               "path": "core/shared",
-              "dir": "core/shared",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "A module both images in this repository enable",
               "options": {},
               "provides": [
@@ -308,8 +335,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "644e04194a52bd7fa6a63998dd8ac8661fbae8cdc88a1acc0e8814a7bff2f4d6",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -317,10 +342,8 @@ source: tests/golden/harness.rs
             },
             {
               "path": "core/dev-tools",
-              "dir": "core/dev-tools",
               "flavour": "dev",
               "variant": null,
-              "remote": null,
               "description": "Compilers and language servers, behind the dev flavour",
               "options": {},
               "provides": [],
@@ -334,8 +357,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "b389afa2df549786eb6284f8de9df649ad3ab660902f2fa34e9b88ca4dff9d84",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],

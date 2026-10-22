@@ -18,6 +18,12 @@ Yes
 
 
 example/
+├── modules/
+│   ├── fedora-family/
+│   │   ├── lib/
+│   │   │   └── + family.sh
+│   │   └── + module.kdl
+│   └── + modules.lock.kdl
 ├── + beta.image.kdl
 └── ~ repo.kdl  example set as the default image
 ==== exit 0

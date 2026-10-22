@@ -1,7 +1,0 @@
-schema-version 1
-
-description "A module imported out of the unpinned collection"
-
-supports "fedora"
-
-packages "fastfetch"

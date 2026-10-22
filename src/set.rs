@@ -522,7 +522,11 @@ impl Conforms {
         datastream: Option<PathBuf>,
         prompt: &Prompt,
     ) -> Result<Option<Self>, Error> {
-        let crate::Loaded { list, index, .. } = crate::load(root);
+        let crate::Loaded { list, .. } = crate::load(root);
+        // The offer may bring a library module, so it reads the libraries
+        // already on this machine. Resolution reads none.
+        let disk = crate::parse::disk::Disk::scan(root);
+        let index = crate::provider::Index::scan(root, &list.sources, &disk, false);
         if list.images.is_empty() {
             return Err(
                 "`set conforms` needs an image; run `tect create image <name>` first"
@@ -560,8 +564,8 @@ impl Conforms {
         };
         let image = &list.images[at];
 
-        let family = image.base.as_ref().map_or("", |base| base.family.as_str());
-        let path = crate::scap::content_path(family, datastream.as_deref())?;
+        let (named, family) = crate::scap::named_by(image.base.as_ref());
+        let path = crate::scap::content_path(named, family, datastream.as_deref())?;
         let content = crate::scap::content_of(&path)?;
         if content.profiles.is_empty() {
             return Err(format!(
@@ -728,13 +732,6 @@ impl Claims {
         datastream: Option<PathBuf>,
         prompt: &Prompt,
     ) -> Result<Option<Self>, Error> {
-        let remote = format!("{}/", crate::model::remote::REMOTE_DIR);
-        if let Some(source) = named.strip_prefix(&remote) {
-            return Err(Error::Invocation(format!(
-                "nothing can be changed here; `{named}` is a fetched module; `tect import module \
-                 {source}` makes a copy this repository owns"
-            )));
-        }
         let file = Path::new(layout::MODULES)
             .join(named)
             .join(layout::MODULE_FILE);
@@ -755,7 +752,7 @@ impl Claims {
                 )))
             }
         };
-        let path = crate::scap::content_path(family, datastream.as_deref())?;
+        let path = crate::scap::content_path("", family, datastream.as_deref())?;
         let content = crate::scap::content_of(&path)?;
         if content.profiles.is_empty() {
             return Err(format!("{} carries no profile to claim against", path.display()).into());

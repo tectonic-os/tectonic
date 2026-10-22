@@ -1,7 +1,0 @@
----
-source: tests/golden.rs
----
-{
-  "packages": [],
-  "relationships": []
-}

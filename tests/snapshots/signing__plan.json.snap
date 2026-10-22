@@ -17,7 +17,6 @@ source: tests/golden/harness.rs
   "audit": {
     "enforce": false
   },
-  "remotes": [],
   "assets": [],
   "images": [
     {
@@ -37,15 +36,27 @@ source: tests/golden/harness.rs
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
+        "scap_content": "",
         "signed": false,
         "provides": [
           "rechunking",
           "initramfs-generation"
         ],
         "witnesses": {
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
           "initramfs-generation": [
-            "/usr/bin/initramfs-generation",
-            "/usr/sbin/initramfs-generation"
+            "/usr/bin/dracut"
           ],
           "kernel-devel": [
             "/usr/bin/kernel-devel",
@@ -55,9 +66,14 @@ source: tests/golden/harness.rs
             "/usr/bin/kernel-devel-helpers",
             "/usr/sbin/kernel-devel-helpers"
           ],
-          "rechunking": [
-            "/usr/bin/rechunking",
-            "/usr/sbin/rechunking"
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
           ]
         },
         "requires": [],
@@ -79,10 +95,8 @@ source: tests/golden/harness.rs
           "modules": [
             {
               "path": "kernel/signed-kernel",
-              "dir": "kernel/signed-kernel",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "A kernel that signs its own modules against a Secure Boot key",
               "options": {},
               "provides": [
@@ -103,8 +117,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "5ac14983e4b81694e894685b202b0b8ab3e3cb418ef16b8cd27976eb59319840",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [
@@ -126,10 +138,8 @@ source: tests/golden/harness.rs
             },
             {
               "path": "drivers/kvmfr",
-              "dir": "drivers/kvmfr",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "A DKMS module built and signed against the kernel above",
               "options": {},
               "provides": [],
@@ -144,8 +154,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "1ad92bc90ff2be7753e1143747b366e8ddc19e7dd219b82110452f6d35db8118",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -157,6 +165,7 @@ source: tests/golden/harness.rs
             "mok_privkey"
           ],
           "contract_files": [
+            "/usr/bin/dracut",
             "/usr/share/secureboot/sb_cert.der"
           ],
           "verify_exceptions": [],

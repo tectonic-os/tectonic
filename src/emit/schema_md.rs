@@ -40,7 +40,7 @@ impl Area {
             Area::Image => "Image files",
             Area::Modules => "Modules",
             Area::Module => "Module manifests",
-            Area::Bases => "Base images and capabilities",
+            Area::Bases => "Base images",
             Area::Lock => "The module lock",
         }
     }
@@ -66,8 +66,6 @@ const SECTIONS: &[Section] = &[
         at: "The root of the repository, as `image.kdl` or `<name>.image.kdl`." },
     Section { name: "<name>.base.kdl", node: &bases::BASE_FILE, declared: false, area: Area::Bases,
         at: "`base-images/<library>/<name>.base.kdl`, in a `base-images` source." },
-    Section { name: "capabilities.kdl", node: &bases::CAPABILITIES, declared: false, area: Area::Bases,
-        at: "`capabilities.kdl`, at the root of a `capabilities` source." },
     Section { name: "module.kdl", node: &module::MODULE, declared: false, area: Area::Module,
         at: "`modules/<module-name>/module.kdl`, in the directory of the module." },
     Section { name: "modules.lock.kdl", node: &lock::LOCK_FILE, declared: false, area: Area::Lock,

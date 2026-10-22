@@ -95,11 +95,11 @@ pub fn parse_option(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option
         );
     }
 
-    if name == "source" {
+    if name == "pin" {
         issues.push(
-            Issue::new("`source` is not usable as an option name", src)
+            Issue::new("`pin` is not usable as an option name", src)
                 .at(node.name().span(), "reserved")
-                .help("a `source` child of a list entry is the out-of-tree module pin, so this option could never be set"),
+                .help("an image refuses a `pin` child of a list entry, so this option could never be set"),
         );
     }
 

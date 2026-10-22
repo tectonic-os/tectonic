@@ -16,6 +16,7 @@ image {
         family "fedora"
         provides "rechunking" "bootc"
         signed #true
+        scap-content "ssg-cs10-ds.xml"
     }
     layout {
         bootloader "grub2"
@@ -277,6 +278,7 @@ The reference can carry a digest after its tag:
 | [`requires`](#image-base-requires) (optional,&nbsp;repeatable) | *list of strings* | The capabilities that an enabled module must provide before the base is usable. |
 | [`satisfies`](#image-base-satisfies) (optional) | optionally {&nbsp;[fields](#image-base-satisfies-fields)&nbsp;} | An audit declaration of the benchmarks and rules that the base image already satisfies. `tect` records it and certifies nothing. |
 | [`signed`](#image-base-signed) (optional) | *boolean* | Whether the base publishes a cosign signature. |
+| [`scap-content`](#image-base-scap-content) (optional) | *string* | The SSG datastream file that a scan of an image on this base reads. |
 
 > [!NOTE]
 > The build record says what one build got. Only a digest in the image file says what the next build gets.
@@ -393,6 +395,22 @@ image {
 ```
 
 Accepts: *boolean*
+
+<a id="image-base-scap-content"></a>
+
+#### `scap-content` (optional)
+
+Names the SCAP content file that measures an image on this base, as a filename in the content directory. Each EL release publishes its own datastream, so the `rhel` family has no default and a scan of a `rhel` image needs this line. `tect create image` copies it from the base file of the library.
+
+```kdl
+image {
+    base "quay.io/fedora/fedora-bootc:44" {
+        scap-content "ssg-cs10-ds.xml"
+    }
+}
+```
+
+Accepts: *string*
 
 <a id="image-layout"></a>
 
@@ -571,7 +589,7 @@ image {
 
 ### `modules` (required)
 
-Lists every module that the image is made of. A module comes from `modules/` in this repository, from a collection in `sources`, or from another repository through a `pin`.
+Lists every module that the image is made of. Each module is a directory under `modules/` in this repository.
 
 ```kdl
 image {
@@ -588,7 +606,6 @@ Accepts: {&nbsp;[fields](#image-modules-fields)&nbsp;}
 | Field | Accepts | Description |
 | --- | --- | --- |
 | [`module`](#image-modules-module) (required,&nbsp;repeatable) | *string*, then optionally {&nbsp;[fields](#image-modules-module-fields)&nbsp;} | One module of the image, which the list entry names by its path under `modules/`. |
-| [`source`](#image-modules-source) (optional,&nbsp;repeatable) | *string*, then {&nbsp;[fields](#image-modules-source-fields)&nbsp;} | The modules that the image references from one of the collections in `sources`. |
 | [`flavour`](#image-modules-flavour) (optional,&nbsp;repeatable) | *string*, then {&nbsp;[fields](#image-modules-flavour-fields)&nbsp;} | The modules one flavour adds, which build only for that flavour. |
 
 <a id="image-modules-module"></a>
@@ -607,13 +624,6 @@ image {
 
 Accepts: *string*, then optionally {&nbsp;[fields](#image-modules-module-fields)&nbsp;}
 
-A list entry with a `pin` names a module in another repository:
-
-- `tect` fetches the module, verifies it against the hash and unpacks it under `modules/.remote/`.
-- The URL of the pin is `https` or `file`, and it points at a tar archive. It expands `{version}` and no other placeholder.
-- The fetched module ships a `module.kdl` that the same schema holds.
-- `tect` fetches nothing that the fetched module requires. If the module needs another module, then the image lists that module too.
-
 | Property | Accepts | Description |
 | --- | --- | --- |
 | `variant=` (optional) | *string* | Which of the module's declared variants this image builds. |
@@ -622,217 +632,12 @@ A list entry with a `pin` names a module in another repository:
 
 | Field | Accepts | Description |
 | --- | --- | --- |
-| [`pin`](#image-modules-module-pin) (optional) | {&nbsp;[fields](#image-modules-module-pin-fields)&nbsp;} | Where content comes from, which version it is, what verifies it, and what keeps the version current. |
 | [`<name>`](#image-modules-module-name) (optional,&nbsp;repeatable) |  | An option that the module declares, which this image sets in a child node named after the option. |
 
 > [!NOTE]
-> A nested name such as `hardening/coredumps` names the directories that the collection groups its members in. Each part of the name is a name in its own right.
-
-<a id="image-modules-module-pin"></a>
-
-##### `pin` (optional)
-
-A pin fixes where a download comes from and which version it is, and says how the version stays current. Unless the pin is `unpinned`, `tect` verifies each download against the pinned hash, so a changed upstream file is caught.
-
-```kdl
-image {
-    modules {
-        module "core/bootloader" {
-            pin {
-                renovate datasource="github-tags" depName="owner/repo"
-                version "v1.0.0"
-                url "https://github.com/owner/repo/archive/refs/tags/{version}.tar.gz"
-                sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
-            }
-        }
-    }
-}
-```
-
-Accepts: {&nbsp;[fields](#image-modules-module-pin-fields)&nbsp;}
-
-A pin holds exactly one of these, so every pin says how it stays current:
-
-- `renovate`, if Renovate keeps the version current;
-- `manual`, if nothing tracks the pin;
-- `unpinned`, if the pin follows a moving ref with no `sha256`.
-
-<a id="image-modules-module-pin-fields"></a>
-
-| Field | Accepts | Description |
-| --- | --- | --- |
-| [`renovate`](#image-modules-module-pin-renovate) (optional) |  | The Renovate custom manager that keeps `version` current. |
-| [`manual`](#image-modules-module-pin-manual) (optional) | *string* | Why nothing tracks this pin. |
-| [`unpinned`](#image-modules-module-pin-unpinned) (optional) | *string* | Why this pin follows a moving ref with no `sha256`. |
-| [`version`](#image-modules-module-pin-version) (required) | *string* | The version, tag or commit that `url` expands and Renovate rewrites. |
-| [`url`](#image-modules-module-pin-url) (required) | *string* | Where the content comes from. |
-| [`sha256`](#image-modules-module-pin-sha256) (optional) | *string* | The hash the fetched content must match. |
-| [`path`](#image-modules-module-pin-path) (optional) | *string* | The directory inside the archive that holds the content. |
-
-> [!NOTE]
-> An `asset`, an out-of-tree module and a collection each hold a `pin`.
+> A nested name such as `hardening/coredumps` names the directories that the module is grouped in under `modules/`. Each part of the name is a name in its own right.
 >
-> A base holds no `pin`. Its image reference holds the location and the version, and `signed` records whether the base publishes a cosign signature.
->
-> Renovate matches `renovate` together with the line directly below it. Put `version` on that line.
-
-<a id="image-modules-module-pin-renovate"></a>
-
-###### `renovate` (optional)
-
-The Renovate custom manager that keeps `version` current.
-
-```kdl
-image {
-    modules {
-        module "core/bootloader" {
-            pin {
-                renovate datasource="github-tags" depName="owner/repo"
-            }
-        }
-    }
-}
-```
-
-| Property | Accepts | Description |
-| --- | --- | --- |
-| `datasource=` (required) | `github-releases` or `github-tags` or `git-refs` | The Renovate datasource that tracks the pin. |
-| `depName=` (required) | *string* | The name the datasource knows the dependency by. |
-| `extractVersion=` (optional) | *string* | The pattern that extracts the version from a tag. |
-
-<a id="image-modules-module-pin-manual"></a>
-
-###### `manual` (optional)
-
-Why nothing tracks this pin.
-
-```kdl
-image {
-    modules {
-        module "core/bootloader" {
-            pin {
-                manual "upstream publishes no releases"
-            }
-        }
-    }
-}
-```
-
-Accepts: *string*
-
-<a id="image-modules-module-pin-unpinned"></a>
-
-###### `unpinned` (optional)
-
-Why this pin follows a moving ref with no `sha256`.
-
-```kdl
-image {
-    modules {
-        module "core/bootloader" {
-            pin {
-                unpinned "followed at its branch head"
-            }
-        }
-    }
-}
-```
-
-Accepts: *string*
-
-> [!NOTE]
-> Every fetch takes what the ref holds at that moment, and nothing checks what arrived.
->
-> Only a collection's pin takes `unpinned`. The build runs an out-of-tree module as root, so the pin of an out-of-tree module needs a `sha256`.
->
-> `unpinned` does not combine with `sha256`, because a moving ref breaks the hash.
-
-<a id="image-modules-module-pin-version"></a>
-
-###### `version` (required)
-
-The version, tag or commit that `url` expands and Renovate rewrites.
-
-```kdl
-image {
-    modules {
-        module "core/bootloader" {
-            pin {
-                version "v1.0.0"
-            }
-        }
-    }
-}
-```
-
-Accepts: *string*
-
-<a id="image-modules-module-pin-url"></a>
-
-###### `url` (required)
-
-Where the content comes from.
-
-```kdl
-image {
-    modules {
-        module "core/bootloader" {
-            pin {
-                url "https://github.com/owner/repo/archive/refs/tags/{version}.tar.gz"
-            }
-        }
-    }
-}
-```
-
-Accepts: *string*
-
-<a id="image-modules-module-pin-sha256"></a>
-
-###### `sha256` (optional)
-
-The hash the fetched content must match.
-
-```kdl
-image {
-    modules {
-        module "core/bootloader" {
-            pin {
-                sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
-            }
-        }
-    }
-}
-```
-
-Accepts: *string*
-
-| Property | Accepts | Description |
-| --- | --- | --- |
-| `from=` (optional) | `asset` or `sidecar` or `manual` | Where the hash is refreshed from. `asset`, the default, hashes the payload itself. `sidecar` reads the `<url>.sha256` file that upstream publishes. `manual` means nothing recomputes the hash. |
-
-> [!NOTE]
-> If a pin has no `sha256` and no `unpinned`, then `tect check` reports an error.
-
-<a id="image-modules-module-pin-path"></a>
-
-###### `path` (optional)
-
-The directory inside the archive that holds the content.
-
-```kdl
-image {
-    modules {
-        module "core/bootloader" {
-            pin {
-                path "modules/example"
-            }
-        }
-    }
-}
-```
-
-Accepts: *string*
+> An entry names a module under `modules/` only. `tect import module` copies a module from a library into `modules/` and records where it came from in `modules/modules.lock.kdl`.
 
 <a id="image-modules-module-name"></a>
 
@@ -849,30 +654,6 @@ image {
     }
 }
 ```
-
-<a id="image-modules-source"></a>
-
-#### `source` (optional, repeatable)
-
-Groups the modules that come from one collection in `sources`. Each entry inside names a module by its path within that collection.
-
-```kdl
-image {
-    modules {
-        source "tectonic-os" {
-            module "core/bootloader"
-        }
-    }
-}
-```
-
-Accepts: *string*, then {&nbsp;[fields](#image-modules-source-fields)&nbsp;}
-
-<a id="image-modules-source-fields"></a>
-
-| Field | Accepts | Description |
-| --- | --- | --- |
-| [`module`](#image-modules-module) (required,&nbsp;repeatable) | *string*, then optionally {&nbsp;[fields](#image-modules-module-fields)&nbsp;} | One module of the image, which the list entry names by its path under `modules/`. |
 
 <a id="image-modules-flavour"></a>
 
@@ -897,4 +678,3 @@ Accepts: *string*, then {&nbsp;[fields](#image-modules-flavour-fields)&nbsp;}
 | Field | Accepts | Description |
 | --- | --- | --- |
 | [`module`](#image-modules-module) (required,&nbsp;repeatable) | *string*, then optionally {&nbsp;[fields](#image-modules-module-fields)&nbsp;} | One module of the image, which the list entry names by its path under `modules/`. |
-| [`source`](#image-modules-source) (optional,&nbsp;repeatable) | *string*, then {&nbsp;[fields](#image-modules-source-fields)&nbsp;} | The modules that the image references from one of the collections in `sources`. |

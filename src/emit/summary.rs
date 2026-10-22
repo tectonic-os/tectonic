@@ -12,7 +12,6 @@ struct Row {
     path: String,
     flavour: Option<String>,
     variant: Option<String>,
-    remote: Option<String>,
     description: String,
     options: Vec<(String, String)>,
     satisfies: Vec<(String, Vec<String>)>,
@@ -33,9 +32,6 @@ pub fn render(list: &List, target: &str) -> Option<String> {
                 path: entry.path.clone(),
                 flavour: entry.flavour.clone(),
                 variant: entry.variant.clone(),
-                remote: entry
-                    .pin(&list.sources)
-                    .map(|remote| remote.selector().to_string()),
                 description: module.map(|m| m.description.clone()).unwrap_or_default(),
                 options: module
                     .map(|m| m.resolved.as_slice())
@@ -83,7 +79,6 @@ pub fn on_host(target: &Json) -> String {
             path: text(module, "path").unwrap_or_default(),
             flavour: text(module, "flavour"),
             variant: text(module, "variant"),
-            remote: text(module, "remote"),
             description: text(module, "description").unwrap_or_default(),
             options: match field(module, "options") {
                 Some(Json::Object(fields)) => fields
@@ -165,10 +160,8 @@ fn table(flavour: Option<&str>, conforms: &str, rows: &[Row]) -> String {
         if let Some(flavour) = &row.flavour {
             let _ = write!(out, " `[{flavour}]`");
         }
-        for (word, value) in [("variant", &row.variant), ("remote", &row.remote)] {
-            if let Some(value) = value {
-                let _ = write!(out, " `{word}={value}`");
-            }
+        if let Some(variant) = &row.variant {
+            let _ = write!(out, " `variant={variant}`");
         }
         let options: Vec<String> = row
             .options

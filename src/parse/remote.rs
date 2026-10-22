@@ -56,10 +56,6 @@ const BASE_IMAGES_PATH: Node = path(
     "The directory inside the Git repository that holds this base-image library.",
     "\"base-images/core\"",
 );
-const CAPABILITIES_PATH: Node = path(
-    "The directory inside the Git repository that holds this capability library.",
-    "\"capabilities\"",
-);
 
 const VERSION: Node = Node::new(
     "version",
@@ -156,15 +152,7 @@ pub const BASE_IMAGES: Node = source(
 )
 .scaffolds(&["url", "path"]);
 
-pub const CAPABILITIES: Node = source(
-    "capabilities",
-    "A capability library that locates capability witness paths.",
-    "\"core\"",
-    &[DIR, URL, CAPABILITIES_PATH, VERSION, SHA256, UNPINNED],
-)
-.scaffolds(&["url", "path"]);
-
-pub const SOURCES: [Node; 3] = [MODULES, BASE_IMAGES, CAPABILITIES];
+pub const SOURCES: [Node; 2] = [MODULES, BASE_IMAGES];
 
 fn value<'a>(node: &'a KdlNode, name: &str) -> Option<(&'a str, Span)> {
     kids(node)

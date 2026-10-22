@@ -107,7 +107,7 @@ pub fn collisions(image: &Image, shipped: &Index, brought: &BTreeSet<String>) ->
         let Some(module) = &entries[later].module else {
             continue;
         };
-        if !brought.contains(&entries[later].dir()) && !brought.contains(&entries[earlier].dir()) {
+        if !brought.contains(&entries[later].path) && !brought.contains(&entries[earlier].path) {
             continue;
         }
         if module.overrides.iter().any(|decl| &decl.name == path) {

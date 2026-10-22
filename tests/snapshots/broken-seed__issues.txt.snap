@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
   x `tectonic-os` is not a collection this repository declares
   help: a repository is seedable only if it publishes its own modules/ as a
@@ -12,18 +12,7 @@ source: tests/golden.rs
  11 |         module "core/hello"
     :         ^^^|^^
     :            `-- `tectonic-os` is not declared in `sources`
- 12 |         module "steam-tweaks" {
-    `----
-  help: a seed lists a module by name and nothing else, so one nothing can
-        import leaves a seeded repository unbuildable
-
-  x `steam-tweaks` is in no collection the seed can name
-    ,-[tests/repos/broken-seed/example.image.kdl:12:9]
- 11 |         module "core/hello"
- 12 |         module "steam-tweaks" {
-    :         ^^^|^^
-    :            `-- pinned to a source of its own
- 13 |             pin {
+ 12 |     }
     `----
   help: a seed lists a module by name and nothing else, so one nothing can
         import leaves a seeded repository unbuildable
