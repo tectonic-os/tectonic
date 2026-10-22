@@ -83,9 +83,6 @@ pub struct Run {
     /// Collections following a moving ref, which is what makes the repository
     /// build a different tree tomorrow. `check`'s alone.
     pub unpinned: Vec<String>,
-    /// Names the imported modules whose content no longer matches their lock
-    /// entry. Forking one is legitimate, so only `check` reads it out.
-    pub modified: Vec<String>,
     /// Modules whose Containerfile fragment a closed script rule does not
     /// reach. The rule is narrower than its name, so `check` says where.
     pub ungoverned: Vec<String>,
@@ -188,6 +185,7 @@ pub(crate) fn load(root: &Path) -> Loaded {
     let disk = parse::disk::Disk::scan(root);
     let index = provider::Index::local(root, &list.sources, &disk);
     parse::module::check_unlisted(&list, root, &disk, &mut issues);
+    provenance::lock::check(root, &mut issues);
 
     let network = list.network;
     let schema_version = list.schema_version;
@@ -275,18 +273,14 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
         ungoverned,
     } = loaded;
 
-    let (unpinned, modified) = match command {
+    let unpinned = match command {
         Command::Check => {
-            provenance::lock::validate(root, &mut issues);
             scap::check_content(&list, &mut issues);
-            (
-                list.sources
-                    .iter()
-                    .filter(|c| c.unpinned())
-                    .map(|c| c.name.clone())
-                    .collect(),
-                provenance::lock::modified(root),
-            )
+            list.sources
+                .iter()
+                .filter(|c| c.unpinned())
+                .map(|c| c.name.clone())
+                .collect()
         }
         Command::Plan
         | Command::Generate
@@ -299,22 +293,8 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
         | Command::Why
         | Command::WhyJson
         | Command::Coverage
-        | Command::CoverageJson => (Vec::new(), Vec::new()),
+        | Command::CoverageJson => Vec::new(),
     };
-    if list.audit_enforce {
-        for name in &modified {
-            issues.push(
-                Issue::new(
-                    format!("`{name}` no longer matches its entry in the module lock"),
-                    &list.repo_src,
-                )
-                .help(
-                    "`audit { enforce #true }` makes a fork an error; re-import it, or drop its \
-                     entry from `modules/modules.lock.kdl` to own the module outright",
-                ),
-            );
-        }
-    }
 
     if let Some(unknown) = image_arg.filter(|id| !list.images.iter().any(|i| i.id == *id)) {
         let known: Vec<&str> = list.images.iter().map(|i| i.id.as_str()).collect();
@@ -561,7 +541,6 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
         suppressed: list.images.iter().map(|i| i.suppressed.len()).sum(),
         flavours: list.images.iter().map(|i| i.flavours.len()).sum(),
         unpinned,
-        modified,
         ungoverned,
         index,
         list,

@@ -461,7 +461,6 @@ Accepts: *boolean*
 Each check runs in the command named before it:
 
 - `tect import module`, `tect create image` and `tect set conforms`: the library a module is copied from is pinned to a tag and its hash.
-- `tect check`: each imported module still matches its entry in the module lock.
 - `tect build`: the base tag resolves to a manifest digest.
 - `tect build`: the repository is at a commit.
 - `tect build`: each cloned asset resolves to a commit.
@@ -474,6 +473,8 @@ Each check runs in the command named before it:
 
 > [!NOTE]
 > `tect` also reports a `module.sh` or `finalize.sh` that reaches the network with no `asset` that declares the download. This report does not depend on `enforce`.
+>
+> `tect` refuses a module that tracks its library and no longer matches its entry in the module lock. This refusal does not depend on `enforce`.
 
 <a id="security-policy"></a>
 

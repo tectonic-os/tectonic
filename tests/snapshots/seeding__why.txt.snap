@@ -36,7 +36,7 @@ Nothing. It declares no `satisfies`.
 | --- | --- | --- | --- | --- |
 | `tectonic-os` | https://github.com/tectonic-os/modules | v1.0.0 | not declared | none |
 
-Its content still matches what was imported.
+It tracks its library, and its content still matches what was imported. An edit to it stops `tect check`, `tect generate` and `tect build`.
 
 ## What it pulls in
 
@@ -83,7 +83,8 @@ None. It declares no `copr` and ships no `repo` file.
       "selector": "v1.0.0",
       "verifier": null,
       "tracker": "none"
-    }
+    },
+    "tracked": true
   },
   "modified": false,
   "fetches": [],
@@ -130,7 +131,7 @@ Nothing. It declares no `satisfies`.
 | --- | --- | --- | --- | --- |
 | `tectonic-os` | https://github.com/tectonic-os/modules | v1.0.0 | not declared | none |
 
-Its content still matches what was imported.
+It tracks its library, and its content still matches what was imported. An edit to it stops `tect check`, `tect generate` and `tect build`.
 
 ## What it pulls in
 
@@ -156,4 +157,4 @@ drivers, fedora-family, flatpak, hello
 | --- | --- | --- | --- | --- |
 | `tectonic-os` | https://github.com/tectonic-os/modules | v1.0.0 | not declared | none |
 
-Its content still matches what was imported.
+It tracks its library, and its content still matches what was imported. An edit to it stops `tect check`, `tect generate` and `tect build`.

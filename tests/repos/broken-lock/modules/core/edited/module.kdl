@@ -1,0 +1,7 @@
+schema-version 1
+
+description "A module the lock records as imported"
+
+supports "fedora"
+
+packages "fastfetch"

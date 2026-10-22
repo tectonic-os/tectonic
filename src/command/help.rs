@@ -593,8 +593,9 @@ pub(super) const WHY_NOTES: &str = r#"> [!NOTE]
 > this `tect` does not read, and names both versions. `tect plan --json` still
 > prints the document.
 >
-> A module edited since its import is said plainly, and it is not an error.
-> `audit { enforce #true }` makes it fail.
+> A module that tracks its library and was edited since its import is refused,
+> so `tect why` stops. An untracked module edited since its import is said
+> plainly, and it is not an error.
 >
 > `tect` does not read a `repo` file, so it points at the file and prints the
 > URLs it found."#;

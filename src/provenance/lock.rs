@@ -5,7 +5,7 @@
 //! The lock is one tool-owned file. A file inside a module directory would sit
 //! outside its own hash.
 
-use crate::diag::{Issues, Source};
+use crate::diag::{Issue, Issues, Source};
 use crate::layout;
 use crate::parse::schema::{check_doc, Arg, Node, Say, NEEDS_VALUE};
 use crate::parse::{child, kids, string_arg, syntax_issue, text};
@@ -51,18 +51,21 @@ pub(crate) const LOCK_FILE: Node = Node::new("lock file",
     "The record of every imported module, which `tect import module` writes.")
     .about("When `tect import module` copies a module into this repository, it records the module \
         here. The entry keeps where the module came from and what its content hashed to, so \
-        `tect check` can show whether the copy has changed since.")
+        `tect check`, `tect generate` and `tect build` can tell whether the copy has changed since.")
     .children(&[LOCKED], Say::new("unknown node `{}` in the lock", "not part of the schema",
         "the lock holds one `module` entry for each imported module"))
     .notes(&[
-        "`tect import module` writes the whole file. The user does not edit it, and `tect check` \
-         reports an entry that does not read.",
+        "`tect import module` writes the whole file. The user does not edit it, and every command \
+         that reads the images refuses an entry that does not read.",
         "The entry is keyed by the local path, so one library module imported twice under two \
          names has two entries.",
         "`plan.json` carries the same hash for each module, so `tect verify` fails on a module \
          edited without a new `tect generate`.",
-        "If a module's content no longer matches its entry, then `tect check` names the module. \
-         The mismatch is an error only under `audit { enforce #true }`.",
+        "If a tracked module's content no longer matches its entry, or its directory is missing, \
+         then every command that reads the images refuses it, `tect build` included. `audit` does \
+         not change this.",
+        "If an untracked module's content no longer matches its entry, then `tect why` reads the \
+         edit out. The copy is the repository's own, so no command refuses it.",
     ]);
 
 /// Holds one module's lock entry.
@@ -80,8 +83,8 @@ pub struct Record {
     pub tracked: bool,
 }
 
-/// Reads every entry in the lock. A lock that does not parse reads as empty,
-/// and `check` reports it through `validate`.
+/// Reads every entry in the lock. A lock that does not parse reads as empty.
+/// `tect check` reports it.
 pub fn read(root: &Path) -> Vec<Record> {
     let Ok(raw) = std::fs::read_to_string(layout::lock(root)) else {
         return Vec::new();
@@ -113,21 +116,6 @@ pub fn read(root: &Path) -> Vec<Record> {
 /// Finds the entry for the module at `dir`, its path under `modules/`.
 pub fn entry(root: &Path, dir: &str) -> Option<Record> {
     read(root).into_iter().find(|record| record.path == dir)
-}
-
-/// Holds the lock to its grammar. `check` calls this once for the repository,
-/// because every module reads its own entry without a diagnostic.
-pub fn validate(root: &Path, issues: &mut Issues) {
-    let path = layout::lock(root);
-    let Ok(raw) = std::fs::read_to_string(&path) else {
-        return;
-    };
-    let name = path.display().to_string();
-    let src = Source::new(&name, raw.clone());
-    match raw.parse::<KdlDocument>() {
-        Ok(doc) => check_doc(&doc, &LOCK_FILE, &src, issues),
-        Err(err) => issues.push(syntax_issue(&err, &name, &src)),
-    }
 }
 
 /// Renders the whole lock with `record` added, or replacing the entry at its
@@ -197,19 +185,97 @@ pub fn hash(dir: &Path) -> Option<String> {
     crate::runtime::sha256_tree(dir, &listed).ok()
 }
 
-/// Names every imported module whose content no longer matches its entry.
-/// Forking a module is legitimate, so this is a read-out that makes the fork
-/// visible.
-pub fn modified(root: &Path) -> Vec<String> {
-    let mut out: Vec<String> = read(root)
-        .into_iter()
-        .filter(|record| {
-            hash(&layout::module(root, &record.path)).is_some_and(|found| found != record.content)
-        })
-        .map(|record| format!("{}/{}", layout::MODULES, record.path))
-        .collect();
-    out.sort();
-    out
+/// Holds the lock to its grammar and refuses each tracked module that no
+/// longer matches its entry. A tracked copy is immutable, so `audit` does not
+/// change the refusal. An untracked copy is the repository's own.
+/// `tect why` reads out its mismatch.
+pub fn check(root: &Path, issues: &mut Issues) {
+    let path = layout::lock(root);
+    let Ok(raw) = std::fs::read_to_string(&path) else {
+        return;
+    };
+    let name = path.display().to_string();
+    let src = Source::new(&name, raw.clone());
+    let doc = match raw.parse::<KdlDocument>() {
+        Ok(doc) => doc,
+        Err(err) => {
+            issues.push(syntax_issue(&err, &name, &src));
+            return;
+        }
+    };
+    check_doc(&doc, &LOCK_FILE, &src, issues);
+    for record in read(root) {
+        // The key is joined onto `modules/` and hashed, so a key that climbs out
+        // of `modules/` would hash files outside the repository.
+        if !inside(&record.path) {
+            issues.push(
+                Issue::new(
+                    format!("`{}` is not a path under `modules/`", record.path),
+                    &src,
+                )
+                .at(record.pin.span, "this entry")
+                .help(
+                    "a lock entry is keyed by a path under `modules/`; run `tect import \
+                         module` again to rewrite it",
+                ),
+            );
+            continue;
+        }
+        // The grammar already reports an entry with no `content`.
+        if !record.tracked || record.content.is_empty() {
+            continue;
+        }
+        let module = format!("{}/{}", layout::MODULES, record.path);
+        let dir = layout::module(root, &record.path);
+        let issue = match hash(&dir) {
+            Some(found) if found == record.content => continue,
+            Some(_) => Issue::new(
+                format!("`{module}` tracks its library, and its content no longer matches its lock entry"),
+                &src,
+            )
+            .help(format!(
+                "undo the edit to `{module}`, or drop `track` from its entry to make the copy the \
+                 repository's own"
+            )),
+            None if !dir.exists() => Issue::new(
+                format!("`{module}` tracks its library, and the directory is missing"),
+                &src,
+            )
+            .help(restore(&module, &record)),
+            None => Issue::new(
+                format!("`{module}` tracks its library, and its content cannot be hashed"),
+                &src,
+            )
+            .help(format!(
+                "`{module}` holds no file of its own, or a file in it cannot be read; restore its \
+                 files from version control"
+            )),
+        };
+        issues.push(issue.at(record.pin.span, "this entry"));
+    }
+}
+
+/// Answers whether a lock key stays under `modules/` when joined onto it.
+fn inside(key: &str) -> bool {
+    !key.is_empty()
+        && Path::new(key)
+            .components()
+            .all(|part| matches!(part, std::path::Component::Normal(_)))
+}
+
+/// A re-import lands at the library's own path. If the key is a local name
+/// that differs from it, then a re-import cannot restore the entry's directory.
+fn restore(module: &str, record: &Record) -> String {
+    match record.path == record.upstream {
+        true => format!(
+            "restore `{module}` from version control, or run `tect import module {}/{}` to copy \
+             it again",
+            record.library, record.upstream
+        ),
+        false => {
+            format!("restore `{module}` from version control, or remove its entry from the lock")
+        }
+    }
 }
 
 #[cfg(test)]
@@ -233,19 +299,19 @@ mod tests {
     #[test]
     fn a_written_entry_reads_back_as_what_was_written() {
         let root = std::env::temp_dir().join(format!("tect-lock-{}", std::process::id()));
-        crate::init::put(
-            &layout::lock(&root),
-            &with(&root, record("browser@1", true)).unwrap(),
-        )
-        .unwrap();
+        let dir = layout::module(&root, "browser@1");
+        crate::init::put(&dir.join(layout::MODULE_FILE), "description \"x\"\n").unwrap();
+        let mut held = record("browser@1", true);
+        held.content = hash(&dir).unwrap();
+        crate::init::put(&layout::lock(&root), &with(&root, held).unwrap()).unwrap();
 
         let mut issues = Issues::default();
-        validate(&root, &mut issues);
+        check(&root, &mut issues);
         assert!(issues.is_empty(), "{}", issues.plain());
         let read = entry(&root, "browser@1").expect("the entry is there");
         assert_eq!(read.library, "tectonic-os");
         assert_eq!(read.upstream, "browser");
-        assert_eq!(read.content, "abc");
+        assert_eq!(Some(read.content), hash(&dir));
         assert_eq!(
             read.pin.url.as_deref(),
             Some("https://host/owner/library.git")
@@ -283,17 +349,90 @@ mod tests {
     }
 
     #[test]
-    fn an_edited_module_is_named_and_an_unedited_one_is_not() {
+    fn an_edited_tracked_module_is_refused_and_an_edited_untracked_one_is_not() {
         let root = std::env::temp_dir().join(format!("tect-lock-edit-{}", std::process::id()));
-        let dir = layout::module(&root, "browser");
-        crate::init::put(&dir.join(layout::MODULE_FILE), "description \"x\"\n").unwrap();
-        let mut held = record("browser", true);
-        held.content = hash(&dir).unwrap();
-        crate::init::put(&layout::lock(&root), &with(&root, held).unwrap()).unwrap();
-        assert!(modified(&root).is_empty());
+        for (name, tracked) in [("browser", true), ("editor", false)] {
+            let dir = layout::module(&root, name);
+            crate::init::put(&dir.join(layout::MODULE_FILE), "description \"x\"\n").unwrap();
+            let mut held = record(name, tracked);
+            held.content = hash(&dir).unwrap();
+            crate::init::put(&layout::lock(&root), &with(&root, held).unwrap()).unwrap();
+        }
+        let mut issues = Issues::default();
+        check(&root, &mut issues);
+        assert!(issues.is_empty(), "{}", issues.plain());
 
-        crate::init::put(&dir.join(layout::MODULE_FILE), "description \"y\"\n").unwrap();
-        assert_eq!(modified(&root), ["modules/browser"]);
+        for name in ["browser", "editor"] {
+            let dir = layout::module(&root, name);
+            crate::init::put(&dir.join(layout::MODULE_FILE), "description \"y\"\n").unwrap();
+        }
+        let mut issues = Issues::default();
+        check(&root, &mut issues);
+        let said = issues.plain();
+        assert!(
+            said.contains("`modules/browser` tracks its library"),
+            "{said}"
+        );
+        assert!(!said.contains("modules/editor"), "{said}");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_key_outside_modules_is_refused() {
+        let root = std::env::temp_dir().join(format!("tect-lock-climb-{}", std::process::id()));
+        crate::init::put(
+            &layout::lock(&root),
+            "module \"../..\" {\n    library \"x\"\n    path \"x\"\n    content \"0\"\n    track\n}\n",
+        )
+        .unwrap();
+        let mut issues = Issues::default();
+        check(&root, &mut issues);
+        let said = issues.plain();
+        assert!(
+            said.contains("`../..` is not a path under `modules/`"),
+            "{said}"
+        );
+        assert!(!said.contains("tracks its library"), "{said}");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn an_empty_tracked_directory_is_not_called_missing() {
+        let root = std::env::temp_dir().join(format!("tect-lock-empty-{}", std::process::id()));
+        std::fs::create_dir_all(layout::module(&root, "browser")).unwrap();
+        let held = record("browser", true);
+        crate::init::put(&layout::lock(&root), &with(&root, held).unwrap()).unwrap();
+        let mut issues = Issues::default();
+        check(&root, &mut issues);
+        let said = issues.plain();
+        assert!(said.contains("cannot be hashed"), "{said}");
+        assert!(!said.contains("missing"), "{said}");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_library_path_with_an_underscore_is_a_key() {
+        assert!(inside("tools/node_exporter"));
+        assert!(inside("browser@1"));
+        assert!(!inside("../browser"));
+        assert!(!inside("/etc"));
+        assert!(!inside(""));
+    }
+
+    #[test]
+    fn a_missing_renamed_module_is_not_sent_to_a_reimport() {
+        let root = std::env::temp_dir().join(format!("tect-lock-gone-{}", std::process::id()));
+        crate::init::put(
+            &layout::lock(&root),
+            &with(&root, record("browser@1", true)).unwrap(),
+        )
+        .unwrap();
+        let mut issues = Issues::default();
+        check(&root, &mut issues);
+        let said = issues.plain();
+        assert!(said.contains("the directory is missing"), "{said}");
+        assert!(!said.contains("tect import module"), "{said}");
+        assert!(said.contains("remove its entry"), "{said}");
         std::fs::remove_dir_all(root).unwrap();
     }
 
@@ -328,7 +467,7 @@ mod tests {
         let refused = with(&root, record("editor", true)).unwrap_err();
         assert!(refused.contains("does not parse"), "{refused}");
         let mut issues = Issues::default();
-        validate(&root, &mut issues);
+        check(&root, &mut issues);
         assert!(!issues.is_empty());
         assert_eq!(
             std::fs::read_to_string(layout::lock(&root)).unwrap(),
@@ -346,7 +485,7 @@ mod tests {
         )
         .unwrap();
         let mut issues = Issues::default();
-        validate(&root, &mut issues);
+        check(&root, &mut issues);
         let said = issues.plain();
         assert!(said.contains("records no `path`"), "{said}");
         std::fs::remove_dir_all(root).unwrap();

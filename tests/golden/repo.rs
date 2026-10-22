@@ -297,17 +297,12 @@ fn copied(name: &str, root: &Path) {
         "==== check\n{}",
         tect::run(Command::Check, None, &here).issues.plain()
     ));
-    out.push_str(&format!(
-        "==== modified\n{:?}\n",
-        tect::provenance::lock::modified(&here)
-    ));
 
-    // Forking an imported module is legitimate, so the edit is reported. A
-    // diagnostic would call it a fault.
+    // The silent import tracks its library.
+    // A tracked copy is immutable, so an edit to it fails `check`.
     std::fs::write(root.join("modules/flatpak/module.sh"), "echo forked\n").unwrap();
     out.push_str(&format!(
-        "==== modified after an edit\n{:?}\n{}",
-        tect::provenance::lock::modified(&here),
+        "==== check after an edit\n{}",
         tect::run(Command::Check, None, &here).issues.plain()
     ));
     assert_golden(name, "import.txt", &out);
@@ -520,6 +515,19 @@ fn unpinned_import(root: &Path) {
     assert!(refused.contains("follows a moving ref"), "{refused}");
 }
 
+/// The refusal runs in the shared load, so `generate` and the `verify` that
+/// `build` runs first refuse what `check` refuses. The fixture holds no
+/// generated files, so `verify` also reports them missing.
+fn refused_everywhere(root: &Path) {
+    let here = given(root);
+    let checked = tect::run(Command::Check, None, &here).issues.plain();
+    assert!(checked.contains("tracks its library"), "{checked}");
+    for command in [Command::Generate, Command::Verify] {
+        let said = tect::run(command, None, &here).issues.plain();
+        assert!(said.starts_with(&checked), "{command:?}: {said}");
+    }
+}
+
 /// Which commands the missing default belongs to: the ones that had to pick an
 /// image with nothing naming one, and no others.
 fn assert_no_default(root: &Path) {
@@ -570,6 +578,7 @@ fn repo_case(name: &str) {
             tect::base::catalog(&here, &list.sources, &mut issues);
             assert_golden(name, "catalog.txt", &issues.plain());
         }
+        "broken-lock" => refused_everywhere(&root),
         "no-default" => assert_no_default(&root),
         // The module came from the collection the seed publishes, so its lock
         // entry names that library.
@@ -609,6 +618,7 @@ repo_cases! {
     broken_image => "broken-image",
     broken_key => "broken-key",
     broken_layout => "broken-layout",
+    broken_lock => "broken-lock",
     broken_module => "broken-module",
     broken_network => "broken-network",
     broken_options => "broken-options",

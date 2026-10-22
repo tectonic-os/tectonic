@@ -48,7 +48,15 @@ module "flatpak" {
     track
 }
 ==== check
-==== modified
-[]
-==== modified after an edit
-["modules/flatpak"]
+==== check after an edit
+  x `modules/flatpak` tracks its library, and its content no longer matches
+  | its lock entry
+   ,-[target/tmp/copy/modules/modules.lock.kdl:8:1]
+ 7 | 
+ 8 | module "flatpak" {
+   : ^^^|^^
+   :    `-- this entry
+ 9 |     library "upstream"
+   `----
+  help: undo the edit to `modules/flatpak`, or drop `track` from its entry to
+        make the copy the repository's own

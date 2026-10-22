@@ -935,9 +935,6 @@ fn reading(
                  is whatever the release holds, unverified"
             );
         }
-        for name in &run.modified {
-            eprintln!("tect: `{name}` has been edited since it was imported");
-        }
         for name in &run.ungoverned {
             eprintln!(
                 "tect: `{name}` ships a Containerfile fragment, and the script rule does not \

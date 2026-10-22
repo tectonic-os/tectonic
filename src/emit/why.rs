@@ -66,6 +66,7 @@ pub struct Why {
     pub satisfies: Vec<(String, Vec<String>)>,
     pub content: Option<String>,
     pub imported: Option<(String, Fetch)>,
+    pub tracked: bool,
     pub modified: bool,
     /// The build can record a directory hash that differs from the declared
     /// `content` hash.
@@ -143,6 +144,7 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
 
     if let Some(record) = &module.imported {
         why.imported = Some((record.library.clone(), Fetch::of("collection", &record.pin)));
+        why.tracked = record.tracked;
     }
     for asset in &module.assets {
         why.fetches.push(Fetch::of(&asset.name, &asset.pin));
@@ -445,9 +447,11 @@ impl Why {
             )),
             Some((collection, pin)) => {
                 out.extend(evidence(COLLECTION, &[(collection.as_str(), pin)], terminal));
-                out.push(Part::Text(match self.modified {
-                    true => "**It has been edited since it was imported.** Forking a module is legitimate; what the lock buys is that the fork is visible.".into(),
-                    false => "Its content still matches what was imported.".into(),
+                out.push(Part::Text(match (self.tracked, self.modified) {
+                    (true, false) => "It tracks its library, and its content still matches what was imported. An edit to it stops `tect check`, `tect generate` and `tect build`.".into(),
+                    (true, true) => "**It has been edited since it was imported**, and it tracks its library, so `tect check`, `tect generate` and `tect build` refuse it.".into(),
+                    (false, false) => "It is the repository's own copy, and its content still matches what was imported.".into(),
+                    (false, true) => "**It has been edited since it was imported.** It is the repository's own copy, and the lock entry records where it came from.".into(),
                 }));
             }
         }
@@ -580,6 +584,7 @@ impl Why {
                     Some((collection, pin)) => Json::object([
                         ("collection", Json::string(collection)),
                         ("pin", pin.json()),
+                        ("tracked", Json::Bool(self.tracked)),
                     ]),
                 },
             ),
@@ -789,6 +794,7 @@ pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why
                     (text(imported, "library"), field(imported, "pin"))
                 {
                     why.modified = text(imported, "content") != why.content;
+                    why.tracked = matches!(field(imported, "tracked"), Some(Json::Bool(true)));
                     why.imported = Some((collection, pin_of(pin, "collection")));
                 }
             }
