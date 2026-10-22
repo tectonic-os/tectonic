@@ -12,6 +12,9 @@ name "Workstation"
 workflows at="12:30" {
     build
 }
+renovate rebaseWhen="never" {
+    schedule "* 0-5 * * *"
+}
 sources {
     modules "tectonic-modules" {
         url "https://github.com/tectonic-os/library"
@@ -33,6 +36,7 @@ sources {
 | [`pr-image`](#pr-image) (optional) | *string* | The image a pull request builds. |
 | [`seed`](#seed) (optional) | *string* | The image that this repository publishes as a starting point for a new repository. |
 | [`workflows`](#workflows) (optional) | {&nbsp;[fields](#workflows-fields)&nbsp;} | The CI workflows that `tect generate` writes into `.github/workflows/`. |
+| [`renovate`](#renovate) (optional) | optionally {&nbsp;[fields](#renovate-fields)&nbsp;} | The Renovate policy that `tect generate` writes into `.github/renovate.json5`. |
 | [`sources`](#sources) (optional) | {&nbsp;[fields](#sources-fields)&nbsp;} | The module and base-image libraries this repository reads. |
 | [`manifest`](#manifest) (optional) | {&nbsp;[fields](#manifest-fields)&nbsp;} | Whether a build stamps the generated manifest onto the image as an OCI label. |
 | [`audit`](#audit) (optional) | {&nbsp;[fields](#audit-fields)&nbsp;} | How the repository treats a provenance check that fails. |
@@ -194,6 +198,49 @@ One workflow, which the stem of its file names.
 ```kdl
 workflows at="12:30" {
     build
+}
+```
+
+| Property | Accepts | Description |
+| --- | --- | --- |
+| `schedule=` (optional) | *string* | The cron line that this workflow runs on, in UTC. It replaces the schedule that `at` places. |
+
+<a id="renovate"></a>
+
+## `renovate` (optional)
+
+Says when Renovate opens its pull requests and how it groups and merges them. The block is Renovate's own configuration in KDL. `tect generate` adds the custom managers that match the files it writes, and one manager for each image entry that sets a tracked `version`.
+
+```kdl
+renovate rebaseWhen="never"
+```
+
+Accepts: optionally {&nbsp;[fields](#renovate-fields)&nbsp;}
+
+<a id="renovate-fields"></a>
+
+| Field | Accepts | Description |
+| --- | --- | --- |
+| [`<name>`](#renovate-name) (optional,&nbsp;repeatable) |  | One Renovate setting, named as Renovate names it. |
+
+> [!NOTE]
+> A property is a scalar setting. The arguments of a child are an array, because Renovate wants array syntax for a list of one.
+>
+> The properties and named children of a child are an object. A block of `-` children is an array, and each `-` holds one value or one object.
+>
+> `$schema`, `ignorePaths`, `dockerfile` and `customManagers` belong to `tect generate`, and the block refuses them.
+>
+> If the block is absent, then `tect generate` writes no `.github/renovate.json5`, and leaves one the user wrote in place.
+
+<a id="renovate-name"></a>
+
+### `<name>` (optional, repeatable)
+
+One Renovate setting, named as Renovate names it.
+
+```kdl
+renovate rebaseWhen="never" {
+    schedule "* 0-5 * * *"
 }
 ```
 

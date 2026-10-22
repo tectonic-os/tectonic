@@ -1,0 +1,7 @@
+---
+source: tests/golden/harness.rs
+---
+{
+  "packages": [],
+  "relationships": []
+}

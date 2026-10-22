@@ -1,33 +1,13 @@
+// `tect generate` writes this file from the `renovate` block in repo.kdl.
+// `tect verify` byte-compares it, so the policy is changed in repo.kdl.
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:best-practices",
-  ],
 
-  "rebaseWhen": "never",
+  // tect:policy
 
   // `tect generate` writes the workflows and `tect verify` byte-compares
   // them, so a bump inside one is reverted by the next regeneration.
   "ignorePaths": [".github/workflows/**"],
-
-  // Early enough that the PR build and automerge finish before the 12:30 UTC
-  // image build.
-  "timezone": "Etc/UTC",
-  "schedule": ["before 6am"],
-
-  "packageRules": [
-    {
-      "matchPackageNames": ["*"],
-      "groupName": "scheduled updates",
-      "automerge": true,
-    },
-    {
-      // quay.io/fedora prunes untagged manifests within days, so a pinned
-      // digest 404s before the next bump lands. Track the tag.
-      "matchPackageNames": ["quay.io/fedora/fedora-bootc"],
-      "pinDigests": false,
-    },
-  ],
 
   // A generated Containerfile sits under its image's own directory, which the
   // dockerfile manager does not recognise, and its FROM has to bump with the
@@ -36,8 +16,6 @@
     "managerFilePatterns": ["/^generated/[^/]+/Containerfile$/"],
   },
 
-  // Each of these matches a `renovate` node and the tracked line directly
-  // below it. The repository's `lint.sh` fails a pin these cannot match.
   "customManagers": [
     {
       "customType": "regex",
@@ -65,14 +43,12 @@
     },
     {
       "customType": "regex",
-      // One spelling for every pin, so one manager covers an asset, an
-      // out-of-tree module and a collection. RE2 has no negative lookahead, so
-      // the leading-lowercase rule is how an underscore-prefixed module
-      // directory is excluded.
+      // Every asset pin spells its tracker the same way, so one manager covers
+      // them all. RE2 has no negative lookahead. The leading-lowercase rule
+      // excludes an underscore-prefixed module directory.
       "description": "Version-tagged pins",
       "managerFilePatterns": [
         "/^modules/([a-z][^/]*/)?[a-z][^/]*/module\\.kdl$/",
-        "/^[^/]+\\.kdl$/",
       ],
       "matchStrings": [
         "renovate datasource=\"(?<datasource>github-releases|github-tags)\" depName=\"(?<depName>[^\"]+)\"(?: extractVersion=\"(?<extractVersion>[^\"]+)\")?\\s*\\n\\s*version \"(?<currentValue>[^\"]+)\"",
@@ -88,5 +64,6 @@
       // The regex manager requires a currentValue even for a digest-only pin.
       "currentValueTemplate": "master",
     },
+    // tect:managers
   ],
 }

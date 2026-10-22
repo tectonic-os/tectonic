@@ -7,7 +7,8 @@ source: tests/golden/harness.rs
   4) [x] cleanup-registry  prunes old versions of the images off the registry
   5) [ ] (unavailable) kernel-freshness  needs a module taking a KERNEL arg
   6) [x] smoke-test  installs the image to a disk and boots it under qemu
-Which workflows? [1-6, several, 0 for none]: 1 3
+  7) [x] update-modules  refreshes tracked modules and opens a pull request
+Which workflows? [1-7, several, 0 for none]: 1 3
 
 Publish images only on scheduled builds? (Yes/No)
 No

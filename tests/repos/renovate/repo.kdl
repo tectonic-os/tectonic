@@ -1,0 +1,11 @@
+schema-version 1
+name "Renovate"
+
+renovate rebaseWhen="never" prConcurrentLimit=2 {
+    schedule "* 0-5 * * 1"
+    packageRules {
+        - groupName="weekly" automerge=#true {
+            matchPackageNames "*"
+        }
+    }
+}

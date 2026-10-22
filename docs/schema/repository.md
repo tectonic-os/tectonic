@@ -30,7 +30,7 @@ A repository is a git repository with `repo.kdl` at its root, which is how `tect
 | `image.kdl` | `tect create image`, then the user | yes | The images of the repository. See [`image.kdl`](image.md). |
 | `<name>.image.kdl` | `tect create image`, then the user | yes | More images. The name in front of the suffix is decorative. |
 | `modules/` | the user, `tect create module` or `tect import module` | yes | The modules of the repository, one directory each. See [Modules](modules.md). |
-| `modules/modules.lock.kdl` | `tect import module` | yes | Where each imported module came from, and what its content hashed to. See [`modules.lock.kdl`](lock.md). |
+| `modules/modules.lock.kdl` | `tect import module`, `tect fetch modules` and `tect set module` | yes | Where each imported module came from, and what its content hashed to. See [`modules.lock.kdl`](lock.md). |
 | `keys/public/` | `tect create key` or `tect set key` | yes | The public half of each key, at the path it has in the image. |
 | `keys/private/` | `tect create key` | no | The private half of each key. The build never copies it into the image. |
 | `generated/` | `tect generate` | yes | Everything that `tect generate` writes. `tect verify` compares it byte for byte, so the user does not edit it. |
@@ -39,5 +39,5 @@ A repository is a git repository with `repo.kdl` at its root, which is how `tect
 | `out/` | `tect` | no | Local exports, caches and scratch. `tect` reads nothing here as a declaration. |
 | `.cache/sources/` | `tect` | no | The libraries that `tect import module` fetches and copies a module from. `tect check`, `tect generate` and `tect build` read nothing here. |
 | `disk_config/` | `tect create repo`, then the user | yes | The settings that bootc-image-builder reads when it builds a Fedora or RHEL disk image. `disk.toml` sets the smallest size of `/`. |
-| `.github/renovate.json5` | `tect create repo`, then the user | yes | The Renovate settings. Its custom managers keep the `tect` release in `repo.kdl` and each pin that declares `renovate` current. |
+| `.github/renovate.json5` | `tect generate` | yes | The Renovate settings, written from the `renovate` block in `repo.kdl`. Its custom managers keep the `tect` release, the base images, each pin that declares `renovate` and each image entry's tracked `version` current. |
 | `.gitignore` | `tect create repo` | yes | Keeps `keys/private/`, `out/` and `.cache/` out of git. |

@@ -1,0 +1,16 @@
+schema-version 1
+
+description "A browser whose image entry sets the version"
+
+supports "fedora"
+
+packages "firefox"
+
+option "lang-version" type="string" {
+    default "1"
+}
+
+option "version" type="string" {
+    default "128.0"
+    renovate datasource="repology" depName="fedora_rawhide/firefox"
+}

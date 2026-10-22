@@ -189,3 +189,21 @@ fn notes_follow_their_node_before_the_nodes_inside_it() {
     assert!(block < leaf, "{out}");
     assert!(out[leaf..].contains("The leaf note.\n"), "{out}");
 }
+
+/// `renovate` holds free-form settings at any depth. `sources` declares its
+/// fields, so only the fields it names are scaffolded.
+#[test]
+fn only_an_undeclared_block_scaffolds_every_depth() {
+    let marked = scaffold(Area::Repo);
+    assert!(marked.iter().any(|p| p == "renovate/*/**"), "{marked:?}");
+    assert!(
+        marked.iter().any(|p| p == "sources/modules/url"),
+        "{marked:?}"
+    );
+    assert!(
+        !marked
+            .iter()
+            .any(|p| p.starts_with("sources/") && p.ends_with("/**")),
+        "{marked:?}"
+    );
+}

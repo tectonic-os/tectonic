@@ -11,7 +11,7 @@ Buffer {
         "  [x] cleanup-registry  prunes old versions of the images off the registry      ",
         "  [ ] kernel-freshness  needs a module taking a KERNEL arg                      ",
         "  [x] smoke-test  installs the image to a disk and boots it under qemu          ",
-        "                                                                                ",
+        "  [ ] update-modules  refreshes tracked modules and opens a pull request        ",
         "                                                                                ",
         "                                                                                ",
         "                                                                                ",
@@ -57,6 +57,8 @@ Buffer {
         x: 58, y: 5, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
         x: 18, y: 6, fg: Reset, bg: Reset, underline: Reset, modifier: DIM,
         x: 70, y: 6, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
+        x: 22, y: 7, fg: Reset, bg: Reset, underline: Reset, modifier: DIM,
+        x: 72, y: 7, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
         x: 0, y: 31, fg: Reset, bg: Reset, underline: Reset, modifier: DIM,
         x: 13, y: 31, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
     ]

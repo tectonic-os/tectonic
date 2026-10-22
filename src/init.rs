@@ -18,20 +18,36 @@ pub(crate) const GITIGNORE: &str = include_str!("../assets/.gitignore");
 
 /// What `create repo` copies once and `generate` never writes again, as this
 /// release ships it.
-const SCAFFOLDED: [(&str, &str); 6] = [
+const SCAFFOLDED: [(&str, &str); 5] = [
     (".dockerignore", include_str!("../assets/.dockerignore")),
     (".gitattributes", include_str!("../assets/.gitattributes")),
     (".gitignore", GITIGNORE),
     (".shellcheckrc", include_str!("../assets/.shellcheckrc")),
     (
-        ".github/renovate.json5",
-        include_str!("../assets/.github/renovate.json5"),
-    ),
-    (
         "disk_config/disk.toml",
         include_str!("../assets/disk_config/disk.toml"),
     ),
 ];
+
+/// The Renovate policy a new repository starts with, which `generate` writes
+/// into `.github/renovate.json5`.
+const RENOVATE: &str = r#"// Renovate opens its pull requests in this window.
+// The pull request build and the automerge finish before the 12:30 UTC image build.
+renovate rebaseWhen="never" timezone="Etc/UTC" {
+    extends "config:best-practices"
+    schedule "* 0-5 * * *"
+    packageRules {
+        - groupName="scheduled updates" automerge=#true {
+            matchPackageNames "*"
+        }
+        // quay.io/fedora prunes an untagged manifest within days.
+        // A pinned digest then fails to pull before the next bump lands.
+        - pinDigests=#false {
+            matchPackageNames "quay.io/fedora/fedora-bootc"
+        }
+    }
+}
+"#;
 
 /// This release ships this Containerfile skeleton.
 pub(crate) const SKELETON: &str = include_str!("../assets/scripts/Containerfile.skeleton");
@@ -183,14 +199,14 @@ pub fn write(
 
     let sources = match sources.is_empty() {
         true => String::new(),
-        false => format!("\n{sources}"),
+        false => format!("\n{sources}\n"),
     };
     put(
         &root.join(layout::REPO_FILE),
         &format!(
             "schema-version {SCHEMA_VERSION}\n\
              name \"{name}\"\n\
-             {sources}"
+             {sources}\n{RENOVATE}"
         ),
     )?;
     put(&root.join("README.md"), &format!("# {name}\n"))?;
@@ -271,7 +287,19 @@ fn copy_below(
             continue;
         }
         let source = entry.path();
-        if source.is_dir() {
+        let kind = entry
+            .file_type()
+            .map_err(|err| format!("{}: {err}", source.display()))?;
+        // A library is untrusted content, and the update workflow commits what
+        // it copies with a write token. A symbolic link would copy the file it
+        // names, which can sit outside the library.
+        if kind.is_symlink() {
+            return Err(format!(
+                "{} is a symbolic link, and a module copy holds files and directories only",
+                source.display()
+            ));
+        }
+        if kind.is_dir() {
             wrote.extend(copy_below(from, to, &rel, skip)?);
         } else {
             let dest = to.join(&rel);
@@ -285,6 +313,20 @@ fn copy_below(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The link names a file outside the copied tree.
+    #[test]
+    fn a_symbolic_link_in_a_module_is_refused() {
+        let at = std::env::temp_dir().join(format!("tect-link-{}", std::process::id()));
+        put(&at.join("secret"), "token\n").unwrap();
+        put(&at.join("library/browser/module.kdl"), "").unwrap();
+        std::os::unix::fs::symlink(at.join("secret"), at.join("library/browser/notes")).unwrap();
+        let refused =
+            copy_module(&at.join("library/browser"), &at.join("modules/browser")).unwrap_err();
+        assert!(refused.contains("is a symbolic link"), "{refused}");
+        assert!(!at.join("modules/browser/notes").exists());
+        fs::remove_dir_all(at).unwrap();
+    }
 
     #[test]
     fn an_absent_path_is_already_removed() {

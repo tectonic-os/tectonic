@@ -8,6 +8,7 @@ pub mod create;
 pub mod diag;
 pub mod dispatch;
 pub mod emit;
+pub mod fetch;
 #[cfg(feature = "fuzzing")]
 pub mod fuzzing;
 pub mod import;
@@ -394,6 +395,7 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
             files.extend(emit::graph::files(image));
         }
         files.extend(emit::seed::file(&list));
+        files.extend(emit::renovate::file(&list).map(|text| (emit::renovate::path(), text)));
         files.push((
             PathBuf::from(layout::GENERATED).join("plan.json"),
             emit::plan::build(&list, &resolved, &workflows).render(),

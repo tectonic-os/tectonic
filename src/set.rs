@@ -297,10 +297,14 @@ impl Workflows {
         let block = match self.chosen.is_empty() {
             true => String::new(),
             false => {
+                let held = parse::repo::workflow_schedules(text);
                 let named: String = self
                     .chosen
                     .iter()
-                    .map(|stem| format!("    {stem}\n"))
+                    .map(|stem| match held.iter().find(|(name, _)| name == stem) {
+                        Some((_, line)) => format!("    {stem} schedule=\"{line}\"\n"),
+                        None => format!("    {stem}\n"),
+                    })
                     .collect();
                 let at = match self.at == DEFAULT_AT {
                     true => String::new(),
@@ -1063,6 +1067,15 @@ mod tests {
         assert_eq!(
             out,
             "name \"Example\"\n\nworkflows {\n    build\n    smoke-test\n}\n\nsources {\n}\n"
+        );
+    }
+
+    #[test]
+    fn a_rewritten_block_keeps_each_declared_schedule() {
+        let text = "workflows {\n    build\n    update-modules schedule=\"0 3 * * 0\"\n}\n";
+        assert_eq!(
+            set(&["build", "update-modules"], DEFAULT_AT).spliced(text),
+            text
         );
     }
 

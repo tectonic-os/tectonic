@@ -83,8 +83,6 @@ named `workstation` starts with these key files:
 
 ```text
 workstation/
-├── .github/
-│   └── renovate.json5
 ├── disk_config/
 │   └── disk.toml
 ├── modules/
@@ -122,7 +120,9 @@ generated/
 
 The generated Containerfile and capability graph can be reviewed before the
 build. Generated files are committed but not edited by hand; `tect` verifies
-them against the declarations before every build.
+them against the declarations before every build. `tect generate` also writes
+the declared workflows, and `.github/renovate.json5` from the `renovate` block
+in `repo.kdl`.
 
 Build the default image:
 

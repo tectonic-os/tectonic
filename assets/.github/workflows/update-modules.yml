@@ -1,0 +1,72 @@
+---
+name: Update modules
+
+on:
+  schedule:
+    - cron: '30 5 * * 1'  # tect:schedule
+  workflow_dispatch:
+
+env:
+  GH_TOKEN: ${{ github.token }}
+
+permissions: {}
+
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: true
+
+      - name: Refresh the tracked modules
+        run: |
+          set -euo pipefail
+          ./scripts/tect.sh fetch modules
+          ./scripts/tect.sh generate
+
+      - name: Open or update the pull request
+        run: |
+          set -euo pipefail
+          branch="update-modules"
+          title="chore(modules): refresh the tracked modules"
+          if [ -z "$(git status --porcelain -- modules generated .github)" ]; then
+            echo "Every tracked module matches its library."
+            exit 0
+          fi
+          # The workflow token cannot push a change under .github/workflows/.
+          if [ -n "$(git status --porcelain -- .github/workflows)" ]; then
+            echo "::error::The refreshed modules change the generated workflows. Run 'tect fetch modules' and 'tect generate' locally, and push the result."
+            exit 1
+          fi
+          git diff -- modules/modules.lock.kdl > "$RUNNER_TEMP/lock.diff"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$branch"
+          git add -A -- modules generated .github
+          git commit -m "$title"
+          git push -f origin "$branch"
+          {
+            echo "Automated by the update-modules workflow. Each tracked module below was copied again from its library."
+            echo
+            echo '```diff'
+            cat "$RUNNER_TEMP/lock.diff"
+            echo '```'
+          } > "$RUNNER_TEMP/pr-body.md"
+          pr="$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$pr" ]; then
+            gh pr edit "$pr" --body-file "$RUNNER_TEMP/pr-body.md"
+          elif ! gh pr create --head "$branch" --title "$title" --body-file "$RUNNER_TEMP/pr-body.md"; then
+            echo "::error::The branch ${branch} is pushed, and no pull request opened. Allow GitHub Actions to create pull requests under Settings, Actions, General, Workflow permissions."
+            exit 1
+          fi
+          # A push with the workflow token starts no workflow.
+          # The pull request build is dispatched on the branch instead.
+          if [ -f .github/workflows/build.yml ]; then
+            gh workflow run build.yml --ref "$branch"
+          fi

@@ -116,6 +116,10 @@ pub fn track(named: &str) -> String {
     format!("Track upstream for {named}?")
 }
 
+pub fn untrack(key: &str) -> String {
+    format!("Stop tracking upstream for `modules/{key}`, so the copy is the repository's own?")
+}
+
 // What an import offers to bring with it. The modules a `requires` offer names
 // are the rows of the import that follows it, and the rules a claims offer
 // counts are what `tect coverage` prints.
