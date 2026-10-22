@@ -30,7 +30,7 @@ graph LR
 | --- | --- | --- | --- | --- |
 | `kde` |  |  |  |  |
 ==== tect why bazaar
-# tectonic-modules/apps/bazaar
+# apps/bazaar
 
 Bazaar, the Flatpak storefront
 
@@ -43,8 +43,8 @@ workstation-2
 | Direction | What | With |
 | --- | --- | --- |
 | provides | `bazaar` | nothing |
-| requires | `flatpak` | tectonic-modules/flatpak |
-| requires | `display-manager` | tectonic-modules/desktop-environment/kde-plasma |
+| requires | `flatpak` | flatpak |
+| requires | `display-manager` | desktop-environment/kde-plasma |
 
 ## What it claims
 
@@ -58,9 +58,9 @@ Nothing. It declares no `satisfies`.
 
 | Collection | Locator | Selector | Verifier | Tracker |
 | --- | --- | --- | --- | --- |
-| `tectonic-modules` | https://github.com/tectonic-os/library | not declared | not declared | unpinned |
+| `tectonic-modules` | https://github.com/tectonic-os/library | not declared | not declared | none |
 
-It is referenced rather than copied, so what a build reads is the collection's own tree at that pin.
+It tracks its library, and its content still matches what was imported. An edit to it stops `tect check`, `tect generate` and `tect build`.
 
 ## What it pulls in
 

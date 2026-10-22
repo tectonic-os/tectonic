@@ -427,6 +427,12 @@ copy is immutable: if it no longer matches its entry, then `tect check`,
 `tect generate` and `tect build` refuse it. An untracked copy is yours to edit, and `tect why` shows that it
 was edited.
 
+A tracked copy changes only when its library moves. `tect fetch modules`
+copies each tracked module again from its library and records the new hash in
+the lock. The `update-modules` workflow runs it on a schedule and opens a pull
+request. To edit a tracked copy, first run `tect set module <path>
+--untracked`, which makes the copy yours.
+
 If `modules/` already holds a module at that path, then the import asks
 whether to list the module you hold or to import the library's under another
 name, such as `desktop-environment/kde-plasma@1`.
@@ -456,7 +462,7 @@ family "ubuntu" {
     packages "plasma-session-wayland" "plasma-session-x11"
 }
 
-family "debian" {
+family "debian" "ubuntu" {
     packages "systemsettings" "sddm" "kwin-wayland"
 }
 ```
@@ -735,7 +741,7 @@ tect why bazaar
 
 <!-- transcript-output: tect why bazaar -->
 ```markdown
-# tectonic-modules/apps/bazaar
+# apps/bazaar
 
 Bazaar, the Flatpak storefront
 
@@ -748,8 +754,8 @@ workstation-2
 | Direction | What | With |
 | --- | --- | --- |
 | provides | `bazaar` | nothing |
-| requires | `flatpak` | tectonic-modules/flatpak |
-| requires | `display-manager` | tectonic-modules/desktop-environment/kde-plasma |
+| requires | `flatpak` | flatpak |
+| requires | `display-manager` | desktop-environment/kde-plasma |
 
 ## What it claims
 
@@ -763,9 +769,9 @@ Nothing. It declares no `satisfies`.
 
 | Collection | Locator | Selector | Verifier | Tracker |
 | --- | --- | --- | --- | --- |
-| `tectonic-modules` | https://github.com/tectonic-os/library | not declared | not declared | unpinned |
+| `tectonic-modules` | https://github.com/tectonic-os/library | not declared | not declared | none |
 
-It is referenced rather than copied, so what a build reads is the collection's own tree at that pin.
+It tracks its library, and its content still matches what was imported. An edit to it stops `tect check`, `tect generate` and `tect build`.
 
 ## What it pulls in
 
@@ -819,4 +825,6 @@ to GitHub, and the workflow builds the image, pushes it to
 `SIGNING_SECRET`, attests its SBOM, and runs the scans. The schedule in the
 workflow comes from `at=`, the image version comes from the build, and
 `tect registry namespace` prints the namespace the image publishes under.
+Pick `update-modules` as well, and the tracked modules are refreshed once a
+week.
 [repo.kdl](schema/repo.md#workflows) documents the block.
