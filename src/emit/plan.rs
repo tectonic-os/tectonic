@@ -1,10 +1,8 @@
 //! One resolved JSON plan holds every fact that downstream commands derive.
 
-use crate::base::Capability;
 use crate::model::asset::Asset;
 use crate::model::image::{Entry, Image, List, Target, NO_FLAVOUR};
 use crate::model::module::Module;
-use crate::provenance::Evidence;
 use crate::resolve::overlay;
 use crate::resolve::workflow::Declared;
 use crate::resolve::Resolved;
@@ -89,7 +87,6 @@ pub fn build(list: &List, resolved: &[Resolved], workflows: &[Declared]) -> Json
             "audit",
             Json::object([("enforce", Json::Bool(list.audit_enforce))]),
         ),
-        ("remotes", remotes(list)),
         ("assets", every_asset(list)),
         (
             "images",
@@ -146,12 +143,13 @@ fn image(list: &List, image: &Image, resolved: &Resolved) -> Json {
                 Some(base) => Json::object([
                     ("image", Json::string(&base.image)),
                     ("family", Json::string(&base.family)),
+                    ("scap_content", Json::string(&base.scap_content)),
                     ("signed", Json::Bool(base.signed)),
                     (
                         "provides",
                         Json::strings(base.provides.iter().map(|d| d.name.clone())),
                     ),
-                    ("witnesses", witnesses(image, &list.capabilities)),
+                    ("witnesses", witnesses(image)),
                     (
                         "requires",
                         Json::strings(base.requires.iter().map(|d| d.name.clone())),
@@ -248,11 +246,7 @@ fn target(list: &List, image: &Image, resolved: &Resolved, target: &Target) -> J
         ),
         (
             "modules",
-            Json::array(
-                entries
-                    .iter()
-                    .map(|entry| self::module(list, entry, family)),
-            ),
+            Json::array(entries.iter().map(|entry| self::module(entry, family))),
         ),
         (
             "suppressed",
@@ -261,7 +255,7 @@ fn target(list: &List, image: &Image, resolved: &Resolved, target: &Target) -> J
                     .suppressed
                     .iter()
                     .filter(|entry| in_target(entry, flavour))
-                    .map(|entry| self::module(list, entry, family)),
+                    .map(|entry| self::module(entry, family)),
             ),
         ),
         (
@@ -272,7 +266,7 @@ fn target(list: &List, image: &Image, resolved: &Resolved, target: &Target) -> J
         ),
         (
             "contract_files",
-            Json::strings(contract_files(image, &modules, &list.capabilities)),
+            Json::strings(contract_files(image, &modules)),
         ),
         (
             "verify_exceptions",
@@ -321,21 +315,12 @@ fn target(list: &List, image: &Image, resolved: &Resolved, target: &Target) -> J
     ])
 }
 
-fn module(list: &List, entry: &Entry, family: &str) -> Json {
+fn module(entry: &Entry, family: &str) -> Json {
     let module = entry.module.as_ref();
     Json::object([
         ("path", Json::string(&entry.path)),
-        ("dir", Json::string(entry.dir())),
         ("flavour", Json::optional(entry.flavour.clone())),
         ("variant", Json::optional(entry.variant.clone())),
-        (
-            "remote",
-            Json::optional(
-                entry
-                    .pin(&list.sources)
-                    .map(|pin| pin.selector().to_string()),
-            ),
-        ),
         (
             "description",
             Json::string(module.map(|m| m.description.as_str()).unwrap_or_default()),
@@ -371,7 +356,7 @@ fn module(list: &List, entry: &Entry, family: &str) -> Json {
             batches(module.map(|m| m.groups.as_slice()), family),
         ),
         ("coprs", coprs(module, family)),
-        ("provenance", provenance(list, entry)),
+        ("provenance", provenance(entry)),
         (
             "satisfies",
             Json::array(
@@ -452,9 +437,9 @@ fn decls(
         .unwrap_or_default()
 }
 
-/// Keeping content, pin and import evidence together lets consumers distinguish
-/// local copies from fetched modules.
-fn provenance(list: &List, entry: &Entry) -> Json {
+/// Keeping content and import evidence together lets a consumer tell an
+/// imported copy from a module the repository owns.
+fn provenance(entry: &Entry) -> Json {
     let module = entry.module.as_ref();
     Json::object([
         (
@@ -462,11 +447,6 @@ fn provenance(list: &List, entry: &Entry) -> Json {
             Json::optional(module.and_then(|m| m.content.clone())),
         ),
         ("repo", Json::Bool(module.is_some_and(|m| m.repo))),
-        ("source", Json::optional(entry.source.clone())),
-        (
-            "pin",
-            entry.pin(&list.sources).map_or(Json::Null, Evidence::json),
-        ),
         (
             "imported",
             match module.and_then(|m| m.imported.as_ref()) {
@@ -483,14 +463,9 @@ fn provenance(list: &List, entry: &Entry) -> Json {
     ])
 }
 
-/// Each capability stays one layer probe even when base, module and catalog
+/// Each capability stays one layer probe even when base, module and table
 /// paths offer alternatives.
-pub(crate) fn contract_files(
-    image: &Image,
-    modules: &[&Module],
-    rows: &[Capability],
-) -> Vec<String> {
-    let family = image.base.as_ref().map_or("", |base| base.family.as_str());
+pub(crate) fn contract_files(image: &Image, modules: &[&Module]) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     let mut add = |paths: Vec<String>| {
         let token = paths.join("|");
@@ -502,7 +477,7 @@ pub(crate) fn contract_files(
         if !image.boot.is_empty() && decl.name == "bootupctl" {
             continue;
         }
-        if let Some(paths) = crate::base::witness(&decl.name, family, None, rows) {
+        if let Some(paths) = crate::base::witness(&decl.name, None) {
             add(paths);
         }
     }
@@ -513,7 +488,7 @@ pub(crate) fn contract_files(
                 continue;
             }
             let own = own.map(|file| file.file.as_str());
-            if let Some(paths) = crate::base::witness(&decl.name, family, own, rows) {
+            if let Some(paths) = crate::base::witness(&decl.name, own) {
                 add(paths);
             }
         }
@@ -537,12 +512,11 @@ pub(crate) fn provides(image: &Image, entries: &[&Entry], name: &str) -> bool {
 
 /// Only located capabilities can produce filesystem probes. Abstract rows must
 /// leave the probe result unchanged.
-fn witnesses(image: &Image, rows: &[Capability]) -> Json {
-    let family = image.base.as_ref().map_or("", |base| base.family.as_str());
-    let mut names: Vec<&str> = rows
+fn witnesses(image: &Image) -> Json {
+    let mut names: Vec<&str> = crate::base::CAPABILITIES
         .iter()
-        .filter(|row| row.path.is_some() || !row.families.is_empty())
-        .map(|row| row.name.as_str())
+        .filter(|row| row.path.is_some())
+        .map(|row| row.name)
         .chain(
             image
                 .base
@@ -561,7 +535,7 @@ fn witnesses(image: &Image, rows: &[Capability]) -> Json {
     names.sort_unstable();
     names.dedup();
     Json::map(names.into_iter().filter_map(|name| {
-        let paths = crate::base::probe(name, family, rows)?;
+        let paths = crate::base::probe(name)?;
         Some((name.to_string(), Json::strings(paths)))
     }))
 }
@@ -680,31 +654,6 @@ fn every_asset(list: &List) -> Json {
     assets(&modules)
 }
 
-/// A shared fetch directory requires one pin for a module used by several
-/// images.
-fn remotes(list: &List) -> Json {
-    let mut seen: Vec<&str> = Vec::new();
-    let mut out: Vec<Json> = Vec::new();
-    for image in &list.images {
-        for entry in &image.entries {
-            let Some(remote) = entry.pin(&list.sources) else {
-                continue;
-            };
-            if seen.contains(&entry.path.as_str()) {
-                continue;
-            }
-            seen.push(&entry.path);
-            out.push(Json::object([
-                ("name", Json::string(&entry.path)),
-                ("dir", Json::string(format!("modules/{}", entry.dir()))),
-                ("file", Json::string(declared_in(image.src.name()))),
-                ("pin", remote.json()),
-            ]));
-        }
-    }
-    Json::Array(out)
-}
-
 /// `NO_FLAVOUR` must identify the ungated target because an absent gate would
 /// silently admit gated entries.
 pub(crate) fn in_target(entry: &Entry, target: &str) -> bool {
@@ -743,12 +692,10 @@ mod tests {
 
     fn entry(flavour: Option<&str>) -> Entry {
         Entry {
-            source: None,
             path: "owner/module".into(),
             flavour: flavour.map(str::to_string),
             variant: None,
             options: Vec::new(),
-            remote: None,
             span: Span::default(),
             module: None,
         }

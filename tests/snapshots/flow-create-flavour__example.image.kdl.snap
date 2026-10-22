@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 schema-version 1
 
@@ -12,6 +12,7 @@ image {
         family "fedora"
         provides "rechunking" "initramfs-generation" "luks-initramfs" "selinux-policy" "ssh" "bootc" "bootupctl" "podman" "crun"
         signed #false
+        scap-content "ssg-fedora-ds.xml"
     }
 
     layout {

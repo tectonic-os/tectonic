@@ -1,75 +1,13 @@
 //! Library files: one `base` node per `*.base.kdl` file in a base-images
-//! library, and one `capabilities.kdl` file per capabilities library.
+//! library.
 
-use crate::base::{Base, Capability};
+use crate::base::Base;
 use crate::diag::{Issue, Issues, Source, Span};
 use crate::parse::schema::{check_doc, Arg, Node, Say};
-use crate::parse::{bool_arg, check_capability, check_path, child, string_arg, string_args, text};
+use crate::parse::{bool_arg, check_capability, child, string_args, text};
 use crate::parse::{kids, syntax_issue};
 use kdl::{KdlDocument, KdlNode};
 use std::path::Path;
-
-/// The path that witnesses a capability, on every family or on the families
-/// of the block that holds it.
-#[rustfmt::skip]
-const PATH: Node = Node::new("path",
-    "The absolute path whose presence witnesses the capability.").example("\"/usr/sbin/sshd\"")
-    .arg(Arg::Str, Say::new("`path` needs a path", "nothing given",
-        "`path \"/usr/sbin/sshd\"`, the file the finished image is checked for"))
-    .once("");
-
-/// The path a `family` block names, which is what the families it holds read
-/// instead of the row's default.
-#[rustfmt::skip]
-const FAMILY_PATH: Node = Node::new("path",
-    "The absolute path that witnesses the capability on these families.").example("\"/usr/bin/ssh\"")
-    .arg(Arg::Str, Say::new("`path` needs a path", "nothing given",
-        "`path \"/usr/bin/ssh\"`, the file a base of these families is checked for"))
-    .once("")
-    .missing(Say::new("this `family` block names no path", "nothing to read",
-        "`family \"debian\" { path \"/usr/bin/ssh\" }`, the file the family is checked for"));
-
-/// A path that overrides the capability's default on the families it names.
-#[rustfmt::skip]
-const FAMILY: Node = Node::new("family",
-    "A path that overrides the capability's default on the families it names.").example("\"debian\" \"ubuntu\"")
-    .arg(Arg::Strs, Say::new("`family` needs a family name", "nothing named",
-        "`family \"debian\" \"ubuntu\" { path \"/usr/bin/ssh\" }`"))
-    .children(&[FAMILY_PATH], Say::new("unknown node `{}` in a family block", "not part of the schema",
-        "a family block holds the one `path` it reads"));
-
-/// One capability and where its presence is read.
-#[rustfmt::skip]
-const CAPABILITY: Node = Node::new("capability",
-    "Where the presence of a capability is read, which is the path that witnesses it.").about("Tells `tect` how to prove that a capability is in a finished image: the path of a file that witnesses it. A bare `path` holds for every family, and a `family` block reads a different path on the families it names. A row is needed only where the witness is not `/usr/bin/<name>` or `/usr/sbin/<name>`.").example("\"ssh\"")
-    .arg(Arg::Str, Say::new("`capability` needs a name", "nothing named",
-        "`capability \"ssh\" { path \"/usr/sbin/sshd\" }`, or `capability \"rechunking\"` for one \
-         no path witnesses"))
-    .unique(Say::new("capability `{}` is described twice", "already described above",
-        "one name is one row"))
-    .children(&[PATH, FAMILY], Say::new("unknown node `{}` in a capability", "not part of the schema",
-        "a capability holds `path`, or `family` blocks that override it"))
-    .lists(&[
-        ("A path witnesses a capability name. `tect` reads the first of these that names one:", &[
-            "the `file=` of a module's `provides \"<name>\"`;",
-            "the capability row for the image's family;",
-            "`/usr/bin/<name>` or `/usr/sbin/<name>`, where the base probe measures a base and \
-             no row names the capability at all.",
-        ]),
-    ])
-    .notes(&[
-        "A row with no path names a capability that nothing witnesses. It also suppresses the \
-         probe's conventional lookup, so a row is how a name with no file anywhere stays \
-         abstract on purpose.",
-        "`tect validate-image` checks the finished image for each name that the base claims, and \
-         for each name that a module or a row locates. `base-sig-probe` reads the same \
-         witnesses when it measures a base.",
-        "The witness of `luks-initramfs` is inside an archive. If a target declares it, then \
-         the build validates the initramfs with `lsinitrd`. If no target declares it, then the \
-         installer does not offer root encryption.",
-        "Declare `luks-initramfs` in a custom base or module only if its initramfs unlocks LUKS. \
-         `tect build` then proves that the binary is present before the installer offers it.",
-    ]);
 
 /// The one `base` node a `*.base.kdl` file holds.
 #[rustfmt::skip]
@@ -152,20 +90,6 @@ pub const BASE_FILE: Node = Node::new("base file",
          in.",
     ]);
 
-/// The grammar of one `capabilities.kdl` file.
-#[rustfmt::skip]
-pub const CAPABILITIES: Node = Node::new("capabilities",
-    "The capability rows one capabilities library holds.").about("One file locates the witnesses a base and a module name. A capabilities source reads this one file at the root of the directory its `path` names.").scaffolds(&["capability"])
-    .children(&[CAPABILITY], Say::new("unknown node `{}` in capabilities.kdl", "not part of the schema",
-        "capabilities.kdl holds `capability` rows; a base goes in a `*.base.kdl` file of a \
-         base-images library"))
-    .notes(&[
-        "A capability that no row names is read at `/usr/bin/<name>` then `/usr/sbin/<name>`, \
-         where a probe measures a base.",
-        "A row with no path names an abstract capability. It suppresses the conventional \
-         lookup, so the name is never witnessed and no build stops on it.",
-    ]);
-
 /// One base out of its `*.base.kdl` file, named by the file stem, with the
 /// source its spans point into.
 pub fn read_base(path: &Path, issues: &mut Issues) -> Option<(Base, Source)> {
@@ -194,71 +118,6 @@ pub fn read_base(path: &Path, issues: &mut Issues) -> Option<(Base, Source)> {
         .and_then(|file| file.strip_suffix(crate::base::BASE_SUFFIX))?
         .to_string();
     Some((entry(node, name, &src, issues)?, src))
-}
-
-/// Every capability row one `capabilities.kdl` file holds, with the source
-/// their spans point into.
-pub fn read_capabilities(path: &Path, issues: &mut Issues) -> Option<(Vec<Capability>, Source)> {
-    let text = read(path, issues)?;
-    let src = Source::new(path.display().to_string(), &text);
-    let doc: KdlDocument = match text.parse() {
-        Ok(doc) => doc,
-        Err(err) => {
-            issues.push(syntax_issue(&err, src.name(), &src));
-            return None;
-        }
-    };
-    check_doc(&doc, &CAPABILITIES, &src, issues);
-
-    let mut rows: Vec<Capability> = Vec::new();
-    for node in doc
-        .nodes()
-        .iter()
-        .filter(|node| node.name().value() == "capability")
-    {
-        let Some(row) = row(node, &src, issues) else {
-            continue;
-        };
-        // A second row for one name is the walker's to report, and this is
-        // what keeps it from being reported again as another library's.
-        if !rows.iter().any(|first| first.name == row.name) {
-            rows.push(row);
-        }
-    }
-    Some((rows, src))
-}
-
-/// One capability row, or nothing where it names nothing.
-fn row(node: &KdlNode, src: &Source, issues: &mut Issues) -> Option<Capability> {
-    let span: Span = node.name().span().into();
-    let name = string_arg(node)?.to_string();
-    check_capability(&name, span, src, issues);
-    let path = child(node, "path").and_then(string_arg).map(|path| {
-        check_path(path, span, src, issues);
-        path.to_string()
-    });
-    let families: Vec<(Vec<String>, String)> = kids(node)
-        .iter()
-        .filter(|block| block.name().value() == "family")
-        .filter_map(|block| {
-            let names: Vec<String> = string_args(block)
-                .iter()
-                .map(|name| {
-                    check_capability(name, block.name().span().into(), src, issues);
-                    name.to_string()
-                })
-                .collect();
-            let path = child(block, "path").and_then(string_arg)?;
-            check_path(path, block.name().span().into(), src, issues);
-            Some((names, path.to_string()))
-        })
-        .collect();
-    Some(Capability {
-        name,
-        path,
-        families,
-        span,
-    })
 }
 
 /// One entry, or nothing where it describes too little to build an image with.

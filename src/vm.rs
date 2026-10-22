@@ -232,7 +232,7 @@ fn access(root: &Path, kind: &str, opts: &Options) -> Access {
     let Some((_, _, entries)) = crate::emit::plan::of_target(&list, &target.to_string()) else {
         return Access::default();
     };
-    let dirs: Vec<_> = entries.iter().map(|entry| entry.dir()).collect();
+    let dirs: Vec<_> = entries.iter().map(|entry| entry.path.clone()).collect();
     let disk = crate::parse::disk::Disk::scan(root);
     let keys: Vec<_> = disk
         .keys

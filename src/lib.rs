@@ -8,7 +8,6 @@ pub mod create;
 pub mod diag;
 pub mod dispatch;
 pub mod emit;
-pub mod fetch;
 #[cfg(feature = "fuzzing")]
 pub mod fuzzing;
 pub mod import;
@@ -48,8 +47,7 @@ pub fn find_root(from: &Path) -> Option<PathBuf> {
 }
 
 /// What the repository declares, without loading a module manifest: enough for
-/// anything that only needs a name, and readable before a pinned module has
-/// been fetched.
+/// anything that only needs a name.
 pub fn declarations(root: &Path) -> (List, Issues, String) {
     let (list, issues) = List::load(root);
     let context = context(&list, root);
@@ -188,8 +186,7 @@ pub(crate) fn load(root: &Path) -> Loaded {
     let context = context(&list, root);
 
     let disk = parse::disk::Disk::scan(root);
-    // Costs no network: a collection not on this machine is passed over.
-    let index = provider::Index::scan(root, &list.sources, &disk, false);
+    let index = provider::Index::local(root, &list.sources, &disk);
     parse::module::check_unlisted(&list, root, &disk, &mut issues);
 
     let network = list.network;
@@ -280,10 +277,8 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
 
     let (unpinned, modified) = match command {
         Command::Check => {
-            // Reading the catalog is what reports two libraries describing one
-            // base, and `check` is where the repository is answered for.
-            let _ = base::catalog(root, &list.sources, &mut issues);
             provenance::lock::validate(root, &mut issues);
+            scap::check_content(&list, &mut issues);
             (
                 list.sources
                     .iter()

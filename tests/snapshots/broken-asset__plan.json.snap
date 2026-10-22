@@ -17,7 +17,6 @@ source: tests/golden/harness.rs
   "audit": {
     "enforce": false
   },
-  "remotes": [],
   "assets": [
     {
       "module": "core/pins",
@@ -68,14 +67,35 @@ source: tests/golden/harness.rs
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
+        "scap_content": "",
         "signed": false,
         "provides": [
           "rechunking"
         ],
         "witnesses": {
-          "rechunking": [
-            "/usr/bin/rechunking",
-            "/usr/sbin/rechunking"
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
           ]
         },
         "requires": [],
@@ -97,10 +117,8 @@ source: tests/golden/harness.rs
           "modules": [
             {
               "path": "core/pins",
-              "dir": "core/pins",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "Asset pins that say nothing usable about what they fetch",
               "options": {},
               "provides": [],
@@ -112,8 +130,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "0a6e33a44495c03490914aa3c2dc1f481f5f15245895211b735299a7cafb8dac",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],

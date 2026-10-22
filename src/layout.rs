@@ -242,11 +242,8 @@ pub const LOCK_FILE: &str = "modules.lock.kdl";
 /// the release the repository is pinned to.
 pub const MOUNTED: &str = "out/tect";
 /// Holds each fetched library, unpacked. `import module` copies the chosen
-/// member from here, and `out/` is ignored.
-pub const SOURCES_CACHE: &str = "out/sources";
-/// What a fetched tree hashed to, kept out of the tree it describes so nothing
-/// under `modules/` is tool-written state.
-pub const STAMPS: &str = "out/remote-modules";
+/// member from here. `.gitignore` ignores `.cache/`.
+pub const SOURCES_CACHE: &str = ".cache/sources";
 
 /// Whether a root file holds images. An allowlist, so a root `.kdl` that is
 /// neither is reported. "Everything but repo.kdl" would parse it as an image.
@@ -357,9 +354,6 @@ pub const REPOSITORY: Tree = Tree {
         Place { path: &[MODULES, "/", LOCK_FILE], writer: "`tect import module`", tracked: true,
             what: "Where each imported module came from, and what its content hashed to. See \
                 [`modules.lock.kdl`](lock.md)." },
-        Place { path: &[MODULES, "/", crate::model::remote::REMOTE_DIR, "/"], writer: "`tect`", tracked: false,
-            what: "The modules that an image pins from another repository, fetched and verified \
-                against their hash." },
         Place { path: &[KEYS, "/", PUBLIC_KEYS, "/"], writer: "`tect create key` or `tect set key`", tracked: true,
             what: "The public half of each key, at the path it has in the image." },
         Place { path: &[KEYS, "/", PRIVATE_KEYS, "/"], writer: "`tect create key`", tracked: false,
@@ -375,7 +369,8 @@ pub const REPOSITORY: Tree = Tree {
         Place { path: &[OUT, "/"], writer: "`tect`", tracked: false,
             what: "Local exports, caches and scratch. `tect` reads nothing here as a declaration." },
         Place { path: &[SOURCES_CACHE, "/"], writer: "`tect`", tracked: false,
-            what: "The libraries that `tect import module` fetches and copies a module from." },
+            what: "The libraries that `tect import module` fetches and copies a module from. \
+                `tect check`, `tect generate` and `tect build` read nothing here." },
         Place { path: &["disk_config/"], writer: "`tect create repo`, then the user", tracked: true,
             what: "The settings that bootc-image-builder reads when it builds a Fedora or RHEL disk \
                 image. `disk.toml` sets the smallest size of `/`." },
@@ -383,7 +378,7 @@ pub const REPOSITORY: Tree = Tree {
             what: "The Renovate settings. Its custom managers keep the `tect` release in `repo.kdl` \
                 and each pin that declares `renovate` current." },
         Place { path: &[".gitignore"], writer: "`tect create repo`", tracked: true,
-            what: "Keeps `keys/private/`, `out/` and `modules/.remote/` out of git." },
+            what: "Keeps `keys/private/`, `out/` and `.cache/` out of git." },
     ],
     lists: &[],
     notes: &[],

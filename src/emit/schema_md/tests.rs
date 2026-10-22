@@ -145,12 +145,11 @@ fn a_nested_section_shows_the_blocks_that_hold_it() {
 }
 
 /// A reader expects a field on the page of the file that holds it, so a
-/// block that three files share is documented on each of their pages.
+/// block that two files share is documented on each of their pages.
 #[test]
 fn a_shared_block_is_documented_on_each_page_that_holds_it() {
     assert!(page(Area::Module).contains("<a id=\"asset-pin\"></a>"));
     assert!(page(Area::Repo).contains("<a id=\"sources-modules-url\"></a>"));
-    assert!(page(Area::Image).contains("<a id=\"image-modules-module-pin\"></a>"));
 }
 
 #[test]

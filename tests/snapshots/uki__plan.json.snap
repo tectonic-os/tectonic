@@ -17,7 +17,6 @@ source: tests/golden/harness.rs
   "audit": {
     "enforce": false
   },
-  "remotes": [],
   "assets": [],
   "images": [
     {
@@ -37,19 +36,36 @@ source: tests/golden/harness.rs
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
+        "scap_content": "",
         "signed": false,
         "provides": [
           "bootupctl",
           "luks-initramfs"
         ],
         "witnesses": {
-          "bootupctl": [
-            "/usr/bin/bootupctl",
-            "/usr/sbin/bootupctl"
+          "bootc": [
+            "/usr/bin/bootc"
           ],
-          "luks-initramfs": [
-            "/usr/bin/luks-initramfs",
-            "/usr/sbin/luks-initramfs"
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
           ]
         },
         "requires": [],
@@ -71,10 +87,8 @@ source: tests/golden/harness.rs
           "modules": [
             {
               "path": "uki",
-              "dir": "uki",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "UKI provider fixture",
               "options": {},
               "provides": [
@@ -88,8 +102,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "6cdc14dd351a2941ba0448c8a233c9d441c4fa35c61ea8bea6cdaeeac08a6b28",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -97,10 +109,8 @@ source: tests/golden/harness.rs
             },
             {
               "path": "enrolment",
-              "dir": "enrolment",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "Secure Boot enrollment provider fixture",
               "options": {},
               "provides": [
@@ -114,8 +124,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "ed3ce21e4b130a2a2db0090d1c8c633b97e56b79b05da7b698a0a2373ffa61ef",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -151,19 +159,36 @@ source: tests/golden/harness.rs
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
+        "scap_content": "",
         "signed": false,
         "provides": [
           "bootupctl",
           "luks-initramfs"
         ],
         "witnesses": {
-          "bootupctl": [
-            "/usr/bin/bootupctl",
-            "/usr/sbin/bootupctl"
+          "bootc": [
+            "/usr/bin/bootc"
           ],
-          "luks-initramfs": [
-            "/usr/bin/luks-initramfs",
-            "/usr/sbin/luks-initramfs"
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
           ]
         },
         "requires": [],
@@ -185,10 +210,8 @@ source: tests/golden/harness.rs
           "modules": [
             {
               "path": "uki",
-              "dir": "uki",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "UKI provider fixture",
               "options": {},
               "provides": [
@@ -202,8 +225,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "6cdc14dd351a2941ba0448c8a233c9d441c4fa35c61ea8bea6cdaeeac08a6b28",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -211,10 +232,8 @@ source: tests/golden/harness.rs
             },
             {
               "path": "enrolment",
-              "dir": "enrolment",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "Secure Boot enrollment provider fixture",
               "options": {},
               "provides": [
@@ -228,8 +247,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "ed3ce21e4b130a2a2db0090d1c8c633b97e56b79b05da7b698a0a2373ffa61ef",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -265,19 +282,36 @@ source: tests/golden/harness.rs
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
+        "scap_content": "",
         "signed": false,
         "provides": [
           "bootupctl",
           "luks-initramfs"
         ],
         "witnesses": {
-          "bootupctl": [
-            "/usr/bin/bootupctl",
-            "/usr/sbin/bootupctl"
+          "bootc": [
+            "/usr/bin/bootc"
           ],
-          "luks-initramfs": [
-            "/usr/bin/luks-initramfs",
-            "/usr/sbin/luks-initramfs"
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
           ]
         },
         "requires": [],

@@ -3,8 +3,7 @@
 use crate::diag::{Issue, Source, Span};
 use crate::model::module::{Access, Coverage, Module, Refusal};
 use crate::model::options::Value;
-use crate::model::remote::{Collection, Kind as SourceKind, REMOTE_DIR};
-use crate::provenance::Evidence;
+use crate::model::remote::Collection;
 
 /// The schema every file in the repository is written against.
 pub const SCHEMA_VERSION: u32 = 1;
@@ -131,6 +130,10 @@ pub struct Base {
     pub satisfies: Vec<Coverage>,
     /// Whether the base image publishes a cosign signature.
     pub signed: bool,
+    /// The SSG datastream file a scan of an image on this base reads, as a
+    /// bare filename under the content directory. Empty where the family's
+    /// default stands.
+    pub scap_content: String,
     pub span: Span,
 }
 
@@ -179,16 +182,12 @@ pub struct Workflow {
 /// One entry in the list: a module, and the decisions the image author makes
 /// about it.
 pub struct Entry {
-    /// The modules source this entry references, for a member listed under a
-    /// `source` block.
-    pub source: Option<String>,
+    /// The module's directory, relative to `modules/`.
     pub path: String,
     pub flavour: Option<String>,
     pub variant: Option<String>,
     /// Option name to the values set on it.
     pub options: Vec<(String, Vec<Value>, Span)>,
-    /// The pin, for a module that lives outside this repository.
-    pub remote: Option<Evidence>,
     pub span: Span,
     /// The manifest this entry names, loaded during resolution. None when it
     /// could not be read, which is already an issue.
@@ -196,59 +195,18 @@ pub struct Entry {
 }
 
 impl Entry {
-    /// Where the module's directory is, relative to `modules/`.
-    pub fn dir(&self) -> String {
-        match (&self.source, &self.remote) {
-            (Some(_), _) | (_, Some(_)) => format!("{REMOTE_DIR}/{}", self.path),
-            (None, None) => self.path.clone(),
+    /// Names this module as a seed calls it. An imported module keeps its
+    /// library and its path there. A module this repository owns takes the
+    /// collection it publishes as.
+    pub fn qualified(&self, publishes_as: &str) -> String {
+        match self
+            .module
+            .as_ref()
+            .and_then(|module| module.imported.as_ref())
+        {
+            Some(record) => format!("{}/{}", record.library, record.upstream),
+            None => format!("{publishes_as}/{}", self.path),
         }
-    }
-
-    /// The name inside its collection, or its whole local name.
-    pub fn name(&self) -> &str {
-        match &self.source {
-            Some(_) => self
-                .path
-                .split_once('/')
-                .map_or(&self.path, |(_, name)| name),
-            None => &self.path,
-        }
-    }
-
-    /// The pin that fetches it, whether declared on the entry or its source.
-    pub fn pin<'a>(&'a self, sources: &'a [Collection]) -> Option<&'a Evidence> {
-        self.remote.as_ref().or_else(|| {
-            self.source
-                .as_ref()
-                .and_then(|name| {
-                    sources
-                        .iter()
-                        .find(|source| source.kind == SourceKind::Modules && &source.name == name)
-                })
-                .and_then(Collection::pin)
-        })
-    }
-
-    /// Names this module as a seed calls it. A reference keeps its source collection,
-    /// and an imported module keeps its library and its path there. A module
-    /// this repository owns takes the collection it publishes as.
-    pub fn qualified(&self, publishes_as: &str) -> Option<String> {
-        if self.remote.is_some() {
-            return None;
-        }
-        if self.source.is_some() {
-            return Some(self.path.clone());
-        }
-        Some(
-            match self
-                .module
-                .as_ref()
-                .and_then(|module| module.imported.as_ref())
-            {
-                Some(record) => format!("{}/{}", record.library, record.upstream),
-                None => format!("{publishes_as}/{}", self.path),
-            },
-        )
     }
 }
 
@@ -294,8 +252,6 @@ pub struct List {
     pub audit_enforce: bool,
     /// What repo.kdl lets each step of a module layer reach.
     pub network: Network,
-    /// Where each capability's presence is read, off the catalog.
-    pub capabilities: Vec<crate::base::Capability>,
     /// What repo.kdl declares, which is `SCHEMA_VERSION` or the load failed.
     pub schema_version: Option<u32>,
     /// repo.kdl, for a diagnostic about either of the two above.

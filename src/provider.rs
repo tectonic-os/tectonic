@@ -3,7 +3,7 @@
 //!
 //! One index: five callers ask the same question.
 
-use crate::model::remote::{Collection, Kind as SourceKind, REMOTE_DIR};
+use crate::model::remote::{Collection, Kind as SourceKind};
 use crate::parse::disk::Disk;
 use crate::parse::module::Summary;
 use crate::{layout, parse};
@@ -14,7 +14,7 @@ use std::path::Path;
 pub struct Provider {
     /// The collection it comes from, absent for a module the repository owns.
     pub owner: Option<String>,
-    /// Its directory under `modules/`, or its name inside the collection.
+    /// Its directory under `modules/`, or its path inside the collection.
     pub name: String,
     /// Already on this machine, so an image can list it without an import.
     pub here: bool,
@@ -27,15 +27,6 @@ impl Provider {
     pub fn qualified(&self) -> String {
         match &self.owner {
             Some(owner) => format!("{owner}/{}", self.name),
-            None => self.name.clone(),
-        }
-    }
-
-    /// Where its manifest sits under `modules/`, which is what an image entry
-    /// naming it resolves to.
-    pub fn dir(&self) -> String {
-        match &self.owner {
-            Some(owner) => format!("{REMOTE_DIR}/{owner}/{}", self.name),
             None => self.name.clone(),
         }
     }
@@ -71,19 +62,22 @@ pub struct Index {
 }
 
 impl Index {
+    /// The repository's own modules and nothing else, for resolution.
+    pub fn local(root: &Path, sources: &[Collection], disk: &Disk) -> Self {
+        Self {
+            held: own(root, disk),
+            unread: Vec::new(),
+            sourced: sources
+                .iter()
+                .any(|collection| collection.kind == SourceKind::Modules),
+            unreached: None,
+        }
+    }
+
     /// `fetch` decides whether a collection that is not on this machine is
     /// downloaded to answer, which resolution never does and a flow may.
     pub fn scan(root: &Path, sources: &[Collection], disk: &Disk, fetch: bool) -> Self {
-        let mut out: Vec<Provider> = Vec::new();
-        for dir in disk.modules() {
-            let (owner, name) = split(dir);
-            out.push(Provider {
-                owner,
-                name,
-                here: true,
-                declares: parse::module::summary(&layout::manifest(root, dir)),
-            });
-        }
+        let mut out = own(root, disk);
         // One collection that cannot be reached takes the whole catalog with
         // it, so a scan that meant to fetch falls back to what is already here.
         // `unread` is what still says the search was incomplete.
@@ -93,20 +87,16 @@ impl Index {
         let found = fetched
             .or_else(|_| crate::import::catalog(root, sources, false))
             .unwrap_or_default();
-        for module in found {
-            if !out.iter().any(|held| held.dir() == module.dir()) {
-                out.push(module);
-            }
-        }
+        out.extend(found);
         Self {
             held: out,
             unreached,
             // The module collections `catalog` just skipped: a source counts
             // as read only where the tree it names is. Two sources naming one
             // library share a cache directory, so the other kind's subtree
-            // being there does not make this one read. A base-image or
-            // capability source is not a collection this index speaks for, so
-            // it is never named here.
+            // being there does not make this one read. A base-image source is
+            // not a collection this index speaks for, so it is never named
+            // here.
             unread: match fetch && reached {
                 true => Vec::new(),
                 false => sources
@@ -150,7 +140,7 @@ impl Index {
     /// silence carries one voice. Empty where the scan was complete.
     pub fn unsearched(&self) -> String {
         // A scan that tried and failed is not a scan that skipped: saying
-        // `tect fetch modules` downloads it, to someone whose fetch has just
+        // `tect import module` fetches it, to someone whose fetch has just
         // been refused, is the wrong sentence.
         if let Some(why) = &self.unreached {
             return format!(
@@ -161,11 +151,11 @@ impl Index {
         match named.len() {
             0 => String::new(),
             1 => format!(
-                "The {} collection is declared but not on this machine, so nothing read it: `tect fetch modules` downloads it",
+                "The {} collection is declared but not on this machine, so nothing read it: `tect import module` fetches it",
                 named.join(", ")
             ),
             _ => format!(
-                "The {} collections are declared but not on this machine, so nothing read them: `tect fetch modules` downloads them",
+                "The {} collections are declared but not on this machine, so nothing read them: `tect import module` fetches them",
                 named.join(", ")
             ),
         }
@@ -230,34 +220,56 @@ impl Index {
     }
 
     /// The one an image entry names, which is how what an image already has is
-    /// read back off its declaration.
+    /// read back off its declaration. An entry names a module under
+    /// `modules/`, never a library member.
     pub fn at(&self, dir: &str) -> Option<&Provider> {
-        self.held.iter().find(|held| held.dir() == dir)
+        self.held
+            .iter()
+            .find(|held| held.owner.is_none() && held.name == dir)
     }
 }
 
-/// A module directory as the collection and name it stands for: everything
-/// under `.remote` belongs to the collection it was fetched from.
-fn split(dir: &str) -> (Option<String>, String) {
-    match dir
-        .strip_prefix(REMOTE_DIR)
-        .and_then(|rest| rest.strip_prefix('/'))
-        .and_then(|rest| rest.split_once('/'))
-    {
-        Some((owner, name)) => (Some(owner.to_string()), name.to_string()),
-        None => (None, dir.to_string()),
-    }
+/// Every module directory the repository holds.
+fn own(root: &Path, disk: &Disk) -> Vec<Provider> {
+    disk.modules()
+        .map(|dir| Provider {
+            owner: None,
+            name: dir.clone(),
+            here: true,
+            declares: parse::module::summary(&layout::manifest(root, dir)),
+        })
+        .collect()
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
+    /// Writes a repository where `both` provides `x` and `y`, and `other`
+    /// provides `y` alone.
+    pub(crate) fn two_providers(name: &str) -> std::path::PathBuf {
+        let root =
+            std::env::temp_dir().join(format!("tect-providers-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        crate::init::put(
+            &root.join("modules/both/module.kdl"),
+            "schema-version 1\n\nsupports \"fedora\"\n\nprovides \"x\" \"y\"\n",
+        )
+        .unwrap();
+        crate::init::put(
+            &root.join("modules/other/module.kdl"),
+            "schema-version 1\n\nsupports \"fedora\"\n\nprovides \"y\"\n",
+        )
+        .unwrap();
+        root
+    }
+
     #[test]
-    fn a_fetched_module_is_the_collection_member_it_came_from() {
-        let (owner, name) = split(".remote/one/browser");
-        assert_eq!((owner.as_deref(), name.as_str()), (Some("one"), "browser"));
-        let (owner, name) = split("my/editor");
-        assert_eq!((owner, name.as_str()), (None, "my/editor"));
+    fn an_entry_finds_the_module_it_names() {
+        let root = two_providers("at");
+        let index = Index::local(&root, &[], &Disk::scan(&root));
+        let found = index.at("other").map(|held| held.name.as_str());
+        std::fs::remove_dir_all(&root).unwrap();
+        assert_eq!(found, Some("other"));
     }
 }

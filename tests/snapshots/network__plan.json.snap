@@ -17,7 +17,6 @@ source: tests/golden/harness.rs
   "audit": {
     "enforce": false
   },
-  "remotes": [],
   "assets": [
     {
       "module": "core/fetcher",
@@ -56,19 +55,36 @@ source: tests/golden/harness.rs
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
+        "scap_content": "",
         "signed": false,
         "provides": [
           "rechunking",
           "selinux-policy"
         ],
         "witnesses": {
-          "rechunking": [
-            "/usr/bin/rechunking",
-            "/usr/sbin/rechunking"
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
           ],
           "selinux-policy": [
-            "/usr/bin/selinux-policy",
-            "/usr/sbin/selinux-policy"
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
           ]
         },
         "requires": [],
@@ -90,10 +106,8 @@ source: tests/golden/harness.rs
           "modules": [
             {
               "path": "fedora-family",
-              "dir": "fedora-family",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "dnf5 and its plugins, which every fedora build layer reaches for",
               "options": {},
               "provides": [
@@ -107,8 +121,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "90fed2e5b6c345fb0d615059da327f1499bdd2b1748756caf0e3e772455466f9",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -116,10 +128,8 @@ source: tests/golden/harness.rs
             },
             {
               "path": "core/tools",
-              "dir": "core/tools",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "Installs a package, then configures it with no network",
               "options": {},
               "provides": [],
@@ -144,8 +154,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "7c3c70f5626649cc3a12dd520c35fcf6c9706e15b6ab7db6e1b5818aa077ee0e",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -153,10 +161,8 @@ source: tests/golden/harness.rs
             },
             {
               "path": "core/fetcher",
-              "dir": "core/fetcher",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "Fetches a pinned release in its own script",
               "options": {},
               "provides": [],
@@ -168,8 +174,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "70ccaa7afc7ec3c653ae149fcffe3ea3f37496324e945e88eff19c0032ac78fd",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -177,10 +181,8 @@ source: tests/golden/harness.rs
             },
             {
               "path": "core/quiet",
-              "dir": "core/quiet",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "Ships files and nothing else",
               "options": {},
               "provides": [],
@@ -192,8 +194,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "a4d01e46e2cb954df2105a6b2706ac9219516a92c7aa57a51f7f7289087a0220",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -201,10 +201,8 @@ source: tests/golden/harness.rs
             },
             {
               "path": "core/spliced",
-              "dir": "core/spliced",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "Ships a fragment beside its standard layer",
               "options": {},
               "provides": [],
@@ -216,8 +214,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "2953572315102d2cf4a5a42a1761ad379caf000fee499329efc556041d86f433",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -226,7 +222,9 @@ source: tests/golden/harness.rs
           ],
           "suppressed": [],
           "secrets": [],
-          "contract_files": [],
+          "contract_files": [
+            "/usr/sbin/semodule"
+          ],
           "verify_exceptions": [],
           "assets": [
             {

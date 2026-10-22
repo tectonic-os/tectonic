@@ -102,12 +102,22 @@ Accepts: *list of strings*
 
 | Property | Accepts | Description |
 | --- | --- | --- |
-| `file=` (optional) | *string* | The absolute path that witnesses the one capability that the node names. It is needed only if the witness is neither `/usr/bin/<name>` nor `/usr/sbin/<name>`. |
+| `file=` (optional) | *string* | The absolute path that witnesses the one capability that the node names. Without it, the build reads the path that `tect` holds for the name. If `tect` holds no path for the name, then nothing witnesses it. |
 | `build-only=` (optional) | *boolean* | Whether the `file` exists only while the build runs. |
 | `exclusive=` (optional) | *boolean* | Whether a second enabled provider of the capabilities that the node names conflicts with this one. |
 
 > [!NOTE]
 > The build checks the finished image for the witness file.
+>
+> `tect` holds a witness path for each capability that a base can ship, such as `/usr/sbin/sshd` for `ssh`. A name that `tect` holds with no path, such as `rechunking`, is abstract, and nothing witnesses it.
+>
+> The base probe reads the path that `tect` holds for a name. If `tect` does not hold the name, then the probe reads `/usr/bin/<name>` and then `/usr/sbin/<name>`.
+>
+> `tect validate-image` checks the finished image for the witness of each name that the base or a module provides. `base-sig-probe` reads the same witnesses when it measures a base.
+>
+> The witness of `luks-initramfs` is inside an archive. If a target declares it, then the build validates the initramfs with `lsinitrd`. If no target declares it, then the installer does not offer root encryption.
+>
+> Declare `luks-initramfs` in a custom base or module only if its initramfs unlocks LUKS. `tect build` then proves that the binary is present before the installer offers it.
 >
 > Many enabled modules may provide one capability. If one of them declares it `exclusive=#true`, then `tect check` refuses a second provider, and `tect import module` asks whether to replace the first.
 >
@@ -508,7 +518,7 @@ The layer of the module gets three variables, where `<NAME>` is the asset name i
 
 ### `pin` (optional)
 
-A pin fixes where a download comes from and which version it is, and says how the version stays current. Unless the pin is `unpinned`, `tect` verifies each download against the pinned hash, so a changed upstream file is caught.
+A pin fixes where a download comes from and which version it is, and says how the version stays current. `tect` verifies each download against the pinned hash, so a changed upstream file is caught.
 
 ```kdl
 asset "starship" {
@@ -526,8 +536,7 @@ Accepts: {&nbsp;[fields](#asset-pin-fields)&nbsp;}
 A pin holds exactly one of these, so every pin says how it stays current:
 
 - `renovate`, if Renovate keeps the version current;
-- `manual`, if nothing tracks the pin;
-- `unpinned`, if the pin follows a moving ref with no `sha256`.
+- `manual`, if nothing tracks the pin.
 
 <a id="asset-pin-fields"></a>
 
@@ -535,14 +544,12 @@ A pin holds exactly one of these, so every pin says how it stays current:
 | --- | --- | --- |
 | [`renovate`](#asset-pin-renovate) (optional) |  | The Renovate custom manager that keeps `version` current. |
 | [`manual`](#asset-pin-manual) (optional) | *string* | Why nothing tracks this pin. |
-| [`unpinned`](#asset-pin-unpinned) (optional) | *string* | Why this pin follows a moving ref with no `sha256`. |
 | [`version`](#asset-pin-version) (required) | *string* | The version, tag or commit that `url` expands and Renovate rewrites. |
 | [`url`](#asset-pin-url) (required) | *string* | Where the content comes from. |
 | [`sha256`](#asset-pin-sha256) (optional) | *string* | The hash the fetched content must match. |
-| [`path`](#asset-pin-path) (optional) | *string* | The directory inside the archive that holds the content. |
 
 > [!NOTE]
-> An `asset`, an out-of-tree module and a collection each hold a `pin`.
+> An `asset` holds a `pin`. A library in `sources` declares its own `version`, `sha256` and `unpinned`.
 >
 > A base holds no `pin`. Its image reference holds the location and the version, and `signed` records whether the base publishes a cosign signature.
 >
@@ -583,29 +590,6 @@ asset "starship" {
 ```
 
 Accepts: *string*
-
-<a id="asset-pin-unpinned"></a>
-
-#### `unpinned` (optional)
-
-Why this pin follows a moving ref with no `sha256`.
-
-```kdl
-asset "starship" {
-    pin {
-        unpinned "followed at its branch head"
-    }
-}
-```
-
-Accepts: *string*
-
-> [!NOTE]
-> Every fetch takes what the ref holds at that moment, and nothing checks what arrived.
->
-> Only a collection's pin takes `unpinned`. The build runs an out-of-tree module as root, so the pin of an out-of-tree module needs a `sha256`.
->
-> `unpinned` does not combine with `sha256`, because a moving ref breaks the hash.
 
 <a id="asset-pin-version"></a>
 
@@ -660,23 +644,7 @@ Accepts: *string*
 | `from=` (optional) | `asset` or `sidecar` or `manual` | Where the hash is refreshed from. `asset`, the default, hashes the payload itself. `sidecar` reads the `<url>.sha256` file that upstream publishes. `manual` means nothing recomputes the hash. |
 
 > [!NOTE]
-> If a pin has no `sha256` and no `unpinned`, then `tect check` reports an error.
-
-<a id="asset-pin-path"></a>
-
-#### `path` (optional)
-
-The directory inside the archive that holds the content.
-
-```kdl
-asset "starship" {
-    pin {
-        path "modules/example"
-    }
-}
-```
-
-Accepts: *string*
+> If a pin names a download and no `sha256`, then `tect check` reports an error. A pin whose `url` is a Git repository is cloned at its `version` and declares none.
 
 <a id="network"></a>
 

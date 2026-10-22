@@ -66,9 +66,6 @@ pub struct Why {
     pub satisfies: Vec<(String, Vec<String>)>,
     pub content: Option<String>,
     pub imported: Option<(String, Fetch)>,
-    /// Only a repository copy has content that can be compared with its
-    /// declared hash.
-    pub copied: bool,
     pub modified: bool,
     /// The build can record a directory hash that differs from the declared
     /// `content` hash.
@@ -139,7 +136,6 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
         content: module.content.clone(),
         modified: matches!((&module.imported, &module.content),
             (Some(record), Some(content)) if record.content != *content),
-        copied: module.imported.is_some(),
         repo: module.repo.then(|| repo_urls(root, &module.dir)),
         repo_read: true,
         ..Why::default()
@@ -147,11 +143,6 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
 
     if let Some(record) = &module.imported {
         why.imported = Some((record.library.clone(), Fetch::of("collection", &record.pin)));
-    } else if let (Some(collection), Some(pin)) = (&entry.source, entry.pin(&list.sources)) {
-        // A referenced module has no lock entry. The repository pin must stand
-        // in, or the read-out would describe a referenced module as locally
-        // written.
-        why.imported = Some((collection.clone(), Fetch::of("collection", pin)));
     }
     for asset in &module.assets {
         why.fetches.push(Fetch::of(&asset.name, &asset.pin));
@@ -454,10 +445,9 @@ impl Why {
             )),
             Some((collection, pin)) => {
                 out.extend(evidence(COLLECTION, &[(collection.as_str(), pin)], terminal));
-                out.push(Part::Text(match (self.copied, self.modified) {
-                    (false, _) => "It is referenced rather than copied, so what a build reads is the collection's own tree at that pin.".into(),
-                    (true, true) => "**It has been edited since it was imported.** Forking a module is legitimate; what the lock buys is that the fork is visible.".into(),
-                    (true, false) => "Its content still matches what was imported.".into(),
+                out.push(Part::Text(match self.modified {
+                    true => "**It has been edited since it was imported.** Forking a module is legitimate; what the lock buys is that the fork is visible.".into(),
+                    false => "Its content still matches what was imported.".into(),
                 }));
             }
         }
@@ -794,20 +784,13 @@ pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why
 
         if let Some(provenance) = field(module, "provenance") {
             why.content = text(provenance, "content");
-            // An imported module carries its lock entry. A reference carries
-            // the collection it is fetched from, beside its pin.
             if let Some(imported) = field(provenance, "imported") {
                 if let (Some(collection), Some(pin)) =
                     (text(imported, "library"), field(imported, "pin"))
                 {
-                    why.copied = true;
                     why.modified = text(imported, "content") != why.content;
                     why.imported = Some((collection, pin_of(pin, "collection")));
                 }
-            } else if let (Some(collection), Some(pin)) =
-                (text(provenance, "source"), field(provenance, "pin"))
-            {
-                why.imported = Some((collection, pin_of(pin, "collection")));
             }
             if matches!(field(provenance, "repo"), Some(Json::Bool(true))) {
                 // The module tree is not in the finished image, so the file

@@ -17,7 +17,6 @@ source: tests/golden/harness.rs
   "audit": {
     "enforce": false
   },
-  "remotes": [],
   "assets": [],
   "images": [
     {
@@ -40,14 +39,35 @@ source: tests/golden/harness.rs
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
+        "scap_content": "",
         "signed": false,
         "provides": [
           "rechunking"
         ],
         "witnesses": {
-          "rechunking": [
-            "/usr/bin/rechunking",
-            "/usr/sbin/rechunking"
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
           ]
         },
         "requires": [],
@@ -69,10 +89,8 @@ source: tests/golden/harness.rs
           "modules": [
             {
               "path": "hello",
-              "dir": "hello",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "",
               "options": {},
               "provides": [],
@@ -84,8 +102,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "627f98d95f1b742adc445f0a4519570745fe3a9ba4161ab74344338f808efba1",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -93,10 +109,8 @@ source: tests/golden/harness.rs
             },
             {
               "path": "menu",
-              "dir": "menu",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "",
               "options": {},
               "provides": [],
@@ -108,8 +122,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "a44a63e8d3e3d5e2bfb1fa341389fb1957aa112a5f94bcd8a96ba17c5a77e874",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -117,10 +129,8 @@ source: tests/golden/harness.rs
             },
             {
               "path": "apps",
-              "dir": "apps",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "",
               "options": {},
               "provides": [],
@@ -132,8 +142,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "f0c9ce6caf1bf31e3982de3365cb90c3f79ff140a8e42796cb2b711edaf5a06f",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -141,10 +149,8 @@ source: tests/golden/harness.rs
             },
             {
               "path": "apps/editor",
-              "dir": "apps/editor",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "",
               "options": {},
               "provides": [],
@@ -156,8 +162,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "d3b3189e72b2564dd629a1e7262f0ee1e059fab537ce4b4b6e2ec08f9d59130d",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],

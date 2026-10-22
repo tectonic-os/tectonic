@@ -4,13 +4,10 @@ use crate::diag::{Issue, Issues, Source, Span};
 use crate::model::image::{is_name, Base, Decl, Entry, Flavour, Image};
 use crate::model::image::{Layout, List, NO_FLAVOUR};
 use crate::model::module::Refusal;
-use crate::model::remote::REMOTE_DIR;
 use crate::parse::prop;
 use crate::parse::schema::{Arg, Kind, Node, Prop, Say, NEEDS_VALUE};
 use crate::parse::{bool_arg, check_capability, child, flag, kids, options};
 use crate::parse::{string_arg, string_args, text};
-use crate::provenance::evidence::{self, Role, PIN};
-use crate::provenance::Evidence;
 use kdl::{KdlDocument, KdlNode};
 
 /// A list entry, which is the same node ungated and inside a flavour block.
@@ -26,32 +23,16 @@ const ENTRY: Node = Node::new("module", "One module of the image, which the list
     ], Say::new("unknown module property `{}`", "not part of the schema",
         "a list entry accepts `variant`; options are set as child nodes"))
     .children(&[
-        PIN,
         Node::new("",
             "An option that the module declares, which this image sets in a child node named after the option.").example("fonts \"JetBrainsMono\" \"FiraCode\""),
     ], Say::NONE)
-    .lists(&[
-        ("A list entry with a `pin` names a module in another repository:", &[
-            "`tect` fetches the module, verifies it against the hash and unpacks it under \
-             `modules/.remote/`.",
-            "The URL of the pin is `https` or `file`, and it points at a tar archive. It expands \
-             `{version}` and no other placeholder.",
-            "The fetched module ships a `module.kdl` that the same schema holds.",
-            "`tect` fetches nothing that the fetched module requires. If the module needs another \
-             module, then the image lists that module too.",
-        ]),
-    ])
     .notes(&[
-        "A nested name such as `hardening/coredumps` names the directories that the collection \
-         groups its members in. Each part of the name is a name in its own right.",
+        "A nested name such as `hardening/coredumps` names the directories that the module is \
+         grouped in under `modules/`. Each part of the name is a name in its own right.",
+        "An entry names a module under `modules/` only. `tect import module` copies a module \
+         from a library into `modules/` and records where it came from in \
+         `modules/modules.lock.kdl`.",
     ]);
-
-#[rustfmt::skip]
-const SOURCE: Node = Node::new("source", "The modules that the image references from one of the collections in `sources`.").about("Groups the modules that come from one collection in `sources`. Each entry inside names a module by its path within that collection.").example("\"tectonic-os\"")
-    .arg(Arg::Str, Say::new("`source` needs a collection name", "no collection given",
-        "`source \"collection\" { module \"name\" }`"))
-    .children(&[ENTRY], Say::new("`{}` is not allowed inside a source block",
-        "only `module` belongs here", "source blocks do not nest"));
 
 /// The root filesystems the installer formats.
 const FILESYSTEMS: &[&str] = &["xfs", "ext4", "btrfs"];
@@ -114,7 +95,7 @@ pub const IMAGE: Node = Node::new("image",
                  enrollment into the firmware key database"))
             .once(""),
 
-        Node::new("base", "The Linux image that every layer builds on. Its block declares what a build on the base can assume.").about("The base is the upstream bootc image that the custom image starts from. Its block tells `tect` what the base already has, so `tect` checks each module against it and skips a module that the base already covers.").scaffolds(&["family", "provides", "signed"]).example("\"quay.io/fedora/fedora-bootc:44\"")
+        Node::new("base", "The Linux image that every layer builds on. Its block declares what a build on the base can assume.").about("The base is the upstream bootc image that the custom image starts from. Its block tells `tect` what the base already has, so `tect` checks each module against it and skips a module that the base already covers.").scaffolds(&["family", "provides", "signed", "scap-content"]).example("\"quay.io/fedora/fedora-bootc:44\"")
             .arg(Arg::Str, Say::new("`base` needs an image reference", "no image given",
                 "`base \"quay.io/fedora/fedora-bootc:44\"`, emitted verbatim as the generated FROM"))
             .once("an image builds on one base; a second family is a second image")
@@ -158,8 +139,13 @@ pub const IMAGE: Node = Node::new("image",
                         "`signed #false` records that this base publishes no cosign signature; \
                          base-sig-probe.yml keeps it current"))
                     .once(""),
+                Node::new("scap-content", "The SSG datastream file that a scan of an image on this base reads.").about("Names the SCAP content file that measures an image on this base, as a filename in the content directory. Each EL release publishes its own datastream, so the `rhel` family has no default and a scan of a `rhel` image needs this line. `tect create image` copies it from the base file of the library.").example("\"ssg-cs10-ds.xml\"")
+                    .arg(Arg::Str, Say::new("`scap-content` needs a filename", "no file given",
+                        "`scap-content \"ssg-cs10-ds.xml\"`, a datastream in the SSG content directory"))
+                    .once(""),
             ], Say::new("unknown base property `{}`", "not part of the schema",
-                "a base accepts `family`, `provides`, `requires`, `satisfies` and `signed`"))
+                "a base accepts `family`, `provides`, `requires`, `satisfies`, `signed` and \
+                 `scap-content`"))
             .lists(&[
                 ("The reference can carry a digest after its tag:", &[
                     "`tect` strips the digest before it looks up the catalog, so a pinned base is \
@@ -268,23 +254,25 @@ pub const IMAGE: Node = Node::new("image",
                  measures the ungated target only.",
             ]),
 
-        Node::new("modules", "Every module that the image is made of, whether a flavour gates it or not.").about("Lists every module that the image is made of. A module comes from `modules/` in this repository, from a collection in `sources`, or from another repository through a `pin`.")
+        Node::new("modules", "Every module that the image is made of, whether a flavour gates it or not.").about("Lists every module that the image is made of. Each module is a directory under `modules/` in this repository.")
             .once("a second block would split one list in two")
             .missing(Say::new("`image` has no `modules` block", "nothing in it",
                 "an image with no modules is almost certainly a mistake; the block is required \
                  even when empty"))
             .children(&[
                 ENTRY,
-                SOURCE,
                 Node::new("flavour", "The modules one flavour adds, which build only for that flavour.").about("Lists the modules that build only for one flavour. Every module outside a `flavour` block builds for every target.").example("\"dev\"")
                     .arg(Arg::Str, Say::new("`flavour` needs a flavour name", "no name given",
                         "`flavour \"desktop\" { module \"...\" }`"))
-                    .children(&[ENTRY, SOURCE],
+                    .children(&[ENTRY],
                         Say::new("`{}` is not allowed inside a flavour block",
-                            "only `module` and `source` belong here",
-                            "flavour blocks do not nest; a module gated to two flavours is listed under each")),
+                            "only `module` belongs here",
+                            "flavour blocks do not nest; a module gated to two flavours is listed \
+                             under each, and `tect import module` copies a library module into \
+                             `modules/`")),
             ], Say::new("unknown node `{}` in `modules`", "not part of the schema",
-                "`modules` holds `module` entries, `source` blocks and `flavour` blocks")),
+                "`modules` holds `module` entries and `flavour` blocks; `tect import module` \
+                 copies a library module into `modules/`")),
     ], Say::new("unknown image property `{}`", "not part of the schema",
         "an image accepts `id`, `name`, `pretty-name`, `url`, `issues-url`, `description`, \
          `keywords`, `logo-url`, `conforms`, `boot` and `allow-remediation`, and the `base`, \
@@ -448,6 +436,7 @@ impl Image {
                 .map(|block| crate::parse::module::coverages(block, src, issues))
                 .unwrap_or_default(),
             signed: child(node, "signed").and_then(bool_arg).unwrap_or(false),
+            scap_content: text(node, "scap-content"),
             span: node.name().span().into(),
         };
 
@@ -634,11 +623,10 @@ impl Image {
         for node in kids(block) {
             match node.name().value() {
                 "module" => {
-                    if let Some(entry) = self.parse_entry(node, None, None, issues) {
+                    if let Some(entry) = self.parse_entry(node, None, issues) {
                         self.entries.push(entry);
                     }
                 }
-                "source" => self.parse_source(node, None, issues),
                 "flavour" => {
                     let Some(name) = string_arg(node).map(str::to_string) else {
                         continue;
@@ -658,14 +646,9 @@ impl Image {
                         );
                     }
                     for inner in kids(node) {
-                        match inner.name().value() {
-                            "module" => {
-                                let entry =
-                                    self.parse_entry(inner, Some(name.clone()), None, issues);
-                                self.entries.extend(entry);
-                            }
-                            "source" => self.parse_source(inner, Some(name.clone()), issues),
-                            _ => {}
+                        if inner.name().value() == "module" {
+                            let entry = self.parse_entry(inner, Some(name.clone()), issues);
+                            self.entries.extend(entry);
                         }
                     }
                 }
@@ -674,33 +657,14 @@ impl Image {
         }
     }
 
-    fn parse_source(&mut self, node: &KdlNode, flavour: Option<String>, issues: &mut Issues) {
-        let Some(source) = string_arg(node) else {
-            return;
-        };
-        for inner in kids(node) {
-            if inner.name().value() != "module" {
-                continue;
-            }
-            if let Some(entry) = self.parse_entry(inner, flavour.clone(), Some(source), issues) {
-                self.entries.push(entry);
-            }
-        }
-    }
-
     fn parse_entry(
         &self,
         node: &KdlNode,
         flavour: Option<String>,
-        source: Option<&str>,
         issues: &mut Issues,
     ) -> Option<Entry> {
         let src = &self.src;
-        let name = string_arg(node)?;
-        let path = match source {
-            Some(source) => format!("{source}/{name}"),
-            None => name.to_string(),
-        };
+        let path = string_arg(node)?.to_string();
 
         if let Some(dup) = self
             .entries
@@ -717,25 +681,23 @@ impl Image {
         }
 
         let mut options = Vec::new();
-        let mut pin: Option<Evidence> = None;
         for child in kids(node) {
+            // A `pin` would otherwise read as an option the module does not
+            // declare. That message never says how a library module reaches
+            // an image.
             if child.name().value() == "pin" {
-                if source.is_some() {
-                    issues.push(
-                        Issue::new(format!("`{path}` carries its collection's pin"), src)
-                            .at(child.name().span(), "a second pin would disagree")
-                            .help("pin the collection in repo.kdl"),
-                    );
-                    continue;
-                }
-                match pin.as_ref().map(|p| p.span) {
-                    Some(first) => issues.push(
-                        Issue::new(format!("`{path}` is pinned twice"), src)
-                            .at(first, "first here")
-                            .at(child.name().span(), "and again here"),
-                    ),
-                    None => pin = Some(evidence::read(child, Role::Module, src, issues)),
-                }
+                issues.push(
+                    Issue::new(format!("`{path}` carries a `pin`"), src)
+                        .at(
+                            child.name().span(),
+                            "an entry names a module under modules/",
+                        )
+                        .help(
+                            "`tect import module <name>` copies a library module into \
+                             `modules/` and records where it came from in \
+                             `modules/modules.lock.kdl`; the image then lists it by its path",
+                        ),
+                );
                 continue;
             }
             options.push((
@@ -745,21 +707,11 @@ impl Image {
             ));
         }
 
-        if (pin.is_some() || source.is_some()) && !name.split('/').all(is_name) {
-            issues.push(
-                Issue::new(format!("invalid module name `{path}`"), src)
-                    .at(node.name().span(), "every part must be lowercase letters, digits and dashes, starting with a letter")
-                    .help(format!("a referenced module is fetched under modules/{REMOTE_DIR}/, so a name that nests names the directories a collection groups its members in")),
-            );
-        }
-
         Some(Entry {
-            source: source.map(str::to_string),
             path,
             flavour,
             variant: prop(node, "variant").map(str::to_string),
             options,
-            remote: pin,
             span: node.name().span().into(),
             module: None,
         })

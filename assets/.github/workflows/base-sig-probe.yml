@@ -35,7 +35,7 @@ jobs:
       - name: Probe each base and correct the declaration
         id: probe
         # The plan names every capability a probe can decide and the paths that
-        # witness it: the catalog's located rows, what the base claims, and what
+        # witness it: the tool's located rows, what the base claims, and what
         # the image's modules require. A name it cannot witness, such as the
         # abstract `rechunking`, is left as it was.
         #
@@ -44,7 +44,6 @@ jobs:
         # silent.
         run: |
           set -euo pipefail
-          ./scripts/tect.sh fetch modules
 
           # To a file, and before the loop, because `plan --json` writes nothing
           # at all when any module is refused: read through a process

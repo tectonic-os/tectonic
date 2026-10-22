@@ -17,7 +17,6 @@ source: tests/golden/harness.rs
   "audit": {
     "enforce": false
   },
-  "remotes": [],
   "assets": [],
   "images": [
     {
@@ -37,19 +36,36 @@ source: tests/golden/harness.rs
       "base": {
         "image": "ghcr.io/ublue-os/bazzite:stable",
         "family": "fedora",
+        "scap_content": "",
         "signed": false,
         "provides": [
           "rechunking",
           "flatpak"
         ],
         "witnesses": {
-          "flatpak": [
-            "/usr/bin/flatpak",
-            "/usr/sbin/flatpak"
+          "bootc": [
+            "/usr/bin/bootc"
           ],
-          "rechunking": [
-            "/usr/bin/rechunking",
-            "/usr/sbin/rechunking"
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
           ]
         },
         "requires": [],
@@ -79,10 +95,8 @@ source: tests/golden/harness.rs
           "modules": [
             {
               "path": "apps/browser",
-              "dir": "apps/browser",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "A flatpak application, which the base satisfies the runtime for",
               "options": {},
               "provides": [],
@@ -96,8 +110,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "f72b344604d4c3e827cd9666ae09ab2bd78434a3fe956d80bfdc67866bfcbdb6",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -107,10 +119,8 @@ source: tests/golden/harness.rs
           "suppressed": [
             {
               "path": "apps/flatpak",
-              "dir": "apps/flatpak",
               "flavour": null,
               "variant": "beta",
-              "remote": null,
               "description": "Installs flatpak and enables the remotes an image asks for",
               "options": {
                 "OPT_REMOTES": "flathub flathub-beta",
@@ -135,8 +145,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "d40c2891d1aac415c97068412a248e05aaea222ab467ca113436d3954d4d6467",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [
@@ -151,7 +159,9 @@ source: tests/golden/harness.rs
             }
           ],
           "secrets": [],
-          "contract_files": [],
+          "contract_files": [
+            "/usr/bin/flatpak"
+          ],
           "verify_exceptions": [],
           "assets": [],
           "overlay_files": {},

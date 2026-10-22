@@ -10,8 +10,9 @@ Tectonic v{version}
    · ────┬───
    ·     ╰── unsatisfied
    ╰────
-  help: upstream/flatpak would satisfy it; `tect import module upstream/
-        flatpak` brings it in and lists it
+  help: no module in the repository declares `provides "flatpak"`, and neither
+        does the `base` node in ./example.image.kdl. `tect import module`
+        lists what the declared libraries provide
 
 tect: 1 problem in ./modules/browser/module.kdl; none in ./example.image.kdl, ./repo.kdl
 ==== exit 2

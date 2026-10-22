@@ -26,7 +26,7 @@ usage: scripts/vm.sh <command> <qcow2|raw|iso> [options]
   --target <image/flavour>
                       what a rebuild builds and what an iso installs
                       (default: the plan's ungated target)
-  --rebuild           fetch modules, generate, then build the container image
+  --rebuild           generate, then build the container image
                       first. The one form of this that changes the repository.
   --ram <size>        memory for the virtual machine (default: 8G)
   --installer <which> what converts the image into a disk: `bib` for
@@ -484,11 +484,8 @@ run_qemu() {
 
 if [ "$command" = build ] || [ "$rebuild" = 1 ] || [ ! -f "$image_file" ]; then
     if [ "$rebuild" = 1 ]; then
-        # The whole chain, in the only order it works in: `fetch modules` brings
-        # the pinned trees down, `generate` writes the committed files off what
-        # they hold, and `build` proves those files. This is the one path that
-        # changes the repository.
-        ./scripts/tect.sh fetch modules
+        # `generate` writes the committed files. `build` proves them.
+        # This is the one path that changes the repository.
         ./scripts/tect.sh generate
         args=(--tag "$ref")
         [ -z "$target" ] || args+=(--target "$target")

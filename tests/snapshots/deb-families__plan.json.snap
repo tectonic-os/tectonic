@@ -17,7 +17,6 @@ source: tests/golden/harness.rs
   "audit": {
     "enforce": false
   },
-  "remotes": [],
   "assets": [],
   "images": [
     {
@@ -40,9 +39,35 @@ source: tests/golden/harness.rs
       "base": {
         "image": "docker.io/library/debian:forky",
         "family": "debian",
+        "scap_content": "",
         "signed": false,
         "provides": [],
-        "witnesses": {},
+        "witnesses": {
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
+          ]
+        },
         "requires": [],
         "satisfies": []
       },
@@ -62,10 +87,8 @@ source: tests/golden/harness.rs
           "modules": [
             {
               "path": "debian-family",
-              "dir": "debian-family",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "apt, which every Debian-family build layer reaches for",
               "options": {},
               "provides": [
@@ -79,8 +102,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "90ee445922e5e06434547f59bd3c77a3adea4c268fd2fa6794ca789670b8c575",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -88,10 +109,8 @@ source: tests/golden/harness.rs
             },
             {
               "path": "core/menu",
-              "dir": "core/menu",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "Collects the justfile fragments the rest of the image contributes",
               "options": {},
               "provides": [],
@@ -103,8 +122,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "c9a5ae0790070fbfbb7b042d5a68ef2e93368eb5acc0e3a5753a6b7d8e70bcbd",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -112,10 +129,8 @@ source: tests/golden/harness.rs
             },
             {
               "path": "core/shared",
-              "dir": "core/shared",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "A module both the Debian and Ubuntu images enable",
               "options": {},
               "provides": [],
@@ -142,8 +157,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "50d842066176973a833abf03f9e65e94dc5432636d45c7e97b0610a26e96f58c",
                 "repo": true,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -194,9 +207,35 @@ source: tests/golden/harness.rs
       "base": {
         "image": "docker.io/library/debian:forky",
         "family": "debian",
+        "scap_content": "",
         "signed": false,
         "provides": [],
-        "witnesses": {},
+        "witnesses": {
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
+          ]
+        },
         "requires": [
           "bootc-base"
         ],
@@ -218,10 +257,8 @@ source: tests/golden/harness.rs
           "modules": [
             {
               "path": "debian-family",
-              "dir": "debian-family",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "apt, which every Debian-family build layer reaches for",
               "options": {},
               "provides": [
@@ -235,8 +272,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "90ee445922e5e06434547f59bd3c77a3adea4c268fd2fa6794ca789670b8c575",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -244,10 +279,8 @@ source: tests/golden/harness.rs
             },
             {
               "path": "core/bootc-base",
-              "dir": "core/bootc-base",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "What a container base needs before it is a bootc image at all",
               "options": {},
               "provides": [
@@ -262,8 +295,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "e9e1a74be2ca49e0741bdd0beca3d3d09c8bd458ae1968342a679325b26f4275",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -271,10 +302,8 @@ source: tests/golden/harness.rs
             },
             {
               "path": "core/confined",
-              "dir": "core/confined",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "Ships one AppArmor profile, which the parser has to accept",
               "options": {},
               "provides": [],
@@ -286,8 +315,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "0f6b3af8d230922486a1fe6005bd60dee659fcedd53fcdce457df965a6c0d8f4",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -295,10 +322,8 @@ source: tests/golden/harness.rs
             },
             {
               "path": "core/menu",
-              "dir": "core/menu",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "Collects the justfile fragments the rest of the image contributes",
               "options": {},
               "provides": [],
@@ -310,8 +335,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "c9a5ae0790070fbfbb7b042d5a68ef2e93368eb5acc0e3a5753a6b7d8e70bcbd",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -319,10 +342,8 @@ source: tests/golden/harness.rs
             },
             {
               "path": "core/shared",
-              "dir": "core/shared",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "A module both the Debian and Ubuntu images enable",
               "options": {},
               "provides": [],
@@ -349,8 +370,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "50d842066176973a833abf03f9e65e94dc5432636d45c7e97b0610a26e96f58c",
                 "repo": true,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -401,9 +420,35 @@ source: tests/golden/harness.rs
       "base": {
         "image": "docker.io/library/ubuntu:26.04",
         "family": "ubuntu",
+        "scap_content": "",
         "signed": false,
         "provides": [],
-        "witnesses": {},
+        "witnesses": {
+          "bootc": [
+            "/usr/bin/bootc"
+          ],
+          "bootupctl": [
+            "/usr/bin/bootupctl"
+          ],
+          "crun": [
+            "/usr/bin/crun"
+          ],
+          "flatpak": [
+            "/usr/bin/flatpak"
+          ],
+          "initramfs-generation": [
+            "/usr/bin/dracut"
+          ],
+          "podman": [
+            "/usr/bin/podman"
+          ],
+          "selinux-policy": [
+            "/usr/sbin/semodule"
+          ],
+          "ssh": [
+            "/usr/sbin/sshd"
+          ]
+        },
         "requires": [],
         "satisfies": []
       },
@@ -423,10 +468,8 @@ source: tests/golden/harness.rs
           "modules": [
             {
               "path": "debian-family",
-              "dir": "debian-family",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "apt, which every Debian-family build layer reaches for",
               "options": {},
               "provides": [
@@ -440,8 +483,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "90ee445922e5e06434547f59bd3c77a3adea4c268fd2fa6794ca789670b8c575",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -449,10 +490,8 @@ source: tests/golden/harness.rs
             },
             {
               "path": "core/menu",
-              "dir": "core/menu",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "Collects the justfile fragments the rest of the image contributes",
               "options": {},
               "provides": [],
@@ -464,8 +503,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "c9a5ae0790070fbfbb7b042d5a68ef2e93368eb5acc0e3a5753a6b7d8e70bcbd",
                 "repo": false,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],
@@ -473,10 +510,8 @@ source: tests/golden/harness.rs
             },
             {
               "path": "core/shared",
-              "dir": "core/shared",
               "flavour": null,
               "variant": null,
-              "remote": null,
               "description": "A module both the Debian and Ubuntu images enable",
               "options": {},
               "provides": [],
@@ -503,8 +538,6 @@ source: tests/golden/harness.rs
               "provenance": {
                 "content": "50d842066176973a833abf03f9e65e94dc5432636d45c7e97b0610a26e96f58c",
                 "repo": true,
-                "source": null,
-                "pin": null,
                 "imported": null
               },
               "satisfies": [],

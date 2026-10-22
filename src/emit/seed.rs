@@ -17,7 +17,7 @@ pub fn file(list: &List) -> Option<(PathBuf, String)> {
     let modules: Vec<(String, &Entry)> = image
         .entries
         .iter()
-        .filter_map(|entry| Some((entry.qualified(&seed.collection)?, entry)))
+        .map(|entry| (entry.qualified(&seed.collection), entry))
         .collect();
 
     let mut out = format!(

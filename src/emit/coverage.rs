@@ -4,7 +4,7 @@
 //! through `Content::numbering`, and the two are not interchangeable.
 
 use crate::emit::{Part, Table};
-use crate::model::image::{Entry, Image};
+use crate::model::image::Image;
 use crate::provider::Index;
 use crate::scap::{ordinal, reached, Content, Profile};
 use common::json::Json;
@@ -72,11 +72,11 @@ pub fn of<'a>(image: &'a Image, content: &'a Content, index: &Index) -> Option<C
         .entries
         .iter()
         .chain(&image.suppressed)
-        .map(Entry::dir)
+        .map(|entry| entry.path.clone())
         .collect();
     let mut would: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for provider in index.claiming(&content.numbering(&open)) {
-        if listed.contains(&provider.dir()) {
+        if listed.contains(&provider.name) {
             continue;
         }
         for rule in reached(content, provider.declares.satisfies.iter()) {

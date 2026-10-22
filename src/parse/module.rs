@@ -7,7 +7,6 @@ use crate::model::module::{
     Access, Collect, Contribution, Copr, Coverage, Decl, FileMode, Key, Located, Module,
     PackageGroup, Position, VerifyException,
 };
-use crate::model::remote::REMOTE_DIR;
 use crate::parse::disk::Disk;
 use crate::parse::prop_span;
 use crate::parse::schema::{check_doc, Arg, Kind, Node, Prop, Say, FILE_SCHEMA_VERSION};
@@ -254,8 +253,8 @@ pub const MODULE: Node = Node::new("module",
             .props(&[
                 Prop { name: "file", kind: Kind::Str,
                     desc: "The absolute path that witnesses the one capability that the node names. \
-                        It is needed only if the witness is neither `/usr/bin/<name>` nor \
-                        `/usr/sbin/<name>`.",
+                        Without it, the build reads the path that `tect` holds for the name. If \
+                        `tect` holds no path for the name, then nothing witnesses it.",
                     say: Say::new("`file` must be a string", "not a path", ""),
                     missing: Say::NONE },
                 Prop { name: "build-only", kind: Kind::Bool,
@@ -271,6 +270,21 @@ pub const MODULE: Node = Node::new("module",
                 "`provides` accepts `file`, `build-only` and `exclusive`"))
             .notes(&[
                 "The build checks the finished image for the witness file.",
+                "`tect` holds a witness path for each capability that a base can ship, such as \
+                 `/usr/sbin/sshd` for `ssh`. A name that `tect` holds with no path, such as \
+                 `rechunking`, is abstract, and nothing witnesses it.",
+                "The base probe reads the path that `tect` holds for a name. If `tect` does not \
+                 hold the name, then the probe reads `/usr/bin/<name>` and then \
+                 `/usr/sbin/<name>`.",
+                "`tect validate-image` checks the finished image for the witness of each name \
+                 that the base or a module provides. `base-sig-probe` reads the same witnesses \
+                 when it measures a base.",
+                "The witness of `luks-initramfs` is inside an archive. If a target declares it, \
+                 then the build validates the initramfs with `lsinitrd`. If no target declares \
+                 it, then the installer does not offer root encryption.",
+                "Declare `luks-initramfs` in a custom base or module only if its initramfs \
+                 unlocks LUKS. `tect build` then proves that the binary is present before the \
+                 installer offers it.",
                 "Many enabled modules may provide one capability. If one of them declares it \
                  `exclusive=#true`, then `tect check` refuses a second provider, and `tect \
                  import module` asks whether to replace the first.",
@@ -647,35 +661,18 @@ impl Module {
         repo_src: &Source,
         issues: &mut Issues,
     ) -> Option<Self> {
-        if (entry.remote.is_some() || entry.source.is_some())
-            && layout::module(root, &entry.path).is_dir()
-        {
-            issues.push(
-                Issue::new(
-                    format!("`{}` is referenced but also exists in tree", entry.path),
-                    &image.src,
-                )
-                .at(entry.span, "two modules would answer to this name")
-                .help(format!(
-                    "rename the referenced one, or drop modules/{}",
-                    entry.path
-                )),
-            );
-        }
-
-        let dir_rel = entry.dir();
+        let dir_rel = &entry.path;
         let file = root
             .join(layout::MODULES)
-            .join(&dir_rel)
+            .join(dir_rel)
             .join(layout::MODULE_FILE)
             .display()
             .to_string();
 
-        let local = entry.source.is_none() && entry.remote.is_none();
         let mut module = match std::fs::read_to_string(&file) {
             Ok(text) => Self::parse_against(
                 &entry.path,
-                &dir_rel,
+                dir_rel,
                 root,
                 text,
                 image.base.as_ref().map(|base| base.family.as_str()),
@@ -692,10 +689,8 @@ impl Module {
                 );
                 return None;
             }
-            Err(_) if local && disk.is_module(&dir_rel) => {
-                Self::bare(&entry.path, &dir_rel, root, issues)
-            }
-            Err(_) if local => {
+            Err(_) if disk.is_module(dir_rel) => Self::bare(&entry.path, dir_rel, root, issues),
+            Err(_) => {
                 issues.push(
                     Issue::new(format!("`{}` is not a module", entry.path), &image.src)
                         .at(entry.span, "nothing to build")
@@ -703,17 +698,6 @@ impl Module {
                             "give modules/{dir_rel} a module.kdl, a module.sh, a files/ \
                              directory, a Containerfile.inc or a file that another module \
                              collects"
-                        )),
-                );
-                return None;
-            }
-            Err(_) => {
-                issues.push(
-                    Issue::new(format!("`{}` is not fetched", entry.path), &image.src)
-                        .at(entry.span, "no module.kdl here yet")
-                        .help(format!(
-                            "run ./{} fetch modules to fetch what the image references",
-                            layout::script(root, "tect.sh")
                         )),
                 );
                 return None;
@@ -1919,11 +1903,11 @@ pub fn check_unlisted(list: &List, root: &Path, disk: &Disk, issues: &mut Issues
         .images
         .iter()
         .flat_map(|image| image.entries.iter())
-        .map(Entry::dir)
+        .map(|entry| entry.path.clone())
         .collect();
 
     for dir in disk.modules() {
-        if listed.contains(dir) || dir.starts_with(REMOTE_DIR) {
+        if listed.contains(dir) {
             continue;
         }
         let file = layout::manifest(root, dir);

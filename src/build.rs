@@ -59,9 +59,9 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
     let target = target(&list, opts.target.as_deref())?;
 
     // Nothing is fetched or regenerated here: a build proves the committed
-    // files are current. `tect fetch modules` and `tect generate` are what
-    // change the repository, and `vm.sh --rebuild` runs both before this. The
-    // rest of the build works off what this read, never a second reading.
+    // files are current. `tect generate` is what changes them, and `vm.sh
+    // --rebuild` runs it before this. The rest of the build works off what
+    // this read, never a second reading.
     let gate = crate::run(crate::Command::Verify, None, root);
     if gate.issues.report(&gate.context) {
         return Ok(Stopped::Repository);
@@ -158,7 +158,7 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
     // returns numbers, and the image is remediated to a profile nobody chose.
     let scap_content = match conforms.is_empty() {
         true => String::new(),
-        false => crate::scap::content_for(root, &list, Some(&target))?,
+        false => crate::scap::datastream(&list, Some(&target))?,
     };
     // Both lists include the base, which claims the way a module does.
     let (scap_claimed, scap_refused) = crate::scap::exclusions(image);
@@ -168,7 +168,7 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
         format!("IMAGE_REGISTRY={}", namespace.clone().unwrap_or_default()),
         format!(
             "CONTRACT_FILES={}",
-            contract_files(image, &modules, &list.capabilities).join(" ")
+            contract_files(image, &modules).join(" ")
         ),
         format!(
             "VERIFY_EXCEPTIONS={}",

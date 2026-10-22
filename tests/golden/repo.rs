@@ -1,6 +1,6 @@
 //! The repository fixtures: what each one renders and what it refuses.
 
-use crate::harness::{assert_golden, copy, crate_dir, given, seed_bases, walk};
+use crate::harness::{assert_golden, copy, crate_dir, given, seed_bases, seed_library, walk};
 
 use std::path::{Path, PathBuf};
 
@@ -552,7 +552,7 @@ fn repo_case(name: &str) {
     let root = dir.join(name);
     capture(name, &root);
     match name {
-        "collecting" | "multi-image" | "pinned" => summary_on_host(&root),
+        "collecting" | "multi-image" => summary_on_host(&root),
         "enforced" => {
             unenforced(&root);
             why(name, &root, "one/hello");
@@ -561,9 +561,19 @@ fn repo_case(name: &str) {
             why(name, &root, "core/hello");
             summary_on_host(&root);
         }
+        // `check` reads no library, so a base file's defects show where
+        // `create image` reads the catalog.
+        "broken-bases" => {
+            let here = given(&root);
+            let (list, _, _) = tect::declarations(&here);
+            let mut issues = tect::diag::Issues::default();
+            tect::base::catalog(&here, &list.sources, &mut issues);
+            assert_golden(name, "catalog.txt", &issues.plain());
+        }
         "no-default" => assert_no_default(&root),
-        // The repository owns a referenced module's pin, so no provenance record sits beside it.
-        "seeding" => why(name, &root, "tectonic-os/flatpak"),
+        // The module came from the collection the seed publishes, so its lock
+        // entry names that library.
+        "seeding" => why(name, &root, "flatpak"),
         "suppressed" => {
             why_unbuilt(&root);
             summary_on_host(&root);
@@ -608,7 +618,6 @@ repo_cases! {
     broken_seed => "broken-seed",
     broken_sources => "broken-sources",
     broken_syntax => "broken-syntax",
-    broken_unpinned => "broken-unpinned",
     collecting => "collecting",
     deb_families => "deb-families",
     enforced => "enforced",
@@ -622,7 +631,6 @@ repo_cases! {
     one_file => "one-file",
     optional_metadata => "optional-metadata",
     past_schema => "past-schema",
-    pinned => "pinned",
     refused => "refused",
     seeding => "seeding",
     signing => "signing",
@@ -648,6 +656,25 @@ fn every_repo_fixture_has_a_case() {
         found, expected,
         "each repository fixture needs a named test"
     );
+}
+
+/// CI holds no library cache, so a cache on this machine must change nothing
+/// that `check` says or `generate` writes. The scaffolded repository reads the
+/// default library, which the cache below holds whole.
+#[test]
+fn the_library_cache_changes_no_output() {
+    let root = init_repo("cache-blind");
+    seed_library(&root);
+    let run = || {
+        (
+            tect::run(Command::Check, None, &root).issues.plain(),
+            tect::run(Command::Generate, None, &root).files,
+        )
+    };
+    let cached = run();
+    std::fs::remove_dir_all(root.join(tect::layout::SOURCES_CACHE)).unwrap();
+    assert_eq!(run(), cached);
+    std::fs::remove_dir_all(&root).unwrap();
 }
 
 #[test]

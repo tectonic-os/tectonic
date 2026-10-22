@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 ### Base Image
 FROM ${BASE} AS rootfs
@@ -18,16 +18,6 @@ RUN if [ -L /usr/local ]; then mv /usr/local /usr/local.bak && \
 RUN --mount=type=bind,from=ctx,source=/modules/core/hello,target=/ctx/modules/core/hello \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
     --mount=type=bind,from=ctx,source=/generated/example/modules/core/hello.sh,target=/ctx/module.sh \
-    --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
-    --mount=type=cache,target=/var/cache \
-    --mount=type=cache,target=/var/log \
-    --mount=type=tmpfs,target=/tmp \
-    bash /ctx/module.sh
-
-# ---- steam-tweaks ----
-RUN --mount=type=bind,from=ctx,source=/modules/.remote/steam-tweaks,target=/ctx/modules/.remote/steam-tweaks \
-    --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
-    --mount=type=bind,from=ctx,source=/generated/example/modules/steam-tweaks.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \

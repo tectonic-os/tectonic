@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 {
   "schema_version": 1,
@@ -38,7 +38,6 @@ source: tests/golden.rs
   "audit": {
     "enforce": false
   },
-  "remotes": [],
   "assets": [],
   "images": [
     {
@@ -61,6 +60,7 @@ source: tests/golden.rs
       "base": {
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
+        "scap_content": "ssg-fedora-ds.xml",
         "signed": false,
         "provides": [
           "rechunking",

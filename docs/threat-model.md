@@ -12,7 +12,9 @@ Report a vulnerability as the [security policy](https://github.com/tectonic-os/t
 ## What an adopter trusts
 
 The image repository is trusted. Its modules run as root inside the build
-containers, and so does every module that a fetched collection supplies.
+containers, and so does every module that `tect import module`, `tect create
+repo`, `tect create image` or `tect set conforms` copied into it from a
+collection.
 `tect` controls where a module comes from and records what it was. `tect` does
 not sandbox what a module does. The review of the repository and its pins is
 the control for that code.
@@ -44,8 +46,8 @@ the control for that code.
 
 ### Fetched collections
 
-A collection is a Git repository of modules, base-image catalogs or
-capabilities that `repo.kdl` names under `sources`.
+A collection is a Git repository of modules or base-image catalogs that
+`repo.kdl` names under `sources`.
 
 - `src/parse/remote.rs` refuses a source URL that is not `https://`, and a
   `sha256` with no `version`. A `dir` source names a local directory and is
@@ -55,10 +57,14 @@ capabilities that `repo.kdl` names under `sources`.
 - Pinning is optional. A source with no `sha256` is unpinned, and every fetch
   of it takes whatever its ref holds at that time. `tect check` warns about
   each unpinned source (`src/dispatch.rs`).
-- Under enforcement, `tect` refuses an image that references an unpinned
-  module collection (`src/parse/repo.rs`), and refuses an import from one
-  (`src/import.rs` `find`). An unpinned base-image or capability library is
-  still fetched (`src/base.rs` `fetch`). See *Known gaps*.
+- An image lists only the modules under `modules/`, and `check`, `generate`
+  and `build` read no collection. The image grammar in `src/parse/image.rs`
+  refuses a `source` block, and `parse_entry` refuses a `pin`. A collection
+  reaches the image only through a copy into `modules/`.
+- Under enforcement, `tect` refuses a copy from an unpinned module collection
+  (`src/import.rs` `verified`), whichever command makes it. An unpinned
+  base-image library is still fetched (`src/base.rs` `fetch`). See *Known
+  gaps*.
 - A collection is never signature-verified. The hash pin and the review of
   `repo.kdl` are the controls. See *Accepted risks*.
 
@@ -199,7 +205,7 @@ Each gap is current behaviour that a control does not yet cover.
 - `audit { enforce #true }` refuses a copied module edited since its copy only
   in `tect check`. `tect build`, and so the generated workflow, does not run
   that check.
-- Enforcement does not refuse an unpinned base-image or capability library.
+- Enforcement does not refuse an unpinned base-image library.
 - A repository with no `tect-version` takes each new `tect` release on its
   next build, with no warning from `tect check`.
 - A `Containerfile.inc` fragment's `RUN` lines run outside the network rule.
@@ -214,11 +220,13 @@ These parts work with no network:
 
 - a `dir` source, which reads a local collection;
 - the sources cache, which holds each pinned collection by its pin;
+- `tect check` and `tect generate`, which read the repository's own modules;
 - installer media that carries the image in its own storage.
 
 These parts need the network:
 
-- `tect fetch` of a Git source, and each new fetch of an unpinned one;
+- `tect import module` from a Git source, and each new fetch of an unpinned
+  one;
 - a run of `tect.sh` in a repository with no `tect-version`;
 - a registry pull of the base image, and the digest lookup of a base named by
   tag (`src/provenance/build.rs` `base`);

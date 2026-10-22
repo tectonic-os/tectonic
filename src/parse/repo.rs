@@ -202,13 +202,13 @@ pub const REPO: Node = Node::new("repo",
                 "The `conforms` of each image decides whether SCAP content exists to scan.",
             ]),
         Node::new("sources",
-            "The module, base-image and capability libraries this repository reads.").about("Lists typed libraries that this repository reads from a local directory or fetches from an HTTPS Git repository. A `modules` source feeds imports. A `base-images` source is the base catalog. A `capabilities` source locates the paths that witness a capability. Every source declares exactly one of `dir` and `url`: `dir` names a directory on this machine, and `url` names an HTTPS Git repository.").scaffolds(&["modules", "base-images", "capabilities"])
+            "The module and base-image libraries this repository reads.").about("Lists typed libraries that this repository reads from a local directory or fetches from an HTTPS Git repository. A `modules` source feeds imports. A `base-images` source is the base catalog. Every source declares exactly one of `dir` and `url`: `dir` names a directory on this machine, and `url` names an HTTPS Git repository.").scaffolds(&["modules", "base-images"])
             .once("a second block would split one registry in two")
             .empty(Say::new("`sources` has no sources in it", "empty block",
                 "omit the block entirely; a repository that reads no library declares nothing here"))
             .children(&SOURCES, Say::new("unknown node `{}` in `sources`", "not part of the schema",
-                "a source is `modules`, `base-images` or `capabilities`, each named by the alias \
-                 its content uses"))
+                "a source is `modules` or `base-images`, each named by the alias its content \
+                 uses"))
             .notes(&[
                 "`tect import module` copies a module from a `modules` source to \
                  `modules/<name>`, and `modules/modules.lock.kdl` records the source.",
@@ -247,8 +247,9 @@ pub const REPO: Node = Node::new("repo",
                     ])
                     .lists(&[
                         ("Each check runs in the command named before it:", &[
-                            "`tect import module`: the library is pinned to a tag and its \
-                             hash.",
+                            "`tect import module`, `tect create image` and `tect set \
+                             conforms`: the library a module is copied from is pinned to a \
+                             tag and its hash.",
                             "`tect check`: each imported module still matches its entry in the \
                              module lock.",
                             "`tect build`: the base tag resolves to a manifest digest.",
@@ -464,7 +465,6 @@ impl List {
             schema_version: None,
             repo_src: Source::new(root.join(layout::REPO_FILE).display().to_string(), ""),
             files: Vec::new(),
-            capabilities: Vec::new(),
         }
     }
 
@@ -547,8 +547,6 @@ impl List {
         }
 
         list.check_images(&mut issues);
-        // `check` reports what is wrong with the catalog; this only reads it.
-        list.capabilities = crate::base::capabilities(root, &list.sources, &mut Issues::default());
         (list, issues)
     }
 
@@ -634,27 +632,6 @@ impl List {
 
     fn check_images(&self, issues: &mut Issues) {
         for (index, image) in self.images.iter().enumerate() {
-            for entry in &image.entries {
-                let Some(source) = &entry.source else {
-                    continue;
-                };
-                let declared = self.sources.iter().find(|declared| {
-                    declared.kind == SourceKind::Modules && &declared.name == source
-                });
-                if declared.is_none() {
-                    issues.push(
-                        Issue::new(format!("`{source}` is not declared in `sources`"), &image.src)
-                            .at(entry.span, "this module has nowhere to come from")
-                            .help("declare the collection in repo.kdl, or list a local module outside a source block"),
-                    );
-                } else if self.audit_enforce && declared.is_some_and(|source| source.unpinned()) {
-                    issues.push(
-                        Issue::new(format!("`{source}` follows an unverified ref"), &image.src)
-                            .at(entry.span, "this reference cannot be verified")
-                            .help("pin the collection to a version and sha256, or drop audit enforcement"),
-                    );
-                }
-            }
             if image.id.is_empty() {
                 continue; // already reported as underivable
             }
@@ -784,12 +761,10 @@ impl List {
         }
 
         for entry in &image.entries {
-            let owner = entry
-                .qualified(&seed.collection)
-                .and_then(|name| name.split('/').next().map(str::to_string));
-            match &owner {
-                Some(owner) if declared(owner) => continue,
-                _ => {}
+            let qualified = entry.qualified(&seed.collection);
+            let owner = qualified.split('/').next().unwrap_or_default();
+            if declared(owner) {
+                continue;
             }
             issues.push(
                 Issue::new(
@@ -798,10 +773,7 @@ impl List {
                 )
                 .at(
                     entry.span,
-                    match owner {
-                        Some(owner) => format!("`{owner}` is not declared in `sources`"),
-                        None => "pinned to a source of its own".to_string(),
-                    },
+                    format!("`{owner}` is not declared in `sources`"),
                 )
                 .help(
                     "a seed lists a module by name and nothing else, so one nothing can import \

@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 3 modules, the ungated set.
 
@@ -7,4 +7,4 @@ source: tests/golden.rs
 | --- | --- | --- | --- | --- |
 | `fedora-family` | dnf5 and its plugins, which every fedora build layer reaches for |  |  |  |
 | `hello` | A module this repository writes and publishes |  |  |  |
-| `tectonic-os/flatpak` `variant=beta` `remote=v1.0.0` | A module imported from the collection this repository publishes | `OPT_REMOTES="flathub flathub-beta"` `OPT_SYSTEM_WIDE="0"` |  |  |
+| `flatpak` `variant=beta` | A module imported from the collection this repository publishes | `OPT_REMOTES="flathub flathub-beta"` `OPT_SYSTEM_WIDE="0"` |  |  |

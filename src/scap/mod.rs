@@ -44,29 +44,36 @@ pub fn content(root: &Path, named: Option<&str>) -> Result<Verdict, String> {
     let Some((list, _)) = open(root, named) else {
         return Ok(Verdict::Wrong);
     };
-    println!("{}", datastream(root, &list, named)?);
+    println!("{}", datastream(&list, named)?);
     Ok(Verdict::Clean)
 }
 
 /// Host lookup derives conformance and base family from the baked target
 /// because no repository is available.
 pub fn content_on_host(image: &Json, target: &Json) -> Result<Verdict, String> {
-    let path = match json::text(target, "conforms")
+    println!("{}", baked_content(image, target)?);
+    Ok(Verdict::Clean)
+}
+
+/// Resolves the datastream from the baked plan as `datastream` resolves it
+/// from the repository, so the booted system reads the file the build read.
+fn baked_content(image: &Json, target: &Json) -> Result<String, String> {
+    if json::text(target, "conforms")
         .unwrap_or_default()
         .is_empty()
     {
-        true => String::new(),
-        false => installed(
-            CONTENT,
-            &json::field(image, "base")
-                .and_then(|base| json::text(base, "family"))
-                .unwrap_or_default(),
-        )?
-        .display()
-        .to_string(),
+        return Ok(String::new());
+    }
+    let base = json::field(image, "base");
+    let read = |key| {
+        base.and_then(|base| json::text(base, key))
+            .unwrap_or_default()
     };
-    println!("{path}");
-    Ok(Verdict::Clean)
+    Ok(
+        measured_by(CONTENT, &read("scap_content"), &read("family"))?
+            .display()
+            .to_string(),
+    )
 }
 
 /// A conformance gap is a notice because users can declare a profile before
@@ -289,14 +296,14 @@ pub fn owed<'a>(image: &Image, content: &Content, profile: &Profile, index: &'a 
         .entries
         .iter()
         .chain(&image.suppressed)
-        .map(Entry::dir)
+        .map(|entry| entry.path.clone())
         .collect();
     let helping: Vec<&crate::provider::Provider> = match open.is_empty() {
         true => Vec::new(),
         false => index
             .claiming(&content.numbering(&open))
             .into_iter()
-            .filter(|provider| !listed.contains(&provider.dir()))
+            .filter(|provider| !listed.contains(&provider.name))
             .collect(),
     };
     let covered: BTreeSet<String> = helping
@@ -353,25 +360,17 @@ fn unclaimed(image: &Image, content: &Content, index: &Index) -> Option<String> 
         .map(|provider| format!("`{}`", provider.qualified()))
         .collect();
 
-    let searched = match index.unread().is_empty() && index.sourced() {
-        true => "the repository or its collections",
-        false => "the repository",
-    };
     let found = match named.is_empty() {
-        true => format!("nothing else in {searched} claims them"),
+        true => "nothing else in the repository claims them".to_string(),
         false => format!(
             "{} would claim {} of them",
             named.join(", "),
             owed.covered.len()
         ),
     };
-    let unsearched = match index.unsearched() {
-        clause if clause.is_empty() => String::new(),
-        clause => format!(". {clause}"),
-    };
     Some(format!(
         "`{}` conforms to `{}`, and nothing it installs or builds on claims {} of the {} rules it \
-         selects; {found}{unsearched}",
+         selects; {found}",
         image.id,
         image.conforms,
         owed.open.len(),
@@ -422,12 +421,6 @@ fn open(root: &Path, named: Option<&str>) -> Option<(List, Vec<crate::resolve::R
     }
 }
 
-/// The finalize layer must receive the same datastream selected by target
-/// conformance.
-pub fn content_for(root: &Path, list: &List, named: Option<&str>) -> Result<String, String> {
-    datastream(root, list, named)
-}
-
 /// A fixed profile name keeps the generated tailoring and scan command aligned.
 const MEASURED: &str = "xccdf_tect_profile_measured";
 
@@ -450,7 +443,7 @@ pub fn tailoring_for(
     }
     let path = match given {
         Some(path) => path.to_path_buf(),
-        None => PathBuf::from(datastream(root, &list, Some(&name))?),
+        None => PathBuf::from(datastream(&list, Some(&name))?),
     };
     let content = content_of(&path)?;
     let profile = content
@@ -493,7 +486,9 @@ fn tailoring(content: &Content, profile: &Profile) -> String {
     out
 }
 
-fn datastream(root: &Path, list: &List, named: Option<&str>) -> Result<String, String> {
+/// The build's finalize layer and the scan both read this path, so the image
+/// is remediated and measured against one datastream.
+pub fn datastream(list: &List, named: Option<&str>) -> Result<String, String> {
     let name = target(list, named)?;
     let (image, flavour, _) = of_target(list, &name).ok_or_else(|| unknown(&name))?;
     if image
@@ -502,43 +497,70 @@ fn datastream(root: &Path, list: &List, named: Option<&str>) -> Result<String, S
     {
         return Ok(String::new());
     }
-    let base = image.base.as_ref();
-    let mut issues = crate::diag::Issues::default();
-    let bases = crate::base::catalog(root, &list.sources, &mut issues);
-    Ok(measured_by(
-        CONTENT,
-        &bases,
-        base.map_or("", |base| base.image.as_str()),
-        base.map_or("", |base| base.family.as_str()),
-    )?
-    .display()
-    .to_string())
+    let (content, family) = named_by(image.base.as_ref());
+    Ok(measured_by(CONTENT, content, family)?.display().to_string())
 }
 
-/// A catalogued base uses its named content, while an uncatalogued base uses
-/// the family default. An empty catalog field falls through so the family can
-/// provide its explicit refusal.
-fn measured_by(
-    dir: &str,
-    bases: &[crate::base::Base],
-    image: &str,
-    family: &str,
-) -> Result<PathBuf, String> {
-    match crate::base::find(bases, image) {
-        Some(base) if !base.scap_content.is_empty() => Ok(Path::new(dir).join(&base.scap_content)),
-        // The library describes this base and names no content for it, which
-        // is a stale row when the family has content of its own.
-        Some(base) => match installed(dir, family) {
-            Err(refusal) => Err(refusal),
-            Ok(_) => Err(format!(
-                "`{}` names no `scap-content`, so nothing says which benchmark it is measured \
-                 against\n\nhelp: add `scap-content \"ssg-<os>-ds.xml\"` to its base file in the \
-                 base-images library",
-                base.image
-            )),
-        },
-        // The family default is the only evidence for an uncatalogued base.
-        None => installed(dir, family),
+/// Answers the content file a base names and its family. Each lookup that has
+/// an image reads both through this, so none of them resolves by family alone.
+pub(crate) fn named_by(base: Option<&crate::model::image::Base>) -> (&str, &str) {
+    base.map_or(("", ""), |base| {
+        (base.scap_content.as_str(), base.family.as_str())
+    })
+}
+
+/// Refuses an image that conforms while its base resolves to no datastream.
+/// `tect build` and the CI scan refuse the same target, so `check` says so
+/// first. A named file missing from the build host is the CI step's to report.
+pub(crate) fn check_content(list: &List, issues: &mut Issues) {
+    for image in &list.images {
+        let Some(base) = &image.base else {
+            continue;
+        };
+        let conforming = !image.conforms.is_empty()
+            || image
+                .flavours
+                .iter()
+                .any(|flavour| !flavour.conforms.is_empty());
+        if !conforming {
+            continue;
+        }
+        let (content, family) = named_by(Some(base));
+        let Err(why) = measured_by(CONTENT, content, family) else {
+            continue;
+        };
+        let message = why
+            .split_once("\n\nhelp: ")
+            .map_or(why.as_str(), |(said, _)| said);
+        // The `--datastream` remedy the lookup offers clears neither `check`
+        // nor the build, so the help names only what does.
+        let help = match family {
+            "rhel" => {
+                "give the `base` block the `scap-content` line that its base file in the \
+                 library names, such as `scap-content \"ssg-cs10-ds.xml\"`, or drop `conforms`"
+            }
+            _ => {
+                "drop `conforms` from this image, because the build has no datastream to \
+                  remediate it against"
+            }
+        };
+        issues.push(
+            Issue::new(
+                format!("`{}` conforms, and {message}", image.id),
+                &image.src,
+            )
+            .at(base.span, "no datastream for this base")
+            .help(help),
+        );
+    }
+}
+
+/// A base that names its content uses it. Any other base uses the family
+/// default, so the family can give its explicit refusal.
+fn measured_by(dir: &str, content: &str, family: &str) -> Result<PathBuf, String> {
+    match content.is_empty() {
+        true => installed(dir, family),
+        false => Ok(Path::new(dir).join(content)),
     }
 }
 
@@ -559,8 +581,8 @@ fn installed(dir: &str, family: &str) -> Result<PathBuf, String> {
             }
             "rhel" => return Err(
                 "SSG writes one datastream per EL release, so the `rhel` family has no default\n\n\
-                 help: give the base's row a `scap-content` line, or name content of your own \
-                 with `--datastream <file>`"
+                 help: give the image's `base` block a `scap-content` line, or name content of \
+                 your own with `--datastream <file>`"
                     .to_string(),
             ),
             _ => return Err(format!("no SSG content is known for the `{family}` family")),
@@ -568,10 +590,10 @@ fn installed(dir: &str, family: &str) -> Result<PathBuf, String> {
     Ok(Path::new(dir).join(file))
 }
 
-/// An explicit path overrides the host's family default. Golden-producing
-/// commands must not reach the host probe.
-pub fn content_path(family: &str, given: Option<&Path>) -> Result<PathBuf, String> {
-    content_at(CONTENT, family, given)
+/// An explicit path overrides the content the base names and the host's
+/// family default. Golden-producing commands must not reach the host probe.
+pub fn content_path(content: &str, family: &str, given: Option<&Path>) -> Result<PathBuf, String> {
+    content_at(CONTENT, content, family, given)
 }
 
 /// Empty rule and profile indexes are rejected so non-SCAP XML cannot pass as
@@ -589,11 +611,16 @@ pub fn content_of(path: &Path) -> Result<Content, String> {
     Ok(content)
 }
 
-fn content_at(dir: &str, family: &str, given: Option<&Path>) -> Result<PathBuf, String> {
+fn content_at(
+    dir: &str,
+    content: &str,
+    family: &str,
+    given: Option<&Path>,
+) -> Result<PathBuf, String> {
     if let Some(path) = given {
         return Ok(path.to_path_buf());
     }
-    let path = installed(dir, family)?;
+    let path = measured_by(dir, content, family)?;
     match path.is_file() {
         true => Ok(path),
         false => Err(format!(
@@ -619,7 +646,7 @@ pub fn run(root: &Path, arf: &Path, opts: &Options) -> Result<Verdict, String> {
 
     let datastream = match &opts.datastream {
         Some(path) => path.clone(),
-        None => match datastream(root, &list, Some(&name))? {
+        None => match datastream(&list, Some(&name))? {
             empty if empty.is_empty() => {
                 return Err(format!(
                     "`{name}` declares no `conforms`, so there is nothing to measure it against; \
@@ -1381,7 +1408,7 @@ mod tests {
     fn a_named_datastream_is_taken_and_a_missing_one_names_both_remedies() {
         let given = fixture("tests/scap/datastream.xml");
         assert_eq!(
-            content_at("/nowhere", "fedora", Some(&given)).unwrap(),
+            content_at("/nowhere", "", "fedora", Some(&given)).unwrap(),
             given
         );
         assert_eq!(
@@ -1391,6 +1418,7 @@ mod tests {
                     .expect("a fixture directory")
                     .to_str()
                     .unwrap(),
+                "",
                 "fedora",
                 None
             )
@@ -1401,7 +1429,7 @@ mod tests {
                 given.with_file_name("ssg-fedora-ds.xml").display()
             )
         );
-        assert!(content_at("/nowhere", "arch", None)
+        assert!(content_at("/nowhere", "", "arch", None)
             .unwrap_err()
             .contains("no SSG content is known"));
     }
@@ -1411,7 +1439,7 @@ mod tests {
     #[test]
     fn a_deb_family_is_refused_rather_than_given_content_that_measures_nothing() {
         for family in ["debian", "ubuntu"] {
-            let err = content_at("/nowhere", family, None).unwrap_err();
+            let err = content_at("/nowhere", "", family, None).unwrap_err();
             assert!(
                 err.contains(&format!("no content a `{family}` image")),
                 "{err}"
@@ -1422,76 +1450,92 @@ mod tests {
         // to the published family default.
         let given = fixture("tests/scap/datastream.xml");
         assert_eq!(
-            content_at("/nowhere", "debian", Some(&given)).unwrap(),
+            content_at("/nowhere", "", "debian", Some(&given)).unwrap(),
             given
         );
     }
 
-    /// Every EL release has its own datastream, so the row names it and the
-    /// `rhel` family names none.
+    /// `set conforms` and import's offer read content through this, so they
+    /// pick the file the base names, as a build does.
     #[test]
-    fn a_base_row_names_content_the_family_cannot() {
-        let row = |image: &str, family: &str, content: &str| crate::base::Base {
-            name: image.to_string(),
-            image: image.to_string(),
-            family: family.to_string(),
-            provides: Vec::new(),
-            requires: Vec::new(),
-            about: String::new(),
-            signed: false,
-            scap_content: content.to_string(),
-            bootloaders: Vec::new(),
-            span: crate::diag::Span::default(),
-        };
-        let bases = [
-            row(
-                "quay.io/centos-bootc/centos-bootc:stream10",
-                "rhel",
-                "ssg-cs10-ds.xml",
-            ),
-            row(
-                "quay.io/fedora/fedora-bootc:44",
-                "fedora",
-                "ssg-fedora-ds.xml",
-            ),
-            row("example.invalid/silent:1", "fedora", ""),
-        ];
-        let of = |image, family| measured_by("/nowhere", &bases, image, family);
-
-        let el = of("quay.io/centos-bootc/centos-bootc:stream10", "rhel").unwrap();
-        assert!(el.ends_with("ssg-cs10-ds.xml"), "{}", el.display());
-
-        let fedora = of("quay.io/fedora/fedora-bootc:44", "fedora").unwrap();
+    fn the_content_lookup_reads_the_file_the_base_names() {
+        let err = content_at("/nowhere", "ssg-cs10-ds.xml", "rhel", None).unwrap_err();
         assert!(
-            fedora.ends_with("ssg-fedora-ds.xml"),
-            "{}",
-            fedora.display()
+            err.contains("/nowhere/ssg-cs10-ds.xml is not there"),
+            "{err}"
         );
+    }
 
-        // A digest pins a catalogued tag rather than naming a second base.
-        let pinned = of(
-            "quay.io/centos-bootc/centos-bootc:stream10@sha256:0000",
-            "rhel",
+    /// An image created before its base named `scap-content` still conforms.
+    /// Its build would find no datastream.
+    #[test]
+    fn check_refuses_a_conforming_image_whose_base_names_no_content() {
+        let root = std::env::temp_dir().join(format!("tect-check-content-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        crate::init::put(
+            &root.join("repo.kdl"),
+            "schema-version 1\nname \"Example\"\n",
         )
         .unwrap();
-        assert!(pinned.ends_with("ssg-cs10-ds.xml"), "{}", pinned.display());
+        let image = |content: &str| {
+            format!(
+                "schema-version 1\n\nimage {{\n    name \"Example\"\n    conforms \"standard\"\n    base \"quay.io/centos-bootc/centos-bootc:stream10\" {{\n        family \"rhel\"\n{content}    }}\n    modules {{}}\n}}\n"
+            )
+        };
+        let checked = |content: &str| {
+            crate::init::put(&root.join("image.kdl"), &image(content)).unwrap();
+            let (list, _, _) = crate::declarations(&root);
+            let mut issues = Issues::default();
+            check_content(&list, &mut issues);
+            issues.plain()
+        };
+        let refused = checked("");
+        assert!(
+            refused.contains("one datastream per EL release"),
+            "{refused}"
+        );
+        assert!(!refused.contains("--datastream"), "{refused}");
+        assert!(refused.contains("`scap-content` line"), "{refused}");
+        assert_eq!(checked("        scap-content \"ssg-cs10-ds.xml\"\n"), "");
+        let flavoured = image("").replace(
+            "    conforms \"standard\"\n",
+            "    flavours { gpu conforms=\"standard\" }\n",
+        );
+        crate::init::put(&root.join("image.kdl"), &flavoured).unwrap();
+        let (list, _, _) = crate::declarations(&root);
+        let mut issues = Issues::default();
+        check_content(&list, &mut issues);
+        assert!(
+            issues.plain().contains("one datastream per EL release"),
+            "{}",
+            issues.plain()
+        );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
 
-        // A base the catalog does not describe has only the family to go on,
-        // and an EL one has nothing.
-        let fell = of("example.invalid/unknown:1", "fedora").unwrap();
+    #[test]
+    fn the_booted_system_reads_the_content_the_base_names() {
+        let image =
+            Json::parse(r#"{"base": {"family": "rhel", "scap_content": "ssg-cs10-ds.xml"}}"#)
+                .unwrap();
+        let target = Json::parse(r#"{"conforms": "standard"}"#).unwrap();
+        let path = baked_content(&image, &target).unwrap();
+        assert!(path.ends_with("ssg-cs10-ds.xml"), "{path}");
+    }
+
+    /// Every EL release has its own datastream, so the base names it and the
+    /// `rhel` family names none.
+    #[test]
+    fn a_base_names_content_the_family_cannot() {
+        let el = measured_by("/nowhere", "ssg-cs10-ds.xml", "rhel").unwrap();
+        assert!(el.ends_with("ssg-cs10-ds.xml"), "{}", el.display());
+
+        let fell = measured_by("/nowhere", "", "fedora").unwrap();
         assert!(fell.ends_with("ssg-fedora-ds.xml"), "{}", fell.display());
-        let err = of("example.invalid/alma:10", "rhel").unwrap_err();
+
+        let err = measured_by("/nowhere", "", "rhel").unwrap_err();
         assert!(err.contains("one datastream per EL release"), "{err}");
-
-        // A catalogued row that names no content must not inherit a family
-        // benchmark silently.
-        let err = of("example.invalid/silent:1", "fedora").unwrap_err();
-        assert!(err.contains("names no `scap-content`"), "{err}");
-        assert!(err.contains("add `scap-content"), "{err}");
-
-        // If the family also has no content, its refusal wins.
-        let err = of("example.invalid/silent:1", "debian").unwrap_err();
-        assert!(err.contains("no content a `debian` image"), "{err}");
+        assert!(err.contains("`scap-content` line"), "{err}");
     }
 
     #[test]
@@ -1681,7 +1725,11 @@ mod tests {
         let image = loaded.list.images.first().expect("one image");
         assert!(image.entries.is_empty(), "the base covers the only module");
         assert_eq!(
-            image.suppressed.iter().map(Entry::dir).collect::<Vec<_>>(),
+            image
+                .suppressed
+                .iter()
+                .map(|entry| entry.path.clone())
+                .collect::<Vec<_>>(),
             ["one/aide"]
         );
         assert_eq!(
@@ -1743,11 +1791,11 @@ mod tests {
             .is_empty());
     }
 
-    /// A collection declared and cached is one the search reached, so the
-    /// sentence says what was searched. The collection holds a module and it
-    /// claims nothing, which is the only way to be sure the walk read it.
+    /// A collection declared and on this machine is one resolution still
+    /// never reads, so the sentence names the repository alone. The collection
+    /// holds a module, so a search that walked it would say so.
     #[test]
-    fn a_search_that_reached_the_collections_says_so() {
+    fn resolution_never_says_it_searched_the_collections() {
         let root = fixture("tests/scap/sourced-claimant");
         let loaded = crate::load(&root);
         assert!(
@@ -1755,11 +1803,7 @@ mod tests {
             "{}",
             loaded.issues.plain()
         );
-        assert!(loaded.index.sourced() && loaded.index.unread().is_empty());
-        assert!(
-            loaded.index.at(".remote/held/one/plain").is_some(),
-            "the collection was walked"
-        );
+        assert!(loaded.index.sourced());
         assert_eq!(
             conformance(
                 &loaded.list,
@@ -1769,7 +1813,7 @@ mod tests {
             .expect("the fixture datastream reads"),
             [
                 "`sourced` conforms to `standard`, and nothing it installs or builds on claims 4 \
-              of the 4 rules it selects; nothing else in the repository or its collections claims them"
+              of the 4 rules it selects; nothing else in the repository claims them"
             ]
         );
     }

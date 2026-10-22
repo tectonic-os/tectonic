@@ -8,7 +8,4 @@ sources {
     base-images "two" {
         dir "collections/two"
     }
-    capabilities "caps" {
-        dir "collections/caps"
-    }
 }

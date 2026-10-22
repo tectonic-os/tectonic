@@ -173,24 +173,16 @@ mod tests {
         assert!(!pushed.contains("workflow_run"), "{pushed}");
     }
 
+    /// A job reads the plan off the committed modules, so a fetch step would
+    /// make CI build something the repository does not hold.
     #[test]
-    fn fresh_jobs_fetch_modules_before_reading_the_plan() {
-        assert!(BODY
-            .contains("run: |\n          ./scripts/tect.sh fetch modules\n          selection="));
-        assert!(BODY.contains(
-            "set -euo pipefail\n          ./scripts/tect.sh fetch modules\n          ./scripts/tect.sh plan"
-        ));
-        assert!(BODY.contains(
-            "set -euo pipefail\n          ./scripts/tect.sh fetch modules\n          datastream="
-        ));
+    fn no_shipped_workflow_fetches_modules() {
         for shipped in crate::resolve::workflow::SHIPPED {
-            if shipped.body.contains("plan --json") {
-                assert!(
-                    shipped.body.contains("fetch modules"),
-                    "{} reads the plan without fetching modules",
-                    shipped.stem
-                );
-            }
+            assert!(
+                !shipped.body.contains("fetch modules"),
+                "{} fetches modules",
+                shipped.stem
+            );
         }
     }
 

@@ -689,6 +689,13 @@ pub struct Image {
     /// A second image records the former implicit default so a bare build keeps
     /// its target.
     names_default: Option<String>,
+    /// Holds the library providers the base offer took. `apply` vendors them
+    /// once `repo.kdl` declares their library. The lock entry then carries the
+    /// library's pin.
+    vendored: Vec<crate::import::Found>,
+    /// Names the library providers the offer took that the repository
+    /// already holds. The image lists the local module, and the tree says so.
+    kept: Vec<String>,
 }
 
 /// The repository that a scaffolded image is written into.
@@ -824,6 +831,39 @@ impl Image {
             true => seeded(&wanted),
             false => String::new(),
         };
+        // A provider the repository already holds is listed as it is, so a
+        // local fork is never copied over.
+        let holds = |provider: &crate::provider::Provider| {
+            layout::is_module(&layout::module(root, &provider.name))
+        };
+        let kept: Vec<String> = match take_wanted {
+            true => wanted
+                .iter()
+                .filter(|provider| provider.owner.is_some() && holds(provider))
+                .map(|provider| provider.name.clone())
+                .collect(),
+            false => Vec::new(),
+        };
+        let vendored = match take_wanted {
+            true => wanted
+                .iter()
+                .filter_map(|provider| Some((provider, provider.owner.as_deref()?)))
+                .filter(|(provider, _)| !holds(provider))
+                .map(|(provider, owner)| {
+                    crate::import::cached_member(
+                        root,
+                        sources,
+                        list.audit_enforce,
+                        owner,
+                        &provider.name,
+                    )?
+                    .ok_or_else(|| {
+                        format!("`{}` is no longer in its library", provider.qualified())
+                    })
+                })
+                .collect::<Result<Vec<_>, String>>()?,
+            false => Vec::new(),
+        };
         let held = prev
             .filter(|prev| prev.base == base)
             .and_then(|prev| prev.bootloader.as_deref());
@@ -846,12 +886,29 @@ impl Image {
             took: wanted.is_empty() || !seed.is_empty(),
             bootloader,
             names_default,
+            vendored,
+            kept,
         })
     }
 
     pub fn apply(&self, root: &Path) -> Result<Vec<(PathBuf, Change)>, String> {
+        let (list, _) = crate::model::image::List::load(root);
+        let copies: Vec<(&crate::import::Found, &str)> = self
+            .vendored
+            .iter()
+            .map(|from| (from, from.name.as_str()))
+            .collect();
+        // The copies track their library. `import module` opens on the same
+        // answer.
+        let mut wrote = crate::import::vendor_all(root, &list.sources, &copies, true)?;
+        wrote.extend(self.kept.iter().map(|name| {
+            (
+                PathBuf::from(layout::MODULES).join(name),
+                Change::Updated("already here, so the image lists it as it is".to_string()),
+            )
+        }));
         crate::init::put(&self.file, &self.text)?;
-        let mut wrote = vec![(under(root, &self.file), Change::Created)];
+        wrote.push((under(root, &self.file), Change::Created));
         if let Some(was) = &self.names_default {
             append_default_image(root, was)?;
             wrote.push((
@@ -1123,7 +1180,7 @@ impl Module {
 
         let text = module_kdl(&description, &supports, &pkgs, &with)?;
         let listing = Listing::collect_from(&list, images, prompt)?;
-        listing.refuse_duplicate(&list, &path, None)?;
+        listing.refuse_duplicate(&list, &path)?;
         Ok(Self {
             path,
             file,
@@ -1337,18 +1394,16 @@ impl Listing {
         })
     }
 
-    /// Duplicate checks compare `name` and `source` within each selected image.
-    /// A module gated to two flavours conflicts only where the flavours overlap.
+    /// Duplicate checks compare `name` within each selected image. A module
+    /// gated to two flavours conflicts only where the flavours overlap.
     pub fn refuse_duplicate(
         &self,
         list: &crate::model::image::List,
         name: &str,
-        source: Option<&str>,
     ) -> Result<(), String> {
         let Self::In(listed) = self else {
             return Ok(());
         };
-        let dir = dir_of(name, source);
         let target = |image: &crate::model::image::Image, flavour: &Option<String>| {
             crate::model::image::Target {
                 image: image.id.clone(),
@@ -1358,21 +1413,13 @@ impl Listing {
             }
         };
         for into in listed {
-            let Some((image, held)) = holds(list, into, name, source) else {
+            let Some((image, held)) = holds(list, into, name) else {
                 continue;
             };
             let (at, into) = (target(image, &held.flavour), target(image, &into.flavour));
-            // When the spellings differ, the path distinguishes an owned
-            // `dev-tools` module from an existing `.remote` entry.
-            let elsewhere = match held.dir() == dir {
-                true => String::new(),
-                false => format!(", as {}/{}", crate::layout::MODULES, held.dir()),
-            };
             return Err(match at.to_string() == into.to_string() {
-                true => format!("`{at}` already lists `{name}`{elsewhere}"),
-                false => {
-                    format!("`{at}` already lists `{name}`{elsewhere}, so `{into}` lists it twice")
-                }
+                true => format!("`{at}` already lists `{name}`"),
+                false => format!("`{at}` already lists `{name}`, so `{into}` lists it twice"),
             });
         }
         Ok(())
@@ -1386,7 +1433,7 @@ impl Listing {
         list: &crate::model::image::List,
         path: &str,
     ) -> Result<Vec<(PathBuf, Change)>, String> {
-        self.apply_declaration(list, &[(path, None)])
+        self.apply_declaration(list, &[path])
     }
 
     pub fn cancelled(&self) -> bool {
@@ -1434,13 +1481,12 @@ impl Listing {
             .collect()
     }
 
-    /// Batch application preserves member order and collection ownership.
-    /// An existing member is skipped only in the image that already declares
-    /// it.
+    /// Batch application preserves member order. An existing member is
+    /// skipped only in the image that already declares it.
     pub(crate) fn apply_declaration(
         &self,
         list: &crate::model::image::List,
-        declarations: &[(&str, Option<&str>)],
+        declarations: &[&str],
     ) -> Result<Vec<(PathBuf, Change)>, String> {
         match self {
             Self::Cancelled => Ok(Vec::new()),
@@ -1449,8 +1495,8 @@ impl Listing {
                 Ok(Vec::new())
             }
             Self::Declined { .. } => {
-                for (name, source) in declarations {
-                    let shown = wrap(&listed_in(None, *source)[1..], &leaf(name));
+                for name in declarations {
+                    let shown = wrap(&listed_in(None)[1..], &leaf(name));
                     println!(
                         "next, to build it, list it in an image:\n {}",
                         shown.replace('\n', "\n ")
@@ -1462,14 +1508,14 @@ impl Listing {
                 let mut wrote: Vec<(PathBuf, Vec<String>)> = Vec::new();
                 for target in listed {
                     let mut taken: Vec<String> = Vec::new();
-                    for (name, source) in declarations {
-                        if holds(list, target, name, *source).is_some() {
+                    for name in declarations {
+                        if holds(list, target, name).is_some() {
                             continue;
                         }
                         append(
                             &target.file,
                             &target.image,
-                            &listed_in(target.flavour.as_deref(), *source),
+                            &listed_in(target.flavour.as_deref()),
                             &leaf(name),
                         )?;
                         taken.push((*name).to_string());
@@ -1502,38 +1548,19 @@ impl Listing {
     }
 }
 
-/// The relative path distinguishes referenced members under `.remote` from
-/// repository-owned modules.
-fn dir_of(name: &str, source: Option<&str>) -> String {
-    match source {
-        Some(owner) => format!("{}/{owner}/{name}", crate::model::remote::REMOTE_DIR),
-        None => name.to_string(),
-    }
-}
-
 /// An ungated entry spans every flavour, so an existing entry conflicts only
 /// where its target overlaps `into`.
-///
-/// Matched by the module's name, so `import` under `.remote/<collection>/` and
-/// `copy` under `modules/` see each other. A namesake from a different
-/// collection is a different module and is not one of these.
 fn holds<'a>(
     list: &'a crate::model::image::List,
     into: &Listed,
     name: &str,
-    source: Option<&str>,
 ) -> Option<(
     &'a crate::model::image::Image,
     &'a crate::model::image::Entry,
 )> {
     let image = list.images.iter().find(|image| image.name == into.image)?;
     let entry = image.entries.iter().find(|entry| {
-        let same_module = match (entry.source.as_deref(), source) {
-            (Some(held), Some(want)) => held == want,
-            _ => true,
-        };
-        entry.name() == name
-            && same_module
+        entry.path == name
             && (into.flavour.is_none() || entry.flavour.is_none() || entry.flavour == into.flavour)
     })?;
     Some((image, entry))
@@ -1588,16 +1615,10 @@ fn target_rows(
     rows
 }
 
-fn listed_in<'a>(
-    flavour: Option<&'a str>,
-    source: Option<&'a str>,
-) -> Vec<(&'a str, Option<&'a str>)> {
+fn listed_in(flavour: Option<&str>) -> Vec<(&str, Option<&str>)> {
     let mut chain = vec![("modules", None)];
     if let Some(flavour) = flavour {
         chain.push(("flavour", Some(flavour)));
-    }
-    if let Some(source) = source {
-        chain.push(("source", Some(source)));
     }
     chain
 }
@@ -1654,12 +1675,11 @@ pub(crate) fn unlist(
     file: &Path,
     image: &str,
     flavour: Option<&str>,
-    source: Option<&str>,
     name: &str,
 ) -> Result<(), String> {
     let mut text =
         std::fs::read_to_string(file).map_err(|err| format!("{}: {err}", file.display()))?;
-    let span = crate::parse::image::entry_span(&text, image, &listed_in(flavour, source), name)
+    let span = crate::parse::image::entry_span(&text, image, &listed_in(flavour), name)
         .ok_or_else(|| format!("{} does not list `{name}` in `{image}`", file.display()))?;
     let from = span.offset;
     // A node's span stops before its `;`, which goes with it on a shared line.
@@ -1703,7 +1723,10 @@ fn wanted<'a>(
         let Some(provider) = index.adapter(capability, family) else {
             continue;
         };
-        if !out.iter().any(|held| held.dir() == provider.dir()) {
+        if !out
+            .iter()
+            .any(|held| held.qualified() == provider.qualified())
+        {
             out.push(provider);
         }
     }
@@ -1745,28 +1768,9 @@ fn yes_no_options() -> [Choice; 2] {
 }
 
 fn seeded(wanted: &[&crate::provider::Provider]) -> String {
-    let mut owners: Vec<Option<&str>> = Vec::new();
-    for provider in wanted {
-        let owner = provider.owner.as_deref();
-        if !owners.contains(&owner) {
-            owners.push(owner);
-        }
-    }
-    let mut out = String::new();
-    for owner in owners {
-        let leaf: String = wanted
-            .iter()
-            .filter(|provider| provider.owner.as_deref() == owner)
-            .map(|provider| format!("module \"{}\"", provider.name))
-            .collect::<Vec<String>>()
-            .join("\n");
-        let chain: Vec<(&str, Option<&str>)> =
-            owner.iter().map(|owner| ("source", Some(*owner))).collect();
-        out.push_str(&wrap(&chain, &leaf));
-        out.push('\n');
-    }
-    out.lines()
-        .map(|line| format!("\x20       {line}\n"))
+    wanted
+        .iter()
+        .map(|provider| format!("\x20       module \"{}\"\n", provider.name))
         .collect()
 }
 
@@ -1806,6 +1810,12 @@ fn image_kdl(
         // The signature probe can correct only a written line. An omission
         // would leave it no declaration to repair.
         ships.push_str(&format!("\x20       signed #{}\n", known.signed));
+        if !known.scap_content.is_empty() {
+            ships.push_str(&format!(
+                "\x20       scap-content \"{}\"\n",
+                known.scap_content
+            ));
+        }
     }
     format!(
         "schema-version {}\n\
@@ -1932,6 +1942,20 @@ fn create_remote(owner: &str, id: &str) -> Result<(), String> {
 mod tests {
     use super::*;
 
+    /// One module fills both roles, so the offer names it once.
+    #[test]
+    fn a_module_filling_two_roles_is_offered_once() {
+        let root = crate::provider::tests::two_providers("wanted");
+        let index =
+            crate::provider::Index::local(&root, &[], &crate::parse::disk::Disk::scan(&root));
+        let offered: Vec<String> = wanted(&index, "fedora", &["x", "y"])
+            .iter()
+            .map(|provider| provider.name.clone())
+            .collect();
+        std::fs::remove_dir_all(&root).unwrap();
+        assert_eq!(offered, ["both"]);
+    }
+
     /// A kept script calls the other scripts by path, so a second copy moves
     /// the calls in a kept script the user left as it was, and only in that one.
     #[test]
@@ -1960,35 +1984,6 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
-    /// Interleaved members from two collections prove that seeding writes one
-    /// `source` block per collection.
-    #[test]
-    fn the_seeded_block_groups_each_collections_modules_under_one_source() {
-        let provider = |owner: Option<&str>, name: &str| crate::provider::Provider {
-            owner: owner.map(str::to_string),
-            name: name.to_string(),
-            here: false,
-            declares: crate::parse::module::Summary::default(),
-        };
-        // Grouping by owner keeps one block per collection when a base
-        // interleaves their requirements.
-        let held = [
-            provider(Some("tectonic-os"), "debian-family"),
-            provider(None, "mine"),
-            provider(Some("tectonic-os"), "deb-bootc-base/bootc"),
-        ];
-        let wanted: Vec<&crate::provider::Provider> = held.iter().collect();
-        assert_eq!(
-            seeded(&wanted),
-            "        source \"tectonic-os\" {\n\
-             \x20           module \"debian-family\"\n\
-             \x20           module \"deb-bootc-base/bootc\"\n\
-             \x20       }\n\
-             \x20       module \"mine\"\n"
-        );
-        assert_eq!(seeded(&[]), "");
-    }
-
     #[test]
     fn repeated_targets_write_once_and_one_file_names_every_addition() {
         let root = std::env::temp_dir().join(format!("tect-listing-{}", std::process::id()));
@@ -2004,7 +1999,7 @@ image {
         server
     }
     modules {
-        flavour "dev" { source "one" { module "one" } }
+        flavour "dev" { module "one" }
     }
 }
 "#,
@@ -2023,9 +2018,7 @@ image {
         assert_eq!(listing.targets().len(), 2);
 
         let (list, _) = crate::model::image::List::load(&root);
-        let wrote = listing
-            .apply_declaration(&list, &[("one", Some("one")), ("two", Some("one"))])
-            .unwrap();
+        let wrote = listing.apply_declaration(&list, &["one", "two"]).unwrap();
         assert_eq!(wrote.len(), 1);
         let Change::Updated(description) = &wrote[0].1 else {
             panic!("an existing image file is updated")
@@ -2218,9 +2211,6 @@ image {
                 .unwrap_or_else(|| panic!("{} describes no base", path.display()));
             bases.push(base);
         }
-        let (rows, _) =
-            crate::parse::bases::read_capabilities(&dir.join("capabilities.kdl"), &mut issues)
-                .expect("the fixture library carries capabilities.kdl");
         assert!(issues.is_empty(), "{}", issues.plain());
         for base in bases {
             assert!(is_name(&base.family), "{}", base.image);
@@ -2228,23 +2218,16 @@ image {
                 assert!(is_name(name), "{} provides {name}", base.image);
             }
         }
-        for row in rows {
-            assert!(is_name(&row.name), "capability {}", row.name);
-            assert!(
-                row.path.as_deref().is_none_or(|p| p.starts_with('/')),
-                "{}",
-                row.name
-            );
-            for (_, path) in &row.families {
-                assert!(path.starts_with('/'), "{} reads {path}", row.name);
-            }
+        for row in &crate::base::CAPABILITIES {
+            assert!(is_name(row.name), "capability {}", row.name);
+            assert!(row.path.is_none_or(|p| p.starts_with('/')), "{}", row.name);
         }
     }
 
-    /// The gated reference lives two blocks below `modules` and neither is
-    /// there, so both are written on the way down.
+    /// The gated entry lives in a flavour block that is not there yet, so the
+    /// block is written on the way down.
     #[test]
-    fn a_missing_flavour_and_source_block_are_written_around_the_declaration() {
+    fn a_missing_flavour_block_is_written_around_the_declaration() {
         let root = std::env::temp_dir().join(format!("tect-nested-{}", std::process::id()));
         std::fs::create_dir_all(&root).unwrap();
         let file = root.join("example.image.kdl");
@@ -2262,15 +2245,13 @@ image {
         )
         .unwrap();
 
-        let chain = listed_in(Some("dx"), Some("one"));
+        let chain = listed_in(Some("dx"));
         append(&file, "Example", &chain, "module \"dev-tools\"").unwrap();
         let written = std::fs::read_to_string(&file).unwrap();
         let nested = [
             "    modules {",
             "        flavour \"dx\" {",
-            "            source \"one\" {",
-            "                module \"dev-tools\"",
-            "            }",
+            "            module \"dev-tools\"",
             "        }",
             "    }",
         ]
@@ -2280,9 +2261,8 @@ image {
         append(&file, "Example", &chain, "module \"editor\"").unwrap();
         let written = std::fs::read_to_string(&file).unwrap();
         assert_eq!(written.matches("flavour \"dx\"").count(), 1);
-        assert_eq!(written.matches("source \"one\"").count(), 1);
         assert!(
-            written.contains("module \"dev-tools\"\n                module \"editor\"\n"),
+            written.contains("module \"dev-tools\"\n            module \"editor\"\n"),
             "{written}"
         );
 
@@ -2305,9 +2285,9 @@ image {
         )
         .unwrap();
 
-        unlist(&file, "one", None, None, "gone").unwrap();
-        unlist(&file, "one", Some("dev"), None, "inline").unwrap();
-        unlist(&file, "one", None, None, "trailing").unwrap();
+        unlist(&file, "one", None, "gone").unwrap();
+        unlist(&file, "one", Some("dev"), "inline").unwrap();
+        unlist(&file, "one", None, "trailing").unwrap();
         assert_eq!(
             std::fs::read_to_string(&file).unwrap(),
             "image {\n    name \"one\"\n    modules {\n        module \"kept\";\n        flavour \"dev\" { module \"also\" }\n    }\n}\n"
@@ -2318,7 +2298,7 @@ image {
             &[("modules", None)]
         )
         .is_some());
-        assert!(unlist(&file, "one", None, None, "absent").is_err());
+        assert!(unlist(&file, "one", None, "absent").is_err());
         std::fs::remove_dir_all(root).unwrap();
     }
 

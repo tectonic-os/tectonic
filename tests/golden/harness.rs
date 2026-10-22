@@ -91,9 +91,8 @@ pub(super) fn copy(from: &Path, to: &Path) {
     }
 }
 
-/// Lays the fixture base catalog and capabilities where the fetch of the
-/// default libraries would put them, so a sealed run reads a catalog instead
-/// of the network.
+/// Lays the fixture base catalog where the fetch of the default libraries
+/// would put it, so a sealed run reads a catalog instead of the network.
 pub(super) fn seed_bases(root: &Path) {
     let keyed = tect::import::cache_path(root, tect::base::LIBRARY_URL, "HEAD")
         .expect("the default library URL hashes");
@@ -106,13 +105,6 @@ pub(super) fn seed_bases(root: &Path) {
             std::fs::copy(entry.path(), core.join(name)).unwrap();
         }
     }
-    let capabilities = keyed.join("capabilities");
-    std::fs::create_dir_all(&capabilities).unwrap();
-    std::fs::copy(
-        collections.join("capabilities.kdl"),
-        capabilities.join("capabilities.kdl"),
-    )
-    .unwrap();
 }
 
 /// The same, with the fixture module tree as well, for a flow whose offer has
@@ -123,7 +115,7 @@ pub(super) fn seed_library(root: &Path) {
         .expect("the default library URL hashes");
     let collections = crate_dir().join("tests/collections/upstream");
     copy(&collections, &keyed.join("modules"));
-    for stray in ["capabilities.kdl", "fedora.base.kdl", "collected.base.kdl"] {
+    for stray in ["fedora.base.kdl", "collected.base.kdl"] {
         let _ = std::fs::remove_file(keyed.join("modules").join(stray));
     }
 }

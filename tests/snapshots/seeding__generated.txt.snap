@@ -21,13 +21,13 @@ for dir in generated/scripts scripts; do
     [ ! -d "$dir" ] || roots+=("$dir")
 done
 # A helper below is left to the shell it names, so it is not a script here too.
-mapfile -t scripts < <(find "${roots[@]}" -path modules/.remote -prune -o \
+mapfile -t scripts < <(find "${roots[@]}" \
     -name '*.sh' -type f ! \( -path '*/files/*' \
     \( -path '*/libexec/*' -o -path '*/system-generators/*' \) \) -print)
 # A `repo` file is shell and carries no extension.
-mapfile -t repos < <(find modules -path modules/.remote -prune -o -name repo -type f -print)
+mapfile -t repos < <(find modules -name repo -type f -print)
 # What a module ships to run on the machine, and each names its shell.
-mapfile -t helpers < <(find modules -path modules/.remote -prune -o -path '*/files/*' -type f \
+mapfile -t helpers < <(find modules -path '*/files/*' -type f \
     \( -path '*/libexec/*' -o -path '*/system-generators/*' \) -print)
 shfmt=(shfmt -i 4 -ci -bn -sr)
 counted="${#scripts[@]} scripts, ${#repos[@]} repo files and ${#helpers[@]} helpers"
@@ -55,8 +55,6 @@ shellcheck -s bash "${scripts[@]}"
     exit 1
 }
 echo "lint: ${counted} pass shellcheck and shfmt"
-
-./generated/scripts/tect.sh fetch modules
 
 ./generated/scripts/tect.sh check
 
@@ -359,7 +357,7 @@ usage: generated/scripts/vm.sh <command> <qcow2|raw|iso> [options]
   --target <image/flavour>
                       what a rebuild builds and what an iso installs
                       (default: the plan's ungated target)
-  --rebuild           fetch modules, generate, then build the container image
+  --rebuild           generate, then build the container image
                       first. The one form of this that changes the repository.
   --ram <size>        memory for the virtual machine (default: 8G)
   --installer <which> what converts the image into a disk: `bib` for
@@ -817,11 +815,8 @@ run_qemu() {
 
 if [ "$command" = build ] || [ "$rebuild" = 1 ] || [ ! -f "$image_file" ]; then
     if [ "$rebuild" = 1 ]; then
-        # The whole chain, in the only order it works in: `fetch modules` brings
-        # the pinned trees down, `generate` writes the committed files off what
-        # they hold, and `build` proves those files. This is the one path that
-        # changes the repository.
-        ./generated/scripts/tect.sh fetch modules
+        # `generate` writes the committed files. `build` proves them.
+        # This is the one path that changes the repository.
         ./generated/scripts/tect.sh generate
         args=(--tag "$ref")
         [ -z "$target" ] || args+=(--target "$target")
@@ -912,11 +907,11 @@ RUN --mount=type=bind,from=ctx,source=/modules/hello,target=/ctx/modules/hello \
     --mount=type=tmpfs,target=/tmp \
     bash /ctx/module.sh
 
-# ---- tectonic-os/flatpak ----
-RUN --mount=type=bind,from=ctx,source=/modules/.remote/tectonic-os/flatpak,target=/ctx/modules/.remote/tectonic-os/flatpak \
+# ---- flatpak ----
+RUN --mount=type=bind,from=ctx,source=/modules/flatpak,target=/ctx/modules/flatpak \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib,rw \
     --mount=type=bind,from=ctx,source=/modules/fedora-family/lib/family.sh,target=/ctx/lib/family.sh \
-    --mount=type=bind,from=ctx,source=/generated/example/modules/tectonic-os/flatpak.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/generated/example/modules/flatpak.sh,target=/ctx/module.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
@@ -1032,12 +1027,12 @@ export MODDIR
 source /ctx/lib/family.sh
 
 install_packages 'fastfetch'
-==== generated/example/modules/tectonic-os/flatpak.sh
+==== generated/example/modules/flatpak.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.
 set -euxo pipefail
 
-MODDIR=/ctx/modules/.remote/tectonic-os/flatpak
+MODDIR=/ctx/modules/flatpak
 export MODDIR
 
 OPT_REMOTES=(flathub flathub-beta)
@@ -1259,7 +1254,7 @@ graph LR
     base["quay.io/fedora/fedora-bootc:44"]
     m0["fedora-family"]
     m1["hello"]
-    m2["tectonic-os/flatpak"]
+    m2["flatpak"]
     m3["drivers [nvidia]"]
 ```
 
@@ -1268,7 +1263,7 @@ graph LR
 | Name | Kind | Provided by | Required by | After |
 |---|---|---|---|---|
 | `build-environment` | capability | `fedora-family` |  |  |
-| `flatpak` | capability | `tectonic-os/flatpak` |  |  |
+| `flatpak` | capability | `flatpak` |  |  |
 | `rechunking` | capability | `base` |  |  |
 ==== generated/example/graph.json
 {
@@ -1286,7 +1281,7 @@ graph LR
       "name": "flatpak",
       "kind": "capability",
       "build_only": false,
-      "provider": "tectonic-os/flatpak",
+      "provider": "flatpak",
       "required_by": [],
       "after": []
     },

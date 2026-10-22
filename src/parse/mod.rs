@@ -81,9 +81,8 @@ pub(crate) fn check_capability(name: &str, span: Span, src: &Source, issues: &mu
             )
             .at(span, "a name, such as `ssh` or `bootc`")
             .help(
-                "a capability is found at `/usr/bin/<name>` or `/usr/sbin/<name>`; anywhere \
-                     else, a module writes `provides \"<name>\" file=\"<path>\"`, or a \
-                     capabilities library a `capability \"<name>\" { path \"<path>\" }` row",
+                "a capability is a name; a module that ships it at a path writes \
+                     `provides \"<name>\" file=\"<path>\"`, and the build checks that path",
             ),
         );
         return;
