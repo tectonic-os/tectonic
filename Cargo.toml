@@ -60,6 +60,6 @@ codegen-units = 1
 
 # clap-markdown renders `docs/cli.md` in a test and never reaches a dist binary.
 [dev-dependencies]
-clap-markdown = "0.1.5"
+clap-markdown = "=0.1.5"
 common = { git = "https://github.com/tectonic-os/common", rev = "80c5601c2da11a3bc8c150ed41926e0985b31295", features = ["test-support"] }
-insta = { version = "1.49.0", default-features = false, features = ["filters"] }
+insta = { version = "=1.49.0", default-features = false, features = ["filters"] }
