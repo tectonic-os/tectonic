@@ -21,7 +21,7 @@ env:
 
 jobs:
   smoke-test:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # tect:only scheduled-publish
     # The two events the build publishes on, and only a build that passed.
     if: >-
