@@ -447,7 +447,8 @@ includes the following nodes:
 ```kdl
 supports "fedora" "debian" "ubuntu"
 
-provides "plasma-desktop" "display-manager" "graphical-session" "wayland"
+provides "plasma-desktop" "graphical-session" "wayland"
+provides "display-manager" exclusive=#true
 
 requires "build-environment"
 
@@ -473,7 +474,9 @@ family "debian" "ubuntu" {
 - **provides** and **requires** name capabilities a module provides or needs
   from other modules. For example, a GUI app can declare that it requires a
   `display-manager`, and modules that add a display manager can declare that
-  they provide it.
+  they provide it. `exclusive=#true` says that a second provider conflicts, so
+  `tect check` refuses an image or flavour that would hold two display
+  managers.
 - **packages** resolves to the base image's package manager, which the
   `build-environment` module supplies for each family.
 - **family "fedora|rhel|debian|ubuntu"** gates any of the module's top-level
