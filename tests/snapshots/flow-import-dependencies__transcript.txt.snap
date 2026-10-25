@@ -5,16 +5,16 @@ Tectonic v{version}
 
 
 example/
-├── modules/
+├── components/
 │   ├── browser/
-│   │   └── + module.kdl
+│   │   └── + manifest.kdl
 │   ├── flatpak/
 │   │   ├── files/
 │   │   │   └── usr/
 │   │   │       └── share/
 │   │   │           └── example/
 │   │   │               └── + remotes.list
-│   │   └── + module.kdl
-│   └── + modules.lock.kdl
-└── ~ example.image.kdl  flatpak and browser added to modules
+│   │   └── + manifest.kdl
+│   └── ~ components.lock.kdl  flatpak and browser recorded
+└── ~ example.image.kdl  flatpak and browser added to components
 ==== exit 0

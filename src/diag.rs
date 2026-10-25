@@ -20,6 +20,12 @@ impl Source {
     pub fn name(&self) -> &str {
         self.0.name()
     }
+
+    /// The text it was read from, which an inline definition is parsed out of
+    /// again when its component loads.
+    pub fn text(&self) -> &str {
+        self.0.inner()
+    }
 }
 
 /// A byte range in a source file: what the model carries, so no KDL span type
@@ -177,7 +183,7 @@ impl Issues {
             }
         }
         // A source a problem was found in is not always one of the files read:
-        // a module manifest is reached through an image, and a generated file
+        // a component manifest is reached through an image, and a generated file
         // nothing emits is reached through neither. One entry is never split.
         let clean: Vec<&str> = match context.contains(", ") {
             false => Vec::new(),

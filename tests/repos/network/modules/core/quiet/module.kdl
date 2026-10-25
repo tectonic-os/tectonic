@@ -1,5 +1,0 @@
-schema-version 1
-
-description "Ships files and nothing else"
-
-supports "fedora"

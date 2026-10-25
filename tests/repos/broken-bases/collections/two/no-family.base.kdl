@@ -1,5 +1,0 @@
-base {
-    image "example.invalid/no-family:1"
-    about "Nothing to build against"
-    bootloader "grub2"
-}

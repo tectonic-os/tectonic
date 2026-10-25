@@ -6,7 +6,7 @@ The scan measured 4 rules: 2 pass, 1 fail.
 
 ## Declared coverage, measured
 
-| Module | Benchmark | Rule | Result |
+| Component | Benchmark | Rule | Result |
 | --- | --- | --- | --- |
 | one/hello | cis-fedora | 1.1.1.1 | pass |
 | one/hello | cis-fedora | 5.2.20 | fail |
@@ -36,7 +36,7 @@ The scan measured 4 rules: 1 pass, 2 fail.
 
 ## Declared coverage, measured
 
-| Module | Benchmark | Rule | Result |
+| Component | Benchmark | Rule | Result |
 | --- | --- | --- | --- |
 | one/hello | cis-fedora | 1.1.1.1 | pass |
 | one/hello | cis-fedora | 5.2.20 | fail |
@@ -84,7 +84,7 @@ The scan measured 4 rules: 2 pass, 1 fail.
 
 ## Declared coverage, measured
 
-| Module | Benchmark | Rule | Base alone | Result |
+| Component | Benchmark | Rule | Base alone | Result |
 | --- | --- | --- | --- | --- |
 | one/hello | cis-fedora | 1.1.1.1 | pass | pass |
 | one/hello | cis-fedora | 5.2.20 | pass | fail |
@@ -93,7 +93,7 @@ The scan measured 4 rules: 2 pass, 1 fail.
 
 The base column is the bare base's own pass set. It records what passed and nothing else, so `-` is not a failure: the rule may have failed on the base, or may never have been measured there.
 
-Not load-bearing: one/hello cis-fedora 1.1.1.1. The base alone already passes it, so the image passes with the module and without it. Whether the module implements it too is not something this scan can say, and it applies its settings either way.
+Not load-bearing: one/hello cis-fedora 1.1.1.1. The base alone already passes it, so the image passes with the component and without it. Whether the component implements it too is not something this scan can say, and it applies its settings either way.
 
 ## Measured against every profile
 
@@ -130,7 +130,7 @@ The scan measured 4 rules: 2 pass, 1 fail.
 
 ## Declared coverage, measured
 
-| Module | Benchmark | Rule | Result |
+| Component | Benchmark | Rule | Result |
 | --- | --- | --- | --- |
 | one/hello | cis-fedora | 1.1.1.1 | pass |
 | one/hello | cis-fedora | 5.2.20 | fail |

@@ -88,7 +88,7 @@ fn coverage() {
     assert_golden("coverage", "report.txt", &out);
 }
 
-/// `scap`, over a fixture report and datastream: what the modules claimed
+/// `scap`, over a fixture report and datastream: what the components claimed
 /// against what was measured, what the image scores against every profile the
 /// datastream carries, and what the ratchet catches once a rule that passed
 /// stops. The claims and the numbers are the `enforced` fixture's own.

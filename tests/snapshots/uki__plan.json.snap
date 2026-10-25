@@ -34,6 +34,8 @@ source: tests/golden/harness.rs
       "allows": [],
       "layout": null,
       "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
         "scap_content": "",
@@ -42,32 +44,7 @@ source: tests/golden/harness.rs
           "bootupctl",
           "luks-initramfs"
         ],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -84,7 +61,7 @@ source: tests/golden/harness.rs
           "default": true,
           "pr": true,
           "siblings": [],
-          "modules": [
+          "components": [
             {
               "path": "uki",
               "flavour": null,
@@ -95,14 +72,20 @@ source: tests/golden/harness.rs
                 "boot-chain-uki"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "6cdc14dd351a2941ba0448c8a233c9d441c4fa35c61ea8bea6cdaeeac08a6b28",
+                "defined": null,
+                "content": "9647b3a756ac6866e92d2f7b06d55fb3631a6abe18f2b749b261322d9a8ec9fe",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -117,14 +100,20 @@ source: tests/golden/harness.rs
                 "secureboot-enrolment"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "ed3ce21e4b130a2a2db0090d1c8c633b97e56b79b05da7b698a0a2373ffa61ef",
+                "defined": null,
+                "content": "be348235fe8e5af650ce6222c0cf89d4feac0cf5ce93d883a4070715714dffb1",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -157,6 +146,8 @@ source: tests/golden/harness.rs
       "allows": [],
       "layout": null,
       "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
         "scap_content": "",
@@ -165,32 +156,7 @@ source: tests/golden/harness.rs
           "bootupctl",
           "luks-initramfs"
         ],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -207,7 +173,7 @@ source: tests/golden/harness.rs
           "default": false,
           "pr": false,
           "siblings": [],
-          "modules": [
+          "components": [
             {
               "path": "uki",
               "flavour": null,
@@ -218,14 +184,20 @@ source: tests/golden/harness.rs
                 "boot-chain-uki"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "6cdc14dd351a2941ba0448c8a233c9d441c4fa35c61ea8bea6cdaeeac08a6b28",
+                "defined": null,
+                "content": "9647b3a756ac6866e92d2f7b06d55fb3631a6abe18f2b749b261322d9a8ec9fe",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -240,14 +212,20 @@ source: tests/golden/harness.rs
                 "secureboot-enrolment"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "ed3ce21e4b130a2a2db0090d1c8c633b97e56b79b05da7b698a0a2373ffa61ef",
+                "defined": null,
+                "content": "be348235fe8e5af650ce6222c0cf89d4feac0cf5ce93d883a4070715714dffb1",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -280,6 +258,8 @@ source: tests/golden/harness.rs
       "allows": [],
       "layout": null,
       "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
         "scap_content": "",
@@ -288,32 +268,7 @@ source: tests/golden/harness.rs
           "bootupctl",
           "luks-initramfs"
         ],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -330,7 +285,7 @@ source: tests/golden/harness.rs
           "default": false,
           "pr": false,
           "siblings": [],
-          "modules": [],
+          "components": [],
           "suppressed": [],
           "secrets": [],
           "contract_files": [],

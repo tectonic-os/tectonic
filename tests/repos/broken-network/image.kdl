@@ -3,21 +3,28 @@ schema-version 1
 image {
     name "Broken network"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking"
+    base-image {
+        fedora-bootc-44
     }
 
     layout {
         bootloader "grub2"
     }
 
-    modules {
-        module "fedora-family"
-        module "core/tools"
-        module "core/fetcher"
-        module "core/asset-only"
-        module "core/fragment-only"
-        module "core/installer"
+    fedora-family
+    core {
+        tools
+    }
+    core {
+        fetcher
+    }
+    core {
+        asset-only
+    }
+    core {
+        fragment-only
+    }
+    core {
+        installer
     }
 }

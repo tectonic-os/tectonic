@@ -1,0 +1,9 @@
+schema-version 1
+
+description "A DKMS module built and signed against the kernel above"
+
+targets "fedora"
+
+requires "kernel-devel" "kernel-devel-helpers"
+
+secret "mok_privkey"

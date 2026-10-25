@@ -20,18 +20,18 @@ different methods. Each workstation includes:
 - Firefox browser
 - Flatpak and a Flatpak app (Bazaar, a Flatpak app store)
 
-Workstation-1 is hand-written. Its module holds a Bash script to run commands
+Workstation-1 is hand-written. Its component holds a Bash script to run commands
 and a file tree to copy into the image, exactly as a Containerfile would.
 
 Workstation-2 implements the same configuration with the built-in commands. It
-uses a module library and a module manifest, which add declarative, family
+uses a component library and a component manifest, which add declarative, family
 aware, dependency checked behaviour.
 
 The last part of the tutorial builds the image locally and in CI, producing a
 signed image.
 
 > [!NOTE]
-> The tutorial creates its own keys and fetches the `tectonic-modules`
+> The tutorial creates its own keys and fetches the `tectonic-components`
 > library. Run it somewhere disposable.
 
 ## Create the repository
@@ -42,7 +42,7 @@ structure looks like this:
 ```text
 tect-tutorial/
 ├── .gitignore
-├── modules/
+├── components/
 ├── image.kdl
 └── repo.kdl
 ```
@@ -55,19 +55,18 @@ mkdir tect-tutorial
 cd tect-tutorial
 tect create git
 touch repo.kdl image.kdl
-mkdir modules
+mkdir components
 ```
 
 Below is a summary of each file and directory:
 
 - `repo.kdl` defines repository-wide configuration such as the schema version,
-  the sources for base images and module libraries, the security policy and the
-  CI workflows.
+  the component libraries it reads, the security policy and the CI workflows.
 - `image.kdl` or `<name>.image.kdl` files define the recipe for an image and its
-  flavours: the image's identity, its base image, the modules it includes and
+  flavours: the image's identity, its base image, the components it includes and
   its installation settings.
-- `modules/` holds the modules you create. A module is any directory under
-  `modules/`.
+- `components/` holds the components you create. A component is any directory under
+  `components/`.
 
 This is the minimal file and directory structure for a repository. The
 documentation provides the full [repository
@@ -112,11 +111,17 @@ schema-version 1
 
 image {
     name "workstation-1"
-    base "quay.io/fedora/fedora-bootc:44"
-    modules {
+    base-image {
+        base "quay.io/fedora/fedora-bootc:44" {
+            family "fedora"
+        }
     }
 }
 ```
+
+`base-image` defines the image's base inline. `base` names the bootc image
+that the build starts from, by its image reference. The `family` in its block
+tells components which package manager and package names the base has.
 
 > [!NOTE]
 > `tect` parses every `image.kdl` and `<name>.image.kdl` file at the root of
@@ -133,11 +138,14 @@ image {
 
 An `image` node defines a single image and its flavours.
 
-Within the image node there are the following required nodes:
+Within the image node, `name` is required. It is the os-release name of the
+image.
 
-- `name` is the os-release name of the image.
-- `base` is a node that defines the base image.
-- `modules` is a node that lists the modules included in the image.
+Every other node in the image that is not a property of the image names a
+component by its path under `components/`, one segment per node. A segment
+that holds component properties, such as `base` or `packages`, defines its
+component inline, and no directory is needed. One component is the base that
+every layer builds on.
 
 The [image](https://tectonic-os.github.io/tectonic/schema/image/) schema in
 the documentation lists every node that an image node can accept.
@@ -147,34 +155,28 @@ the documentation lists every node that an image node can accept.
 An easier way to scaffold an image file is to use the `tect create image`
 command, which provides prompts to configure and generate an image.
 
-#### Adding a base-images library (optional)
+#### Adding a component library
 
-You can name the location of a base image directly. You can also use a
-base-images library, which supplies generated properties for each base image
-and fills the `base` node for you.
-
-A base-images library is declared in the `sources` node in `repo.kdl`:
+The inline base names only the image that the build starts from and its family.
+A base component in a library also holds what the base image ships and what it
+imports. A component library holds base components and feature components that
+you can import. A library is declared in the `sources` node in `repo.kdl`:
 
 <!-- kdl-file: repo.kdl -->
 ```kdl
 schema-version 1
 
 sources {
-    base-images "core" {
+    components "tectonic-components" {
         url "https://github.com/tectonic-os/library"
-        path "base-images/core"
+        path "components"
     }
 }
 ```
 
-This uses the default `core` base-images library, which contains definitions
-for Fedora, CentOS Stream, RHEL, AlmaLinux, Rocky Linux, Debian and Ubuntu.
-
-> [!NOTE]
-> You can define your own base images, or create a base-images library in this
-> repository or a separate one. See the
-> [bases](https://tectonic-os.github.io/tectonic/schema/bases/) documentation
-> for details.
+The default library holds base components for Fedora, CentOS Stream, RHEL,
+AlmaLinux, Rocky Linux, Debian, Ubuntu and the Universal Blue images under
+`base-image/`, and feature components for many use cases.
 
 #### Creating an image with the CLI
 
@@ -182,99 +184,138 @@ To skip the prompts, add the image name and a `--base` argument to the
 command. Run the following within the repository:
 
 ```sh
-tect create image workstation-2 --base quay.io/fedora/fedora-bootc:44
+tect create image workstation-2 --base base-image/fedora-bootc
 ```
 
-This generates a new `workstation-2.image.kdl` file using the published
-fedora-bootc:44 base image. Because the repository now has two images, `tect`
-also records `default-image "workstation-1"` in `repo.kdl`.
+This copies the library's `base-image/fedora-bootc` component, and the
+components it imports, into `components/`, and writes a new
+`workstation-2.image.kdl` file that lists only the base. Because the
+repository now has two images, `tect` also records `default-image
+"workstation-1"` in `repo.kdl`.
 
-If you declared the optional `core` base-images library in the step above, the
-`base` node is written with the properties the library holds for that image:
+The image lists the base component by its path segments, and the base's
+segment holds the values this image sets on it:
 
 <!-- kdl-fragment -->
 ```kdl
-base "quay.io/fedora/fedora-bootc:44" {
+base-image {
+    fedora-bootc {
+        version "44"
+        signed #false
+    }
+}
+```
+
+##### The base component
+
+The library's base component holds the facts about the base image, and its
+`base` reads the `version` that the image sets:
+
+<!-- kdl-fragment -->
+```kdl
+provides {
+    "rechunking"
+    "luks-initramfs"
+    "initramfs-generation" witness="/usr/bin/dracut"
+    "selinux-policy" witness="/usr/sbin/semodule"
+    "ssh" witness="/usr/sbin/sshd"
+    // and the rest of what the base image ships
+}
+
+imports "fedora/build-environment" "package-manager/dnf5" "identity"
+
+base "quay.io/fedora/fedora-bootc:$version" {
     family "fedora"
-    provides "rechunking" "initramfs-generation" "luks-initramfs" "selinux-policy" "ssh" "bootc" "bootupctl" "podman" "crun"
-    signed #false
+    bootloader "grub2"
     scap-content "ssg-fedora-ds.xml"
 }
 ```
 
-##### The `base` node
+`base` makes the component a base, and an image holds one base. Its block
+states the base's family, its bootloaders and its benchmark content. The
+`provides` block declares capabilities baked into the base image that
+components might require. It lists one capability on each line. A short list
+can go on one line instead, as `provides "rechunking" "luks-initramfs"`. A
+`witness` names the path that proves the capability is there, and the build
+checks the finished image for it. The `imports` node names
+the components every image on this base needs. `tect create image` copied
+`fedora/build-environment`, `package-manager/dnf5` and `identity` into
+`components/`. The image lists none of them, because the base's import builds
+each one into every image on it. `identity` provides `os-release`. The build writes
+the image's own name into `/usr/lib/os-release` right after the `identity`
+layer. `scap-content` names the benchmark content that a compliance scan of the
+image reads.
 
-The `family` node allows modules to gate compatibility with different Linux
-families. The `provides` node declares capabilities baked into the base image
-that modules might require. The `scap-content` node names the benchmark
-content that a compliance scan of the image reads.
+`signed` records whether the base image publishes a signature. The base
+signature probe workflow corrects it.
 
-## Adding modules
+## Adding components
 
-### How modules work
+### How components work
 
-A module is a directory that encapsulates a feature, or a collection of
-related features. A module directory can contain Bash scripts, files to copy
+A component is a directory that encapsulates a feature, or a collection of
+related features. A component directory can contain Bash scripts, files to copy
 into the image, Containerfile fragments and more.
 
-For a module to be included in an image, it must be declared as a `module`
-inside the image's `modules` node. A `module` is declared by its path relative
-to the `modules/` directory.
+For a component to be included in an image, the image lists its path relative
+to the `components/` directory, one segment per node.
 
 > [!NOTE]
-> For these module directories:
+> For these component directories:
 >
-> - `modules/custom-module`
-> - `modules/dev/git`
-> - `modules/dev/brew`
+> - `components/custom-component`
+> - `components/dev/git`
+> - `components/dev/brew`
 >
-> They are declared in `modules` like this:
+> They are listed in the image like this:
 >
 > <!-- kdl-fragment -->
 > ```kdl
-> modules {
->     module "custom-module"
->     module "dev/git"
->     module "dev/brew"
+> custom-component
+> dev {
+>     git
+>     brew
 > }
 > ```
+>
+> `dev` is a directory that holds components, so it lists nothing itself.
 
-The [module directory
-layouts](https://tectonic-os.github.io/tectonic/schema/modules/) documentation
-shows every type of file and directory a module can use.
+The [component directory
+layouts](https://tectonic-os.github.io/tectonic/schema/components/) documentation
+shows every type of file and directory a component can use.
 
-### Creating a module
+### Creating a component
 
-For this tutorial you will create a new KDE Plasma module.
+For this tutorial you will create a new KDE Plasma component.
 
-Create the `kde` module directory:
+Create the `kde` component directory:
 
 ```sh
-mkdir modules/kde
+mkdir components/kde
 ```
 
-Create the module script file `modules/kde/module.sh`:
+Create the component script file `components/kde/component.sh`:
 
 > [!NOTE]
-> `tect generate` picks up `module.sh` and gives it its own `RUN` layer in the
+> `tect generate` picks up `component.sh` and gives it its own `RUN` layer in the
 > generated `Containerfile`.
 
-Edit `modules/kde/module.sh` and add the following command, which installs
+Edit `components/kde/component.sh` and add the following command, which installs
 KDE Plasma from the Fedora base image's package manager:
 
 ```sh
 dnf5 install -y plasma-desktop
 ```
 
-A module can also ship a file tree. Everything under a module's `files/`
+A component can also ship a file tree. Everything under a component's `files/`
 directory is copied into the image at the same path. Create a default user
 configuration:
 
 ```sh
-mkdir -p modules/kde/files/etc/skel/.config
+mkdir -p components/kde/files/etc/skel/.config
 ```
 
-and write `modules/kde/files/etc/skel/.config/kdeglobals`:
+and write `components/kde/files/etc/skel/.config/kdeglobals`:
 
 ```ini
 [General]
@@ -282,11 +323,11 @@ ColorScheme=BreezeDark
 ```
 
 During the build, this tree is copied into the image at the same path, so
-`modules/kde/files/etc/skel/.config/kdeglobals` lands at
-`/etc/skel/.config/kdeglobals`. The generated module script does the copy with
-`cp -rT /ctx/modules/kde/files /`.
+`components/kde/files/etc/skel/.config/kdeglobals` lands at
+`/etc/skel/.config/kdeglobals`. The generated component script does the copy with
+`cp -rT /ctx/components/kde/files /`.
 
-Include the `kde` module in the `workstation-1` image node in `image.kdl`:
+Include the `kde` component in the `workstation-1` image node in `image.kdl`:
 
 <!-- kdl-file: image.kdl -->
 ```kdl
@@ -294,48 +335,28 @@ schema-version 1
 
 image {
     name "workstation-1"
-    base "quay.io/fedora/fedora-bootc:44"
-    modules {
-        module "kde"
+    base-image {
+        base "quay.io/fedora/fedora-bootc:44" {
+            family "fedora"
+        }
     }
+    kde
 }
 ```
 
-#### Importing a module from a library
+#### Importing a component from a library
 
-Rather than writing every module from scratch, you can import or copy existing
-modules from a library to add features quickly and avoid duplicating code.
-
-The default modules library provides feature modules for many use cases.
-
-To add the default modules library to your repository, edit `repo.kdl` and add
-it to the `sources` node:
-
-<!-- kdl-file: repo.kdl -->
-```kdl
-schema-version 1
-
-sources {
-    base-images "core" {
-        url "https://github.com/tectonic-os/library"
-        path "base-images/core"
-    }
-    modules "tectonic-modules" {
-        url "https://github.com/tectonic-os/library"
-        path "modules"
-    }
-}
-
-default-image "workstation-1"
-```
+Rather than writing every component from scratch, you can import existing
+components from a library to add features quickly and avoid duplicating code.
+The library you declared for workstation-2 also holds feature components.
 
 Now run:
 
 ```sh
-tect import module
+tect import component
 ```
 
-The first prompt asks which image the modules are for. Select `workstation-2`
+The first prompt asks which image the components are for. Select `workstation-2`
 and press enter:
 
 ```ansi
@@ -346,53 +367,39 @@ Which image is this for?
 ↑↓ navigate • ⏎  select • Esc cancel
 ```
 
-You will then be prompted with a populated list of modules from the default
-module library. A module that cannot build on the image's base family is
+You will then be prompted with a populated list of components from the default
+component library. A component that cannot build on the image's base family is
 listed with the reason beside it, and cannot be selected. Tab hides and shows
-those modules. Scroll to the
+those components. Scroll to the
 `desktop-environment` section, expand it with the → key, and toggle
 `kde-plasma` with the space bar:
 
 ```ansi
-Which modules?
+Which components?
   [ ] ▸ browsers
   [-] ▾ desktop-environment
-    [ ] tectonic-modules/desktop-environment/gamemode
-    [ ] tectonic-modules/desktop-environment/gnome
-  > [x] tectonic-modules/desktop-environment/kde-plasma
-    [ ] tectonic-modules/desktop-environment/krunner-bazaar
+    [ ] tectonic-components/desktop-environment/gamemode
+    [ ] tectonic-components/desktop-environment/gnome
+  > [x] tectonic-components/desktop-environment/kde-plasma
+    [ ] tectonic-components/desktop-environment/krunner-bazaar
   [ ] ▸ fedora
   [ ] ▸ hardening
 ↑↓ • ←/→ open • ␣ toggle • ⇥ hide • ⏎  confirm • Esc cancel
 ```
 
-You will then be prompted to add the `build-environment` that this module
-depends on. This is explained later in the [Module
-manifests](#module-manifests) section. Select Yes:
+`kde-plasma` requires a `build-environment`, which is explained later in the
+[Component manifests](#component-manifests) section. The base already imports
+`fedora/build-environment`, so the import asks for nothing more. The last
+prompt asks whether the copy tracks its library. Select Yes:
 
 ```ansi
-The selected modules have dependencies not currently provided by the images:
-
-  kde-plasma > fedora-bootc:44
-    requires: build-environment
-    provider module: fedora/build-environment
-
-Add these provider modules now?
+Track upstream for `desktop-environment/kde-plasma`?
 > Yes
   No
 ↑↓ navigate • ⏎  confirm • Esc cancel
 ```
 
-The last prompt asks whether the copies track their library. Select Yes:
-
-```ansi
-Track upstream for `fedora/build-environment` and `desktop-environment/kde-plasma`?
-> Yes
-  No
-↑↓ navigate • ⏎  confirm • Esc cancel
-```
-
-This modifies `workstation-2.image.kdl` to include two imported modules:
+This adds the imported component to `workstation-2.image.kdl`:
 
 <!-- kdl-file: workstation-2.image.kdl -->
 ```kdl
@@ -401,111 +408,124 @@ schema-version 1
 image {
     name "workstation-2"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking" "initramfs-generation" "luks-initramfs" "selinux-policy" "ssh" "bootc" "bootupctl" "podman" "crun"
-        signed #false
-        scap-content "ssg-fedora-ds.xml"
-    }
-
     layout {
         bootloader "grub2"
     }
 
-    modules {
-        module "fedora/build-environment"
-        module "desktop-environment/kde-plasma"
+    base-image {
+        fedora-bootc {
+            version "44"
+            signed #false
+        }
+    }
+    desktop-environment {
+        kde-plasma
     }
 }
 ```
 
-The import copies each module into `modules/`, at its path in the library,
-and the image lists it like a module you wrote yourself.
-`modules/modules.lock.kdl` records the library each copy came from and what
+The import copies each component into `components/`, at its path in the library,
+and the image lists it like a component you wrote yourself.
+`components/components.lock.kdl` records the library each copy came from and what
 its content hashed to. The entry of a tracked copy carries `track`. A tracked
 copy is immutable: if it no longer matches its entry, then `tect check`,
 `tect generate` and `tect build` refuse it. An untracked copy is yours to edit, and `tect why` shows that it
 was edited.
 
-A tracked copy changes only when its library moves. `tect fetch modules`
-copies each tracked module again from its library and records the new hash in
-the lock. The `update-modules` workflow runs it on a schedule and opens a pull
-request. To edit a tracked copy, first run `tect set module <path>
+A tracked copy changes only when its library moves. `tect fetch components`
+copies each tracked component again from its library and records the new hash in
+the lock. The `update-components` workflow runs it on a schedule and opens a pull
+request. To edit a tracked copy, first run `tect set component <path>
 --untracked`, which makes the copy yours.
 
-If `modules/` already holds a module at that path, then the import asks
-whether to list the module you hold or to import the library's under another
+If `components/` already holds a component at that path, then the import asks
+whether to list the component you hold or to import the library's under another
 name, such as `desktop-environment/kde-plasma@1`.
 
-#### Module manifests
+#### Component manifests
 
-Looking at `modules/desktop-environment/kde-plasma`,
-you will see it contains a `module.kdl` file. This is a module manifest. It
+Looking at `components/desktop-environment/kde-plasma`,
+you will see it contains a `manifest.kdl` file. This is a component manifest. It
 includes the following nodes:
 
 <!-- kdl-fragment -->
 ```kdl
-supports "fedora" "debian" "ubuntu"
+targets "fedora" "debian" "ubuntu"
 
-provides "plasma-desktop" "graphical-session" "wayland"
+provides {
+    "graphical-session"
+    "wayland"
+    "plasma-desktop" witness="/usr/bin/plasmashell"
+}
 provides "display-manager" exclusive=#true
 
 requires "build-environment"
 
-packages "plasma-desktop" "plasma-workspace" "plasma-nm" "dolphin" "konsole" "kate"
-// and the rest of the Plasma application set
+packages {
+    "plasma-desktop"
+    "plasma-workspace"
+    "plasma-nm"
+    "dolphin"
+    "konsole"
+    "kate"
+    // and the rest of the Plasma application set
+}
 
-family "fedora" {
+on "fedora" {
     packages "plasma-login-manager" "kcm-plasmalogin" "kwin" "kscreenlocker"
 }
 
-family "ubuntu" {
+on "ubuntu" {
     packages "plasma-session-wayland" "plasma-session-x11"
 }
 
-family "debian" "ubuntu" {
+on "debian" "ubuntu" {
     packages "systemsettings" "sddm" "kwin-wayland"
 }
 ```
 
 ##### Manifest fields
 
-- **supports** restricts this module to the base-image families it lists.
-- **provides** and **requires** name capabilities a module provides or needs
-  from other modules. For example, a GUI app can declare that it requires a
-  `display-manager`, and modules that add a display manager can declare that
-  they provide it. `exclusive=#true` says that a second provider conflicts, so
+- **targets** restricts this component to the base families it lists.
+- **provides** and **requires** name capabilities a component provides or needs
+  from other components. For example, a GUI app can declare that it requires a
+  `graphical-session`, and components that add a desktop can declare that they
+  provide it. `witness` names the path that proves the capability is in the
+  finished image. `exclusive=#true` says that a second provider conflicts, so
   `tect check` refuses an image or flavour that would hold two display
   managers.
 - **packages** resolves to the base image's package manager, which the
-  `build-environment` module supplies for each family.
-- **family "fedora|rhel|debian|ubuntu"** gates any of the module's top-level
-  configuration for one or more families, so a module can handle the
-  differences between them.
+  `build-environment` component supplies for each family. A short list goes
+  on one line, and a long one goes in a block with one name on each line.
+  Each `packages` node installs as one batch, so an `enablerepo=` on the node
+  covers every name in it.
+- **on "fedora" "rhel" "debian" "ubuntu"** gates any of the component's
+  top-level configuration for one or more families, so a component can handle
+  the differences between them.
 
-### Creating a module with the CLI
+### Creating a component with the CLI
 
-You can create modules with the built-in `tect create module` command, which
-scaffolds a package module.
+You can create components with the built-in `tect create component` command, which
+scaffolds a package component.
 
-Create a module named `browser`, which installs the `firefox` package:
+Create a component named `browser`, which installs the `firefox` package:
 
 ```sh
-tect create module
+tect create component
 ```
 
 The command prompts for a name, an optional description and supported
-families, then asks whether the module installs a package and which images
+families, then asks whether the component installs a package and which images
 list it:
 
 ```ansi
-module name: browser
+component name: browser
 
 description (optional):
 
 supported base families, separated by spaces (optional):
 
-Does this module install packages? Yes
+Does this component install packages? Yes
 
 package names, separated by spaces: firefox
 
@@ -515,22 +535,22 @@ Which images list it?
 ↑↓ navigate • ␣ toggle • ⏎  confirm • Esc cancel
 ```
 
-Alternatively, you can configure a module with command arguments:
+Alternatively, you can configure a component with command arguments:
 
 ```sh
-tect create module browser --image workstation-2 --pkg firefox
+tect create component browser --image workstation-2 --pkg firefox
 ```
 
-#### `create module` arguments
+#### `create component` arguments
 
-**`--image`**: lists the new module in the named image.
-**`--pkg`**: adds these package names to the module.
+**`--image`**: lists the new component in the named image.
+**`--pkg`**: adds these package names to the component.
 **`--no-tui`**: asks nothing; a command that would prompt fails and names the
 flag. Use it in scripts with all arguments supplied.
 
-Review the `module.kdl` file in `modules/browser/`:
+Review the `manifest.kdl` file in `components/browser/`:
 
-<!-- kdl-file: module.kdl -->
+<!-- kdl-file: manifest.kdl -->
 ```kdl
 schema-version 1
 
@@ -542,13 +562,13 @@ packages "firefox"
 A missing dependency is expensive to catch during the image build or at
 runtime.
 
-Declaring `provides` and `requires` in a module's `module.kdl` manifest lets
+Declaring `provides` and `requires` in a component's `manifest.kdl` manifest lets
 `tect` catch them before the build files are generated.
 
 Since Firefox is a GUI app, it requires a graphical session. Add the following
-line to `modules/browser/module.kdl`:
+line to `components/browser/manifest.kdl`:
 
-<!-- kdl-file: module.kdl -->
+<!-- kdl-file: manifest.kdl -->
 ```kdl
 schema-version 1
 
@@ -557,33 +577,41 @@ packages "firefox"
 requires "graphical-session"
 ```
 
-If you temporarily remove `kde-plasma` from the image file and run `tect check`
-or `tect generate`, `tect` reports the missing dependency immediately:
+If an image lists `browser` and no component in the repository provides
+`graphical-session`, then `tect check` and `tect generate` report the missing
+dependency immediately:
 
 ```
   × `browser` requires `graphical-session`, which nothing enabled provides
-   ╭─[./modules/browser/module.kdl:5:1]
+   ╭─[./components/browser/manifest.kdl:5:1]
  4 │
  5 │ requires "graphical-session"
    · ────┬───
    ·     ╰── unsatisfied
    ╰────
-  help: no module in the repository or its collections declares `provides
-        "graphical-session"`, and neither does the `base` node in
-        ./workstation-2.image.kdl
+  help: no component in the repository declares `provides "graphical-
+        session"`, and neither does the base `base-image/fedora-bootc`. `tect
+        import component` lists what the declared libraries provide
 ```
 
-### Hook modules
+Nothing adds a component to the image on its own. `tect check`'s help names
+each component under `components/` that could provide the capability, to add
+to the image. If none is there, then the help names `tect import component`,
+which lists what the declared libraries provide. `generated/plan.json`
+records whether each component is `listed` or `imported`, and names the
+component that imported it. `tect why` names that component too.
 
-The modules so far add features to the image. A module can also add
+### Hook components
+
+The components so far add features to the image. A component can also add
 functionality to the `tect` tool itself and to the generation stage.
 
 #### Key hook
 
-A module can hook into the key generator, `tect create key`, and add new key
-pairs with the `key` node in its `module.kdl` file. The private key then goes
+A component can hook into the key generator, `tect create key`, and add new key
+pairs with the `key` node in its `manifest.kdl` file. The private key then goes
 into a secrets vault, and the public key is installed at the location the
-module declares in the image.
+component declares in the image.
 
 The `key` node takes these fields:
 
@@ -598,11 +626,11 @@ key "cosign" {
 
 `generator` is one of `cosign`, `openssl` or `ssh-keygen`.
 
-Add the signature-policy module, `updates/signature-policy`, to the image
+Add the signature-policy component, `updates/signature-policy`, to the image
 with:
 
 ```sh
-tect import module updates/signature-policy --image workstation-2
+tect import component updates/signature-policy --image workstation-2
 ```
 
 then create the cosign keys with:
@@ -633,43 +661,43 @@ next:
 > `keys/private/`. `tect create key` warns when nothing ignores the private
 > half.
 
-#### Collection modules
+#### Collection components
 
-A module can also collect and organise files from the modules it depends on.
+A component can also collect and organise files from the components it depends on.
 
-For example, a Flatpak module can collect a `flatpaks.list` file from any
-module in the image.
+For example, a Flatpak component can collect a `flatpaks.list` file from any
+component in the image.
 
 Add Flatpak and Bazaar to workstation-2 with:
 
 ```sh
-tect import module flatpak --image workstation-2
-tect import module apps/bazaar --image workstation-2
+tect import component flatpak --image workstation-2
+tect import component apps/bazaar --image workstation-2
 ```
 
-The Flatpak `module.kdl` at `modules/flatpak` holds:
+The Flatpak `manifest.kdl` at `components/flatpak` holds:
 
 <!-- kdl-fragment -->
 ```kdl
 collects "flatpaks.list" into="/usr/share/flatpak-defaults/apps.list" priority=500
 
-provides "flatpak"
+provides "flatpak" witness="/usr/bin/flatpak"
 ```
 
-The Bazaar module at `modules/apps/bazaar` has a manifest that requires
-`flatpak` and `display-manager`, and a `flatpaks.list` file holding:
+The Bazaar component at `components/apps/bazaar` has a manifest that requires
+`flatpak` and `graphical-session`, and a `flatpaks.list` file holding:
 
 ```text
 io.github.kolunmi.Bazaar
 ```
 
-#### Build helper script modules
+#### Build helper script components
 
-A module can provide build helper scripts to every other module with the
-`helpers` node in `module.kdl`.
+A component can provide build helper scripts to every other component with the
+`helpers` node in `manifest.kdl`.
 
-For example, the `fedora/build-environment` module provides
-`lib/family.sh`, which other modules use to install packages with the right
+For example, the `fedora/build-environment` component provides
+`lib/family.sh`, which other components use to install packages with the right
 command for the family.
 
 ## Check the repository
@@ -689,8 +717,8 @@ tect generate
 ```
 
 This creates a `generated` directory. Each image gets a
-`generated/<image>/` directory holding its `Containerfile`, its module scripts
-under `modules/`, `finalize.sh` and the capability graph (`graph.md`).
+`generated/<image>/` directory holding its `Containerfile`, its component scripts
+under `components/`, `finalize.sh` and the capability graph (`graph.md`).
 `generated/plan.json` records the resolved plan, and `generated/lib/` and
 `generated/scripts/` hold the shared helpers and scripts.
 
@@ -728,14 +756,14 @@ tect summary
 
 <!-- transcript-output: tect summary -->
 ```markdown
-1 module, the ungated set.
+1 component, the ungated set.
 
-| Module | Description | Options | Satisfies | Refuses |
+| Component | Description | Options | Satisfies | Refuses |
 | --- | --- | --- | --- | --- |
 | `kde` |  |  |  |  |
 ```
 
-`tect why bazaar` prints where each part of the Bazaar module came from:
+`tect why bazaar` prints where each part of the Bazaar component came from:
 
 <!-- transcript-command: tect why bazaar -->
 ```sh
@@ -758,7 +786,7 @@ workstation-2
 | --- | --- | --- |
 | provides | `bazaar` | nothing |
 | requires | `flatpak` | flatpak |
-| requires | `display-manager` | desktop-environment/kde-plasma |
+| requires | `graphical-session` | desktop-environment/kde-plasma |
 
 ## What it claims
 
@@ -768,11 +796,11 @@ Nothing. It declares no `satisfies`.
 
 | Content | Hash |
 | --- | --- |
-| declared | `8d53093c778d20bac559dc9697fd2507c6891af5ffb754c8717402c3fd4c171e` |
+| declared | `0329331475c534107db0404630eb33cef466ca52542b1cd67d70b718ca51c07c` |
 
 | Collection | Locator | Selector | Verifier | Tracker |
 | --- | --- | --- | --- | --- |
-| `tectonic-modules` | https://github.com/tectonic-os/library | not declared | not declared | none |
+| `tectonic-components` | https://github.com/tectonic-os/library | not declared | not declared | none |
 
 It tracks its library, and its content still matches what was imported. An edit to it stops `tect check`, `tect generate` and `tect build`.
 
@@ -782,7 +810,7 @@ Nothing. It declares no `asset`.
 
 ## Third-party repositories
 
-None. It declares no `copr` and ships no `repo` file.
+None. It declares no `copr` and ships no `repo.sh` file.
 ```
 
 ## Build the image
@@ -828,6 +856,6 @@ to GitHub, and the workflow builds the image, pushes it to
 `SIGNING_SECRET`, attests its SBOM, and runs the scans. The schedule in the
 workflow comes from `at=`, the image version comes from the build, and
 `tect registry namespace` prints the namespace the image publishes under.
-Pick `update-modules` as well, and the tracked modules are refreshed once a
+Pick `update-components` as well, and the tracked components are refreshed once a
 week.
 [repo.kdl](schema/repo.md#workflows) documents the block.

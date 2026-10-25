@@ -3,20 +3,25 @@ schema-version 1
 image {
     name "Forky"
 
-    base "docker.io/library/debian:forky" {
-        family "debian"
-        requires "bootc-base"
+    base-image {
+        debian-forky
     }
 
     layout {
         bootloader "grub2"
     }
 
-    modules {
-        module "debian-family"
-        module "core/bootc-base"
-        module "core/confined"
-        module "core/menu"
-        module "core/shared"
+    debian-family
+    core {
+        bootc-base
+    }
+    core {
+        confined
+    }
+    core {
+        menu
+    }
+    core {
+        shared
     }
 }

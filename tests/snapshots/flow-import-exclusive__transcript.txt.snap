@@ -12,14 +12,14 @@ Yes
 
 
 example/
-├── modules/
+├── components/
 │   ├── flatpak/
 │   │   ├── files/
 │   │   │   └── usr/
 │   │   │       └── share/
 │   │   │           └── example/
 │   │   │               └── + remotes.list
-│   │   └── + module.kdl
-│   └── + modules.lock.kdl
-└── ~ example.image.kdl  flatpak added to modules, and flathub removed
+│   │   └── + manifest.kdl
+│   └── ~ components.lock.kdl  flatpak recorded
+└── ~ example.image.kdl  flatpak added to components, and flathub removed
 ==== exit 0

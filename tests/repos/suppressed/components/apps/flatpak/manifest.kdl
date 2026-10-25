@@ -1,0 +1,28 @@
+schema-version 1
+
+description "Installs flatpak and enables the remotes an image asks for"
+
+targets "fedora"
+
+provides "flatpak" witness="/usr/bin/flatpak"
+
+option "remotes" type="list" {
+    description "Remotes to enable"
+    default "flathub"
+}
+
+option "system-wide" type="bool" {
+    description "Install remotes for every user rather than the builder"
+    default #true
+}
+
+variant "beta" {
+    description "Flathub and its beta remote"
+    set "remotes" "flathub" "flathub-beta"
+}
+
+packages "flatpak"
+
+satisfies {
+    cis-fedora "9.9.9.9"
+}

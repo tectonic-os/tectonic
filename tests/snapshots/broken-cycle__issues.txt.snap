@@ -1,16 +1,18 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
-  x the module graph has a cycle
-    ,-[tests/repos/broken-cycle/image.kdl:12:9]
- 11 |     modules {
- 12 |         module "core/a"
-    :         ^^^|^^
-    :            `-- waits on `core/b`
- 13 |         module "core/b"
-    :         ^^^|^^
-    :            `-- waits on `core/a`
- 14 |     }
+  x the component graph has a cycle
+    ,-[tests/repos/broken-cycle/image.kdl:11:9]
+ 10 |     core {
+ 11 |         a
+    :         |
+    :         `-- waits on `core/b`
+ 12 |     }
+ 13 |     core {
+ 14 |         b
+    :         |
+    :         `-- waits on `core/a`
+ 15 |     }
     `----
   help: a requirement implies ordering, so a cycle has no build order at all;
-        drop one of the edges, or split the module that closes it
+        drop one of the edges, or split the component that closes it

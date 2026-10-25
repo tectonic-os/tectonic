@@ -7,7 +7,7 @@ Tectonic v{version}
   2) None, only add it to the repository
 Which image is this for? [1-2, 0 for none]: 1
 
-`kernel-freshness` tracks the kernel a module pins, and proposes a bump
+`kernel-freshness` tracks the kernel a component pins, and proposes a bump
 
 Generate the workflows this makes runnable? (Yes/No)
 Yes
@@ -17,10 +17,10 @@ Yes
 
 
 example/
-├── modules/
+├── components/
 │   ├── custom-kernel/
-│   │   └── + module.kdl
-│   └── + modules.lock.kdl
-├── ~ example.image.kdl  custom-kernel added to modules
+│   │   └── + manifest.kdl
+│   └── ~ components.lock.kdl  custom-kernel recorded
+├── ~ example.image.kdl  custom-kernel added to components
 └── ~ repo.kdl  the workflows it generates
 ==== exit 0

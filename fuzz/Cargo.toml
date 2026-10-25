@@ -41,8 +41,8 @@ doc = false
 bench = false
 
 [[bin]]
-name = "module_scripts"
-path = "fuzz_targets/module_scripts.rs"
+name = "component_scripts"
+path = "fuzz_targets/component_scripts.rs"
 test = false
 doc = false
 bench = false

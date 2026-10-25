@@ -4,6 +4,7 @@
 //! tracked `version` gives one manager.
 
 use crate::model::image::List;
+use crate::model::options::VersionTracker;
 use common::json::Json;
 use std::path::{Path, PathBuf};
 
@@ -38,9 +39,10 @@ pub fn file(list: &List) -> Option<String> {
     )
 }
 
-/// One manager for each image file and module whose entry sets `version`,
-/// where the module declares what tracks it. Every entry of the module in that
-/// file carries the same tracker, so one manager matches them all.
+/// One manager for each image file and component whose entry sets `version`,
+/// where the component declares what tracks it. Every entry of the component in that
+/// file carries the same tracker, so one manager matches them all. The base
+/// entry gets one too, which also matches its `digest`.
 fn managers(list: &List) -> Vec<Json> {
     let mut seen: Vec<(String, &str)> = Vec::new();
     let mut managers = Vec::new();
@@ -49,14 +51,39 @@ fn managers(list: &List) -> Vec<Json> {
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
             .expect("an image source is named by its file");
+        let based = image.base_entry.as_ref().zip(image.base.as_ref());
+        if let Some((held, tracker)) = based
+            .filter(|(held, _)| {
+                held.entry
+                    .options
+                    .iter()
+                    .any(|(name, ..)| name == "version")
+            })
+            .and_then(|(held, base)| Some((held, base.tracker.as_ref()?)))
+        {
+            managers.push(manager(
+                &format!("`version` of the base {} in {file}", held.entry.path),
+                &file,
+                vec![
+                    entry_match(&held.entry.path, "version", "currentValue", "[^\"]+"),
+                    entry_match(
+                        &held.entry.path,
+                        "digest",
+                        "currentDigest",
+                        "sha256:[0-9a-f]+",
+                    ),
+                ],
+                tracker,
+            ));
+        }
         for entry in &image.entries {
             if !entry.options.iter().any(|(name, ..)| name == "version") {
                 continue;
             }
             let Some(tracker) = entry
-                .module
+                .component
                 .as_ref()
-                .and_then(|module| module.options.iter().find(|opt| opt.name == "version"))
+                .and_then(|component| component.options.iter().find(|opt| opt.name == "version"))
                 .and_then(|opt| opt.renovate.as_ref())
             else {
                 continue;
@@ -65,38 +92,77 @@ fn managers(list: &List) -> Vec<Json> {
                 continue;
             }
             seen.push((file.clone(), &entry.path));
-            let mut fields = vec![
-                ("customType", Json::string("regex")),
-                (
-                    "description",
-                    Json::string(format!("`version` of {} in {file}", entry.path)),
-                ),
-                (
-                    "managerFilePatterns",
-                    Json::strings([format!("/^{}$/", escaped(&file))]),
-                ),
-                ("matchStrings", Json::strings([entry_match(&entry.path)])),
-                ("datasourceTemplate", Json::string(&tracker.datasource)),
-                ("depNameTemplate", Json::string(&tracker.dep_name)),
-            ];
-            if let Some(extract) = &tracker.extract_version {
-                fields.push(("extractVersionTemplate", Json::string(extract)));
-            }
-            managers.push(Json::object(fields));
+            managers.push(manager(
+                &format!("`version` of {} in {file}", entry.path),
+                &file,
+                vec![entry_match(
+                    &entry.path,
+                    "version",
+                    "currentValue",
+                    "[^\"]+",
+                )],
+                tracker,
+            ));
         }
     }
     managers
 }
 
-/// Builds the pattern that finds the `version` value of the entry for `path`.
-/// The entry name may be quoted or bare. The value must open a line or follow
-/// `{` or `;`, so `kernel-version` and a commented line never match.
-fn entry_match(path: &str) -> String {
-    let path = escaped(path);
-    format!(
-        "module\\s+(?:\"{path}\"|{path}\\s)[^{{\\n;]*\\{{(?:[^}}]*?[;\\n])?\\s*version\\s+\"(?<currentValue>[^\"]+)\""
-    )
+/// Builds one regex manager. Several patterns describe one dependency, so
+/// Renovate combines what they match.
+fn manager(description: &str, file: &str, patterns: Vec<String>, tracker: &VersionTracker) -> Json {
+    let mut fields = vec![
+        ("customType", Json::string("regex")),
+        ("description", Json::string(description)),
+        (
+            "managerFilePatterns",
+            Json::strings([format!("/^{}$/", escaped(file))]),
+        ),
+        ("matchStrings", Json::strings(patterns.clone())),
+        ("datasourceTemplate", Json::string(&tracker.datasource)),
+        ("depNameTemplate", Json::string(&tracker.dep_name)),
+    ];
+    if let Some(extract) = &tracker.extract_version {
+        fields.push(("extractVersionTemplate", Json::string(extract)));
+    }
+    if patterns.len() > 1 {
+        fields.push(("matchStringsStrategy", Json::string("combination")));
+    }
+    Json::object(fields)
 }
+
+/// Builds the pattern that captures the value of the `field` child of the
+/// segment that lists `path`. Each segment name may be quoted or bare. A
+/// segment opens a line or follows `{` or `;`. A bare name ends before a blank
+/// or `{` on its own line, so `kernel-version`, a longer segment and the next
+/// line's block never match. Renovate
+/// compiles the pattern with RE2 where it can, and RE2 has no lookaround. The
+/// field must open a line or follow `{` or `;` inside the last segment's
+/// block. Renovate combines a base's `version` and `digest` matches, so it
+/// replaces the digest with the version it moves to.
+fn entry_match(path: &str, field: &str, group: &str, value: &str) -> String {
+    let segment = |part: &str| {
+        let part = escaped(part);
+        format!("(?:^|[\\s{{;])(?:\"{part}\"|{part})(?:[ \\t][^{{\\n;]*)?\\{{")
+    };
+    let parts: Vec<&str> = path.split('/').collect();
+    let (last, parents) = parts.split_last().expect("a component path has a segment");
+    let mut pattern: String = parents
+        .iter()
+        .map(|part| format!("{}{SIBLINGS}", segment(part)))
+        .collect();
+    pattern.push_str(&segment(last));
+    pattern.push_str(&format!(
+        "(?:{SIBLINGS}[;\\n])?\\s*{field}\\s+\"(?<{group}>{value})\""
+    ));
+    pattern
+}
+
+/// Matches the text in front of a node inside its parent's block. A
+/// sibling's block is taken whole, three levels deep, so a namesake inside
+/// another segment never matches. A regular expression cannot count braces,
+/// so a sibling nested deeper stops the match.
+const SIBLINGS: &str = r"(?:[^{}]|\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\})*?";
 
 /// Escapes each regular expression metacharacter. Renovate may compile the
 /// pattern as a JavaScript expression with the `u` flag. That flag refuses an
@@ -133,6 +199,15 @@ mod tests {
     fn the_template_holds_both_markers() {
         assert!(TEMPLATE.contains(POLICY));
         assert!(TEMPLATE.contains(MANAGERS));
+    }
+
+    /// RE2 refuses a lookaround, and Renovate then drops the whole manager.
+    #[test]
+    fn a_pattern_holds_no_lookaround() {
+        let pattern = entry_match("apps/browser", "version", "currentValue", "[^\"]+");
+        for lookaround in ["(?=", "(?!", "(?<=", "(?<!"] {
+            assert!(!pattern.contains(lookaround), "{pattern}");
+        }
     }
 
     #[test]

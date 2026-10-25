@@ -7,13 +7,13 @@ Tectonic v{version}
   2) None, only add it to the repository
 Which image is this for? [1-2, 0 for none]: 1
 
-The selected modules have dependencies not currently provided by the images:
+The selected components have dependencies not currently provided by the images:
 
   needs-family > fedora-bootc:44
     requires: build-environment
-    provider module: fedora-family
+    provider component: fedora-family
 
-Add these provider modules now? (Yes/No)
+Add these provider components now? (Yes/No)
 Yes
 
 Track upstream for `fedora-family` and `needs-family`? (Yes/No)
@@ -21,13 +21,13 @@ Yes
 
 
 example/
-├── modules/
+├── components/
 │   ├── fedora-family/
 │   │   ├── lib/
 │   │   │   └── + family.sh
-│   │   └── + module.kdl
+│   │   └── + manifest.kdl
 │   ├── needs-family/
-│   │   └── + module.kdl
-│   └── + modules.lock.kdl
-└── ~ example.image.kdl  fedora-family and needs-family added to modules
+│   │   └── + manifest.kdl
+│   └── ~ components.lock.kdl  fedora-family and needs-family recorded
+└── ~ example.image.kdl  fedora-family and needs-family added to components
 ==== exit 0

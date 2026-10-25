@@ -1,0 +1,11 @@
+schema-version 1
+
+description "Provides what the base already provides"
+
+targets "fedora"
+
+helpers "lib/two/shared.sh"
+provides {
+    "rechunking"
+    "shell-tools" exclusive=#true
+}

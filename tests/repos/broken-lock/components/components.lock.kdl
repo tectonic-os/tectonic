@@ -1,0 +1,19 @@
+component "core/edited" {
+    library "upstream"
+    path "edited"
+    content "0000000000000000000000000000000000000000000000000000000000000000"
+    track
+}
+
+component "core/gone" {
+    library "upstream"
+    path "gone"
+    content "0000000000000000000000000000000000000000000000000000000000000000"
+    track
+}
+
+component "core/owned" {
+    library "upstream"
+    path "owned"
+    content "0000000000000000000000000000000000000000000000000000000000000000"
+}

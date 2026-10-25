@@ -1,0 +1,12 @@
+schema-version 1
+
+description "A viewer imported under a local name, whose entry sits on one line"
+
+targets "fedora"
+
+packages "eog"
+
+option "version" type="string" {
+    default "3.0"
+    renovate datasource="github-releases" depName="GNOME/eog" extractVersion="^v(?<version>.+)$"
+}

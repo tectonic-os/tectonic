@@ -1,0 +1,11 @@
+---
+source: tests/golden.rs
+---
+4 components, the ungated set.
+
+| Component | Description | Options | Satisfies | Refuses |
+| --- | --- | --- | --- | --- |
+| `hello` |  |  |  |  |
+| `menu` |  |  |  |  |
+| `apps` |  |  |  |  |
+| `apps/editor` |  |  |  |  |

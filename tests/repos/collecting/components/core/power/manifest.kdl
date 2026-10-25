@@ -1,0 +1,7 @@
+schema-version 1
+
+description "Power recipes, contributed to the menu after the defaults"
+
+targets "fedora"
+
+contributes "justfile.inc" priority=900

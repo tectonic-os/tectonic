@@ -1,24 +1,24 @@
 ---
 source: tests/golden/harness.rs
 ---
-  x `modules/core/edited` tracks its library, and its content no longer
+  x `components/core/edited` tracks its library, and its content no longer
   | matches its lock entry
-   ,-[tests/repos/broken-lock/modules/modules.lock.kdl:1:1]
- 1 | module "core/edited" {
-   : ^^^|^^
-   :    `-- this entry
+   ,-[tests/repos/broken-lock/components/components.lock.kdl:1:1]
+ 1 | component "core/edited" {
+   : ^^^^|^^^^
+   :     `-- this entry
  2 |     library "upstream"
    `----
-  help: undo the edit to `modules/core/edited`, or run `tect set module core/
-        edited --untracked` to make the copy the repository's own
+  help: undo the edit to `components/core/edited`, or run `tect set component
+        core/edited --untracked` to make the copy the repository's own
 
-  x `modules/core/gone` tracks its library, and the directory is missing
-   ,-[tests/repos/broken-lock/modules/modules.lock.kdl:8:1]
+  x `components/core/gone` tracks its library, and the directory is missing
+   ,-[tests/repos/broken-lock/components/components.lock.kdl:8:1]
  7 | 
- 8 | module "core/gone" {
-   : ^^^|^^
-   :    `-- this entry
+ 8 | component "core/gone" {
+   : ^^^^|^^^^
+   :     `-- this entry
  9 |     library "upstream"
    `----
-  help: restore `modules/core/gone` from version control, or run `tect fetch
-        modules core/gone` to copy it again
+  help: restore `components/core/gone` from version control, or run `tect
+        fetch components core/gone` to copy it again

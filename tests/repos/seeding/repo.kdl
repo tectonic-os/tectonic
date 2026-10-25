@@ -4,13 +4,13 @@ name "Seeding"
 seed "example" collection="tectonic-os"
 
 sources {
-    modules "tectonic-os" {
+    components "tectonic-os" {
         url "https://github.com/tectonic-os/modules"
         version "v1.0.0"
         sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
     }
-    modules "scratch" {
-        dir "../modules"
+    components "scratch" {
+        dir "../components"
     }
 }
 

@@ -24,9 +24,9 @@ graph LR
     m0["kde"]
 ```
 ==== tect summary
-1 module, the ungated set.
+1 component, the ungated set.
 
-| Module | Description | Options | Satisfies | Refuses |
+| Component | Description | Options | Satisfies | Refuses |
 | --- | --- | --- | --- | --- |
 | `kde` |  |  |  |  |
 ==== tect why bazaar
@@ -44,7 +44,7 @@ workstation-2
 | --- | --- | --- |
 | provides | `bazaar` | nothing |
 | requires | `flatpak` | flatpak |
-| requires | `display-manager` | desktop-environment/kde-plasma |
+| requires | `graphical-session` | desktop-environment/kde-plasma |
 
 ## What it claims
 
@@ -54,11 +54,11 @@ Nothing. It declares no `satisfies`.
 
 | Content | Hash |
 | --- | --- |
-| declared | `8d53093c778d20bac559dc9697fd2507c6891af5ffb754c8717402c3fd4c171e` |
+| declared | `0329331475c534107db0404630eb33cef466ca52542b1cd67d70b718ca51c07c` |
 
 | Collection | Locator | Selector | Verifier | Tracker |
 | --- | --- | --- | --- | --- |
-| `tectonic-modules` | https://github.com/tectonic-os/library | not declared | not declared | none |
+| `tectonic-components` | https://github.com/tectonic-os/library | not declared | not declared | none |
 
 It tracks its library, and its content still matches what was imported. An edit to it stops `tect check`, `tect generate` and `tect build`.
 
@@ -68,7 +68,7 @@ Nothing. It declares no `asset`.
 
 ## Third-party repositories
 
-None. It declares no `copr` and ships no `repo` file.
+None. It declares no `copr` and ships no `repo.sh` file.
 ==== tect build
 tect: tags workstation-1:latest
 ==== IMAGE_REGISTRY=ghcr.io/example tect registry ref

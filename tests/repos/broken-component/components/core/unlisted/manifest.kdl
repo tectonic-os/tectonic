@@ -1,0 +1,7 @@
+schema-version 1
+
+description "Sits on disk without being listed"
+targets "fedora"
+
+flies "a kite"
+provides "Shell|Tools"

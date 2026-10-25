@@ -3,13 +3,14 @@ schema-version 1
 image {
     name "Signing"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking" "initramfs-generation"
+    base-image {
+        fedora-bootc-44
     }
 
-    modules {
-        module "kernel/signed-kernel"
-        module "drivers/kvmfr"
+    kernel {
+        signed-kernel
+    }
+    drivers {
+        kvmfr
     }
 }

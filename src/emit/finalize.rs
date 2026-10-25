@@ -1,5 +1,5 @@
 //! The finalize step: the collected files assembled from their parts, then
-//! every module's finalize hook, both named here in the order the resolved
+//! every component's finalize hook, both named here in the order the resolved
 //! plan put them in.
 
 use crate::layout;
@@ -19,27 +19,19 @@ pub fn path(image: &Image) -> PathBuf {
     layout::generated_image(&image.id).join("finalize.sh")
 }
 
-/// Every module directory whose finalize hook this image runs, in build order
-/// and without the repeat a module listed under two flavours would produce,
+/// Every component directory whose finalize hook this image runs, in build order
+/// and without the repeat a component listed under two flavours would produce,
 /// each with the hooks it ships: its own, then the one under the base family's
-/// directory. A module shipping only the gated one runs only on that family.
+/// directory. A component shipping only the gated one runs only on that family.
 pub fn hooks<'a>(image: &'a Image, root: &Path) -> Vec<(&'a Entry, Vec<String>)> {
     let family = image.base.as_ref().map_or("", |base| base.family.as_str());
     image
         .entries
         .iter()
-        .filter(|entry| entry.module.is_some())
+        .filter(|entry| entry.component.is_some())
         .filter_map(|entry| {
-            let dir = layout::modules(root).join(&entry.path);
-            let found: Vec<String> = std::iter::once(String::new())
-                .chain(
-                    layout::family_dirs(&dir, family)
-                        .into_iter()
-                        .map(|gated| format!("{gated}/")),
-                )
-                .filter(|at| dir.join(at).join("finalize.sh").is_file())
-                .map(|at| format!("{at}finalize.sh"))
-                .collect();
+            let dir = layout::components(root).join(&entry.path);
+            let found = layout::layered(&dir, family, layout::FINALIZE_SCRIPT);
             (!found.is_empty()).then_some((entry, found))
         })
         .collect()
@@ -72,12 +64,12 @@ rm -rf {dest}.d
     }
 
     for (entry, scripts) in hooks {
-        let dir = format!("/ctx/modules/{}", entry.path);
+        let dir = format!("/ctx/components/{}", entry.path);
         let sourced: String = scripts
             .iter()
             .map(|script| format!("source {dir}/{script}\n"))
             .collect();
-        let mut body = format!("MODDIR={dir}\nexport MODDIR\n{sourced}");
+        let mut body = format!("COMPONENT_DIR={dir}\nexport COMPONENT_DIR\n{sourced}");
         if let Some(flavour) = &entry.flavour {
             body = body
                 .lines()
@@ -86,6 +78,22 @@ rm -rf {dest}.d
             body = format!("if [ \"${{FLAVOUR:-}}\" = \"{flavour}\" ]; then\n{body}fi\n");
         }
         let _ = write!(out, "\n# ---- {} ----\n{body}", entry.path);
+    }
+
+    // The final layer receives IMAGE_VERSION, so it writes the version and
+    // the PRETTY_NAME fallback that contains it.
+    for entry in &image.entries {
+        if entry
+            .component
+            .as_ref()
+            .is_some_and(|component| super::containerfile::renders_os_release(image, component))
+        {
+            let _ = write!(
+                out,
+                "\n# ---- os-release ----\n{}\n",
+                super::containerfile::flavoured(entry.flavour.as_deref(), "/ctx/tect os-release")
+            );
+        }
     }
 
     // The tail interpolates nothing, so it lives beside this file where

@@ -5,7 +5,7 @@
 use crate::diag::{Issue, Issues};
 use crate::layout;
 use crate::model::image::List;
-use crate::parse::module::rpm;
+use crate::parse::component::rpm;
 use std::path::{Path, PathBuf};
 
 /// What a workflow cannot run without, which is shown beside it and refused
@@ -16,7 +16,7 @@ pub enum Needs {
     /// The disk workflow: it dies in the SELinux relabel, `setfiles` against a
     /// policy a deb image does not carry.
     Selinux,
-    /// A module taking a `KERNEL` build arg, which is what it tracks.
+    /// A component taking a `KERNEL` build arg, which is what it tracks.
     Kernel,
 }
 
@@ -27,7 +27,7 @@ impl Needs {
         match self {
             Self::Nothing => "",
             Self::Selinux => "needs a fedora or rhel image",
-            Self::Kernel => "needs a module taking a KERNEL arg",
+            Self::Kernel => "needs a component taking a KERNEL arg",
         }
     }
 }
@@ -100,7 +100,7 @@ pub const SHIPPED: &[Shipped] = &[
     ),
     shipped!(
         "kernel-freshness",
-        "tracks the kernel a module pins, and proposes a bump",
+        "tracks the kernel a component pins, and proposes a bump",
         Needs::Kernel,
         Some((-3, "*"))
     ),
@@ -114,8 +114,8 @@ pub const SHIPPED: &[Shipped] = &[
         Some((-9, "1"))
     ),
     shipped!(
-        "update-modules",
-        "refreshes tracked modules and opens a pull request",
+        "update-components",
+        "refreshes tracked components and opens a pull request",
         Needs::Nothing,
         Some((-7, "1"))
     ),
@@ -136,7 +136,7 @@ pub struct Basis {
 }
 
 impl Basis {
-    /// A repository already declared. `kernel` is a module taking the arg the
+    /// A repository already declared. `kernel` is a component taking the arg the
     /// freshness workflow flips, which is a fact about the repository.
     pub fn of(list: &List) -> Self {
         Self {
@@ -146,13 +146,13 @@ impl Basis {
                 .any(|image| image.base.as_ref().is_some_and(|base| rpm(&base.family))),
             kernel: list.images.iter().any(|image| {
                 image
-                    .modules()
-                    .any(|module| module.args.iter().any(|arg| arg.name == KERNEL_ARG))
+                    .components()
+                    .any(|component| component.args.iter().any(|arg| arg.name == KERNEL_ARG))
             }),
         }
     }
 
-    /// The one being scaffolded, which has a base and no modules yet.
+    /// The one being scaffolded, which has a base and no components yet.
     pub fn scaffolding(family: &str) -> Self {
         Self {
             selinux: rpm(family),
@@ -163,7 +163,7 @@ impl Basis {
 
 const KERNEL_ARG: &str = "KERNEL";
 
-/// The workflows a module declaring `args` would make runnable that the
+/// The workflows a component declaring `args` would make runnable that the
 /// repository does not already declare. Nothing where the block names a
 /// workflow the tool does not ship, since it cannot be rewritten without
 /// dropping that line.

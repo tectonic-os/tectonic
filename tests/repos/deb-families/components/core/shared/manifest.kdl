@@ -1,0 +1,12 @@
+schema-version 1
+
+description "A component both the Debian and Ubuntu images enable"
+
+targets "debian" "ubuntu"
+
+packages "curl"
+
+on "debian" { packages "git" }
+on "ubuntu" { packages "vim" }
+
+contributes "justfile.inc" priority=900

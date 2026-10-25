@@ -1,0 +1,7 @@
+schema-version 1
+
+description "Provides the same capability as another enabled component"
+
+targets "arch"
+
+provides "shell-tools"

@@ -1,0 +1,26 @@
+schema-version 1
+
+description "A kernel that signs its own modules against a Secure Boot key"
+
+targets "fedora"
+
+provides {
+    "kernel-devel"
+    "kernel-devel-helpers" witness="/usr/libexec/kernel-devel-helpers.sh" build-only=#true
+}
+
+key "secureboot" {
+    generator "openssl" profile="module-signing" bits=4096
+    public "/usr/share/secureboot/sb_cert.der" format="der"
+    private "MOK.priv"
+}
+
+requires "initramfs-generation"
+
+arg "KERNEL"
+secret "mok_privkey"
+
+satisfies {
+    cis-fedora "1.1.1.1" "5.2.20"
+    stig "RHEL-09-232010"
+}

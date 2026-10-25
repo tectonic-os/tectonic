@@ -1,0 +1,7 @@
+schema-version 1
+
+description "Requires what the imported component provides"
+
+targets "fedora"
+
+requires "hello"

@@ -34,6 +34,8 @@ source: tests/golden/harness.rs
       "allows": [],
       "layout": null,
       "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
         "scap_content": "",
@@ -41,32 +43,7 @@ source: tests/golden/harness.rs
         "provides": [
           "rechunking"
         ],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -83,7 +60,7 @@ source: tests/golden/harness.rs
           "default": true,
           "pr": true,
           "siblings": [],
-          "modules": [
+          "components": [
             {
               "path": "core/configurable",
               "flavour": null,
@@ -95,14 +72,20 @@ source: tests/golden/harness.rs
               },
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "e72396aee3a78323972b864bd948528af9c4cf2f9b0bfefa175dc72f1149cf8f",
+                "defined": null,
+                "content": "b627423d24f4f2af379aa8896fd0c7e4607e29b2d0460d746ff85f2685c917fc",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []

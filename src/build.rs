@@ -3,8 +3,8 @@
 
 use crate::emit::plan::{contract_files, of_target, pinned, preset_files, provides, unique_pairs};
 use crate::layout;
+use crate::model::component::Component;
 use crate::model::image::{List, NO_FLAVOUR};
-use crate::model::module::Module;
 use crate::provenance::build as record;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
@@ -74,7 +74,10 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
     let (list, resolved) = (gate.list, gate.resolved);
     let (image, flavour, entries) =
         of_target(&list, &target).ok_or_else(|| format!("`{target}` has no image"))?;
-    let modules: Vec<&Module> = entries.iter().filter_map(|e| e.module.as_ref()).collect();
+    let components: Vec<&Component> = entries
+        .iter()
+        .filter_map(|e| e.component.as_ref())
+        .collect();
     let presets = list
         .images
         .iter()
@@ -106,19 +109,20 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
     // the remote can answer.
     let mut resolutions = Vec::new();
     let mut unresolved = Vec::new();
-    for (module, asset) in pinned(&modules) {
+    for (component, asset) in pinned(&components) {
         let Some(url) = asset.pin.url.as_deref().filter(|_| asset.pin.cloned()) else {
             continue;
         };
-        let named = format!("`{}` asset `{}`", module.path, asset.name);
+        let named = format!("`{}` asset `{}`", component.path, asset.name);
         let Some(version) = asset.pin.version.as_deref() else {
             unresolved.push(format!("{named} names no `version` to resolve"));
             continue;
         };
         match record::clone_commit(url, version) {
-            Some(commit) => {
-                resolutions.push(format!("{}|{}|{version}|{commit}", module.path, asset.name))
-            }
+            Some(commit) => resolutions.push(format!(
+                "{}|{}|{version}|{commit}",
+                component.path, asset.name
+            )),
             None => unresolved.push(format!(
                 "{named} did not resolve {version} to a commit at {url}"
             )),
@@ -160,7 +164,7 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
         true => String::new(),
         false => crate::scap::datastream(&list, Some(&target))?,
     };
-    // Both lists include the base, which claims the way a module does.
+    // Both lists include the base, which claims the way a component does.
     let (scap_claimed, scap_refused) = crate::scap::exclusions(image);
     let mut build_args = vec![
         format!("FLAVOUR={}", flavour.unwrap_or_default()),
@@ -168,11 +172,11 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
         format!("IMAGE_REGISTRY={}", namespace.clone().unwrap_or_default()),
         format!(
             "CONTRACT_FILES={}",
-            contract_files(image, &modules).join(" ")
+            contract_files(image, &components).join(" ")
         ),
         format!(
             "VERIFY_EXCEPTIONS={}",
-            unique_pairs(&modules, |m| m
+            unique_pairs(&components, |m| m
                 .verify_exceptions
                 .iter()
                 .map(|e| (e.class.clone(), e.unit.clone()))
@@ -182,7 +186,7 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
             .collect::<Vec<_>>()
             .join(" ")
         ),
-        format!("MODULE_PRESETS={}", presets.join(" ")),
+        format!("COMPONENT_PRESETS={}", presets.join(" ")),
         format!(
             "LUKS_INITRAMFS={}",
             provides(image, &entries, crate::emit::recipe::LUKS_INITRAMFS)
@@ -205,8 +209,8 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
         format!("SCAP_REFUSED={}", scap_refused.join(" ")),
         format!("TARGET={target}"),
         format!(
-            "MODULE_HASHES={}",
-            modules
+            "COMPONENT_HASHES={}",
+            components
                 .iter()
                 .filter_map(|m| m.content.as_ref().map(|c| format!("{}|{c}", m.path)))
                 .collect::<Vec<_>>()
@@ -454,7 +458,7 @@ fn build_uki(root: &Path, invocation: &Invocation) -> Result<(), String> {
     if !text.contains("${SPLIT_BASE}") || !text.contains("ARG COMPOSEFS_DIGEST") {
         return Err(format!(
             "{} carries no two-pass seal (`FROM ${{SPLIT_BASE}}` and `ARG COMPOSEFS_DIGEST`); \
-             the module collection providing its boot chain predates this tool, so update it, \
+             the component collection providing its boot chain predates this tool, so update it, \
              then run `tect generate`",
             containerfile.display()
         ));
@@ -626,7 +630,7 @@ fn validate_argv(root: &Path, tag: &str, build_args: &[String]) -> Vec<String> {
     for name in [
         "CONTRACT_FILES",
         "VERIFY_EXCEPTIONS",
-        "MODULE_PRESETS",
+        "COMPONENT_PRESETS",
         "LUKS_INITRAMFS",
         "FAMILY",
     ] {

@@ -3,8 +3,8 @@ source: tests/golden/harness.rs
 ---
 Tectonic v{version}
 
-Error: The upstream/signature-policy module must be imported before creating cosign keys.
-You can add it with `tect import module upstream/signature-policy`
+Error: The upstream/signature-policy component must be imported before creating cosign keys.
+You can add it with `tect import component upstream/signature-policy`
 
 Run 'tect --help' to list the commands
 ==== exit 1

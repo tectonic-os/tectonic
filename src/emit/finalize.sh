@@ -105,11 +105,11 @@ if [ -L /usr/local.bak ]; then
 fi
 shopt -u dotglob
 
-# ---- module presets ----
-apply_module_presets() {
+# ---- component presets ----
+apply_component_presets() {
     local scope="$1" dir="$2" flag=() f verb unit
     [ "$scope" = user ] && flag=(--global)
-    for f in "$dir"/45-module-*.preset; do
+    for f in "$dir"/45-component-*.preset; do
         [ -f "$f" ] || continue
         while read -r verb unit; do
             case "$verb" in
@@ -120,8 +120,8 @@ apply_module_presets() {
         done < "$f"
     done
 }
-apply_module_presets system /usr/lib/systemd/system-preset
-apply_module_presets user /usr/lib/systemd/user-preset
+apply_component_presets system /usr/lib/systemd/system-preset
+apply_component_presets user /usr/lib/systemd/user-preset
 
 # ---- /var to tmpfiles ----
 # `rpm-ostree` walks /var at base compose time and writes these rules; nothing

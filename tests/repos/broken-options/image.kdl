@@ -3,13 +3,12 @@ schema-version 1
 image {
     name "Broken Options"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking"
+    base-image {
+        fedora-bootc-44
     }
 
-    modules {
-        module "core/configurable" variant="nonexistent" {
+    core {
+        configurable variant="nonexistent" {
             fonts "Fira Code"
             starship "yes"
             colour "blue"

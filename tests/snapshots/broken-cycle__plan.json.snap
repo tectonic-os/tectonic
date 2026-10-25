@@ -34,6 +34,8 @@ source: tests/golden/harness.rs
       "allows": [],
       "layout": null,
       "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
         "scap_content": "",
@@ -41,40 +43,7 @@ source: tests/golden/harness.rs
         "provides": [
           "rechunking"
         ],
-        "witnesses": {
-          "a": [
-            "/usr/bin/a",
-            "/usr/sbin/a"
-          ],
-          "b": [
-            "/usr/bin/b",
-            "/usr/sbin/b"
-          ],
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -91,7 +60,7 @@ source: tests/golden/harness.rs
           "default": true,
           "pr": true,
           "siblings": [],
-          "modules": [
+          "components": [
             {
               "path": "core/a",
               "flavour": null,
@@ -104,14 +73,25 @@ source: tests/golden/harness.rs
               "requires": [
                 "b"
               ],
+              "met_by": {
+                "b": {
+                  "how": "listed",
+                  "provider": "core/b"
+                }
+              },
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "cc7260e120776948474867b27673339ef476705a15f43407eefd1a790d959edb",
+                "defined": null,
+                "content": "703db1ad8d1d5b6b99e166f6f422f0c25d22957c6444d780e08a1956ee7a37b9",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -128,14 +108,25 @@ source: tests/golden/harness.rs
               "requires": [
                 "a"
               ],
+              "met_by": {
+                "a": {
+                  "how": "listed",
+                  "provider": "core/a"
+                }
+              },
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "87804fe68af87a65168f0eb720b2914bb0fc09790e7a2e07a4a1af272e629f11",
+                "defined": null,
+                "content": "6195dadd4fb59d7b6d09045989b7901fc39dd17084250e13920923a94a56204c",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []

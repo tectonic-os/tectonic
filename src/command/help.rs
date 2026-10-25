@@ -54,7 +54,7 @@ It asks, in order:
    give the account.
 3. On GitHub, choose whether to create the remote repository now.
 4. Choose whether to add a first image. Then name it and choose its base.
-5. If the base needs modules, choose whether to add them.
+5. If the base needs components, choose whether to add them.
 6. If the repository syncs to a host, choose the CI workflows. Then choose
    whether images publish and scan only on scheduled builds, and give the daily
    build time.
@@ -62,7 +62,7 @@ It asks, in order:
 8. Review every answer, change any of them, and choose Create."#;
 
 pub(super) const CREATE_REPO_NOTES: &str = r#"> [!WARNING]
-> The `tectonic-modules` source that `repo.kdl` declares is `unpinned`. Each
+> The `tectonic-components` source that `repo.kdl` declares is `unpinned`. Each
 > fetch takes the head of its branch, and no hash checks what arrives. To pin
 > it, add `version` and `sha256` beside its `url`.
 
@@ -85,31 +85,36 @@ It asks, in order:
 1. Name the image. The repository name is the default.
 2. Choose the base from the catalog. If `--base` names a base outside the
    catalog, then choose its family.
-3. If the base needs modules that the image does not list, such as the family
-   adapter, choose whether to add them from the declared collections. Each
-   one is copied into `modules/` and recorded in `modules/modules.lock.kdl`. A
-   module the repository already holds is listed as it is."#;
+3. If the base imports no build environment, choose whether to add the
+   family adapter. If the base requires a component that the image does not
+   list, choose whether to add its providers. Each one comes from the declared
+   collections, is copied into `components/` and is recorded in
+   `components/components.lock.kdl`. A component the repository already holds
+   is listed as it is.
+
+The components a library base imports are copied into `components/` beside
+it, and the image file lists none of them."#;
 
 pub(super) const CREATE_IMAGE_NOTES: &str = r#"> [!NOTE]
 > A base outside the catalog asks for its family and writes no `provides`.
-> `tect check` then reports each capability that no module provides.
+> `tect check` then reports each capability that no component provides.
 >
 > If the repository declares no `default-image`, then a second image adds one
 > to `repo.kdl` that names the first image. A bare `tect build` then builds what
 > it built before.
 >
-> To offer the base's modules, it reads the declared collections, and fetches a
+> To offer the base's components, it reads the declared collections, and fetches a
 > collection that is not on this machine. With no terminal, it fetches
 > nothing.
 >
-> The base's modules are the family adapter and a provider of each capability
-> that the base requires. The family adapter is the module that `supports` the
+> The base's components are the family adapter and a provider of each capability
+> that the base requires. The family adapter is the component that `targets` the
 > family and `provides "build-environment"`."#;
 
 pub(super) const CREATE_FLAVOUR: &str = r#"Adds a flavour to an image. A flavour is a second build of the image with more
-modules, published as `<image>-<flavour>` beside the image. This command
-declares the flavour in the image's `flavours` block. To add a module to the
-flavour, run `tect create module` or `tect import module` and choose the
+components, published as `<image>-<flavour>` beside the image. This command
+declares the flavour in the image's `flavours` block. To add a component to the
+flavour, run `tect create component` or `tect import component` and choose the
 flavour.
 
 It asks, in order:
@@ -124,47 +129,52 @@ pub(super) const CREATE_FLAVOUR_NOTES: &str = r#"> [!NOTE]
 > It refuses a name that the image already declares, and `none`, which names
 > the image's own build."#;
 
-pub(super) const CREATE_MODULE: &str = r#"Writes a new module, `modules/<name>/module.kdl`, and offers to list it in an
+pub(super) const CREATE_COMPONENT: &str = r#"Writes a new component, `components/<name>/manifest.kdl`, and offers to list it in an
 image. The name can be a path, so `apps/firefox` writes
-`modules/apps/firefox/module.kdl`.
+`components/apps/firefox/manifest.kdl`.
 
 It asks, in order:
 
-1. Name the module.
+1. Name the component.
 2. Optionally describe it.
 3. Optionally restrict it to named base families.
 4. Choose whether it installs packages, then name them.
 5. Choose the images and flavours that list it."#;
 
-pub(super) const CREATE_MODULE_NOTES: &str = r#"> [!NOTE]
-> With no `supports` declaration, a module supports every base family. It
-> writes packages outside a family gate so every supported family installs
+pub(super) const CREATE_COMPONENT_NOTES: &str = r#"> [!NOTE]
+> With no `targets` declaration, a component targets every base family. It
+> writes packages outside a family gate so every targeted family installs
 > them. A package name that differs by family goes in a `family` block.
 > The build installs them through the family adapter, with `dnf install -y` on
 > Fedora and RHEL, and with `apt-get update`, `apt-get install -y` and
 > `apt-get clean` on Debian and Ubuntu.
 >
-> An image and one of its own flavours cannot both list the module. The image
+> An image and one of its own flavours cannot both list the component. The image
 > entry already reaches every flavour of that image.
 >
-> No image is an answer. The module exists, and no image lists it yet. Leaving
+> No image is an answer. The component exists, and no image lists it yet. Leaving
 > the picker writes nothing."#;
 
-pub(super) const IMPORT_MODULE: &str = r#"Copies a module from a library into `modules/<name>`, and records it in
-`modules/modules.lock.kdl`: the library, the module's path there, the
+pub(super) const IMPORT_COMPONENT: &str = r#"Copies a component from a library into `components/<name>`, and records it in
+`components/components.lock.kdl`: the library, the component's path there, the
 library's revision and the content hash. The repository holds the copy, so a
 fetch never changes it.
 
 It asks, in order:
 
-1. Choose the image or flavour the modules are for, or none.
-2. Choose the modules. A module that the image's base family cannot build is
-   listed as unavailable, with the reason beside it.
-3. If the repository already holds a module at that path, choose to list the
-   local module or to import the library's under another name. The name
+1. Choose the image or flavour the components are for, or none.
+2. Choose the components. A component that the image's base family cannot build,
+   and a base component, are listed as unavailable, with the reason beside
+   them.
+3. If the repository already holds a component at that path, choose to list the
+   local component or to import the library's under another name. The name
    offered is `<name>@1`.
-4. Choose whether to add the modules that they require.
-5. If a module provides a capability that an entry in the same image or
+4. If several library components provide one capability that they require,
+   choose one. Then choose whether to add the components that they require. A
+   requirement whose `provider` reads an option takes the answer as that
+   option's value on the component's entry, and the provider is copied in
+   without an entry of its own.
+5. If a component provides a capability that an entry in the same image or
    flavour declares exclusive, or the other way round, choose to replace that
    entry or cancel.
 6. Choose whether to generate the CI workflows that they make runnable.
@@ -172,7 +182,7 @@ It asks, in order:
    against.
 8. Choose whether the copies track upstream."#;
 
-pub(super) const IMPORT_MODULE_NOTES: &str = r#"> [!WARNING]
+pub(super) const IMPORT_COMPONENT_NOTES: &str = r#"> [!WARNING]
 > A pinned library is downloaded once and checked against its hash. An
 > `unpinned` library is downloaded each time with no check, and
 > `audit { enforce #true }` refuses it.
@@ -184,18 +194,20 @@ pub(super) const IMPORT_MODULE_NOTES: &str = r#"> [!WARNING]
 > A bare name is searched for in every library. `<owner>/<name>` picks
 > between two libraries that both hold it.
 >
-> It refuses a module that the image already lists, and a module that the
+> It refuses a component that the image already lists, and a component that the
 > image's base family cannot build.
 >
 > A tracked copy carries `track` in its lock entry. An untracked copy is the
 > repository's own, and its entry keeps where it came from.
 >
 > Without a terminal, the copies are tracked, and an image lists them only
-> where `--image` names one. A named module at a path the repository already
+> where `--image` names one. A named component at a path the repository already
 > holds is refused, and so is an exclusive clash. A provider that
-> `--dependencies` brings is listed as the repository holds it.
+> `--dependencies` brings is listed as the repository holds it. If several
+> library components provide one requirement, then `--dependencies` refuses and
+> names each.
 >
-> If the user declines a required module, then the file stays valid, and
+> If the user declines a required component, then the file stays valid, and
 > `tect check` names the import that would satisfy it."#;
 
 pub(super) const CREATE_GIT: &str = r#"Puts the directory under git control, so a hand-written repository is under
@@ -214,7 +226,7 @@ pub(super) const CREATE_SCRIPTS: &str = r#"Copies a script that `tect` supplies 
 owns it. Git tracks the copy, the user can review and change it, and a `tect`
 upgrade does not replace it. The scripts are:
 
-- `Containerfile.skeleton`, the Containerfile around the generated module layers
+- `Containerfile.skeleton`, the Containerfile around the generated component layers
 - `lint.sh`, `tect.sh`, `smoke.sh` and `vm.sh`, which `tect generate` otherwise
   writes into `generated/scripts/`
 
@@ -235,7 +247,7 @@ pub(super) const CREATE_SCRIPTS_NOTES: &str = r#"> [!NOTE]
 >
 > `tect create repo` asks the same question, with the skeleton chosen."#;
 
-pub(super) const CREATE_KEY: &str = r#"Generates a key that a module in the repository declares. The public half goes
+pub(super) const CREATE_KEY: &str = r#"Generates a key that a component in the repository declares. The public half goes
 under `keys/public/`, at the path it has in the image. The private half goes
 under `keys/private/`, which git ignores.
 
@@ -246,7 +258,7 @@ It makes each kind with its own tool:
 - `openssl profile="module-signing"` makes the Secure Boot certificate that
   signs the kernel and its modules. Set the private half as the `MOK_PRIVKEY`
   repository secret, and `$MOK_KEY_PATH` points a local build at it. It
-  writes the `format` that the module declares, and `sign-file` and `mokutil`
+  writes the `format` that the component declares, and `sign-file` and `mokutil`
   read DER.
 - `openssl profile="pcr-signing"` makes the RSA pair that signs the PCR 11
   policy of a sealed UKI. Set the private half as the `PCR_PRIVKEY` repository
@@ -274,12 +286,12 @@ pub(super) const CREATE_KEY_NOTES: &str = r#"> [!WARNING]
 > If `.gitignore` does not cover `keys/private/`, then it says so and does not
 > edit the file.
 >
-> If no module declares the kind, then it names a module in the declared
-> collections that does, and the `tect import module` line that adds it."#;
+> If no component declares the kind, then it names a component in the declared
+> collections that does, and the `tect import component` line that adds it."#;
 
 pub(super) const SET_KEY: &str = r#"Records the public half of a key that the user already holds, in place of
 generating one. Use it for an existing cosign key, MOK certificate or SSH key.
-It writes to the path that the module's `public` declaration gives.
+It writes to the path that the component's `public` declaration gives.
 
 It asks, in order:
 
@@ -301,11 +313,11 @@ pub(super) const SET_KEY_NOTES: &str = r#"> [!WARNING]
 > - `pcr-signing` takes a bare PEM public key.
 > - `ssh-keygen` takes an OpenSSH key line."#;
 
-pub(super) const SET_MODULE: &str = r#"Makes an imported module the repository's own copy. The module stops tracking
-its library, so `tect fetch modules` passes it over, and the user may edit it.
+pub(super) const SET_COMPONENT: &str = r#"Makes an imported component the repository's own copy. The component stops tracking
+its library, so `tect fetch components` passes it over, and the user may edit it.
 With no `--untracked`, it asks first. With no terminal, it needs the flag."#;
 
-pub(super) const SET_MODULE_NOTES: &str = r#"> [!NOTE]
+pub(super) const SET_COMPONENT_NOTES: &str = r#"> [!NOTE]
 > The lock entry keeps the library, the path and the content hash, so `tect
 > why` still says where the copy came from and reads out each later edit."#;
 
@@ -329,13 +341,14 @@ pub(super) const SET_WORKFLOWS_NOTES: &str = r#"> [!NOTE]
 > Each schedule is an offset from the daily build time, so a new daily time
 > moves every schedule."#;
 
-pub(super) const SET_LIBRARY: &str = r#"Adds a library to the `sources` block in `repo.kdl`: the default library of
-that kind, or a source the user types. A source of the same kind and alias is
-replaced, so the declaration moves to what the user chose.
+pub(super) const SET_LIBRARY: &str = r#"Adds a library to the `sources` block in `repo.kdl`: the default library, or
+a source the user types. A library holds components and base components alike. A
+source with the same alias is replaced, so the declaration moves to what the
+user chose.
 
 It asks, in order:
 
-1. Choose the default library of that kind, or another source.
+1. Choose the default library, or another source.
 2. For another source, give its alias, its HTTPS Git URL and the directory
    inside the repository."#;
 
@@ -348,7 +361,7 @@ It asks, in order:
 
 1. If the repository holds several images, choose one.
 2. Choose the profile.
-3. Choose whether to import the collection modules that claim rules of the
+3. Choose whether to import the collection components that claim rules of the
    profile that nothing in the image claims yet."#;
 
 pub(super) const SET_CONFORMS_NOTES: &str = r#"> [!NOTE]
@@ -361,17 +374,17 @@ pub(super) const SET_CONFORMS_NOTES: &str = r#"> [!NOTE]
 > If no `--datastream` is given and no SCAP content is installed for the
 > image's family, then it stops and names `scap-security-guide`.
 >
-> The import offer covers collection modules only. A module in the repository
-> needs a line in the image's `modules` block, and `tect check` names it."#;
+> The import offer covers collection components only. A component in the repository
+> needs its path segments in the image, and `tect check` names it."#;
 
-pub(super) const SET_CLAIMS: &str = r#"Chooses the benchmark rules that a module in the repository claims to cover,
+pub(super) const SET_CLAIMS: &str = r#"Chooses the benchmark rules that a component in the repository claims to cover,
 and writes their numbers into its `satisfies` block. A claim says what the
-module supplies, and `tect scap` measures whether the built image keeps it.
+component supplies, and `tect scap` measures whether the built image keeps it.
 
 It asks, in order:
 
 1. Choose the profile that the rules come from.
-2. Choose the rules that the module claims."#;
+2. Choose the rules that the component claims."#;
 
 pub(super) const SET_CLAIMS_NOTES: &str = r#"> [!NOTE]
 > A group chooses every rule under it. The file holds the number of each rule,
@@ -385,8 +398,8 @@ pub(super) const SET_CLAIMS_NOTES: &str = r#"> [!NOTE]
 >
 > No rule removes the `satisfies` block. Leaving the picker changes nothing.
 >
-> A module that declares `supports` uses the installed content for its first
-> named family by default. A module with no `supports` declaration has no
+> A component that declares `targets` uses the installed content for its first
+> named family by default. A component with no `targets` declaration has no
 > single default, so name `--datastream`. If that content is not installed, the
 > command stops and names `scap-security-guide`.
 >
@@ -394,27 +407,27 @@ pub(super) const SET_CLAIMS_NOTES: &str = r#"> [!NOTE]
 > number resolves against the datastream, never against the benchmark name."#;
 
 pub(super) const CHECK: &str = r#"Reads every file in the repository and reports each problem at the line that
-caused it. Run it after an edit. The last line counts the images, the modules,
-the flavours and the listed modules that the base already provides."#;
+caused it. Run it after an edit. The last line counts the images, the components,
+the flavours and the listed components that the base already provides."#;
 
 pub(super) const CHECK_NOTES: &str = r#"> [!NOTE]
 > It also reports these findings, which do not change the exit code:
 >
 > - A collection describes a base differently from the catalog.
 > - A collection is `unpinned`.
-> - An image `conforms` to a profile, and no listed module claims a rule of it.
-> - A `module.kdl` sits inside the directory of another collection module.
+> - An image `conforms` to a profile, and no listed component claims a rule of it.
+> - A `manifest.kdl` sits inside the directory of another collection component.
 >
 > With `--datastream`, it also counts the rules of each declared profile that
-> no listed module claims, and names the modules that would claim them.
+> no listed component claims, and names the components that would claim them.
 > `tect scap content` prints the path to give it."#;
 
 pub(super) const GENERATE: &str = r#"Writes the build files, and the CI workflows that `repo.kdl` names. Run it
 after a change to a KDL file. `tect build` refuses build files that are not
-current. It reads only the repository's own modules. It writes:
+current. It reads only the repository's own components. It writes:
 
 - `generated/<image>/Containerfile`, one for each image
-- `generated/<image>/modules/<module>.sh`, the build script of each module
+- `generated/<image>/components/<component>.sh`, the build script of each component
 - `generated/<image>/finalize.sh`
 - `generated/<image>/graph.md` and `graph.json`, the capability graph
 - `generated/plan.json`
@@ -423,7 +436,7 @@ current. It reads only the repository's own modules. It writes:
 - `.github/renovate.json5`, if `repo.kdl` holds a `renovate` block"#;
 
 pub(super) const GENERATE_NOTES: &str = r#"> [!NOTE]
-> It clears `generated/` first, so the files of a removed image or module go
+> It clears `generated/` first, so the files of a removed image or component go
 > too. It removes only the workflows that `tect` ships, and keeps the
 > repository's own.
 >
@@ -478,20 +491,20 @@ pub(super) const VM_NOTES: &str = r#"> [!NOTE]
 > installed machine updates from `$IMAGE_REGISTRY`. `run iso` keeps the installed disk
 > under `out/bootiso/storage/`, so a reboot tests what was installed.
 >
-> If a module imports `passwd.hashed-password.*`, then `run` and `spawn` add a
+> If a component imports `passwd.hashed-password.*`, then `run` and `spawn` add a
 > `tect` account for the console and ask for its password. `VM_USER` changes the
 > account, and `VM_PASSWORD_HASH` gives a crypt(5) hash for a run with no
 > terminal. The account is set on the first boot only."#;
 
-pub(super) const SECTION: &str = r#"Prints the generated Containerfile module section of one image, or of the
+pub(super) const SECTION: &str = r#"Prints the generated Containerfile component section of one image, or of the
 default image if none is named."#;
 
 pub(super) const GRAPH: &str = r#"Prints the capability graph of the default image. The graph shows what provides
 each capability, what requires it, what only orders against it, and what the
 base already carries."#;
 
-pub(super) const COVERAGE: &str = r#"Prints each rule of the profile that an image `conforms` to, with the module
-that claims it. If no module claims a rule, then it names a module in the
+pub(super) const COVERAGE: &str = r#"Prints each rule of the profile that an image `conforms` to, with the component
+that claims it. If no component claims a rule, then it names a component in the
 repository or its collections that would. It uses the default image if none is
 named, and a terminal picks one."#;
 
@@ -506,7 +519,7 @@ pub(super) const COVERAGE_NOTES: &str = r#"> [!NOTE]
 > gets markdown, so `tect coverage > report.md` exports it.
 >
 > A rule with an empty `Number` cell has no number that a `satisfies` can name,
-> so no module can claim it."#;
+> so no component can claim it."#;
 
 pub(super) const PLAN: &str = r#"Prints every fact that the repository derives as one JSON document. The
 document holds the images, the targets of each image, and what each target is
@@ -518,7 +531,7 @@ with what the repository holds: `generated/`, the declared workflows and
 missing, and each file under `generated/` that nothing writes. Every build runs
 it first."#;
 
-pub(super) const SUMMARY: &str = r#"Prints a markdown table of what one target is made of. Each row is a module
+pub(super) const SUMMARY: &str = r#"Prints a markdown table of what one target is made of. Each row is a component
 that the target builds, with its description and the options it resolved. A CI
 build writes the table into its job summary."#;
 
@@ -528,7 +541,7 @@ came from, so CI merges this into the SBOM that the scan produces."#;
 
 pub(super) const SCAP: &str = r#"Reads the report of one scan against the datastream that produced it, and
 prints what they say about the target as markdown. The report shows what each
-module claimed and what was measured, the score against each profile of the
+component claimed and what was measured, the score against each profile of the
 datastream, and what stopped passing since the last scan."#;
 
 pub(super) const SCAP_NOTES: &str = r#"> [!NOTE]
@@ -536,9 +549,9 @@ pub(super) const SCAP_NOTES: &str = r#"> [!NOTE]
 > rule is a fault in the declaration, and the image is not at fault. A declared
 > profile that the datastream does not carry is a finding.
 >
-> A claimed rule that the image fails names the module that claimed it. If
-> another module replaced a file of the claiming module, then it names that
-> module too.
+> A claimed rule that the image fails names the component that claimed it. If
+> another component replaced a file of the claiming component, then it names that
+> component too.
 >
 > `--baseline` keeps a pass set. A rule that passed the last scan and fails now
 > is a finding, and each run writes the new pass set, so a deliberate
@@ -589,7 +602,7 @@ pub(super) const RECIPE_NOTES: &str = r#"> [!NOTE]
 > `hostname` is the published name. It is the one value that the user is
 > expected to replace."#;
 
-pub(super) const WHY: &str = r#"Prints what one module is and where every byte of it came from. It lists the
+pub(super) const WHY: &str = r#"Prints what one component is and where every byte of it came from. It lists the
 targets that build it, what it provides and requires, and what it claims to
 harden. It also lists the collection and pin it came from, whether it was
 edited since, what it fetches, and whether it adds a package repository."#;
@@ -603,11 +616,11 @@ pub(super) const WHY_NOTES: &str = r#"> [!NOTE]
 > this `tect` does not read, and names both versions. `tect plan --json` still
 > prints the document.
 >
-> A module that tracks its library and was edited since its import is refused,
-> so `tect why` stops. An untracked module edited since its import is said
+> A component that tracks its library and was edited since its import is refused,
+> so `tect why` stops. An untracked component edited since its import is said
 > plainly, and it is not an error.
 >
-> `tect` does not read a `repo` file, so it points at the file and prints the
+> `tect` does not read a `repo.sh` file, so it points at the file and prints the
 > URLs it found."#;
 
 pub(super) const OS_RELEASE: &str = r#"Writes the image identity, which the build arguments carry, into
@@ -616,7 +629,7 @@ pub(super) const OS_RELEASE: &str = r#"Writes the image identity, which the buil
 pub(super) const BUILD_RECORD: &str = r#"Writes `/usr/share/tectonic/build.json`, the record of what the build resolved.
 The baked `manifest.json` beside it holds what the repository declared. The
 record holds the digest of the base, the commit of each cloned asset, the source
-commit, the `tect` release, the target, the content hash of each module, and
+commit, the `tect` release, the target, the content hash of each component, and
 whether enforcement was on.
 
 No file under `generated/` holds the record, so `tect verify` never compares
@@ -631,22 +644,22 @@ It runs inside a build:
 - `rpm` installs the package, on an rpm family
 - `deb` installs the package, on a deb family"#;
 
-pub(super) const FETCH_MODULES: &str = r#"Refreshes each tracked module from the library that its lock entry names, as
-`sources` in `repo.kdl` declares that library now. It replaces the module's
-files, and records the new content hash and revision in the lock. A module
-whose library has not moved stays as it is. The scheduled `update-modules`
+pub(super) const FETCH_COMPONENTS: &str = r#"Refreshes each tracked component from the library that its lock entry names, as
+`sources` in `repo.kdl` declares that library now. It replaces the component's
+files, and records the new content hash and revision in the lock. A component
+whose library has not moved stays as it is. The scheduled `update-components`
 workflow runs it and opens a pull request."#;
 
-pub(super) const FETCH_MODULES_NOTES: &str = r#"> [!WARNING]
-> A tracked module whose content no longer matches its lock entry stops the
+pub(super) const FETCH_COMPONENTS_NOTES: &str = r#"> [!WARNING]
+> A tracked component whose content no longer matches its lock entry stops the
 > update before anything is written. Undo the edit, or make the copy the
-> repository's own with `tect set module <path> --untracked`.
+> repository's own with `tect set component <path> --untracked`.
 
 > [!NOTE]
-> A tracked module whose directory is missing is copied again. A module that
-> another module's directory holds has its own lock entry, so the refresh of
-> the outer module leaves it in place."#;
+> A tracked component whose directory is missing is copied again. A component that
+> another component's directory holds has its own lock entry, so the refresh of
+> the outer component leaves it in place."#;
 
 pub(super) const VALIDATE_IMAGE: &str = r#"Runs every check that a built image has to pass. The build gives it the preset
-files of the enabled modules, and it fails on each one that the image does not
+files of the enabled components, and it fails on each one that the image does not
 have."#;

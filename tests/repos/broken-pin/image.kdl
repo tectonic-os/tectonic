@@ -3,20 +3,17 @@ schema-version 1
 image {
     name "Broken Pin"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking"
+    base-image {
+        fedora-bootc-44
     }
 
-    modules {
-        module "loose" {
-            pin {
-                url "http://example.com/modules.zip"
-                path "/etc/passwd"
-            }
+    loose {
+        pin {
+            url "http://example.com/components.zip"
+            path "/etc/passwd"
         }
-        source "one" {
-            module "remote"
-        }
+    }
+    source "one" {
+        remote
     }
 }

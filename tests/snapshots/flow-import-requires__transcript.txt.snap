@@ -7,13 +7,13 @@ Tectonic v{version}
   2) None, only add it to the repository
 Which image is this for? [1-2, 0 for none]: 1
 
-The selected modules have dependencies not currently provided by the images:
+The selected components have dependencies not currently provided by the images:
 
   browser > fedora-bootc:44
     requires: flatpak
-    provider module: flatpak
+    provider component: flatpak
 
-Add these provider modules now? (Yes/No)
+Add these provider components now? (Yes/No)
 Yes
 
 Track upstream for `flatpak` and `browser`? (Yes/No)
@@ -21,16 +21,16 @@ Yes
 
 
 example/
-├── modules/
+├── components/
 │   ├── browser/
-│   │   └── + module.kdl
+│   │   └── + manifest.kdl
 │   ├── flatpak/
 │   │   ├── files/
 │   │   │   └── usr/
 │   │   │       └── share/
 │   │   │           └── example/
 │   │   │               └── + remotes.list
-│   │   └── + module.kdl
-│   └── + modules.lock.kdl
-└── ~ example.image.kdl  flatpak and browser added to modules
+│   │   └── + manifest.kdl
+│   └── ~ components.lock.kdl  flatpak and browser recorded
+└── ~ example.image.kdl  flatpak and browser added to components
 ==== exit 0

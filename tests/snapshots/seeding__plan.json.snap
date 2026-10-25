@@ -34,6 +34,8 @@ source: tests/golden/harness.rs
       "allows": [],
       "layout": null,
       "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
         "scap_content": "",
@@ -42,29 +44,8 @@ source: tests/golden/harness.rs
           "rechunking"
         ],
         "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
           "flatpak": [
             "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
           ]
         },
         "requires": [],
@@ -94,7 +75,7 @@ source: tests/golden/harness.rs
               "published": "example-nvidia"
             }
           ],
-          "modules": [
+          "components": [
             {
               "path": "fedora-family",
               "flavour": null,
@@ -105,14 +86,20 @@ source: tests/golden/harness.rs
                 "build-environment"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "3723ca1c2c425222dcc4ca69f9262963278dfbefe7f6cc5c588df27aa5278209",
+                "defined": null,
+                "content": "1657e7d2d58210a215309d2e0803b7fa58b82613c1b96bef63ec97ae7df436de",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -121,10 +108,12 @@ source: tests/golden/harness.rs
               "path": "hello",
               "flavour": null,
               "variant": null,
-              "description": "A module this repository writes and publishes",
+              "description": "A component this repository writes and publishes",
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [
                 {
@@ -138,9 +127,13 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "95c6ac797c60f0ae7f7bdcb93f1752061fe8e7eb4109abcaa36b4800420ad03b",
+                "defined": null,
+                "content": "fd3c031c50af3533886a0def0a92fe3888bd2fbac321667da37d058a5ad07666",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -149,7 +142,7 @@ source: tests/golden/harness.rs
               "path": "flatpak",
               "flavour": null,
               "variant": "beta",
-              "description": "A module imported from the collection this repository publishes",
+              "description": "A component imported from the collection this repository publishes",
               "options": {
                 "OPT_REMOTES": "flathub flathub-beta",
                 "OPT_SYSTEM_WIDE": "0"
@@ -158,7 +151,11 @@ source: tests/golden/harness.rs
                 "flatpak"
               ],
               "requires": [],
-              "files": {},
+              "met_by": {},
+              "removes": [],
+              "files": {
+                "flatpak": "/usr/bin/flatpak"
+              },
               "packages": [
                 {
                   "family": "fedora",
@@ -171,7 +168,8 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "92b59a9174674c7508a790d68206326d8816d9b17a472093acace7b6ee01a114",
+                "defined": null,
+                "content": "deb16d7bc597e50fb1c20f6f0fbd4d550031efaaf306125a53679675367c12be",
                 "repo": false,
                 "imported": {
                   "library": "tectonic-os",
@@ -189,6 +187,9 @@ source: tests/golden/harness.rs
                   },
                   "tracked": true
                 }
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -221,7 +222,7 @@ source: tests/golden/harness.rs
               "published": "example"
             }
           ],
-          "modules": [
+          "components": [
             {
               "path": "fedora-family",
               "flavour": null,
@@ -232,14 +233,20 @@ source: tests/golden/harness.rs
                 "build-environment"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "3723ca1c2c425222dcc4ca69f9262963278dfbefe7f6cc5c588df27aa5278209",
+                "defined": null,
+                "content": "1657e7d2d58210a215309d2e0803b7fa58b82613c1b96bef63ec97ae7df436de",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -248,10 +255,12 @@ source: tests/golden/harness.rs
               "path": "hello",
               "flavour": null,
               "variant": null,
-              "description": "A module this repository writes and publishes",
+              "description": "A component this repository writes and publishes",
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [
                 {
@@ -265,9 +274,13 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "95c6ac797c60f0ae7f7bdcb93f1752061fe8e7eb4109abcaa36b4800420ad03b",
+                "defined": null,
+                "content": "fd3c031c50af3533886a0def0a92fe3888bd2fbac321667da37d058a5ad07666",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -276,7 +289,7 @@ source: tests/golden/harness.rs
               "path": "flatpak",
               "flavour": null,
               "variant": "beta",
-              "description": "A module imported from the collection this repository publishes",
+              "description": "A component imported from the collection this repository publishes",
               "options": {
                 "OPT_REMOTES": "flathub flathub-beta",
                 "OPT_SYSTEM_WIDE": "0"
@@ -285,7 +298,11 @@ source: tests/golden/harness.rs
                 "flatpak"
               ],
               "requires": [],
-              "files": {},
+              "met_by": {},
+              "removes": [],
+              "files": {
+                "flatpak": "/usr/bin/flatpak"
+              },
               "packages": [
                 {
                   "family": "fedora",
@@ -298,7 +315,8 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "92b59a9174674c7508a790d68206326d8816d9b17a472093acace7b6ee01a114",
+                "defined": null,
+                "content": "deb16d7bc597e50fb1c20f6f0fbd4d550031efaaf306125a53679675367c12be",
                 "repo": false,
                 "imported": {
                   "library": "tectonic-os",
@@ -317,6 +335,9 @@ source: tests/golden/harness.rs
                   "tracked": true
                 }
               },
+              "origin": {
+                "how": "listed"
+              },
               "satisfies": [],
               "refuses": []
             },
@@ -324,10 +345,12 @@ source: tests/golden/harness.rs
               "path": "drivers",
               "flavour": "nvidia",
               "variant": null,
-              "description": "A module only one flavour builds",
+              "description": "A component only one flavour builds",
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [
                 {
@@ -341,9 +364,13 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "5fcdb6d8bc34a3d70056fc31385d8d31f3f8f07a04c21b045e07de975b4209c1",
+                "defined": null,
+                "content": "44b3527a8df4588fb97df9a7570afc0b25b9514f24d95da407c08e14df593094",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []

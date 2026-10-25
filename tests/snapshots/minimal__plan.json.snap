@@ -37,6 +37,8 @@ source: tests/golden/harness.rs
         "bootloader": "grub2"
       },
       "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
         "scap_content": "",
@@ -44,32 +46,7 @@ source: tests/golden/harness.rs
         "provides": [
           "rechunking"
         ],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -86,7 +63,7 @@ source: tests/golden/harness.rs
           "default": true,
           "pr": true,
           "siblings": [],
-          "modules": [
+          "components": [
             {
               "path": "fedora-family",
               "flavour": null,
@@ -97,14 +74,20 @@ source: tests/golden/harness.rs
                 "build-environment"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "90fed2e5b6c345fb0d615059da327f1499bdd2b1748756caf0e3e772455466f9",
+                "defined": null,
+                "content": "893be5ba24118e8a9f68ae39f30c20b7c415dca45f18aa406c8c8f00f02b375b",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -113,10 +96,12 @@ source: tests/golden/harness.rs
               "path": "core/hello",
               "flavour": null,
               "variant": null,
-              "description": "The smallest module a repository can hold",
+              "description": "The smallest component a repository can hold",
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [
                 {
@@ -150,9 +135,13 @@ source: tests/golden/harness.rs
                 }
               ],
               "provenance": {
-                "content": "33877acc20d198115512d34f23bc7481d0cd20ff656dc49e6931a2aa7986e318",
+                "defined": null,
+                "content": "5397e8faff956d7988d4c15ce672506ecc23d667ed77f91fd83601df5b64db9a",
                 "repo": true,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []

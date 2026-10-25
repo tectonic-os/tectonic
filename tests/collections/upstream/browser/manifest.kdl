@@ -1,0 +1,7 @@
+schema-version 1
+
+description "A browser, from the first collection"
+
+targets "fedora"
+
+packages "firefox"

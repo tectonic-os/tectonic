@@ -1,7 +1,0 @@
-schema-version 1
-
-description "Requires what the imported module provides"
-
-supports "fedora"
-
-requires "hello"

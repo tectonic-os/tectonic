@@ -1,4 +1,4 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 

@@ -5,17 +5,17 @@ Tectonic v{version}
 
   1) grouped/hardening/coredumps
   2) namesake/sandbox/coredumps
-`coredumps` names more than one module; which one [1-2, 0 for none]: 1
+`coredumps` names more than one component; which one [1-2, 0 for none]: 1
 
 Track upstream for `hardening/coredumps`? (Yes/No)
 Yes
 
 
 example/
-├── modules/
+├── components/
 │   ├── hardening/
 │   │   └── coredumps/
-│   │       └── + module.kdl
-│   └── + modules.lock.kdl
-└── ~ example.image.kdl  hardening/coredumps added to modules
+│   │       └── + manifest.kdl
+│   └── ~ components.lock.kdl  hardening/coredumps recorded
+└── ~ example.image.kdl  hardening/coredumps added to components
 ==== exit 0

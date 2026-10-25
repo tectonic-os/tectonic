@@ -1,10 +1,10 @@
 ---
 source: tests/golden.rs
 ---
-3 modules, the ungated set.
+3 components, the ungated set.
 
-| Module | Description | Options | Satisfies | Refuses |
+| Component | Description | Options | Satisfies | Refuses |
 | --- | --- | --- | --- | --- |
 | `debian-family` | apt, which every Debian-family build layer reaches for |  |  |  |
 | `core/menu` | Collects the justfile fragments the rest of the image contributes |  |  |  |
-| `core/shared` | A module both the Debian and Ubuntu images enable |  |  |  |
+| `core/shared` | A component both the Debian and Ubuntu images enable |  |  |  |

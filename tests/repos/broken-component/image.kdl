@@ -1,0 +1,22 @@
+schema-version 1
+
+image {
+    name "Broken Component"
+
+    base-image {
+        fedora-bootc-44
+    }
+
+    core {
+        nameless
+    }
+    core {
+        missing
+    }
+    core {
+        latin
+    }
+    core {
+        nameless
+    }
+}

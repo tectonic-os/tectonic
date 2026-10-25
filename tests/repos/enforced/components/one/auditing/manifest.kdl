@@ -1,0 +1,9 @@
+schema-version 1
+
+description "Claims one rule the image does not list a component for, and one it does"
+
+targets "fedora"
+
+satisfies {
+    cis-fedora "1.1.1.1" "4.1.3.1"
+}

@@ -1,5 +1,0 @@
-schema-version 1
-
-description "Coredump lockdown, from a collection that groups what it holds"
-
-supports "fedora"

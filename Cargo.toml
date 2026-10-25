@@ -6,7 +6,7 @@ edition = "2021"
 # toolchain.
 rust-version = "1.95"
 publish = false
-description = "Reads the image files and the per-module module.kdl manifests"
+description = "Reads the image files and the per-component manifest.kdl manifests"
 
 [features]
 fuzzing = ["dep:tempfile"]

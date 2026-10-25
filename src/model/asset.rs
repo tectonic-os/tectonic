@@ -1,4 +1,4 @@
-//! Asset pins: the upstream payloads a module fetches, as data.
+//! Asset pins: the upstream payloads a component fetches, as data.
 
 use crate::diag::Span;
 use crate::provenance::Evidence;
@@ -17,7 +17,7 @@ impl Asset {
         format!("ASSET_{}", self.name.to_uppercase().replace('-', "_"))
     }
 
-    /// Every env pair this asset puts on its module's layer, in the order they
+    /// Every env pair this asset puts on its component's layer, in the order they
     /// are written: the pin, where it comes from, what it must hash to.
     pub fn env(&self) -> Vec<(String, String)> {
         let prefix = self.env_prefix();

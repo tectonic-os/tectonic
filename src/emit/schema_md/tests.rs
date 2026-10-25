@@ -75,13 +75,16 @@ fn the_page_opens_on_the_file_and_its_scaffold() {
 }
 
 /// Source fields belong to the typed source the repository scaffolds and do
-/// not leak into an image module's independent pin.
+/// not leak into an image component's independent pin.
 #[test]
 fn a_shared_node_is_scaffolded_only_where_its_block_names_it() {
     let image = file(&SECTIONS[1], Show::Scaffold);
-    assert!(!image.contains("tectonic-modules"), "{image}");
+    assert!(!image.contains("tectonic-components"), "{image}");
     let repo = file(&SECTIONS[0], Show::Scaffold);
-    assert!(repo.contains("modules \"tectonic-modules\" {"), "{repo}");
+    assert!(
+        repo.contains("components \"tectonic-components\" {"),
+        "{repo}"
+    );
     assert!(repo.contains("        url "), "{repo}");
 }
 
@@ -148,16 +151,16 @@ fn a_nested_section_shows_the_blocks_that_hold_it() {
 /// block that two files share is documented on each of their pages.
 #[test]
 fn a_shared_block_is_documented_on_each_page_that_holds_it() {
-    assert!(page(Area::Module).contains("<a id=\"asset-pin\"></a>"));
-    assert!(page(Area::Repo).contains("<a id=\"sources-modules-url\"></a>"));
+    assert!(page(Area::Component).contains("<a id=\"asset-pin\"></a>"));
+    assert!(page(Area::Repo).contains("<a id=\"sources-components-url\"></a>"));
 }
 
 #[test]
 fn a_node_already_documented_links_back() {
-    let out = page(Area::Module);
+    let out = page(Area::Component);
     let gate = out
-        .find("## `family` (optional, repeatable)")
-        .expect("the family section");
+        .find("## `on` (optional, repeatable)")
+        .expect("the on section");
     assert!(
         out[gate..].contains("| [`packages`](#packages) (optional,&nbsp;repeatable) |"),
         "{out}"
@@ -197,7 +200,7 @@ fn only_an_undeclared_block_scaffolds_every_depth() {
     let marked = scaffold(Area::Repo);
     assert!(marked.iter().any(|p| p == "renovate/*/**"), "{marked:?}");
     assert!(
-        marked.iter().any(|p| p == "sources/modules/url"),
+        marked.iter().any(|p| p == "sources/components/url"),
         "{marked:?}"
     );
     assert!(

@@ -1,0 +1,12 @@
+schema-version 1
+
+description "KDE, gaming and hardware support over kinoite-main"
+provides {
+    "rechunking"
+    "flatpak" witness="/usr/bin/flatpak"
+}
+base "ghcr.io/ublue-os/bazzite:stable" {
+    family "fedora"
+    scap-content "ssg-fedora-ds.xml"
+    bootloader "grub2"
+}

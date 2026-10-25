@@ -1,0 +1,6 @@
+schema-version 1
+
+base "docker.io/library/debian:forky" {
+    family "debian"
+}
+requires "bootc-base"

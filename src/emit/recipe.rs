@@ -144,7 +144,7 @@ pub fn refusal(list: &List, name: &str) -> String {
     format!(
         "`{name}` answers no {}, and guessing one erases a disk before it fails to \
          boot\n\nhelp: declare it in the image's `layout {{ }}`; the bootloader is one \
-         the base's file in its base-images library lists",
+         what the base component lists",
         unanswered(&base.family, image.layout.as_ref(), &image.boot).join(", ")
     )
 }

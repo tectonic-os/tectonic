@@ -1,11 +1,10 @@
 ---
 source: tests/golden/harness.rs
-assertion_line: 50
 ---
 ### Base Image
 FROM ${BASE} AS rootfs
 
-## Module layers
+## Component layers
 
 # ---- /opt build root ----
 RUN mv /opt /opt.bak && mkdir /opt
@@ -16,44 +15,44 @@ RUN if [ -L /usr/local ]; then mv /usr/local /usr/local.bak && \
     /usr/local/lib /usr/local/lib64 /usr/local/libexec /usr/local/share /usr/local/src; fi
 
 # ---- core/menu ----
-RUN --mount=type=bind,from=ctx,source=/modules/core/menu,target=/ctx/modules/core/menu \
+RUN --mount=type=bind,from=ctx,source=/components/core/menu,target=/ctx/components/core/menu \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
-    --mount=type=bind,from=ctx,source=/generated/broken-collect/modules/core/menu.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-collect/components/core/menu.sh,target=/ctx/component.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/module.sh
+    bash /ctx/component.sh
 
 # ---- core/absent ----
-RUN --mount=type=bind,from=ctx,source=/modules/core/absent,target=/ctx/modules/core/absent \
+RUN --mount=type=bind,from=ctx,source=/components/core/absent,target=/ctx/components/core/absent \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
-    --mount=type=bind,from=ctx,source=/generated/broken-collect/modules/core/absent.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-collect/components/core/absent.sh,target=/ctx/component.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/module.sh
+    bash /ctx/component.sh
 
 # ---- core/unclaimed ----
-RUN --mount=type=bind,from=ctx,source=/modules/core/unclaimed,target=/ctx/modules/core/unclaimed \
+RUN --mount=type=bind,from=ctx,source=/components/core/unclaimed,target=/ctx/components/core/unclaimed \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
-    --mount=type=bind,from=ctx,source=/generated/broken-collect/modules/core/unclaimed.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-collect/components/core/unclaimed.sh,target=/ctx/component.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/module.sh
+    bash /ctx/component.sh
 
 # ---- core/shipper ----
-RUN --mount=type=bind,from=ctx,source=/modules/core/shipper,target=/ctx/modules/core/shipper \
+RUN --mount=type=bind,from=ctx,source=/components/core/shipper,target=/ctx/components/core/shipper \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
-    --mount=type=bind,from=ctx,source=/generated/broken-collect/modules/core/shipper.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-collect/components/core/shipper.sh,target=/ctx/component.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/module.sh
+    bash /ctx/component.sh
 
 # ---- flavour gate ----
 ARG FLAVOUR
@@ -76,10 +75,6 @@ ARG SCAP_REFUSED=
 ARG IMAGE_ID="broken-collect"
 ARG IMAGE_NAME="Broken Collect"
 ARG IMAGE_REGISTRY=""
-
-# ---- os-release ----
-RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
-    IMAGE_VERSION="${IMAGE_VERSION}" IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" /ctx/tect os-release
 
 # ---- finalize ----
 RUN --mount=type=bind,from=ctx,source=/generated/broken-collect/finalize.sh,target=/ctx/finalize.sh \

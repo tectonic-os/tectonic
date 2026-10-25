@@ -1,4 +1,4 @@
-//! What paths a typed name names: the one rule `why` reads a module name by,
+//! What paths a typed name names: the one rule `why` reads a component name by,
 //! lifted so `import` and `copy` cannot drift into a second spelling of it.
 
 /// Whether `given` names `path`: an exact match, or a suffix the `/` before
@@ -12,7 +12,7 @@ pub(crate) fn named(path: &str, given: &str) -> bool {
 }
 
 /// Every path `given` names. An exact path wins outright, so that the full
-/// name of a module is always a way to say it — otherwise `a/x` beside
+/// name of a component is always a way to say it — otherwise `a/x` beside
 /// `b/a/x` would leave the first one with no name a person could type.
 pub(crate) fn matching(paths: &[String], given: &str) -> Vec<String> {
     if let Some(exact) = paths.iter().find(|path| *path == given) {
@@ -30,7 +30,7 @@ mod tests {
     use super::matching;
 
     #[test]
-    fn module_names_are_unambiguous_suffixes() {
+    fn component_names_are_unambiguous_suffixes() {
         let paths = vec![
             "one/hardening/coredumps".to_string(),
             "two/coredumps".to_string(),
@@ -44,7 +44,7 @@ mod tests {
         );
     }
 
-    /// The full path always names one module, even where it is also the tail
+    /// The full path always names one component, even where it is also the tail
     /// of another: without this the shorter of the two has no name at all.
     #[test]
     fn an_exact_path_beats_a_suffix() {

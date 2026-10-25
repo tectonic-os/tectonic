@@ -3,20 +3,25 @@ schema-version 1
 image {
     name "Network"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking" "selinux-policy"
+    base-image {
+        fedora-bootc-44
     }
 
     layout {
         bootloader "grub2"
     }
 
-    modules {
-        module "fedora-family"
-        module "core/tools"
-        module "core/fetcher"
-        module "core/quiet"
-        module "core/spliced"
+    fedora-family
+    core {
+        tools
+    }
+    core {
+        fetcher
+    }
+    core {
+        quiet
+    }
+    core {
+        spliced
     }
 }

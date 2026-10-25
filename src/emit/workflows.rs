@@ -173,15 +173,15 @@ mod tests {
         assert!(!pushed.contains("workflow_run"), "{pushed}");
     }
 
-    /// A build reads the plan off the committed modules, so a fetch step would
+    /// A build reads the plan off the committed components, so a fetch step would
     /// make CI build something the repository does not hold. The update
     /// workflow commits what it fetches to a pull request.
     #[test]
-    fn only_the_update_workflow_fetches_modules() {
+    fn only_the_update_workflow_fetches_components() {
         for shipped in crate::resolve::workflow::SHIPPED {
             assert_eq!(
-                shipped.body.contains("fetch modules"),
-                shipped.stem == "update-modules",
+                shipped.body.contains("fetch components"),
+                shipped.stem == "update-components",
                 "{}",
                 shipped.stem
             );

@@ -37,37 +37,14 @@ source: tests/golden/harness.rs
         "bootloader": "systemd"
       },
       "base": {
+        "path": "base-image/debian-forky-debian",
+        "defined": null,
         "image": "docker.io/library/debian:forky",
         "family": "debian",
         "scap_content": "",
         "signed": false,
         "provides": [],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -84,7 +61,7 @@ source: tests/golden/harness.rs
           "default": true,
           "pr": true,
           "siblings": [],
-          "modules": [
+          "components": [
             {
               "path": "debian-family",
               "flavour": null,
@@ -95,14 +72,20 @@ source: tests/golden/harness.rs
                 "build-environment"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "90ee445922e5e06434547f59bd3c77a3adea4c268fd2fa6794ca789670b8c575",
+                "defined": null,
+                "content": "0d248eb51f9ddb23bad27bc7f21853c8ef5fd3c7a79b2ae87915d0dc44ae7799",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -115,14 +98,20 @@ source: tests/golden/harness.rs
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "c9a5ae0790070fbfbb7b042d5a68ef2e93368eb5acc0e3a5753a6b7d8e70bcbd",
+                "defined": null,
+                "content": "dc8648b6cdc964c4d135eaf663639d39050d02c31c27a833d8e1bd22cdae62c6",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -131,10 +120,12 @@ source: tests/golden/harness.rs
               "path": "core/shared",
               "flavour": null,
               "variant": null,
-              "description": "A module both the Debian and Ubuntu images enable",
+              "description": "A component both the Debian and Ubuntu images enable",
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [
                 {
@@ -155,9 +146,13 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "50d842066176973a833abf03f9e65e94dc5432636d45c7e97b0610a26e96f58c",
+                "defined": null,
+                "content": "0f592cc089c7de30479c4b8ce7f8b40a76ff0a9cfbedd821a146752cf0b3d67f",
                 "repo": true,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -205,37 +200,14 @@ source: tests/golden/harness.rs
         "bootloader": "grub2"
       },
       "base": {
+        "path": "base-image/debian-forky",
+        "defined": null,
         "image": "docker.io/library/debian:forky",
         "family": "debian",
         "scap_content": "",
         "signed": false,
         "provides": [],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [
           "bootc-base"
         ],
@@ -254,7 +226,7 @@ source: tests/golden/harness.rs
           "default": false,
           "pr": false,
           "siblings": [],
-          "modules": [
+          "components": [
             {
               "path": "debian-family",
               "flavour": null,
@@ -265,14 +237,20 @@ source: tests/golden/harness.rs
                 "build-environment"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "90ee445922e5e06434547f59bd3c77a3adea4c268fd2fa6794ca789670b8c575",
+                "defined": null,
+                "content": "0d248eb51f9ddb23bad27bc7f21853c8ef5fd3c7a79b2ae87915d0dc44ae7799",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -288,14 +266,20 @@ source: tests/golden/harness.rs
                 "apparmor-policy"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "e9e1a74be2ca49e0741bdd0beca3d3d09c8bd458ae1968342a679325b26f4275",
+                "defined": null,
+                "content": "d73f36c38d0d87b01511745f4351e5b7f3b1cca1e06fba3002d1d65d77d01a02",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -308,14 +292,20 @@ source: tests/golden/harness.rs
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "0f6b3af8d230922486a1fe6005bd60dee659fcedd53fcdce457df965a6c0d8f4",
+                "defined": null,
+                "content": "3bacd7c62fb5119f92fc4735d4cc8798e43285fc35a4051e9b937920872969ee",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -328,14 +318,20 @@ source: tests/golden/harness.rs
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "c9a5ae0790070fbfbb7b042d5a68ef2e93368eb5acc0e3a5753a6b7d8e70bcbd",
+                "defined": null,
+                "content": "dc8648b6cdc964c4d135eaf663639d39050d02c31c27a833d8e1bd22cdae62c6",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -344,10 +340,12 @@ source: tests/golden/harness.rs
               "path": "core/shared",
               "flavour": null,
               "variant": null,
-              "description": "A module both the Debian and Ubuntu images enable",
+              "description": "A component both the Debian and Ubuntu images enable",
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [
                 {
@@ -368,9 +366,13 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "50d842066176973a833abf03f9e65e94dc5432636d45c7e97b0610a26e96f58c",
+                "defined": null,
+                "content": "0f592cc089c7de30479c4b8ce7f8b40a76ff0a9cfbedd821a146752cf0b3d67f",
                 "repo": true,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -418,37 +420,14 @@ source: tests/golden/harness.rs
         "bootloader": "grub2"
       },
       "base": {
+        "path": "base-image/ubuntu-26-04",
+        "defined": null,
         "image": "docker.io/library/ubuntu:26.04",
         "family": "ubuntu",
         "scap_content": "",
         "signed": false,
         "provides": [],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -465,7 +444,7 @@ source: tests/golden/harness.rs
           "default": false,
           "pr": false,
           "siblings": [],
-          "modules": [
+          "components": [
             {
               "path": "debian-family",
               "flavour": null,
@@ -476,14 +455,20 @@ source: tests/golden/harness.rs
                 "build-environment"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "90ee445922e5e06434547f59bd3c77a3adea4c268fd2fa6794ca789670b8c575",
+                "defined": null,
+                "content": "0d248eb51f9ddb23bad27bc7f21853c8ef5fd3c7a79b2ae87915d0dc44ae7799",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -496,14 +481,20 @@ source: tests/golden/harness.rs
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "c9a5ae0790070fbfbb7b042d5a68ef2e93368eb5acc0e3a5753a6b7d8e70bcbd",
+                "defined": null,
+                "content": "dc8648b6cdc964c4d135eaf663639d39050d02c31c27a833d8e1bd22cdae62c6",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -512,10 +503,12 @@ source: tests/golden/harness.rs
               "path": "core/shared",
               "flavour": null,
               "variant": null,
-              "description": "A module both the Debian and Ubuntu images enable",
+              "description": "A component both the Debian and Ubuntu images enable",
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [
                 {
@@ -536,9 +529,13 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "50d842066176973a833abf03f9e65e94dc5432636d45c7e97b0610a26e96f58c",
+                "defined": null,
+                "content": "0f592cc089c7de30479c4b8ce7f8b40a76ff0a9cfbedd821a146752cf0b3d67f",
                 "repo": true,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []

@@ -1,13 +1,13 @@
 ---
 source: tests/golden/harness.rs
 ---
-==== modules/my-editor/module.kdl
+==== components/my-editor/manifest.kdl
 schema-version 1
 
 provides "editor"
 
 packages "nano"
-==== modules/plain/module.kdl
+==== components/plain/manifest.kdl
 schema-version 1
 ==== example.image.kdl
 schema-version 1
@@ -17,21 +17,17 @@ image {
     url "https://github.com/someone/example"
     issues-url "https://github.com/someone/example/issues"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking" "initramfs-generation" "luks-initramfs" "selinux-policy" "ssh" "bootc" "bootupctl" "podman" "crun"
-        signed #false
-        scap-content "ssg-fedora-ds.xml"
-    }
-
     layout {
         bootloader "grub2"
     }
 
-    modules {
-        module "my-editor"
-        module "fedora-family"
+    base-image {
+        fedora {
+            version "44"
+            signed #false
+        }
     }
+    my-editor
 }
 ==== server.image.kdl
 schema-version 1
@@ -41,20 +37,16 @@ image {
     url "https://github.com/someone/example"
     issues-url "https://github.com/someone/example/issues"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking" "initramfs-generation" "luks-initramfs" "selinux-policy" "ssh" "bootc" "bootupctl" "podman" "crun"
-        signed #false
-        scap-content "ssg-fedora-ds.xml"
-    }
-
     layout {
         bootloader "grub2"
     }
 
-    modules {
-        module "my-editor"
-        module "fedora-family"
+    base-image {
+        fedora {
+            version "44"
+            signed #false
+        }
     }
+    my-editor
 }
 ==== check

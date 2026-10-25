@@ -1,0 +1,12 @@
+schema-version 1
+
+description "Requires a capability nothing in this image provides"
+
+targets "fedora"
+
+packages "fastfetch"
+
+helpers "lib/one/shared.sh"
+requires "package-manager"
+requires "apparmor-policy"
+requires "nothing"

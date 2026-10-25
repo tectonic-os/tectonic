@@ -10,19 +10,19 @@ Which image is this for? [1-2, 0 for none]: 1
   1) namesakes/apps/client  An app client with a namesake (requires flatpak)
   2) namesakes/desktop/client  A desktop client with a namesake (requires flatpak)
   3) namesakes/flatpak  The provider for both namesake clients
-Which modules? [1-3, several, 0 for none]: 1 2
+Which components? [1-3, several, 0 for none]: 1 2
 
-The selected modules have dependencies not currently provided by the images:
+The selected components have dependencies not currently provided by the images:
 
   apps/client > fedora-bootc:44
     requires: flatpak
-    provider module: flatpak
+    provider component: flatpak
 
   desktop/client > fedora-bootc:44
     requires: flatpak
-    provider module: flatpak
+    provider component: flatpak
 
-Add these provider modules now? (Yes/No)
+Add these provider components now? (Yes/No)
 Yes
 
 Track upstream for `flatpak`, `apps/client` and `desktop/client`? (Yes/No)
@@ -30,15 +30,15 @@ Yes
 
 
 example/
-├── modules/
+├── components/
 │   ├── apps/
 │   │   └── client/
-│   │       └── + module.kdl
+│   │       └── + manifest.kdl
 │   ├── desktop/
 │   │   └── client/
-│   │       └── + module.kdl
+│   │       └── + manifest.kdl
 │   ├── flatpak/
-│   │   └── + module.kdl
-│   └── + modules.lock.kdl
-└── ~ example.image.kdl  flatpak, apps/client and desktop/client added to modules
+│   │   └── + manifest.kdl
+│   └── ~ components.lock.kdl  flatpak, apps/client and desktop/client recorded
+└── ~ example.image.kdl  flatpak, apps/client and desktop/client added to components
 ==== exit 0

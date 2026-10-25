@@ -1,39 +1,33 @@
 //! The capability graph, and the fragments nothing generated can agree with.
 
 use crate::diag::{Issue, Issues};
+use crate::model::component::{Component, Decl, Position};
 use crate::model::image::{Entry, Image};
-use crate::model::module::{Decl, Module, Position};
 use crate::provider::Index;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-/// A module the base covers entirely provisions nothing, so it comes off the
+/// A component the base covers entirely provisions nothing, so it comes off the
 /// entry list before anything orders, checks or emits it. Runs first: the base
-/// wins as provider everywhere.
+/// wins as provider everywhere. A component that another component requires by its
+/// path stays, because the base cannot meet that requirement.
 pub fn suppress(image: &mut Image) {
-    let base: BTreeSet<String> = image
-        .base
-        .iter()
-        .flat_map(|b| b.provides.iter())
+    let Some(base) = &image.base else {
+        return;
+    };
+    let required: BTreeSet<String> = image
+        .components()
+        .flat_map(|component| component.requires.iter())
         .map(|decl| decl.name.clone())
         .collect();
-    if base.is_empty() {
-        return;
-    }
-    let (suppressed, kept): (Vec<Entry>, Vec<Entry>) = image
-        .entries
-        .drain(..)
-        .partition(|entry| covered(entry, &base));
+    let (suppressed, kept): (Vec<Entry>, Vec<Entry>) = image.entries.drain(..).partition(|entry| {
+        !required.contains(&entry.path)
+            && entry.component.as_ref().is_some_and(|component| {
+                base.covers(component.provides.iter().map(|decl| decl.name.as_str()))
+            })
+    });
     image.entries = kept;
     image.suppressed = suppressed;
-}
-
-/// Provides something, and the base provides all of it.
-fn covered(entry: &Entry, base: &BTreeSet<String>) -> bool {
-    let Some(module) = &entry.module else {
-        return false;
-    };
-    !module.provides.is_empty() && module.provides.iter().all(|decl| base.contains(&decl.name))
 }
 
 fn names(decls: &[&Decl]) -> String {
@@ -44,15 +38,15 @@ fn names(decls: &[&Decl]) -> String {
         .join(", ")
 }
 
-fn same_key(capability: &str, providers: &[&Module]) -> bool {
+fn same_key(capability: &str, providers: &[&Component]) -> bool {
     let Some(kind) = capability.strip_suffix("-key") else {
         return false;
     };
     let Some(first) = providers[0].keys.iter().find(|key| key.kind == kind) else {
         return false;
     };
-    providers.iter().all(|module| {
-        module.keys.iter().any(|key| {
+    providers.iter().all(|component| {
+        component.keys.iter().any(|key| {
             key.kind == first.kind
                 && key.generator == first.generator
                 && key.profile == first.profile
@@ -67,49 +61,97 @@ fn same_key(capability: &str, providers: &[&Module]) -> bool {
 /// Gives the help a requirement gets when nothing in the repository provides
 /// it. Resolution reads the repository alone, so the help names the command
 /// that searches the libraries.
-fn nowhere(index: &Index, capability: &str, src: &str) -> String {
+fn nowhere(index: &Index, capability: &str, image: &Image) -> String {
     let next = match index.sourced() {
-        true => "`tect import module` lists what the declared libraries provide",
+        true => "`tect import component` lists what the declared libraries provide",
         false => "repo.kdl declares no `sources`, so there is no collection to import one from",
     };
+    let base = match &image.base {
+        Some(base) => format!("the base `{}`", base.path),
+        None => "a base".to_string(),
+    };
     format!(
-        "no module in the repository declares `provides {capability:?}`, and neither does the `base` node in {src}. {next}"
+        "no component in the repository declares `provides {capability:?}`, and neither does {base}. {next}"
     )
 }
 
-/// What would satisfy a requirement nothing enabled provides. The candidates
-/// are family-filtered, and fall back to every provider when none supports this
-/// family.
+/// What would satisfy a requirement nothing enabled provides. `check` reads no
+/// library, so every candidate named here is under `components/`.
 fn satisfied_by(index: &Index, image: &Image, name: &str) -> String {
     let family = image.base.as_ref().map_or("", |base| base.family.as_str());
     let fits = index.fitting(name, family);
-    let candidates = match fits.is_empty() {
-        true => index.of(name),
-        false => fits,
+    let named = |candidates: &[&crate::provider::Provider]| -> Vec<String> {
+        candidates
+            .iter()
+            .map(|p| format!("`{}`", p.qualified()))
+            .collect()
     };
-    let named: Vec<String> = candidates.iter().map(|p| p.qualified()).collect();
-    match candidates.iter().find(|p| p.here) {
-        Some(_) => format!(
-            "{} would satisfy it; add it to this image. Nothing is included automatically, so the list stays the complete statement of what is in the image",
-            named.join(" or ")
+    if fits.len() > 1 {
+        return format!(
+            "{} each provide it; list one of them in this image",
+            crate::said(&named(&fits))
+        );
+    }
+    if let Some(first) = fits.first() {
+        return format!(
+            "{} would satisfy it; add it to this image",
+            named(&[first])[0]
+        );
+    }
+    let unfit = index.of(name);
+    match unfit.is_empty() {
+        true => nowhere(index, name, image),
+        false => format!(
+            "{} would satisfy it on a family other than `{family}`",
+            crate::said(&named(&unfit))
         ),
-        None => match candidates.first() {
-            Some(first) => format!(
-                "{} would satisfy it; `tect import module {}` brings it in and lists it",
-                named.join(" or "),
-                first.qualified()
-            ),
-            None => nowhere(index, name, image.src.name()),
-        },
     }
 }
 
-/// Names every provider of a capability when none of them reaches `module`'s
-/// targets: each sits in a flavour that `module` is not gated to. An ungated
-/// provider, or one in `module`'s own flavour, reaches it.
-fn elsewhere(module: &Module, providers: &[&Module]) -> Option<String> {
-    let reaches = |provider: &&Module| {
-        provider.flavour.is_none() || provider.flavour.as_ref() == module.flavour.as_ref()
+/// Refuses a `removes` that nothing else on its targets provides, because it
+/// withdraws nothing.
+fn check_removes(image: &Image, issues: &mut Issues) {
+    for component in image.components() {
+        for decl in &component.removes {
+            let supplied = image.base_answers(&decl.name)
+                || image.components().any(|other| {
+                    !std::ptr::eq(other, component)
+                        && super::meet(other.flavour.as_deref(), component.flavour.as_deref())
+                        && other.answers(&decl.name)
+                });
+            if supplied {
+                continue;
+            }
+            issues.push(
+                Issue::new(
+                    format!(
+                        "`{}` removes `{}`, which nothing in the image provides",
+                        component.path, decl.name
+                    ),
+                    &component.src,
+                )
+                .at(decl.span, "nothing to remove")
+                .help("a `removes` withdraws what the base or another component provides; drop it, so it cannot outlive its reason"),
+            );
+        }
+    }
+}
+
+/// Names the component whose import added `path` to the image.
+fn importer<'a>(image: &'a Image, path: &str) -> Option<&'a str> {
+    image
+        .entries
+        .iter()
+        .find(|entry| entry.path == path)
+        .and_then(|entry| entry.imported_by.as_deref())
+}
+
+/// Names every provider of a capability when none of them reaches `component`'s
+/// targets: each sits in a flavour that `component` is not gated to. An ungated
+/// provider, or one in `component`'s own flavour, reaches it.
+fn elsewhere(component: &Component, providers: &[&Component]) -> Option<String> {
+    let reaches = |provider: &&Component| {
+        provider.flavour.is_none() || provider.flavour.as_ref() == component.flavour.as_ref()
     };
     if providers.is_empty() || providers.iter().any(reaches) {
         return None;
@@ -127,10 +169,21 @@ fn elsewhere(module: &Module, providers: &[&Module]) -> Option<String> {
     Some(crate::said(&named))
 }
 
+/// Finds every enabled component that meets a requirement.
+fn answering<'m>(image: &'m Image, required: &str) -> Vec<&'m Component> {
+    image
+        .components()
+        .filter(|component| component.answers(required))
+        .collect()
+}
+
 /// Finds every provider of one capability that conflicts with another
 /// provider of it.
-fn clashing<'m>(providers: &[&'m Module], declares: &impl Fn(&&Module) -> bool) -> Vec<&'m Module> {
-    let side = |module: &'m Module| (module.flavour.as_deref(), declares(&module));
+fn clashing<'m>(
+    providers: &[&'m Component],
+    declares: &impl Fn(&&Component) -> bool,
+) -> Vec<&'m Component> {
+    let side = |component: &'m Component| (component.flavour.as_deref(), declares(&component));
     providers
         .iter()
         .enumerate()
@@ -140,7 +193,7 @@ fn clashing<'m>(providers: &[&'m Module], declares: &impl Fn(&&Module) -> bool) 
                 .enumerate()
                 .any(|(other_at, &other)| at != other_at && super::conflict(side(one), side(other)))
         })
-        .map(|(_, &module)| module)
+        .map(|(_, &component)| component)
         .collect()
 }
 
@@ -150,32 +203,35 @@ fn clashing<'m>(providers: &[&'m Module], declares: &impl Fn(&&Module) -> bool) 
     reason = "every graph check reads the provider maps the function builds first"
 )]
 pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
-    let mut offered: BTreeMap<&str, Vec<&Module>> = BTreeMap::new();
-    for module in image.modules() {
-        for decl in &module.provides {
-            offered.entry(decl.name.as_str()).or_default().push(module);
+    let mut offered: BTreeMap<&str, Vec<&Component>> = BTreeMap::new();
+    for component in image.components() {
+        for decl in &component.provides {
+            offered
+                .entry(decl.name.as_str())
+                .or_default()
+                .push(component);
         }
     }
 
-    let base_caps: BTreeMap<&str, &crate::model::module::Decl> = image
+    let base_caps: BTreeMap<&str, &crate::model::component::Decl> = image
         .base
         .iter()
         .flat_map(|b| b.provides.iter())
         .map(|decl| (decl.name.as_str(), decl))
         .collect();
 
-    let mut helpers: BTreeMap<&str, &Module> = BTreeMap::new();
-    for module in image.modules() {
-        for helper in &module.helpers {
+    let mut helpers: BTreeMap<&str, &Component> = BTreeMap::new();
+    for component in image.components() {
+        for helper in &component.helpers {
             let name = Path::new(&helper.name)
                 .file_name()
                 .and_then(|name| name.to_str())
                 .unwrap_or_default();
-            if let Some(first) = helpers.insert(name, module) {
+            if let Some(first) = helpers.insert(name, component) {
                 issues.push(
                     Issue::new(
-                        format!("two enabled modules declare helper `{name}`"),
-                        &module.src,
+                        format!("two enabled components declare helper `{name}`"),
+                        &component.src,
                     )
                     .at(helper.span, "mounted to the same path")
                     .help(format!(
@@ -188,10 +244,10 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
     }
 
     // Anything the base covers entirely is already suppressed, so what reaches
-    // here is a module the base covers in part: its layer still builds, and
+    // here is a component the base covers in part: its layer still builds, and
     // would provision what the base ships a second time.
-    for module in image.modules() {
-        let (covered, rest): (Vec<&Decl>, Vec<&Decl>) = module
+    for component in image.components() {
+        let (covered, rest): (Vec<&Decl>, Vec<&Decl>) = component
             .provides
             .iter()
             .partition(|decl| base_caps.contains_key(decl.name.as_str()));
@@ -202,14 +258,14 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
             Issue::new(
                 format!(
                     "`{}` provides {}, which the base image already provides",
-                    module.path,
+                    component.path,
                     names(&covered)
                 ),
-                &module.src,
+                &component.src,
             )
             .at(first.span, "already provided by the base")
             .help(format!(
-                "a module the base covers entirely is suppressed instead. This one also provides {}, so its layer still builds and would provision {} a second time: split it, or drop the declaration",
+                "a component the base covers entirely is suppressed instead. This one also provides {}, so its layer still builds and would provision {} a second time: split it, or drop the declaration",
                 names(&rest),
                 names(&covered)
             )),
@@ -222,24 +278,22 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
         .map(|b| b.family.as_str())
         .filter(|f| !f.is_empty());
     if let Some(base_family) = base_family {
-        let needs_adapter = image.modules().any(|module| {
-            (base_family == "fedora" && !module.coprs.is_empty())
-                || module
+        let needs_adapter = image.components().any(|component| {
+            (base_family == "fedora" && !component.coprs.is_empty())
+                || component
                     .packages
                     .iter()
-                    .chain(&module.groups)
+                    .chain(&component.groups)
                     .any(|group| group.family == base_family)
         });
-        let has_adapter = offered.get("build-environment").is_some_and(|providers| {
-            providers
-                .iter()
-                .any(|module| super::supports(&module.supports, base_family))
-        });
+        let has_adapter = answering(image, "build-environment")
+            .iter()
+            .any(|component| super::targets(&component.targets, base_family));
         if needs_adapter && !has_adapter {
             issues.push(
                 Issue::new(
                     format!(
-                        "image `{}` installs packages for `{base_family}`, but no enabled module provides `build-environment` for that family",
+                        "image `{}` installs packages for `{base_family}`, but no enabled component provides `build-environment` for that family",
                         image.id
                     ),
                     &image.src,
@@ -248,24 +302,27 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
             );
         }
     }
-    for module in image.modules() {
+    for component in image.components() {
         let Some(base_family) = base_family else {
             break;
         };
         // An absent declaration is the opt-out from family compatibility
-        // checks, whether the module has no manifest or omits `supports`.
-        if !super::supports(&module.supports, base_family) {
+        // checks, whether the component has no manifest or omits `targets`.
+        if !super::targets(&component.targets, base_family) {
             issues.push(
                 Issue::new(
                     format!(
                         "`{}` does not support the `{base_family}` base family",
-                        module.path
+                        component.path
                     ),
-                    &module.src,
+                    &component.src,
                 )
                 .help(format!(
-                    "it declares support for: {}",
-                    module.supports.join(", ")
+                    "it declares support for: {}{}",
+                    component.targets.join(", "),
+                    importer(image, &component.path)
+                        .map(|by| format!("; `{by}` imports it"))
+                        .unwrap_or_default()
                 )),
             );
         }
@@ -275,9 +332,10 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
         let keyed = capability.strip_suffix("-key").is_some_and(|kind| {
             providers
                 .iter()
-                .any(|module| module.keys.iter().any(|key| key.kind == kind))
+                .any(|component| component.keys.iter().any(|key| key.kind == kind))
         });
-        let declares = |module: &&Module| module.exclusive.iter().any(|name| name == capability);
+        let declares =
+            |component: &&Component| component.exclusive.iter().any(|name| name == capability);
         // A key kind names one key in the image, so its capability conflicts
         // unless every provider declares the same key.
         let found = match keyed {
@@ -292,7 +350,7 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
                 (!clashing.is_empty()).then(|| {
                     let holder = clashing
                         .iter()
-                        .find(|module| declares(module))
+                        .find(|component| declares(component))
                         .map_or("", |m| m.path.as_str());
                     (
                         format!("`{holder}` declares it `exclusive`, so enable one provider"),
@@ -306,7 +364,7 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
             let first = clashing[0];
             issues.push(
                 Issue::new(
-                    format!("`{capability}` is provided by more than one enabled module"),
+                    format!("`{capability}` is provided by more than one enabled component"),
                     &first.src,
                 )
                 .at(
@@ -327,7 +385,7 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
     // cannot satisfy itself, so `base_caps` is not consulted here.
     if let Some(base) = &image.base {
         for decl in &base.requires {
-            if offered.contains_key(decl.name.as_str()) {
+            if !answering(image, &decl.name).is_empty() {
                 continue;
             }
             issues.push(
@@ -344,25 +402,28 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
         }
     }
 
-    if image.boot.is_empty() && offered.contains_key("boot-chain-uki") {
+    if image.boot.is_empty() && !answering(image, "boot-chain-uki").is_empty() {
         issues.push(
             Issue::new(
-                format!("`{}` enables a UKI chain but declares no `boot`", image.id),
+                format!(
+                    "`{}` enables a UKI chain but declares no `boot-chain`",
+                    image.id
+                ),
                 &image.src,
             )
             .at(image.span, "no UKI trust route")
-            .help("declare `boot \"uki-shim\"` or `boot \"uki-db\"`"),
+            .help("declare `boot-chain \"uki-shim\"` or `boot-chain \"uki-db\"`"),
         );
     }
     for capability in ["boot-chain-uki", "secureboot-enrolment"] {
-        let present = offered
-            .get(capability)
-            .is_some_and(|providers| providers.iter().any(|module| module.flavour.is_none()));
+        let present = answering(image, capability)
+            .iter()
+            .any(|component| component.flavour.is_none());
         if !image.boot.is_empty() && !present {
             issues.push(
                 Issue::new(
                     format!(
-                        "`{}` declares `boot \"{}\"` but no ungated module provides `{capability}`",
+                        "`{}` declares `boot-chain \"{}\"` but no ungated component provides `{capability}`",
                         image.id, image.boot
                     ),
                     &image.src,
@@ -373,45 +434,69 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
         }
     }
 
-    for module in image.modules() {
-        for decl in &module.requires {
-            if base_caps.contains_key(decl.name.as_str()) {
+    check_removes(image, issues);
+
+    for component in image.components() {
+        let flavour = component.flavour.as_deref();
+        for decl in &component.requires {
+            if let Some(remover) = image.remover(&decl.name, flavour) {
+                issues.push(
+                    Issue::new(
+                        format!(
+                            "`{}` requires `{}`, which `{}` removes",
+                            component.path, decl.name, remover.path
+                        ),
+                        &component.src,
+                    )
+                    .at(decl.span, "removed from this image")
+                    .help(format!(
+                        "an image that lists `{}` no longer has `{}`; drop one of the two components from this image",
+                        remover.path, decl.name
+                    )),
+                );
                 continue;
             }
-            if !offered.contains_key(decl.name.as_str())
+            if image.base_meets(&decl.name, flavour) {
+                continue;
+            }
+            let providers: Vec<&Component> = answering(image, &decl.name)
+                .into_iter()
+                .filter(|provider| image.component_meets(provider, &decl.name, flavour))
+                .collect();
+            if providers.is_empty()
                 && image
-                    .modules()
+                    .components()
                     .any(|declaring| declaring.refused_keys.contains(&decl.name))
             {
                 continue;
             }
 
-            let Some(providers) = offered.get(decl.name.as_str()) else {
+            if providers.is_empty() {
                 issues.push(
                     Issue::new(
                         format!(
                             "`{}` requires `{}`, which nothing enabled provides",
-                            module.path, decl.name
+                            component.path, decl.name
                         ),
-                        &module.src,
+                        &component.src,
                     )
                     .at(decl.span, "unsatisfied")
                     .help(satisfied_by(index, image, &decl.name)),
                 );
                 continue;
-            };
+            }
 
-            if let Some(gated) = elsewhere(module, providers) {
+            if let Some(gated) = elsewhere(component, &providers) {
                 issues.push(
                     Issue::new(
                         format!(
                             "`{}` requires `{}`, which only {gated} provides",
-                            module.path, decl.name
+                            component.path, decl.name
                         ),
-                        &module.src,
+                        &component.src,
                     )
                     .at(decl.span, "unsatisfied on every other target")
-                    .help("either gate this module to the same flavour, or move the provider out of the flavour block"),
+                    .help("either gate this component to the same flavour, or move the provider out of the flavour block"),
                 );
             }
         }
@@ -419,25 +504,22 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
 
     // If only a gated provider meets an `after`, then the order holds on that
     // flavour's target alone.
-    for module in image.modules() {
-        for decl in &module.after {
-            if base_caps.contains_key(decl.name.as_str()) {
+    for component in image.components() {
+        for decl in &component.after {
+            if image.base_answers(&decl.name) {
                 continue;
             }
-            let Some(providers) = offered.get(decl.name.as_str()) else {
-                continue;
-            };
-            if let Some(gated) = elsewhere(module, providers) {
+            if let Some(gated) = elsewhere(component, &answering(image, &decl.name)) {
                 issues.push(
                     Issue::new(
                         format!(
                             "`{}` builds after `{}`, which only {gated} provides",
-                            module.path, decl.name
+                            component.path, decl.name
                         ),
-                        &module.src,
+                        &component.src,
                     )
                     .at(decl.span, "ineffective on every other target")
-                    .help("either gate this module to the same flavour, or move the provider out of the flavour block"),
+                    .help("either gate this component to the same flavour, or move the provider out of the flavour block"),
                 );
             }
         }
@@ -446,28 +528,28 @@ pub fn check_graph(image: &Image, index: &Index, issues: &mut Issues) {
 
 /// A fragment is inlined verbatim, so nothing the generator does can make it
 /// agree with the entry that carries it. Walks the entries in build order,
-/// which is where `ARG FLAVOUR` lands: directly above the first gated module.
+/// which is where `ARG FLAVOUR` lands: directly above the first gated component.
 pub fn check_fragments(image: &Image, issues: &mut Issues) {
     let mut gated = false;
     for entry in &image.entries {
-        let Some(module) = &entry.module else {
+        let Some(component) = &entry.component else {
             continue;
         };
         gated |= entry.flavour.is_some();
-        let Some(body) = &module.fragment else {
+        let Some(body) = &component.fragment else {
             continue;
         };
         let path = &entry.path;
 
         // A tail fragment is below the flavour gate wherever the gate lands.
-        let above_gate = !gated && module.fragment_position != Position::Tail;
+        let above_gate = !gated && component.fragment_position != Position::Tail;
         if above_gate && (body.contains("${FLAVOUR}") || body.contains("$FLAVOUR")) {
             issues.push(
                 Issue::new(
                     format!("`{path}` expands FLAVOUR above the flavour gate"),
                     &image.src,
                 )
-                .at(entry.span, "listed above the first flavour-gated module")
+                .at(entry.span, "listed above the first flavour-gated component")
                 .help("ARG FLAVOUR is declared directly above the first gated entry, so a fragment before it would expand to an empty string"),
             );
         }

@@ -29,7 +29,7 @@ jobs:
         id: fresh
         run: |
           set -euo pipefail
-          mapfile -t scripts < <(find modules -name kernel_freshness.py -type f | sort)
+          mapfile -t scripts < <(find components -name kernel_freshness.py -type f | sort)
           if [ "${#scripts[@]}" -eq 0 ]; then
             echo "No kernel_freshness.py scripts found — nothing to check."
             echo "count=0" >> "$GITHUB_OUTPUT"
@@ -50,7 +50,7 @@ jobs:
           for json in "$RUNNER_TEMP"/report-*.json; do
             [ -f "$json" ] || continue
             kernel_id="$(jq -r .kernel_id "$json")"
-            mod_path="$(jq -r .module_path "$json")"
+            mod_path="$(jq -r .component_path "$json")"
             status="$(jq -r .status "$json")"
             copr_ver="$(jq -r .copr_version "$json")"
             report="${json%.json}.md"
@@ -85,7 +85,7 @@ jobs:
               git commit -am "$title"
               git push -f origin "$branch"
               {
-                echo "Automated by the kernel-freshness workflow. Merging switches the ${kernel_id} module to the ${to} kernel."
+                echo "Automated by the kernel-freshness workflow. Merging switches the ${kernel_id} component to the ${to} kernel."
                 echo
                 cat "$report"
               } > "$RUNNER_TEMP/pr-body.md"

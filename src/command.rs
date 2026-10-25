@@ -67,13 +67,13 @@ impl Verb {
                 Area::Image,
                 "image-flavours",
             )),
-            Self::CreateModule => Some(("`module.kdl`", Area::Module, "")),
+            Self::CreateModule => Some(("`manifest.kdl`", Area::Component, "")),
             Self::CreateKey | Self::SetKey => {
-                Some(("`module.kdl`&nbsp;›&nbsp;`key`", Area::Module, "key"))
+                Some(("`manifest.kdl`&nbsp;›&nbsp;`key`", Area::Component, "key"))
             }
             Self::CreateScripts => Some(("`scripts/`", Area::Repository, "")),
             Self::ImportModule | Self::FetchModules | Self::SetModule => {
-                Some(("`modules.lock.kdl`", Area::Lock, ""))
+                Some(("`components.lock.kdl`", Area::Lock, ""))
             }
             Self::SetWorkflows => Some((
                 "`repo.kdl`&nbsp;›&nbsp;`workflows`",
@@ -87,16 +87,20 @@ impl Verb {
                 "image-conforms",
             )),
             Self::SetClaims => Some((
-                "`module.kdl`&nbsp;›&nbsp;`satisfies`",
-                Area::Module,
+                "`manifest.kdl`&nbsp;›&nbsp;`satisfies`",
+                Area::Component,
                 "satisfies",
             )),
             Self::Generate => Some(("`generated/`", Area::Repository, "")),
             Self::OsRelease => Some(("`image.kdl`&nbsp;›&nbsp;`image`", Area::Image, "image")),
-            Self::Fetch => Some(("`module.kdl`&nbsp;›&nbsp;`asset`", Area::Module, "asset")),
+            Self::Fetch => Some((
+                "`manifest.kdl`&nbsp;›&nbsp;`asset`",
+                Area::Component,
+                "asset",
+            )),
             Self::ValidateImage => Some((
-                "`module.kdl`&nbsp;›&nbsp;`allow-verify`",
-                Area::Module,
+                "`manifest.kdl`&nbsp;›&nbsp;`allow-verify`",
+                Area::Component,
                 "allow-verify",
             )),
             Self::Upgrade
@@ -188,7 +192,7 @@ pub enum Topic {
     Tool,
     Repository,
     Image,
-    Modules,
+    Components,
     Keys,
     Check,
     Build,
@@ -202,7 +206,7 @@ pub enum Topic {
 pub const TOPICS: [Topic; 11] = [
     Topic::Repository,
     Topic::Image,
-    Topic::Modules,
+    Topic::Components,
     Topic::Keys,
     Topic::Check,
     Topic::Build,
@@ -219,7 +223,7 @@ impl Topic {
             Self::Tool => "CLI tool",
             Self::Repository => "Repository",
             Self::Image => "Image",
-            Self::Modules => "Modules",
+            Self::Components => "Components",
             Self::Keys => "Keys",
             Self::Check => "Check and generate",
             Self::Build => "Build and boot",
@@ -270,11 +274,11 @@ const SURFACE: &[(&str, Verb, Family, bool, Topic)] = &[
         Topic::Image,
     ),
     (
-        "create module",
+        "create component",
         Verb::CreateModule,
         Family::Repo,
         false,
-        Topic::Modules,
+        Topic::Components,
     ),
     (
         "create key",
@@ -291,11 +295,11 @@ const SURFACE: &[(&str, Verb, Family, bool, Topic)] = &[
         Topic::Repository,
     ),
     (
-        "import module",
+        "import component",
         Verb::ImportModule,
         Family::Repo,
         false,
-        Topic::Modules,
+        Topic::Components,
     ),
     (
         "set workflows",
@@ -327,11 +331,11 @@ const SURFACE: &[(&str, Verb, Family, bool, Topic)] = &[
     ),
     ("set key", Verb::SetKey, Family::Repo, false, Topic::Keys),
     (
-        "set module",
+        "set component",
         Verb::SetModule,
         Family::Repo,
         false,
-        Topic::Modules,
+        Topic::Components,
     ),
     ("check", Verb::Check, Family::Repo, false, Topic::Check),
     (
@@ -372,11 +376,11 @@ const SURFACE: &[(&str, Verb, Family, bool, Topic)] = &[
     ),
     ("sbom", Verb::Sbom, Family::Script, false, Topic::Inspect),
     (
-        "fetch modules",
+        "fetch components",
         Verb::FetchModules,
         Family::Repo,
         false,
-        Topic::Modules,
+        Topic::Components,
     ),
     (
         "scap content",
@@ -479,12 +483,12 @@ pub enum Surface {
     /// replace this tect and its assets with the latest
     #[command(long_about = help::UPGRADE, after_long_help = help::UPGRADE_NOTES)]
     Upgrade,
-    /// start a repository, or add an image, flavour, module or key to one
+    /// start a repository, or add an image, flavour, component or key to one
     Create {
         #[command(subcommand)]
         what: Option<CreateWhat>,
     },
-    /// copy a library module into this repository
+    /// copy a library component into this repository
     Import {
         #[command(subcommand)]
         what: Option<ImportWhat>,
@@ -555,12 +559,12 @@ pub enum Surface {
         #[arg(long, value_name = "md|json")]
         format: Option<String>,
     },
-    /// print one module's trust read-out, byte by byte
+    /// print one component's trust read-out, byte by byte
     #[command(long_about = help::WHY, after_long_help = help::WHY_NOTES)]
     Why {
-        /// the module name
-        #[arg(value_name = "module")]
-        module: Option<String>,
+        /// the component name
+        #[arg(value_name = "component")]
+        component: Option<String>,
         /// markdown, the default, or JSON
         #[arg(long, value_name = "md|json")]
         format: Option<String>,
@@ -711,7 +715,7 @@ pub enum CreateWhat {
         #[arg(long, value_name = "ref")]
         base: Option<String>,
     },
-    /// add a gated module set an image also publishes
+    /// add a gated component set an image also publishes
     #[command(long_about = help::CREATE_FLAVOUR, after_long_help = help::CREATE_FLAVOUR_NOTES)]
     Flavour {
         /// the flavour name
@@ -721,16 +725,16 @@ pub enum CreateWhat {
         #[arg(long, value_name = "name")]
         image: Vec<String>,
     },
-    /// write a module, and offer to list it in an image
-    #[command(long_about = help::CREATE_MODULE, after_long_help = help::CREATE_MODULE_NOTES)]
-    Module {
-        /// the module name, which can be a path under `modules/`
+    /// write a component, and offer to list it in an image
+    #[command(long_about = help::CREATE_COMPONENT, after_long_help = help::CREATE_COMPONENT_NOTES)]
+    Component {
+        /// the component name, which can be a path under `components/`
         #[arg(value_name = "name")]
         name: Option<String>,
-        /// list the module in this image or flavour; repeatable
+        /// list the component in this image or flavour; repeatable
         #[arg(long, value_name = "name")]
         image: Vec<String>,
-        /// a package the module installs; repeatable
+        /// a package the component installs; repeatable
         #[arg(long, value_name = "name")]
         pkg: Vec<String>,
         /// one more line in the manifest, such as `--with provides=browser`;
@@ -738,15 +742,15 @@ pub enum CreateWhat {
         #[arg(long, value_name = "verb=value")]
         with: Vec<String>,
     },
-    /// generate a key one of this repository's modules declares
+    /// generate a key one of this repository's components declares
     #[command(long_about = help::CREATE_KEY, after_long_help = help::CREATE_KEY_NOTES)]
     Key {
-        /// the kind of key, as a module declares it
+        /// the kind of key, as a component declares it
         #[arg(value_name = "kind")]
         kind: Option<String>,
-        /// which module, where two of them declare the same kind
+        /// which component, where two of them declare the same kind
         #[arg(long, value_name = "name")]
-        module: Option<String>,
+        component: Option<String>,
         /// the certificate common name; the repository directory name by default
         #[arg(long, value_name = "name")]
         cn: Option<String>,
@@ -762,20 +766,20 @@ pub enum CreateWhat {
 
 #[derive(Subcommand)]
 pub enum ImportWhat {
-    /// copy a module from a library repo.kdl declares into this repository
-    #[command(long_about = help::IMPORT_MODULE, after_long_help = help::IMPORT_MODULE_NOTES)]
-    Module {
-        /// one module, as `<name>` or `<owner>/<name>`
+    /// copy a component from a library repo.kdl declares into this repository
+    #[command(long_about = help::IMPORT_COMPONENT, after_long_help = help::IMPORT_COMPONENT_NOTES)]
+    Component {
+        /// one component, as `<name>` or `<owner>/<name>`
         #[arg(value_name = "name")]
         name: Option<String>,
-        /// list the module in this image or flavour
+        /// list the component in this image or flavour
         #[arg(long, value_name = "name")]
         image: Option<String>,
         /// the SCAP content the profile offer is read out of; the family's
         /// installed copy by default, and no content is no offer
         #[arg(long, value_name = "file")]
         datastream: Option<PathBuf>,
-        /// add provider modules for dependencies the selected modules require
+        /// add provider components for dependencies the selected components require
         #[arg(long)]
         dependencies: bool,
     },
@@ -786,13 +790,9 @@ pub enum SetWhat {
     /// choose the CI this repository generates
     #[command(long_about = help::SET_WORKFLOWS, after_long_help = help::SET_WORKFLOWS_NOTES)]
     Workflows,
-    /// add a module or base-image library
+    /// add a component library
     #[command(long_about = help::SET_LIBRARY)]
-    Library {
-        /// the kind of library: `base-images` or `modules`
-        #[arg(value_name = "kind")]
-        kind: Option<String>,
-    },
+    Library,
     /// choose the benchmark profile an image is measured by
     #[command(long_about = help::SET_CONFORMS, after_long_help = help::SET_CONFORMS_NOTES)]
     Conforms {
@@ -804,35 +804,35 @@ pub enum SetWhat {
         #[arg(long, value_name = "file")]
         datastream: Option<PathBuf>,
     },
-    /// choose the benchmark rules a module claims to cover
+    /// choose the benchmark rules a component claims to cover
     #[command(long_about = help::SET_CLAIMS, after_long_help = help::SET_CLAIMS_NOTES)]
     Claims {
-        /// the module in the repository
-        #[arg(value_name = "module")]
-        module: Option<String>,
+        /// the component in the repository
+        #[arg(value_name = "component")]
+        component: Option<String>,
         /// the SCAP content the rules are read out of; the installed copy for
-        /// the module's first declared family by default, and required when
-        /// the module declares no family restriction
+        /// the component's first declared family by default, and required when
+        /// the component declares no family restriction
         #[arg(long, value_name = "file")]
         datastream: Option<PathBuf>,
     },
     /// record a key that already exists, in place of generating one
     #[command(long_about = help::SET_KEY, after_long_help = help::SET_KEY_NOTES)]
     Key {
-        /// the kind of key, as a module declares it
+        /// the kind of key, as a component declares it
         #[arg(value_name = "kind")]
         kind: Option<String>,
-        /// which module, where two of them declare the same kind
+        /// which component, where two of them declare the same kind
         #[arg(long, value_name = "name")]
-        module: Option<String>,
+        component: Option<String>,
         /// the public half to record
         #[arg(long, value_name = "path")]
         from: Option<String>,
     },
-    /// make an imported module the repository's own
-    #[command(long_about = help::SET_MODULE, after_long_help = help::SET_MODULE_NOTES)]
-    Module {
-        /// the module, by its path under `modules/`
+    /// make an imported component the repository's own
+    #[command(long_about = help::SET_COMPONENT, after_long_help = help::SET_COMPONENT_NOTES)]
+    Component {
+        /// the component, by its path under `components/`
         #[arg(value_name = "path")]
         path: Option<String>,
         /// stop tracking its library, without asking
@@ -921,10 +921,10 @@ pub enum ScapWhat {
 
 #[derive(Subcommand)]
 pub enum FetchWhat {
-    /// refresh each tracked module from its library
-    #[command(long_about = help::FETCH_MODULES, after_long_help = help::FETCH_MODULES_NOTES)]
-    Modules {
-        /// the modules, by their path under `modules/`; every tracked module if absent
+    /// refresh each tracked component from its library
+    #[command(long_about = help::FETCH_COMPONENTS, after_long_help = help::FETCH_COMPONENTS_NOTES)]
+    Components {
+        /// the components, by their path under `components/`; every tracked component if absent
         #[arg(value_name = "path")]
         paths: Vec<String>,
     },
@@ -1177,7 +1177,7 @@ const INTRO: &str = "\
 
 `tect` is the one tool that manages a bootc image repository. The user describes each image \
 in KDL files, and `tect` turns those files into the Containerfiles and the CI workflows that \
-build the image. `tect` works out the module order, the options, the names and the tags in \
+build the image. `tect` works out the component order, the options, the names and the tags in \
 one place, so the build scripts hold no logic of their own and the user can see what goes \
 into each image.
 
@@ -1185,12 +1185,12 @@ into each image.
 
 `tect` runs in three places:
 
-- On the user's machine, it scaffolds the repository and its images, modules and keys. It \
+- On the user's machine, it scaffolds the repository and its images, components and keys. It \
 checks the KDL files, writes the build files, and builds and boots an image.
 - In CI, the generated workflows call it to write the build files, build and publish each \
 image, and scan it.
 - Inside a build, the generated Containerfile calls it to write the image identity, record \
-what the build resolved and check the finished image. A module script can call `tect fetch` \
+what the build resolved and check the finished image. A component script can call `tect fetch` \
 to download a payload and check it against its hash.
 
 ";
@@ -1308,7 +1308,7 @@ pub fn host_labels() -> Vec<String> {
 #[derive(Debug, PartialEq)]
 pub enum Context {
     /// A `repo.kdl` here or above, named the way `--root .` names one, so every
-    /// path a command prints hangs off it and the user reads `modules/x`. An
+    /// path a command prints hangs off it and the user reads `components/x`. An
     /// absolute path would print where their home is.
     Repo(PathBuf),
     /// A booted tectonic image: `/usr/share/tectonic/` carries the manifest
@@ -1454,7 +1454,7 @@ pub enum Command {
 pub enum Arg {
     Image,
     Target,
-    Module,
+    Component,
 }
 
 impl Command {
@@ -1468,7 +1468,7 @@ impl Command {
             | Self::GraphJson => None,
             Self::Section | Self::Coverage | Self::CoverageJson => Some(Arg::Image),
             Self::Summary | Self::Sbom => Some(Arg::Target),
-            Self::Why | Self::WhyJson => Some(Arg::Module),
+            Self::Why | Self::WhyJson => Some(Arg::Component),
         }
     }
 }
@@ -1606,15 +1606,15 @@ mod tests {
     #[test]
     fn import_takes_the_dependencies_switch() {
         let matches = Cli::command()
-            .try_get_matches_from(["tect", "import", "module", "browser", "--dependencies"])
-            .expect("import module takes --dependencies");
+            .try_get_matches_from(["tect", "import", "component", "browser", "--dependencies"])
+            .expect("import component takes --dependencies");
         assert_eq!(flag::<bool>(&matches, "dependencies"), Some(true));
     }
 
     #[test]
     fn copy_is_not_a_command() {
         let error = Cli::command()
-            .try_get_matches_from(["tect", "copy", "module", "browser"])
+            .try_get_matches_from(["tect", "copy", "component", "browser"])
             .expect_err("copy is gone");
         assert_eq!(error.kind(), ErrorKind::InvalidSubcommand);
     }
@@ -1622,7 +1622,7 @@ mod tests {
     #[test]
     fn fetch_takes_its_three_positionals_unless_a_noun_does() {
         Cli::command()
-            .try_get_matches_from(["tect", "fetch", "modules"])
+            .try_get_matches_from(["tect", "fetch", "components"])
             .expect("the noun negates the required positionals");
         let matches = Cli::command()
             .try_get_matches_from(["tect", "fetch", "file", "https://host/f", "abc", "/usr/f"])
@@ -1694,7 +1694,7 @@ mod tests {
         let (answers, rest) = host
             .split_once("these read the source tree")
             .expect("the host help groups what it can answer");
-        assert!(answers.contains("  why [module]"), "{host}");
+        assert!(answers.contains("  why [component]"), "{host}");
         assert!(!answers.contains("  check "), "{host}");
         assert!(rest.contains("  check "), "{host}");
         // The reference still teaches the whole surface, wherever it is read.
@@ -1708,7 +1708,7 @@ mod tests {
     #[test]
     fn a_refusal_lists_the_tails_a_word_wanted() {
         assert_eq!(takes("registry"), "`namespace` or `ref`");
-        assert_eq!(takes("import"), "`module [name]`");
+        assert_eq!(takes("import"), "`component [name]`");
         assert!(takes("create").starts_with("`repo [name]`"));
     }
 
@@ -1737,7 +1737,7 @@ mod tests {
             .map(|choice| choice.label.as_str())
             .collect();
         assert_eq!(headings.last(), Some(&"CLI tool"), "{headings:?}");
-        assert!(headings.contains(&"Modules"), "{headings:?}");
+        assert!(headings.contains(&"Components"), "{headings:?}");
         let (_, drawn) = choices(&rows(Some("vm")), &repo);
         assert!(drawn.iter().all(|choice| !choice.heading));
     }
@@ -1764,7 +1764,7 @@ mod tests {
         assert_eq!(
             host_labels(),
             [
-                "why [module]",
+                "why [component]",
                 "plan",
                 "summary [target]",
                 "scap content",

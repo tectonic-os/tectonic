@@ -1,7 +1,7 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
-==== a module the base suppresses
+==== a component the base suppresses
 # apps/flatpak
 
 Installs flatpak and enables the remotes an image asks for
@@ -34,7 +34,7 @@ A claim the tool records rather than certifies. The scan is what confirms it.
 
 | Content | Hash |
 | --- | --- |
-| declared | `d40c2891d1aac415c97068412a248e05aaea222ab467ca113436d3954d4d6467` |
+| declared | `88c547072a77b325e12905325aece95dea820caba0f53d6ab858f2a9cca0f204` |
 
 It was written in this repository rather than imported, so nothing upstream to compare it against.
 
@@ -44,9 +44,9 @@ Nothing. It declares no `asset`.
 
 ## Third-party repositories
 
-None. It declares no `copr` and ships no `repo` file.
+None. It declares no `copr` and ships no `repo.sh` file.
 
-==== and the same module in an image that does build it
+==== and the same component in an image that does build it
 # apps/flatpak
 
 Installs flatpak and enables the remotes an image asks for

@@ -5,8 +5,8 @@ Buffer {
     area: Rect { x: 0, y: 0, width: 80, height: 32 },
     content: [
         "Included libraries:                                                             ",
-        "> [x] modules "tectonic-modules"  Feature modules for many use cases            ",
-        "  [x] base-images "core"  Fedora, CentOS, RHEL, AlmaLinux, Rocky, Debian and Ubu",
+        "> [x] components "tectonic-components"  Feature components and base images for m",
+        "                                                                                ",
         "                                                                                ",
         "                                                                                ",
         "                                                                                ",
@@ -41,11 +41,8 @@ Buffer {
         x: 0, y: 0, fg: Rgb(90, 86, 224), bg: Reset, underline: Reset, modifier: BOLD,
         x: 19, y: 0, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
         x: 0, y: 1, fg: Rgb(238, 111, 248), bg: Reset, underline: Reset, modifier: BOLD,
-        x: 34, y: 1, fg: Rgb(238, 111, 248), bg: Reset, underline: Reset, modifier: BOLD | DIM,
-        x: 68, y: 1, fg: Rgb(238, 111, 248), bg: Reset, underline: Reset, modifier: BOLD,
+        x: 40, y: 1, fg: Rgb(238, 111, 248), bg: Reset, underline: Reset, modifier: BOLD | DIM,
         x: 0, y: 2, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
-        x: 26, y: 2, fg: Reset, bg: Reset, underline: Reset, modifier: DIM,
-        x: 0, y: 3, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
         x: 0, y: 31, fg: Reset, bg: Reset, underline: Reset, modifier: DIM,
         x: 13, y: 31, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
     ]

@@ -234,28 +234,20 @@ fn env(name: &str) -> Option<String> {
 }
 
 /// Writes the image's declared identity into os-release, from the ARGs the
-/// generated Containerfile passes down.
+/// generated Containerfile passes down. The layer after the identity component
+/// passes no IMAGE_VERSION, so it writes the stable fields alone. The final
+/// layer passes it, so it also writes the version and the PRETTY_NAME
+/// fallback that contains it.
 pub fn os_release() -> Result<(), String> {
-    let name = env("IMAGE_NAME").ok_or("IMAGE_NAME is unset: the image declares no name")?;
-    let version = env("IMAGE_VERSION").unwrap_or_else(|| "dev".to_string());
-    let pretty = env("IMAGE_PRETTY_NAME").unwrap_or_else(|| format!("{name} {version}"));
-    let hostname =
-        env("IMAGE_ID").ok_or("IMAGE_ID is unset: the generated Containerfile passes it")?;
-
-    let mut set: Vec<(&str, String)> = vec![
-        ("NAME", name),
-        ("PRETTY_NAME", pretty),
-        ("DEFAULT_HOSTNAME", hostname),
-        ("IMAGE_VERSION", version),
-    ];
-    if let Some(url) = env("IMAGE_URL") {
-        set.push(("HOME_URL", url.clone()));
-        set.push(("DOCUMENTATION_URL", url));
-    }
-    if let Some(url) = env("IMAGE_ISSUES_URL") {
-        set.push(("SUPPORT_URL", url.clone()));
-        set.push(("BUG_REPORT_URL", url));
-    }
+    // The final layer always passes the variable. An empty value is a build
+    // that named no version.
+    let version = std::env::var("IMAGE_VERSION")
+        .ok()
+        .map(|version| match version.is_empty() {
+            true => "dev".to_string(),
+            false => version,
+        });
+    let set = release_fields(env, version)?;
 
     let text = fs::read_to_string(OS_RELEASE).map_err(|err| format!("{OS_RELEASE}: {err}"))?;
     // An overlay store on btrfs has been measured to pad a rewritten file
@@ -268,6 +260,33 @@ pub fn os_release() -> Result<(), String> {
     let _ = fs::remove_file(link);
     std::os::unix::fs::symlink("../usr/lib/os-release", link)
         .map_err(|err| format!("{}: {err}", link.display()))
+}
+
+/// Answers the os-release keys that the identity ARGs set.
+/// With no `version`, only the stable keys are set.
+/// Without a version, `PRETTY_NAME` is set only where the image declares one.
+fn release_fields(
+    get: impl Fn(&str) -> Option<String>,
+    version: Option<String>,
+) -> Result<Vec<(&'static str, String)>, String> {
+    let name = get("IMAGE_NAME").ok_or("IMAGE_NAME is unset: the image declares no name")?;
+    let hostname =
+        get("IMAGE_ID").ok_or("IMAGE_ID is unset: the generated Containerfile passes it")?;
+    let pretty = get("IMAGE_PRETTY_NAME")
+        .or_else(|| version.as_ref().map(|version| format!("{name} {version}")));
+
+    let mut set: Vec<(&str, String)> = vec![("NAME", name), ("DEFAULT_HOSTNAME", hostname)];
+    set.extend(pretty.map(|pretty| ("PRETTY_NAME", pretty)));
+    set.extend(version.map(|version| ("IMAGE_VERSION", version)));
+    if let Some(url) = get("IMAGE_URL") {
+        set.push(("HOME_URL", url.clone()));
+        set.push(("DOCUMENTATION_URL", url));
+    }
+    if let Some(url) = get("IMAGE_ISSUES_URL") {
+        set.push(("SUPPORT_URL", url.clone()));
+        set.push(("BUG_REPORT_URL", url));
+    }
+    Ok(set)
 }
 
 /// Each key replaced where it already is, appended where it is not.
@@ -599,8 +618,8 @@ fn opens_luks(listing: &str) -> bool {
         .any(|line| BINARIES.iter().any(|path| line.ends_with(path)))
 }
 
-/// Presets a module ships, which is the only enablement this checks.
-pub(crate) const MODULE_PRESET: &str = "45-module-";
+/// Presets a component ships, which is the only enablement this checks.
+pub(crate) const COMPONENT_PRESET: &str = "45-component-";
 
 struct Report {
     failures: usize,
@@ -768,14 +787,42 @@ fn validate_boot_chain(report: &mut Report) {
 
 /// Every check a built image has to pass before it is published.
 /// The image's own witness that its boot chain was signed, and the signed PCR
-/// policy beside it. **Hardcoded here and written by `boot/uki/module.sh`, so
-/// the two can drift**: a repository vendors the module and updates `tect`
-/// separately, and a module writing an older path leaves this reading an image
-/// as unsigned that is in fact signed. `NEXT-53` records the fix — the module
-/// declares the path with `provides "<name>" file="<path>"` and the recipe
+/// policy beside it. **Hardcoded here and written by `boot/uki/component.sh`, so
+/// the two can drift**: a repository vendors the component and updates `tect`
+/// separately, and a component writing an older path leaves this reading an image
+/// as unsigned that is in fact signed. `NEXT-53` records the fix — the component
+/// declares the path with `provides "<name>" witness="<path>"` and the recipe
 /// carries it, the way `luks-initramfs` already works.
 const SIGNED_MARKER: &str = "/usr/share/secureboot/signed";
 const PCR_POLICY: &str = "/usr/share/secureboot/pcr-policy.pem";
+
+/// Checks each witness token. A plain token needs one of its paths present. A
+/// token with a leading `!` belongs to a removed name, so it needs every one of
+/// its paths absent.
+fn check_contracts(contracts: &str, relocated: &[Link], report: &mut Report) {
+    if contracts.trim().is_empty() {
+        println!("    (none declared)");
+        return;
+    }
+    for token in contracts.split_whitespace() {
+        if let Some(removed) = token.strip_prefix('!') {
+            match found(removed, relocated) {
+                Some(path) => report.fail(format!(
+                    "{path}: a component removes this capability, and the image still holds its witness"
+                )),
+                None => println!("    {} absent ok", removed.replace('|', " and ")),
+            }
+            continue;
+        }
+        match found(token, relocated) {
+            Some(path) => println!("    {path} ok"),
+            None => report.fail(format!(
+                "{}: the manifest declares it, the image does not have it",
+                token.replace('|', " or ")
+            )),
+        }
+    }
+}
 
 #[expect(
     clippy::too_many_lines,
@@ -839,20 +886,11 @@ pub fn validate_image() -> Result<(), String> {
     }
 
     println!("==> contract files");
-    let contracts = env("CONTRACT_FILES").unwrap_or_default();
-    if contracts.trim().is_empty() {
-        println!("    (none declared)");
-    } else {
-        for token in contracts.split_whitespace() {
-            match found(token, &relocated) {
-                Some(path) => println!("    {path} ok"),
-                None => report.fail(format!(
-                    "{}: the manifest declares it, the image does not have it",
-                    token.replace('|', " or ")
-                )),
-            }
-        }
-    }
+    check_contracts(
+        &env("CONTRACT_FILES").unwrap_or_default(),
+        &relocated,
+        &mut report,
+    );
 
     let mut exceptions: Vec<(String, String)> = Vec::new();
     for token in env("VERIFY_EXCEPTIONS")
@@ -874,9 +912,9 @@ pub fn validate_image() -> Result<(), String> {
     let mut arrived: Vec<String> = Vec::new();
     for scope in ["system", "user"] {
         // `finalize.sh` applies these as `systemctl enable`/`disable` per line
-        // in glob order, so two modules asking opposite things about one unit
+        // in glob order, so two components asking opposite things about one unit
         // are resolved by the alphabet. Without this the failure names the unit
-        // and not the module that overruled it.
+        // and not the component that overruled it.
         let contradicts = |unit: &str, verb: &str| -> Vec<String> {
             let opposite = match verb {
                 "enable" => "disable",
@@ -993,7 +1031,7 @@ pub fn validate_image() -> Result<(), String> {
                             "            this is the known class '{class}'. If it is expected here,"
                         );
                         eprintln!(
-                            "            declare it in the module shipping {}:",
+                            "            declare it in the component shipping {}:",
                             preset.file_name().unwrap_or_default().to_string_lossy()
                         );
                         eprintln!("              allow-verify \"{class}\" unit=\"{unit}\"");
@@ -1003,7 +1041,7 @@ pub fn validate_image() -> Result<(), String> {
         }
     }
 
-    for message in missing_presets(&env("MODULE_PRESETS").unwrap_or_default(), &arrived) {
+    for message in missing_presets(&env("COMPONENT_PRESETS").unwrap_or_default(), &arrived) {
         report.fail(message);
     }
 
@@ -1043,7 +1081,7 @@ fn missing_presets(expected: &str, arrived: &[String]) -> Vec<String> {
     expected
         .split_whitespace()
         .filter(|path| !arrived.iter().any(|have| have == path))
-        .map(|path| format!("{path}: a module ships it, the image does not have it"))
+        .map(|path| format!("{path}: a component ships it, the image does not have it"))
         .collect()
 }
 
@@ -1056,7 +1094,7 @@ fn presets(scope: &str) -> Vec<PathBuf> {
         .map(|entry| entry.path())
         .filter(|path| {
             let name = path.file_name().unwrap_or_default().to_string_lossy();
-            path.is_file() && name.starts_with(MODULE_PRESET) && name.ends_with(".preset")
+            path.is_file() && name.starts_with(COMPONENT_PRESET) && name.ends_with(".preset")
         })
         .collect();
     found.sort();
@@ -1150,6 +1188,48 @@ fn enablement_links(root: &Path, unit: &str) -> Vec<String> {
 mod tests {
     use super::*;
 
+    /// The layer after the identity component passes no version, so it writes
+    /// no version and no `PRETTY_NAME` built from one. The final layer does.
+    #[test]
+    fn os_release_writes_the_version_half_only_when_given_one() {
+        let get = |name: &str| match name {
+            "IMAGE_NAME" => Some("Example".to_string()),
+            "IMAGE_ID" => Some("example".to_string()),
+            _ => None,
+        };
+        let stable = release_fields(get, None).unwrap();
+        assert_eq!(
+            stable,
+            [
+                ("NAME", "Example".to_string()),
+                ("DEFAULT_HOSTNAME", "example".to_string())
+            ]
+        );
+        let last = release_fields(get, Some("44.1".to_string())).unwrap();
+        assert!(last.contains(&("PRETTY_NAME", "Example 44.1".to_string())));
+        assert!(last.contains(&("IMAGE_VERSION", "44.1".to_string())));
+    }
+
+    #[test]
+    fn a_removed_name_whose_witness_is_still_present_fails() {
+        let dir = std::env::temp_dir().join(format!("tect-removed.{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let kept = dir.join("bootupctl");
+        fs::write(&kept, "").unwrap();
+        let gone = dir.join("gone");
+        let mut report = Report { failures: 0 };
+        check_contracts(
+            &format!("!{}|{}", gone.display(), kept.display()),
+            &[],
+            &mut report,
+        );
+        assert_eq!(report.failures, 1);
+        let mut report = Report { failures: 0 };
+        check_contracts(&format!("!{}", gone.display()), &[], &mut report);
+        assert_eq!(report.failures, 0);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
     /// A hash that comes back wrong, or does not come back at all, is what a
     /// pinned archive is refused on.
     #[test]
@@ -1164,7 +1244,7 @@ mod tests {
         assert!(sha256_file(&path).is_err());
     }
 
-    /// Two module presets asking opposite things about one unit is settled by
+    /// Two component presets asking opposite things about one unit is settled by
     /// the glob order, so the loser's failure is what has to name the winner.
     #[test]
     fn a_preset_names_a_unit_only_on_the_verb_it_says() {
@@ -1383,8 +1463,8 @@ mod tests {
 
     #[test]
     fn a_preset_the_plan_expects_and_the_image_lacks_is_named() {
-        let one = "/usr/lib/systemd/system-preset/45-module-one.preset".to_string();
-        let two = "/usr/lib/systemd/user-preset/45-module-two.preset".to_string();
+        let one = "/usr/lib/systemd/system-preset/45-component-one.preset".to_string();
+        let two = "/usr/lib/systemd/user-preset/45-component-two.preset".to_string();
         let arrived = [one.clone()];
 
         assert!(missing_presets("", &[]).is_empty());

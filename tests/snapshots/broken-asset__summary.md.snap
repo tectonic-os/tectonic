@@ -1,8 +1,8 @@
 ---
 source: tests/golden.rs
 ---
-1 module, the ungated set.
+1 component, the ungated set.
 
-| Module | Description | Options | Satisfies | Refuses |
+| Component | Description | Options | Satisfies | Refuses |
 | --- | --- | --- | --- | --- |
 | `core/pins` | Asset pins that say nothing usable about what they fetch |  |  |  |

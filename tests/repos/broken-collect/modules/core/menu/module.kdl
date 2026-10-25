@@ -1,7 +1,0 @@
-schema-version 1
-
-description "Collects a file, but declares no destination for it"
-
-supports "fedora"
-
-collects "justfile.inc" priority=500

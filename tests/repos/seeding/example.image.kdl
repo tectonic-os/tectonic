@@ -5,23 +5,20 @@ image {
     url "https://github.com/someone/example"
     issues-url "https://github.com/someone/example/issues"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking"
+    base-image {
+        fedora-bootc-44
     }
 
     flavours {
         nvidia
     }
 
-    modules {
-        module "fedora-family"
-        module "hello"
-        module "flatpak" variant="beta" {
-            system-wide #false
-        }
-        flavour "nvidia" {
-            module "drivers"
-        }
+    fedora-family
+    hello
+    flatpak variant="beta" {
+        system-wide #false
+    }
+    flavour "nvidia" {
+        drivers
     }
 }

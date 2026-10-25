@@ -37,12 +37,14 @@ source: tests/golden/harness.rs
           "because": "this image is reached over ssh as root"
         },
         {
-          "rule": "no_module_here_refuses_this",
+          "rule": "no_component_here_refuses_this",
           "because": "and so it lifts nothing"
         }
       ],
       "layout": null,
       "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
         "scap_content": "",
@@ -50,32 +52,7 @@ source: tests/golden/harness.rs
         "provides": [
           "rechunking"
         ],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": [
           {
@@ -101,14 +78,14 @@ source: tests/golden/harness.rs
               "because": "this image is reached over ssh as root"
             },
             {
-              "rule": "no_module_here_refuses_this",
+              "rule": "no_component_here_refuses_this",
               "because": "and so it lifts nothing"
             }
           ],
           "default": true,
           "pr": true,
           "siblings": [],
-          "modules": [
+          "components": [
             {
               "path": "one/contradicts",
               "flavour": null,
@@ -117,14 +94,20 @@ source: tests/golden/harness.rs
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "a718f53ff28c37f3a5f97d360cfdee4ee8a2c38c0b414ca8fad2b9a7f33efe5d",
+                "defined": null,
+                "content": "be3d967d72fde6565dd06dc0dd7c7e4658a3550d54026c113aba12cf916b528d",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [
                 {
@@ -137,7 +120,7 @@ source: tests/golden/harness.rs
               "refuses": [
                 {
                   "rule": "package_aide_installed",
-                  "because": "the fixture needs one module arguing with itself"
+                  "because": "the fixture needs one component arguing with itself"
                 }
               ]
             },
@@ -149,14 +132,20 @@ source: tests/golden/harness.rs
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "0b7b626b2e3833c486805ea78767700e5a10a4bb29050126d6cd9469225285f7",
+                "defined": null,
+                "content": "ccc415862c1d66dabd1d9d35c122e7421643ec8b4a8e656f10d90c0d0018aea7",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [
                 {

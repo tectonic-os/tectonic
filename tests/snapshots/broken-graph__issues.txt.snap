@@ -2,51 +2,52 @@
 source: tests/golden/harness.rs
 ---
   x invalid capability name `boot policy`
-   ,-[tests/repos/broken-graph/image.kdl:8:9]
- 7 |         family "fedora"
- 8 |         provides "rechunking" "boot policy" "selinux-policy"
-   :         ^^^^|^^^
-   :             `-- lowercase, digits and dashes, starting with a letter
- 9 |         requires "bootc-base"
+   ,-[tests/repos/broken-graph/components/base-image/fedora-bootc-44/manifest.kdl:6:23]
+ 5 | }
+ 6 | provides "rechunking" "boot policy" "selinux-policy"
+   :                       ^^^^^^|^^^^^^
+   :                             `-- lowercase, digits and dashes, starting with a letter
+ 7 | requires "bootc-base"
    `----
-  help: the name is written into the generated graph as a mermaid label and a
-        markdown table cell, neither of which quotes anything
+  help: a name is one or more segments joined by `/`, such as `rpm/dnf5`, and
+        each segment starts with a lowercase letter
 
   x unknown base family `arch`
-   ,-[tests/repos/broken-graph/modules/core/three/module.kdl:5:1]
+   ,-[tests/repos/broken-graph/components/core/three/manifest.kdl:5:1]
  4 | 
- 5 | supports "arch"
-   : ^^^^|^^^
-   :     `-- not a family this repository builds on
+ 5 | targets "arch"
+   : ^^^|^^^
+   :    `-- not a family this repository builds on
  6 | 
    `----
   help: known families: fedora, rhel, debian, ubuntu
 
-  x two enabled modules declare helper `shared.sh`
-   ,-[tests/repos/broken-graph/modules/core/two/module.kdl:7:1]
+  x two enabled components declare helper `shared.sh`
+   ,-[tests/repos/broken-graph/components/core/two/manifest.kdl:7:1]
  6 | 
  7 | helpers "lib/two/shared.sh"
    : ^^^|^^^
    :    `-- mounted to the same path
- 8 | provides "rechunking"
+ 8 | provides {
    `----
   help: also declared by `core/one`; helper basenames must be unique across an
         image
 
   x `core/two` provides `rechunking`, which the base image already provides
-   ,-[tests/repos/broken-graph/modules/core/two/module.kdl:8:1]
- 7 | helpers "lib/two/shared.sh"
- 8 | provides "rechunking"
-   : ^^^^|^^^
-   :     `-- already provided by the base
- 9 | provides "shell-tools" exclusive=#true
-   `----
-  help: a module the base covers entirely is suppressed instead. This one also
-        provides `shell-tools`, so its layer still builds and would provision
-        `rechunking` a second time: split it, or drop the declaration
+    ,-[tests/repos/broken-graph/components/core/two/manifest.kdl:9:5]
+  8 | provides {
+  9 |     "rechunking"
+    :     ^^^^^^|^^^^^
+    :           `-- already provided by the base
+ 10 |     "shell-tools" exclusive=#true
+    `----
+  help: a component the base covers entirely is suppressed instead. This one
+        also provides `shell-tools`, so its layer still builds and would
+        provision `rechunking` a second time: split it, or drop the
+        declaration
 
-  x image `broken-graph` installs packages for `fedora`, but no enabled module
-  | provides `build-environment` for that family
+  x image `broken-graph` installs packages for `fedora`, but no enabled
+  | component provides `build-environment` for that family
    ,-[tests/repos/broken-graph/image.kdl:3:1]
  2 | 
  3 | image {
@@ -58,63 +59,61 @@ source: tests/golden/harness.rs
   x `core/three` does not support the `fedora` base family
   help: it declares support for: arch
 
-  x `shell-tools` is provided by more than one enabled module
-   ,-[tests/repos/broken-graph/modules/core/two/module.kdl:9:1]
- 8 | provides "rechunking"
- 9 | provides "shell-tools" exclusive=#true
-   : ^^^^|^^^
-   :     `-- also provided elsewhere
-   `----
+  x `shell-tools` is provided by more than one enabled component
+    ,-[tests/repos/broken-graph/components/core/two/manifest.kdl:10:5]
+  9 |     "rechunking"
+ 10 |     "shell-tools" exclusive=#true
+    :     ^^^^^^|^^^^^^
+    :           `-- also provided elsewhere
+ 11 | }
+    `----
   help: provided by: core/two, core/three. `core/two` declares it `exclusive`,
         so enable one provider
 
   x `quay.io/fedora/fedora-bootc:44` requires `bootc-base`, which nothing
   | enabled provides
-    ,-[tests/repos/broken-graph/image.kdl:9:9]
-  8 |         provides "rechunking" "boot policy" "selinux-policy"
-  9 |         requires "bootc-base"
-    :         ^^^^|^^^
-    :             `-- the base is not usable without it
- 10 |     }
+    ,-[tests/repos/broken-graph/image.kdl:14:4]
+ 13 |         core {
+ 14 | ,->         two
+ 15 | |->     }
+    : `---- the base is not usable without it
+ 16 |         core {
     `----
-  help: no module in the repository declares `provides "bootc-base"`, and
-        neither does the `base` node in tests/repos/broken-graph/image.kdl.
-        repo.kdl declares no `sources`, so there is no collection to import
-        one from
+  help: no component in the repository declares `provides "bootc-base"`, and
+        neither does the base `base-image/fedora-bootc-44`. repo.kdl declares
+        no `sources`, so there is no collection to import one from
 
   x `core/one` requires `package-manager`, which nothing enabled provides
-    ,-[tests/repos/broken-graph/modules/core/one/module.kdl:10:1]
+    ,-[tests/repos/broken-graph/components/core/one/manifest.kdl:10:10]
   9 | helpers "lib/one/shared.sh"
  10 | requires "package-manager"
-    : ^^^^|^^^
-    :     `-- unsatisfied
+    :          ^^^^^^^^|^^^^^^^^
+    :                  `-- unsatisfied
  11 | requires "apparmor-policy"
     `----
-  help: no module in the repository declares `provides "package-manager"`, and
-        neither does the `base` node in tests/repos/broken-graph/image.kdl.
-        repo.kdl declares no `sources`, so there is no collection to import
-        one from
+  help: no component in the repository declares `provides "package-manager"`,
+        and neither does the base `base-image/fedora-bootc-44`. repo.kdl
+        declares no `sources`, so there is no collection to import one from
 
   x `core/one` requires `apparmor-policy`, which nothing enabled provides
-    ,-[tests/repos/broken-graph/modules/core/one/module.kdl:11:1]
+    ,-[tests/repos/broken-graph/components/core/one/manifest.kdl:11:10]
  10 | requires "package-manager"
  11 | requires "apparmor-policy"
-    : ^^^^|^^^
-    :     `-- unsatisfied
+    :          ^^^^^^^^|^^^^^^^^
+    :                  `-- unsatisfied
  12 | requires "nothing"
     `----
-  help: no module in the repository declares `provides "apparmor-policy"`, and
-        neither does the `base` node in tests/repos/broken-graph/image.kdl.
-        repo.kdl declares no `sources`, so there is no collection to import
-        one from
+  help: no component in the repository declares `provides "apparmor-policy"`,
+        and neither does the base `base-image/fedora-bootc-44`. repo.kdl
+        declares no `sources`, so there is no collection to import one from
 
   x `core/one` requires `nothing`, which nothing enabled provides
-    ,-[tests/repos/broken-graph/modules/core/one/module.kdl:12:1]
+    ,-[tests/repos/broken-graph/components/core/one/manifest.kdl:12:10]
  11 | requires "apparmor-policy"
  12 | requires "nothing"
-    : ^^^^|^^^
-    :     `-- unsatisfied
+    :          ^^^^|^^^^
+    :              `-- unsatisfied
     `----
-  help: no module in the repository declares `provides "nothing"`, and neither
-        does the `base` node in tests/repos/broken-graph/image.kdl. repo.kdl
-        declares no `sources`, so there is no collection to import one from
+  help: no component in the repository declares `provides "nothing"`, and
+        neither does the base `base-image/fedora-bootc-44`. repo.kdl declares
+        no `sources`, so there is no collection to import one from

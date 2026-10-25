@@ -1,10 +1,10 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 ### Base Image
 FROM ${BASE} AS rootfs
 
-## Module layers
+## Component layers
 
 # ---- /opt build root ----
 RUN mv /opt /opt.bak && mkdir /opt
@@ -15,28 +15,28 @@ RUN if [ -L /usr/local ]; then mv /usr/local /usr/local.bak && \
     /usr/local/lib /usr/local/lib64 /usr/local/libexec /usr/local/share /usr/local/src; fi
 
 # ---- core/shared ----
-RUN --mount=type=bind,from=ctx,source=/modules/core/shared,target=/ctx/modules/core/shared \
+RUN --mount=type=bind,from=ctx,source=/components/core/shared,target=/ctx/components/core/shared \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
-    --mount=type=bind,from=ctx,source=/generated/workstation/modules/core/shared.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/generated/workstation/components/core/shared.sh,target=/ctx/component.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/module.sh
+    bash /ctx/component.sh
 
 # ---- flavour gate ----
 ARG FLAVOUR
 
 # ---- [dev] ----
 # ---- core/dev-tools ----
-RUN --mount=type=bind,from=ctx,source=/modules/core/dev-tools,target=/ctx/modules/core/dev-tools \
+RUN --mount=type=bind,from=ctx,source=/components/core/dev-tools,target=/ctx/components/core/dev-tools \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
-    --mount=type=bind,from=ctx,source=/generated/workstation/modules/core/dev-tools@dev.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/generated/workstation/components/core/dev-tools@dev.sh,target=/ctx/component.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/module.sh
+    bash /ctx/component.sh
 
 # ---- image version ----
 ARG IMAGE_VERSION=dev
@@ -57,15 +57,11 @@ ARG IMAGE_ID="workstation"
 ARG IMAGE_NAME="Workstation"
 ARG IMAGE_REGISTRY=""
 
-# ---- os-release ----
-RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
-    IMAGE_VERSION="${IMAGE_VERSION}" IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" /ctx/tect os-release
-
 # ---- finalize ----
 RUN --mount=type=bind,from=ctx,source=/generated/workstation/finalize.sh,target=/ctx/finalize.sh \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
-    --mount=type=bind,from=ctx,source=/modules/core/shared,target=/ctx/modules/core/shared \
-    --mount=type=bind,from=ctx,source=/modules/core/dev-tools,target=/ctx/modules/core/dev-tools \
+    --mount=type=bind,from=ctx,source=/components/core/shared,target=/ctx/components/core/shared \
+    --mount=type=bind,from=ctx,source=/components/core/dev-tools,target=/ctx/components/core/dev-tools \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \

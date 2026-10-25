@@ -4,24 +4,19 @@ image {
     name "Refused"
     conforms "standard"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking"
-
-        // A base claims the way a module does, so remediation has to leave
-        // this alone too.
-        satisfies {
-            stig "RHEL-09-232010"
-        }
+    base-image {
+        fedora-bootc-44
     }
 
-    // A module's refusal is its judgement about a deployment, and this image
+    // A component's refusal is its judgement about a deployment, and this image
     // overrides one of them and names a rule nothing refuses.
     allow-remediation "sshd_disable_root_login" because="this image is reached over ssh as root"
-    allow-remediation "no_module_here_refuses_this" because="and so it lifts nothing"
+    allow-remediation "no_component_here_refuses_this" because="and so it lifts nothing"
 
-    modules {
-        module "one/contradicts"
-        module "one/typo"
+    one {
+        contradicts
+    }
+    one {
+        typo
     }
 }

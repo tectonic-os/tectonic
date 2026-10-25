@@ -1,0 +1,7 @@
+schema-version 1
+
+description "Overrides a path no earlier component ships"
+
+targets "fedora"
+
+overrides "/usr/lib/nothing.conf"

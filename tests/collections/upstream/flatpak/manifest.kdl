@@ -1,0 +1,9 @@
+schema-version 1
+
+description "Flatpak client and a daily update timer"
+
+targets "fedora"
+
+packages "flatpak"
+
+provides "flatpak" witness="/usr/bin/flatpak"

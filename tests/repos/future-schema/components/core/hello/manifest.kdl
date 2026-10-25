@@ -1,0 +1,7 @@
+schema-version 1
+
+description "The smallest component a repository can hold"
+
+targets "fedora"
+
+packages "fastfetch"

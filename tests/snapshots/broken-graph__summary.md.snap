@@ -1,10 +1,10 @@
 ---
 source: tests/golden.rs
 ---
-3 modules, the ungated set.
+3 components, the ungated set.
 
-| Module | Description | Options | Satisfies | Refuses |
+| Component | Description | Options | Satisfies | Refuses |
 | --- | --- | --- | --- | --- |
 | `core/one` | Requires a capability nothing in this image provides |  |  |  |
 | `core/two` | Provides what the base already provides |  |  |  |
-| `core/three` | Provides the same capability as another enabled module |  |  |  |
+| `core/three` | Provides the same capability as another enabled component |  |  |  |

@@ -1,9 +1,0 @@
-schema-version 1
-
-description "Flatpak client and a daily update timer"
-
-supports "fedora"
-
-packages "flatpak"
-
-provides "flatpak"

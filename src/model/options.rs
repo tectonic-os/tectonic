@@ -1,11 +1,11 @@
-//! Typed options: declared by the module, set by the image author, resolved
+//! Typed options: declared by the component, set by the image author, resolved
 //! against both and passed to the layer as env.
 
 use crate::diag::{Issue, Issues, Source, Span};
 
 /// A declared value, owned by the model: `parse` is the only thing that sees
 /// KDL's own value type.
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum Value {
     String(String),
     Bool(bool),
@@ -19,6 +19,17 @@ impl Value {
         match self {
             Self::String(s) => Some(s),
             Self::Bool(_) | Self::Integer(_) | Self::Float(_) | Self::Null => None,
+        }
+    }
+
+    /// Writes the value the way a KDL document spells it.
+    pub fn kdl(&self) -> String {
+        match self {
+            Self::String(s) => format!("{s:?}"),
+            Self::Bool(b) => format!("#{b}"),
+            Self::Integer(i) => i.to_string(),
+            Self::Float(f) => f.to_string(),
+            Self::Null => "#null".to_string(),
         }
     }
 
@@ -58,7 +69,7 @@ pub struct Opt {
 }
 
 /// The Renovate datasource that an image entry's `version` value is looked
-/// up in. Only the module knows which package the value versions.
+/// up in. Only the component knows which package the value versions.
 pub struct VersionTracker {
     pub datasource: String,
     pub dep_name: String,
@@ -167,4 +178,15 @@ pub(crate) fn check_values(
         }
     }
     ok
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Value;
+
+    #[test]
+    fn a_value_is_written_as_kdl_spells_it() {
+        assert_eq!(Value::String("44".into()).kdl(), "\"44\"");
+        assert_eq!(Value::Bool(true).kdl(), "#true");
+    }
 }

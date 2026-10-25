@@ -15,9 +15,9 @@ Yes
 
 
 example/
-├── modules/
+├── components/
 │   ├── browser@1/
-│   │   └── + module.kdl
-│   └── + modules.lock.kdl
-└── ~ example.image.kdl  browser@1 added to modules
+│   │   └── + manifest.kdl
+│   └── ~ components.lock.kdl  browser@1 recorded
+└── ~ example.image.kdl  browser@1 added to components
 ==== exit 0

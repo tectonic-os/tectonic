@@ -1,7 +1,0 @@
-schema-version 1
-
-description "Offers the capability, and the image does not list it"
-
-supports "fedora"
-
-provides "scap-remediation"

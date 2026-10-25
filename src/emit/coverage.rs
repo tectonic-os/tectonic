@@ -1,5 +1,5 @@
 //! Every rule the profile an image declares selects, what the image claims it
-//! with, and which module elsewhere would. The claim resolves forward
+//! with, and which component elsewhere would. The claim resolves forward
 //! through `Content::rules`, the search for who would help runs backward
 //! through `Content::numbering`, and the two are not interchangeable.
 
@@ -18,10 +18,10 @@ struct Row {
     /// it. Empty for a rule no number reaches, which nothing can claim.
     numbers: Vec<String>,
     title: String,
-    /// What the image claims this rule with: a module it installs, or the base
+    /// What the image claims this rule with: a component it installs, or the base
     /// it builds on, named by the reference.
     claimed: Vec<String>,
-    /// Modules elsewhere that would, for a rule nothing listed claims.
+    /// Components elsewhere that would, for a rule nothing listed claims.
     would: Vec<String>,
 }
 
@@ -37,20 +37,23 @@ pub fn of<'a>(image: &'a Image, content: &'a Content, index: &Index) -> Option<C
     let profile = content.profiles.iter().find(|p| p.is(&image.conforms))?;
     let selected = content.selected(&profile.id);
 
-    // One walk of the image's modules, then one of the index for the whole
+    // One walk of the image's components, then one of the index for the whole
     // open set: both are keyed by rule afterwards, so neither is repeated per
     // rule.
     let mut claimed: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    for module in image.modules() {
-        let numbers = module
+    for component in image.components() {
+        let numbers = component
             .satisfies
             .iter()
             .flat_map(|coverage| coverage.rules.iter());
         for rule in reached(content, numbers) {
-            claimed.entry(rule).or_default().insert(module.path.clone());
+            claimed
+                .entry(rule)
+                .or_default()
+                .insert(component.path.clone());
         }
     }
-    // The base claims rules the way a module it installs does, and the
+    // The base claims rules the way a component it installs does, and the
     // reference every layer builds on is what names it in the row.
     if let Some(base) = &image.base {
         let numbers = base
@@ -66,7 +69,7 @@ pub fn of<'a>(image: &'a Image, content: &'a Content, index: &Index) -> Option<C
         .filter(|rule| !claimed.contains_key(*rule))
         .cloned()
         .collect();
-    // A module the base suppressed is still one the image lists, so it is
+    // A component the base suppressed is still one the image lists, so it is
     // still not an answer to what the image is missing.
     let listed: BTreeSet<String> = image
         .entries
@@ -232,7 +235,7 @@ mod tests {
 
     /// The base claims rules and the row names it, so this read-out and
     /// `tect check` count the same rules open. A rule the base claims is also
-    /// one no module elsewhere is offered for.
+    /// one no component elsewhere is offered for.
     #[test]
     fn a_rule_the_base_claims_is_claimed_here_and_offered_to_nobody() {
         let root = fixture("tests/scap/claiming-base");
@@ -255,10 +258,10 @@ mod tests {
         );
     }
 
-    /// The index reads a claim the resolved module dropped, so a module the
+    /// The index reads a claim the resolved component dropped, so a component the
     /// image lists reaches the open rule it names. The row offers nothing.
     #[test]
-    fn a_module_the_image_lists_is_not_offered_as_one_that_would_claim() {
+    fn a_component_the_image_lists_is_not_offered_as_one_that_would_claim() {
         let root = fixture("tests/scap/listed-claimant");
         let loaded = crate::load(&root);
         let content = crate::scap::content_of(&fixture("tests/scap/datastream.xml"))

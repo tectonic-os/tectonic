@@ -1,7 +1,7 @@
 ---
 source: tests/golden.rs
 ---
-0 modules, the ungated set.
+0 components, the ungated set.
 
-| Module | Description | Options | Satisfies | Refuses |
+| Component | Description | Options | Satisfies | Refuses |
 | --- | --- | --- | --- | --- |

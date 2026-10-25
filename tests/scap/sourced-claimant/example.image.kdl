@@ -4,11 +4,8 @@ image {
     name "Sourced"
     conforms "standard"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking"
+    base-image {
+        fedora-bootc-44
     }
 
-    modules {
-    }
 }

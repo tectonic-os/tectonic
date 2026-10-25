@@ -2,6 +2,7 @@
 
 pub mod collect;
 pub mod graph;
+pub mod imports;
 pub mod name;
 pub mod options;
 pub mod order;
@@ -10,12 +11,33 @@ pub mod workflow;
 
 use collect::Collection;
 
-/// Answers whether a module that declares `supports` builds on `family`. A
-/// module with no `supports` builds on every family. `check`, the provider
+/// Answers whether a component that declares `targets` builds on `family`. A
+/// component with no `targets` builds on every family. A base with no family
+/// skips the family check, so every component builds on it. `check`, the provider
 /// index and the import picker all read this one rule, so the picker never
-/// offers a module that `check` then refuses.
-pub fn supports(declared: &[String], family: &str) -> bool {
-    declared.is_empty() || declared.iter().any(|has| has == family)
+/// offers a component that `check` then refuses.
+pub fn targets(declared: &[String], family: &str) -> bool {
+    family.is_empty() || declared.is_empty() || declared.iter().any(|has| has == family)
+}
+
+/// Answers whether a declared capability meets a requirement. A declared name
+/// meets a requirement for itself and for each of its ancestors, so `rpm/dnf5`
+/// meets `rpm`.
+pub fn meets(declared: &str, required: &str) -> bool {
+    declared
+        .strip_prefix(required)
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+}
+
+/// Answers whether the component at `path` that declares `provides` meets a
+/// requirement. A component meets a requirement for its own path exactly. An
+/// organising directory above it never becomes a capability.
+pub fn answers<'a>(
+    path: &str,
+    mut provides: impl Iterator<Item = &'a str>,
+    required: &str,
+) -> bool {
+    path == required || provides.any(|has| meets(has, required))
 }
 
 /// Answers whether two providers of one capability conflict. Each side is the
@@ -38,4 +60,17 @@ pub fn meet(one: Option<&str>, other: Option<&str>) -> bool {
 pub struct Resolved {
     pub shipped: overlay::Index,
     pub collected: Collection,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_ungated_entry_meets_every_target() {
+        assert!(meet(None, Some("dev")));
+        assert!(meet(Some("dev"), None));
+        assert!(meet(Some("dev"), Some("dev")));
+        assert!(!meet(Some("dev"), Some("prod")));
+    }
 }

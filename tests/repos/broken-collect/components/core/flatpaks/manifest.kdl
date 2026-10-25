@@ -1,0 +1,7 @@
+schema-version 1
+
+description "Collects flatpaks.list, and this image does not list it"
+
+targets "fedora"
+
+collects "flatpaks.list" into="/usr/share/flatpak-defaults/apps.list" priority=500

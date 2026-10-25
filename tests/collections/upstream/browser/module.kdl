@@ -1,7 +1,0 @@
-schema-version 1
-
-description "A browser, from the first collection"
-
-supports "fedora"
-
-packages "firefox"

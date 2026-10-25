@@ -1,0 +1,9 @@
+schema-version 1
+
+description "A base only the collection knows about"
+provides "rechunking" "collected"
+base "example.invalid/collected:1" {
+    family "fedora"
+    bootloader "grub2"
+}
+imports "fedora-family"

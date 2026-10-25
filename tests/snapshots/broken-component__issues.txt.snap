@@ -1,0 +1,104 @@
+---
+source: tests/golden/harness.rs
+---
+  x `core/nameless` is listed twice
+    ,-[tests/repos/broken-component/image.kdl:11:9]
+ 10 |     core {
+ 11 |         nameless
+    :         ^^^^|^^^
+    :             `-- first here
+ 12 |     }
+ 13 |     core {
+ 14 |         missing
+ 15 |     }
+ 16 |     core {
+ 17 |         latin
+ 18 |     }
+ 19 |     core {
+ 20 |         nameless
+    :         ^^^^|^^^
+    :             `-- and again here
+ 21 |     }
+    `----
+  help: a component builds once per flavour it is listed under
+
+  x unknown node `drives`
+   ,-[tests/repos/broken-component/components/core/nameless/manifest.kdl:5:1]
+ 4 | 
+ 5 | drives "a truck"
+   : ^^^|^^
+   :    `-- not part of the schema
+ 6 | satisfies {
+   `----
+  help: docs/schema/component.md documents every node a manifest may hold
+
+  x `cis-fedora` has no rules listed
+   ,-[tests/repos/broken-component/components/core/nameless/manifest.kdl:7:5]
+ 6 | satisfies {
+ 7 |     cis-fedora
+   :     ^^^^^|^^^^
+   :          `-- nothing to cover
+ 8 |     "" "1.1.1.1"
+   `----
+
+  x benchmark `stig` is declared twice
+    ,-[tests/repos/broken-component/components/core/nameless/manifest.kdl:10:5]
+  9 |     stig "R1"
+ 10 |     stig "R2"
+    :     ^^|^
+    :       `-- already declared above
+ 11 | }
+    `----
+
+  x a benchmark name is required inside `satisfies`
+   ,-[tests/repos/broken-component/components/core/nameless/manifest.kdl:8:5]
+ 7 |     cis-fedora
+ 8 |     "" "1.1.1.1"
+   :     ^|
+   :      `-- empty name
+ 9 |     stig "R1"
+   `----
+  help: `satisfies { cis-fedora "1.1.1.1" }`
+
+  x `core/missing` is not a component
+    ,-[tests/repos/broken-component/image.kdl:14:9]
+ 13 |     core {
+ 14 |         missing
+    :         ^^^|^^^
+    :            `-- nothing to build
+ 15 |     }
+    `----
+  help: give components/core/missing a manifest.kdl, a component.sh, a
+        repo.sh, a packages.sh, a finalize.sh, a files/ directory, a
+        Containerfile.inc or a file that another component collects, or define
+        it inline with a manifest node such as `packages`
+
+  x tests/repos/broken-component/components/core/latin/manifest.kdl cannot be
+  | read: stream did not contain valid UTF-8
+    ,-[tests/repos/broken-component/image.kdl:17:9]
+ 16 |     core {
+ 17 |         latin
+    :         ^^|^^
+    :           `-- manifest.kdl unreadable
+ 18 |     }
+    `----
+
+  x unknown node `flies`
+   ,-[tests/repos/broken-component/components/core/unlisted/manifest.kdl:6:1]
+ 5 | 
+ 6 | flies "a kite"
+   : ^^|^^
+   :   `-- not part of the schema
+ 7 | provides "Shell|Tools"
+   `----
+  help: docs/schema/component.md documents every node a manifest may hold
+
+  x invalid capability name `Shell|Tools`
+   ,-[tests/repos/broken-component/components/core/unlisted/manifest.kdl:7:10]
+ 6 | flies "a kite"
+ 7 | provides "Shell|Tools"
+   :          ^^^^^^|^^^^^^
+   :                `-- lowercase, digits and dashes, starting with a letter
+   `----
+  help: a name is one or more segments joined by `/`, such as `rpm/dnf5`, and
+        each segment starts with a lowercase letter

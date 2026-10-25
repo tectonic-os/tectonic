@@ -1,0 +1,9 @@
+schema-version 1
+
+description "A component that needs the family adapter under it"
+
+targets "fedora"
+
+requires "build-environment"
+
+packages "htop"

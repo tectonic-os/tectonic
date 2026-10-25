@@ -171,7 +171,7 @@ pub fn id(name: &str) -> Result<String, String> {
     Ok(id)
 }
 
-/// Writes a repository into `root`: repo.kdl, the module directory, and
+/// Writes a repository into `root`: repo.kdl, the component directory, and
 /// everything under `assets`, which is an image repository's root. The images
 /// are `create image`'s. `sources` is the block repo.kdl starts with. Answers
 /// every path it wrote, relative to `root`.
@@ -210,9 +210,9 @@ pub fn write(
         ),
     )?;
     put(&root.join("README.md"), &format!("# {name}\n"))?;
-    // A module directory that survives a commit: the build context mounts it.
-    put(&root.join("modules/.gitkeep"), "")?;
-    wrote.extend([layout::REPO_FILE, "README.md", "modules/.gitkeep"].map(PathBuf::from));
+    // A component directory that survives a commit: the build context mounts it.
+    put(&root.join("components/.gitkeep"), "")?;
+    wrote.extend([layout::REPO_FILE, "README.md", "components/.gitkeep"].map(PathBuf::from));
     Ok(wrote)
 }
 
@@ -255,10 +255,10 @@ pub(crate) fn put(path: &Path, text: &str) -> Result<(), String> {
     fs::write(path, text).map_err(|err| format!("{}: {err}", path.display()))
 }
 
-/// Copies one module without the modules it holds of its own.
+/// Copies one component without the components it holds of its own.
 /// Answers every file it copied, relative to `to`.
-pub(crate) fn copy_module(from: &Path, to: &Path) -> Result<Vec<PathBuf>, String> {
-    let held = layout::held_modules(from);
+pub(crate) fn copy_component(from: &Path, to: &Path) -> Result<Vec<PathBuf>, String> {
+    let held = layout::held_components(from);
     let skip: Vec<&Path> = held.iter().map(PathBuf::as_path).collect();
     copy_tree_except(from, to, &skip)
 }
@@ -295,7 +295,7 @@ fn copy_below(
         // names, which can sit outside the library.
         if kind.is_symlink() {
             return Err(format!(
-                "{} is a symbolic link, and a module copy holds files and directories only",
+                "{} is a symbolic link, and a component copy holds files and directories only",
                 source.display()
             ));
         }
@@ -316,15 +316,15 @@ mod tests {
 
     /// The link names a file outside the copied tree.
     #[test]
-    fn a_symbolic_link_in_a_module_is_refused() {
+    fn a_symbolic_link_in_a_component_is_refused() {
         let at = std::env::temp_dir().join(format!("tect-link-{}", std::process::id()));
         put(&at.join("secret"), "token\n").unwrap();
-        put(&at.join("library/browser/module.kdl"), "").unwrap();
+        put(&at.join("library/browser/manifest.kdl"), "").unwrap();
         std::os::unix::fs::symlink(at.join("secret"), at.join("library/browser/notes")).unwrap();
-        let refused =
-            copy_module(&at.join("library/browser"), &at.join("modules/browser")).unwrap_err();
+        let refused = copy_component(&at.join("library/browser"), &at.join("components/browser"))
+            .unwrap_err();
         assert!(refused.contains("is a symbolic link"), "{refused}");
-        assert!(!at.join("modules/browser/notes").exists());
+        assert!(!at.join("components/browser/notes").exists());
         fs::remove_dir_all(at).unwrap();
     }
 
@@ -358,23 +358,23 @@ mod tests {
     }
 
     #[test]
-    fn a_module_copy_leaves_out_the_modules_it_holds() {
+    fn a_component_copy_leaves_out_the_components_it_holds() {
         let root = std::env::temp_dir().join(format!("tect-copy-held-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         let from = root.join("from");
-        put(&from.join(layout::MODULE_FILE), "").unwrap();
-        put(&from.join("module.sh"), "true\n").unwrap();
-        put(&from.join("cuda").join(layout::MODULE_FILE), "").unwrap();
-        put(&from.join("cuda/module.sh"), "true\n").unwrap();
+        put(&from.join(layout::MANIFEST_FILE), "").unwrap();
+        put(&from.join("component.sh"), "true\n").unwrap();
+        put(&from.join("cuda").join(layout::MANIFEST_FILE), "").unwrap();
+        put(&from.join("cuda/component.sh"), "true\n").unwrap();
 
-        let mut wrote = copy_module(&from, &root.join("to")).unwrap();
+        let mut wrote = copy_component(&from, &root.join("to")).unwrap();
         wrote.sort();
         let _ = fs::remove_dir_all(&root);
         assert_eq!(
             wrote,
             [
-                PathBuf::from(layout::MODULE_FILE),
-                PathBuf::from("module.sh")
+                PathBuf::from("component.sh"),
+                PathBuf::from(layout::MANIFEST_FILE)
             ]
         );
     }
@@ -398,7 +398,7 @@ mod tests {
             .iter()
             .map(|path| path.display().to_string())
             .filter(|path| {
-                ![layout::REPO_FILE, "README.md", "modules/.gitkeep"].contains(&path.as_str())
+                ![layout::REPO_FILE, "README.md", "components/.gitkeep"].contains(&path.as_str())
             })
             .collect();
         wrote.sort();
@@ -426,7 +426,7 @@ mod tests {
         let mine = [
             "scripts/deploy.sh",
             ".github/workflows/mine.yml",
-            "base-images/mine.base.kdl",
+            "base-image/mine.base.kdl",
         ];
         for path in mine {
             put(&root.join(path), "mine\n").unwrap();

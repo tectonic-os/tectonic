@@ -20,6 +20,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      issues: write
       pull-requests: write
     steps:
       - name: Checkout
@@ -32,34 +33,35 @@ jobs:
         with:
           cosign-release: 'v2.6.3'
 
-      - name: Probe each base and correct the declaration
+      - name: Probe each base and correct its signature
         id: probe
-        # The plan names every capability a probe can decide and the paths that
-        # witness it: the tool's located rows, what the base claims, and what
-        # the image's modules require. A name it cannot witness, such as the
-        # abstract `rechunking`, is left as it was.
+        # The plan names each capability that a provider in the image
+        # witnesses with a `file=`, with its paths.
+        # It leaves out a component that meets a base requirement.
+        # That component stands in for the base, so the base never claims it.
+        # A name without a `file=`, such as `rechunking`, is left as it was.
         #
         # A name already declared is measured whether or not anything requires
-        # it: an under-claim refuses a module and says so, an over-claim is
+        # it: an under-claim refuses a component and says so, an over-claim is
         # silent.
         run: |
           set -euo pipefail
 
           # To a file, and before the loop, because `plan --json` writes nothing
-          # at all when any module is refused: read through a process
+          # at all when any component is refused: read through a process
           # substitution that would be an empty loop and a run reporting every
           # base matched, having measured none.
           plan="$(mktemp)"
           ./scripts/tect.sh plan --json > "${plan}"
 
           # Reads the witnesses, what the container answered and what the
-          # manifest says; rewrites the `provides` node of every block naming
-          # this base, and prints what it changed. Silence is a base that
-          # already matches.
+          # base component declares, and prints how `provides` drifted.
+          # Silence is a base that already matches. The base component is
+          # the library's, so its CI corrects `provides` and this run edits
+          # no component.
           reconcile="$(mktemp)"
           cat > "${reconcile}" <<'PYTHON'
           import os
-          import pathlib
 
           witness = {}
           for entry in os.environ["WITNESSES"].split():
@@ -67,54 +69,26 @@ jobs:
               witness[name] = paths.split(",")
 
           present = set(os.environ["MEASURED"].split())
-          base = os.environ["BASE"]
           caps_were = os.environ["PROVIDES"].split()
 
           witnessed = {n for n, paths in witness.items() if any(p in present for p in paths)}
           caps = [c for c in caps_were if c not in witness or c in witnessed]
           caps += sorted(c for c in witnessed if c not in caps_were)
 
-          if caps == caps_were:
-              raise SystemExit(0)
-
-          path = pathlib.Path(os.environ["IMAGE_FILE"])
-          lines = path.read_text().split("\n")
-          opens = f'base "{base}" {{'
-          out = []
-          index = 0
-          while index < len(lines):
-              line = lines[index]
-              out.append(line)
-              index += 1
-              if line.strip() != opens:
-                  continue
-              block = []
-              while index < len(lines) and lines[index].strip() != "}":
-                  block.append(lines[index])
-                  index += 1
-              indent = " " * (len(block[0]) - len(block[0].lstrip())) if block else "        "
-              kept = [b for b in block if b.split()[:1] != ["provides"]]
-              nodes = [indent + "provides " + " ".join(f'"{c}"' for c in caps)] if caps else []
-              at = next(
-                  (n for n, b in enumerate(kept) if b.split()[:1] == ["family"]),
-                  -1,
-              ) + 1
-              out.extend(kept[:at] + nodes + kept[at:])
-          path.write_text("\n".join(out))
-
           said = []
           gone = [c for c in caps_were if c not in caps]
           came = [c for c in caps if c not in caps_were]
           if gone:
-              said.append("`provides` lost " + ", ".join(f"`{c}`" for c in gone))
+              said.append("`provides` should lose " + ", ".join(f"`{c}`" for c in gone))
           if came:
-              said.append("`provides` gained " + ", ".join(f"`{c}`" for c in came))
+              said.append("`provides` should gain " + ", ".join(f"`{c}`" for c in came))
           print("; ".join(said))
           PYTHON
 
           memos="$(mktemp -d)"
           changed=""
-          while IFS='|' read -r image base recorded file provides witnesses; do
+          drifted=""
+          while IFS='|' read -r image base recorded file component provides witnesses; do
             [ -n "${image}" ] || continue
             # `signed` records that a signature is published, which is not the
             # same as one a consumer can attribute: a keyless signature carries
@@ -135,6 +109,12 @@ jobs:
             echo "${image}: ${base} is ${kind}, recorded as ${recorded}"
             if [ "${actual}" != "${recorded}" ]; then
               sed -i "s/signed #${recorded}/signed #${actual}/" "${file}"
+              # An entry that writes no `signed` line leaves the sed nothing
+              # to match, and the pull request would carry no change.
+              if ! grep -q "signed #${actual}" "${file}"; then
+                echo "::error file=${file}::\`${image}\` writes no \`signed\` line for the probe to correct; add \`signed #${recorded}\` to its base entry" >&2
+                exit 1
+              fi
               echo "  corrected ${file}: signed #${recorded} -> #${actual}"
               changed="${changed}${changed:+, }\`${image}\` (\`${base}\`): \`signed #${recorded}\` to \`#${actual}\`"
             fi
@@ -154,21 +134,25 @@ jobs:
               podman rmi -f "${base}" > /dev/null 2>&1 || true
             fi
 
-            correction="$(WITNESSES="${witnesses}" MEASURED="${measured}" \
-              PROVIDES="${provides}" IMAGE_FILE="${file}" \
-              BASE="${base}" python3 "${reconcile}")"
-            [ -n "${correction}" ] || continue
-            echo "  ${correction}"
-            changed="${changed}${changed:+, }\`${image}\` (\`${base}\`): ${correction}"
+            drift="$(WITNESSES="${witnesses}" MEASURED="${measured}" \
+              PROVIDES="${provides}" python3 "${reconcile}")"
+            [ -n "${drift}" ] || continue
+            echo "  ${drift}"
+            drifted="${drifted}${drifted:+, }\`${image}\` (\`${component}\`): ${drift}"
           done < <(jq -r '.images[]
-                | [.id, .base.image, (.base.signed | tostring), .file,
+                | [.id, .base.image, (.base.signed | tostring), .file, .base.path,
                    (.base.provides | join(" ")),
                    (.base.witnesses | to_entries
                      | map(.key + "=" + (.value | join(","))) | join(" "))]
                 | join("|")' "${plan}")
 
+          if [ -n "${drifted}" ]; then
+            echo "drift=${drifted}" >> "${GITHUB_OUTPUT}"
+            echo "Base \`provides\` drift, which the library corrects: ${drifted}" \
+              >> "${GITHUB_STEP_SUMMARY}"
+          fi
           if [ -z "${changed}" ]; then
-            echo "every base matches its declaration"
+            echo "every base matches its declared signature"
             exit 0
           fi
           {
@@ -176,11 +160,41 @@ jobs:
             echo "summary=${changed}"
           } >> "${GITHUB_OUTPUT}"
 
+      - name: Open or update the drift issue
+        # Drift with no signature change leaves no file to commit, so it is
+        # reported in one issue that each run updates.
+        if: steps.probe.outputs.changed != 'true' && steps.probe.outputs.drift != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRIFT: ${{ steps.probe.outputs.drift }}
+        run: |
+          set -euo pipefail
+          title="A base image no longer ships what its component declares"
+          body="$(mktemp)"
+          cat > "${body}" <<EOF
+          The base probe measured \`provides\` drift: ${DRIFT}
+
+          \`provides\` lives in the base component, which this workflow does not
+          edit. A tracked base takes the library's correction through the
+          component update workflow. An untracked base is this repository's own,
+          so edit its \`manifest.kdl\`, or its definition in the image file, to
+          match.
+          EOF
+          number="$(gh issue list --state open --search "in:title \"${title}\"" \
+            --json number --jq '.[0].number // empty')"
+          if [ -n "${number}" ]; then
+            gh issue edit "${number}" --body-file "${body}"
+            echo "updated issue #${number}"
+          else
+            gh issue create --title "${title}" --body-file "${body}"
+          fi
+
       - name: Open or update the correction PR
         if: steps.probe.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           SUMMARY: ${{ steps.probe.outputs.summary }}
+          DRIFT: ${{ steps.probe.outputs.drift }}
         run: |
           set -euo pipefail
           branch="base-declaration-status"
@@ -205,6 +219,9 @@ jobs:
 
           body="$(mktemp)"
           printf '%s\n\n' "${SUMMARY}" > "${body}"
+          if [ -n "${DRIFT}" ]; then
+            printf "The probe also measured \`provides\` drift: %s\n\n" "${DRIFT}" >> "${body}"
+          fi
           cat >> "${body}" <<'EOF'
           What a base declares about itself is maintained by
           [this workflow](.github/workflows/base-sig-probe.yml) rather than by
@@ -228,21 +245,21 @@ jobs:
           signatures and has stopped, which is worth finding out about before
           merging.
 
-          ## If `provides` changed
+          ## If the probe reports `provides` drift
 
-          **This one does change the build.** A capability the base carries is
-          one no module has to build, and `tect check` refuses a module whose
-          `requires` nothing declares — so a claim that is missing refuses a
-          module for a binary the image ships.
+          `provides` lives in the base component, which this workflow does not
+          edit. A tracked base takes the library's correction through the
+          component update workflow. An untracked base is this repository's own,
+          so edit its `manifest.kdl`, or its definition in the image file, to
+          match.
 
-          A claim that is *added* is the quieter direction and the one to read
-          carefully: a module every one of whose `provides` the base now covers
-          comes off the build with no diagnostic. The PR title says which
-          modules those are if there are any.
+          A capability the base carries is one no component has to build, and
+          `tect check` refuses a component whose `requires` nothing declares. A
+          claim that is *added* is the quieter direction: a component every one
+          of whose `provides` the base now covers comes off the build with no
+          diagnostic.
 
-          `rechunking` is not measured — no path witnesses it and it stays
-          hand-declared — and no claim the plan names no witness for is ever
-          removed.
+          `rechunking` is not measured, because no path witnesses it.
           EOF
 
           gh pr create \

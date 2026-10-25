@@ -19,9 +19,9 @@ source: tests/golden/harness.rs
   },
   "assets": [
     {
-      "module": "one/hello",
+      "component": "one/hello",
       "name": "hello",
-      "manifest": "modules/one/hello/module.kdl",
+      "manifest": "components/one/hello/manifest.kdl",
       "pin": {
         "locator": "https://github.com/owner/hello/releases/download/v{version}/hello.tar.gz",
         "selector": "1.4.0",
@@ -50,6 +50,8 @@ source: tests/golden/harness.rs
       "allows": [],
       "layout": null,
       "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
         "scap_content": "",
@@ -57,36 +59,7 @@ source: tests/golden/harness.rs
         "provides": [
           "rechunking"
         ],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "hello": [
-            "/usr/bin/hello",
-            "/usr/sbin/hello"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -103,40 +76,46 @@ source: tests/golden/harness.rs
           "default": true,
           "pr": true,
           "siblings": [],
-          "modules": [
+          "components": [
             {
               "path": "one/hello",
               "flavour": null,
               "variant": null,
-              "description": "An imported module edited since it was imported",
+              "description": "An imported component edited since it was imported",
               "options": {},
               "provides": [
                 "hello"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "d477d22a5a9ba3d0aaca5011b7ec83b4ed58c73e068a592c838d096f797f7df7",
+                "defined": null,
+                "content": "ef8159ad4e8ea55c4252eb435ee5c40b6963e7ad9800bac563a63bfac2a89eca",
                 "repo": true,
                 "imported": {
                   "library": "one",
                   "path": "hello",
                   "content": "0000000000000000000000000000000000000000000000000000000000000000",
                   "pin": {
-                    "locator": "https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz",
+                    "locator": "https://github.com/owner/components/archive/refs/tags/{version}.tar.gz",
                     "selector": "v1.0.0",
                     "verifier": null,
                     "tracker": "none",
                     "reason": null,
                     "from": "asset",
                     "path": null,
-                    "resolved": "https://github.com/owner/modules/archive/refs/tags/v1.0.0.tar.gz"
+                    "resolved": "https://github.com/owner/components/archive/refs/tags/v1.0.0.tar.gz"
                   },
                   "tracked": false
                 }
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [
                 {
@@ -160,20 +139,31 @@ source: tests/golden/harness.rs
               "path": "core/consumer",
               "flavour": null,
               "variant": null,
-              "description": "Requires what the imported module provides",
+              "description": "Requires what the imported component provides",
               "options": {},
               "provides": [],
               "requires": [
                 "hello"
               ],
+              "met_by": {
+                "hello": {
+                  "how": "listed",
+                  "provider": "one/hello"
+                }
+              },
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "7f1beedd549fe62f7457c43e77c670975f02338aba11de6dca4b56b754e09f1c",
+                "defined": null,
+                "content": "86d957ad1d583f68d0267d961c5017cf3464b86e1b65420590171d56f2cc7cef",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -185,9 +175,9 @@ source: tests/golden/harness.rs
           "verify_exceptions": [],
           "assets": [
             {
-              "module": "one/hello",
+              "component": "one/hello",
               "name": "hello",
-              "manifest": "modules/one/hello/module.kdl",
+              "manifest": "components/one/hello/manifest.kdl",
               "pin": {
                 "locator": "https://github.com/owner/hello/releases/download/v{version}/hello.tar.gz",
                 "selector": "1.4.0",

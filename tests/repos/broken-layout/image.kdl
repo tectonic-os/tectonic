@@ -3,8 +3,8 @@ schema-version 1
 image {
     name "Sealed"
 
-    base "docker.io/library/debian:forky" {
-        family "debian"
+    base-image {
+        debian-forky
     }
 
     // xfs has no fs-verity and the debian install seals the deployment. The
@@ -14,7 +14,6 @@ image {
         var-disk "sdb"
     }
 
-    modules {}
 }
 
 image {
@@ -22,8 +21,8 @@ image {
 
     // Half an answer on a family nothing here has measured, which is the one
     // state that would reach `bootc install` on a default nobody chose.
-    base "ghcr.io/someone/arch-bootc:latest" {
-        family "arch"
+    base-image {
+        arch-bootc-latest
     }
 
     layout {
@@ -31,5 +30,4 @@ image {
         composefs #true
     }
 
-    modules {}
 }

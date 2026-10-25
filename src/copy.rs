@@ -1,7 +1,7 @@
 //! Every string a prompt asks the user, in one place.
 //!
 //! Prompts only: the questions, the labels of the answers beside them, and the
-//! hints under the widgets. Catalogue content — a base's `about`, a module's
+//! hints under the widgets. Catalogue content — a base's `about`, a component's
 //! description, a rule's title, a workflow's `about` — stays where the catalogue
 //! holds it, and so do diagnostics, errors, `next` lines and the command
 //! table.
@@ -31,9 +31,7 @@ pub fn username(host: &str) -> String {
 // The libraries a repository reads
 
 pub const LIBRARIES: &str = "Included libraries:";
-pub const NO_BASE_LIBRARY: &str = "No base image library in repo, Add one now?";
 pub const WHICH_LIBRARY: &str = "Which library?";
-pub const WHICH_KIND: &str = "Which kind of library?";
 pub const OTHER_SOURCE: &str = "Another source";
 pub const OTHER_SOURCE_ABOUT: &str = "Type the alias, the Git URL and the directory";
 pub const SOURCE_ALIAS: &str = "source alias";
@@ -47,7 +45,8 @@ pub const IMAGE_NAME: &str = "What will the image be called?";
 pub const IMAGE_BASE: &str = "What is the base image for this image?";
 pub const BASE_IMAGE: &str = "base image";
 pub const OTHER_BASE: &str = "Another base image";
-pub const OTHER_BASE_ABOUT: &str = "Type an image reference that is not in this catalog";
+pub const IS_BASE: &str = "a base, which an image lists once as its base";
+pub const OTHER_BASE_ABOUT: &str = "Type an image reference that no base component names";
 pub const BASE_FAMILY: &str = "base family";
 pub const IMAGE_BOOTLOADER: &str = "Which bootloader does it install?";
 pub const BOOTLOADER_GRUB2: &str = "GRUB";
@@ -55,15 +54,15 @@ pub const BOOTLOADER_SYSTEMD: &str = "systemd-boot";
 pub const FLAVOUR_NAME: &str = "flavour name";
 pub const FLAVOUR_IMAGE: &str = "Which image publishes it?";
 
-// The modules
+// The components
 
-pub const MODULE_NAME: &str = "module name";
-pub const MODULE_DESCRIPTION: &str = "description (optional)";
-pub const MODULE_SUPPORTS: &str = "supported base families, separated by spaces (optional)";
-pub const MODULE_PACKAGES: &str = "Does this module install packages?";
+pub const COMPONENT_NAME: &str = "component name";
+pub const COMPONENT_DESCRIPTION: &str = "description (optional)";
+pub const COMPONENT_SUPPORTS: &str = "supported base families, separated by spaces (optional)";
+pub const COMPONENT_PACKAGES: &str = "Does this component install packages?";
 pub const PACKAGE_NAMES: &str = "package names, separated by spaces";
-pub const WHICH_MODULE: &str = "Which module?";
-pub const WHICH_MODULES: &str = "Which modules?";
+pub const WHICH_COMPONENT: &str = "Which component?";
+pub const WHICH_COMPONENTS: &str = "Which components?";
 pub const LIST_IN_IMAGES: &str = "Which images list it?";
 
 /// One image with no flavours is answered yes or no.
@@ -71,17 +70,17 @@ pub fn list_in(target: &str) -> String {
     format!("List it in {target}?")
 }
 
-// What an import asks before it copies a module in. The target image is asked
-// first, because it decides which library modules the picker marks
+// What an import asks before it copies a component in. The target image is asked
+// first, because it decides which library components the picker marks
 // unavailable.
 
 pub const TARGET_IMAGE: &str = "Which image is this for?";
 pub const TARGET_NONE: &str = "None, only add it to the repository";
 
-/// Names the families a module supports and the family of the target image.
-/// The picker shows this beside a module it marks unavailable.
-pub fn unsupported(supports: &[String], family: &str) -> String {
-    format!("supports {}; this image is {family}", supports.join(", "))
+/// Names the families a component targets and the family of the target image.
+/// The picker shows this beside a component it marks unavailable.
+pub fn unsupported(targets: &[String], family: &str) -> String {
+    format!("targets {}; this image is {family}", targets.join(", "))
 }
 
 pub fn present(name: &str) -> String {
@@ -94,8 +93,8 @@ pub fn add_local(name: &str, image: &str) -> String {
 
 pub const ANOTHER_NAME: &str = "Import it under another name";
 
-/// Names the module that already provides a capability one of them declares
-/// exclusive. The picker shows this beside a module it marks unavailable.
+/// Names the component that already provides a capability one of them declares
+/// exclusive. The picker shows this beside a component it marks unavailable.
 pub fn exclusive_to(capability: &str, holder: &str) -> String {
     format!("`{capability}` is exclusive to `{holder}`")
 }
@@ -117,21 +116,26 @@ pub fn track(named: &str) -> String {
 }
 
 pub fn untrack(key: &str) -> String {
-    format!("Stop tracking upstream for `modules/{key}`, so the copy is the repository's own?")
+    format!("Stop tracking upstream for `components/{key}`, so the copy is the repository's own?")
 }
 
-// What an import offers to bring with it. The modules a `requires` offer names
+// What an import offers to bring with it. The components a `requires` offer names
 // are the rows of the import that follows it, and the rules a claims offer
 // counts are what `tect coverage` prints.
 
 pub const REQUIRED: &str =
-    "The selected modules have dependencies not currently provided by the images:";
-pub const BRING_REQUIRED: &str = "Add these provider modules now?";
+    "The selected components have dependencies not currently provided by the images:";
+pub const BRING_REQUIRED: &str = "Add these provider components now?";
+
+/// Asks which of several library components meets one requirement.
+pub fn which_provider(component: &str, capability: &str) -> String {
+    format!("`{component}` requires `{capability}`. Which component provides it?")
+}
 /// The same question against the base row, asked one step earlier: a base that
 /// is not a bootc image says what makes it one, and a fresh repository has
 /// neither that nor the family adapter.
 pub const BRING_FOR_BASE: &str = "Add them now?";
-pub const IMPORT_CLAIMING: &str = "Import the modules claiming these rules?";
+pub const IMPORT_CLAIMING: &str = "Import the components claiming these rules?";
 
 /// What a list says above itself about an answer it cleared. `unmet` is the
 /// same reason the row carries beside itself; this line exists because a row
@@ -173,10 +177,10 @@ pub const WHICH_KEY: &str = "Which key?";
 pub const KEY_CN: &str = "common name, which is what the enrolment prompt shows";
 pub const KEY_FROM: &str = "path to the public half already held";
 
-/// Which module's, where more than one declares the kind. The modules are the
+/// Which component's, where more than one declares the kind. The components are the
 /// rows below, so the question does not list them.
 pub fn key_provider(kind: &str) -> String {
-    format!("Which module's {kind} key?")
+    format!("Which component's {kind} key?")
 }
 
 // The disk a virtual machine boots

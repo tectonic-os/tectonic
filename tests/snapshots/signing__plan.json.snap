@@ -34,6 +34,8 @@ source: tests/golden/harness.rs
       "allows": [],
       "layout": null,
       "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
         "scap_content": "",
@@ -43,37 +45,14 @@ source: tests/golden/harness.rs
           "initramfs-generation"
         ],
         "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
           "initramfs-generation": [
             "/usr/bin/dracut"
           ],
-          "kernel-devel": [
-            "/usr/bin/kernel-devel",
-            "/usr/sbin/kernel-devel"
-          ],
           "kernel-devel-helpers": [
-            "/usr/bin/kernel-devel-helpers",
-            "/usr/sbin/kernel-devel-helpers"
+            "/usr/libexec/kernel-devel-helpers.sh"
           ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
+          "secureboot-key": [
+            "/usr/share/secureboot/sb_cert.der"
           ]
         },
         "requires": [],
@@ -92,7 +71,7 @@ source: tests/golden/harness.rs
           "default": true,
           "pr": true,
           "siblings": [],
-          "modules": [
+          "components": [
             {
               "path": "kernel/signed-kernel",
               "flavour": null,
@@ -107,6 +86,12 @@ source: tests/golden/harness.rs
               "requires": [
                 "initramfs-generation"
               ],
+              "met_by": {
+                "initramfs-generation": {
+                  "how": "base"
+                }
+              },
+              "removes": [],
               "files": {
                 "kernel-devel-helpers": "/usr/libexec/kernel-devel-helpers.sh",
                 "secureboot-key": "/usr/share/secureboot/sb_cert.der"
@@ -115,9 +100,13 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "5ac14983e4b81694e894685b202b0b8ab3e3cb418ef16b8cd27976eb59319840",
+                "defined": null,
+                "content": "bce96e5f3ecb7583ba10db545618f7d8ebd93c5607d0c507ad475368f7081d93",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [
                 {
@@ -147,14 +136,29 @@ source: tests/golden/harness.rs
                 "kernel-devel",
                 "kernel-devel-helpers"
               ],
+              "met_by": {
+                "kernel-devel": {
+                  "how": "listed",
+                  "provider": "kernel/signed-kernel"
+                },
+                "kernel-devel-helpers": {
+                  "how": "listed",
+                  "provider": "kernel/signed-kernel"
+                }
+              },
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "1ad92bc90ff2be7753e1143747b366e8ddc19e7dd219b82110452f6d35db8118",
+                "defined": null,
+                "content": "c1ce5ab5bacdd9ecc69606ecdbbccbf4848b501c12f39e9fa4299b20ed9ffcb3",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []

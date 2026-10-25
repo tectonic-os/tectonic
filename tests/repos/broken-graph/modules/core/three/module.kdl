@@ -1,7 +1,0 @@
-schema-version 1
-
-description "Provides the same capability as another enabled module"
-
-supports "arch"
-
-provides "shell-tools"

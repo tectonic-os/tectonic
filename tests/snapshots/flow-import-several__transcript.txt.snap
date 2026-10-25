@@ -7,26 +7,28 @@ Tectonic v{version}
   2) None, only add it to the repository
 Which image is this for? [1-2, 0 for none]: 1
 
-  1) community/browser  A browser, from the second collection (requires flatpak)
-  2) upstream/browser  A browser, from the first collection
-  3) upstream/custom-kernel  A kernel the image pins, swapped in over the base's own
-  4) (unavailable) upstream/debian-family  supports debian, ubuntu; this image is fedora
-  5) upstream/fedora-family  dnf5 and its plugins, which every fedora build layer reaches for
-  6) upstream/flatpak  Flatpak client and a daily update timer
-  7) upstream/needs-family  A module that needs the family adapter under it (requires build-environment)
-  8) upstream/signature-policy  Sigstore signature verification for the image's own updates
-Which modules? [1-8, several, 0 for none]: 1 3
+  1) (unavailable) upstream/base-image/collected  a base, which an image lists once as its base
+  2) (unavailable) upstream/base-image/fedora  a base, which an image lists once as its base
+  3) community/browser  A browser, from the second collection (requires flatpak)
+  4) upstream/browser  A browser, from the first collection
+  5) upstream/custom-kernel  A kernel the image pins, swapped in over the base's own
+  6) (unavailable) upstream/debian-family  targets debian, ubuntu; this image is fedora
+  7) upstream/fedora-family  dnf5 and its plugins, which every fedora build layer reaches for
+  8) upstream/flatpak  Flatpak client and a daily update timer
+  9) upstream/needs-family  A component that needs the family adapter under it (requires build-environment)
+  10) upstream/signature-policy  Sigstore signature verification for the image's own updates
+Which components? [1-10, several, 0 for none]: 3 5
 
-The selected modules have dependencies not currently provided by the images:
+The selected components have dependencies not currently provided by the images:
 
   browser > fedora-bootc:44
     requires: flatpak
-    provider module: flatpak
+    provider component: flatpak
 
-Add these provider modules now? (Yes/No)
+Add these provider components now? (Yes/No)
 Yes
 
-`kernel-freshness` tracks the kernel a module pins, and proposes a bump
+`kernel-freshness` tracks the kernel a component pins, and proposes a bump
 
 Generate the workflows this makes runnable? (Yes/No)
 Yes
@@ -36,19 +38,19 @@ Yes
 
 
 example/
-├── modules/
+├── components/
 │   ├── browser/
-│   │   └── + module.kdl
+│   │   └── + manifest.kdl
 │   ├── custom-kernel/
-│   │   └── + module.kdl
+│   │   └── + manifest.kdl
 │   ├── flatpak/
 │   │   ├── files/
 │   │   │   └── usr/
 │   │   │       └── share/
 │   │   │           └── example/
 │   │   │               └── + remotes.list
-│   │   └── + module.kdl
-│   └── + modules.lock.kdl
-├── ~ example.image.kdl  flatpak, browser and custom-kernel added to modules
+│   │   └── + manifest.kdl
+│   └── ~ components.lock.kdl  flatpak, browser and custom-kernel recorded
+├── ~ example.image.kdl  flatpak, browser and custom-kernel added to components
 └── ~ repo.kdl  the workflows it generates
 ==== exit 0

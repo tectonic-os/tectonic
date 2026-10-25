@@ -1,0 +1,10 @@
+---
+source: tests/golden.rs
+---
+3 components, the ungated set.
+
+| Component | Description | Options | Satisfies | Refuses |
+| --- | --- | --- | --- | --- |
+| `core/nameless` |  |  | `cis-fedora: ` `stig: R1` `stig: R2` |  |
+| `core/missing` |  |  |  |  |
+| `core/latin` |  |  |  |  |

@@ -11,12 +11,12 @@ Report a vulnerability as the [security policy](https://github.com/tectonic-os/t
 
 ## What an adopter trusts
 
-The image repository is trusted. Its modules run as root inside the build
-containers, and so does every module that `tect import module`, `tect create
+The image repository is trusted. Its components run as root inside the build
+containers, and so does every component that `tect import component`, `tect create
 repo`, `tect create image` or `tect set conforms` copied into it from a
 collection.
-`tect` controls where a module comes from and records what it was. `tect` does
-not sandbox what a module does. The review of the repository and its pins is
+`tect` controls where a component comes from and records what it was. `tect` does
+not sandbox what a component does. The review of the repository and its pins is
 the control for that code.
 
 ## Trust boundaries
@@ -28,28 +28,28 @@ the control for that code.
   lists each check and its command. `src/provenance/mod.rs` `enforce_build`
   refuses a build whose base did not resolve to a digest, and a build from a
   tree with no commit.
-- Every command that reads the resolved images refuses an imported module
+- Every command that reads the resolved images refuses an imported component
   that tracks its library and no longer matches its entry in
-  `modules/modules.lock.kdl` (`src/provenance/lock.rs` `check`, run by
+  `components/components.lock.kdl` (`src/provenance/lock.rs` `check`, run by
   `src/lib.rs` `load`). The refusal does not depend on `audit`, and `tect
   build` runs it through `tect verify`. `tect import`, `tect create` and
   `tect set` do not refuse, so the user can still repair the repository.
-  An untracked module belongs to the repository and is not refused.
-- The `security-policy { network }` rule decides which generated module steps
+  An untracked component belongs to the repository and is not refused.
+- The `security-policy { network }` rule decides which generated component steps
   reach the network. `src/emit/containerfile.rs` runs a closed step with
   `--network=none`. If the repository declares no rule, then every step
   reaches the network.
-- A module's `Containerfile.inc` fragment is copied into the build as written
+- A component's `Containerfile.inc` fragment is copied into the build as written
   (`src/emit/containerfile.rs` `fragment`), so the network rule does not reach
   its own `RUN` lines. If the script rule is not `allow`, then `tect check`
-  names each module that ships a fragment (`src/provenance/mod.rs`
+  names each component that ships a fragment (`src/provenance/mod.rs`
   `ungoverned`).
-- Module secrets enter a step as BuildKit `--mount=type=secret`
+- Component secrets enter a step as BuildKit `--mount=type=secret`
   (`src/emit/containerfile.rs`), so no secret is copied into a layer.
 
 ### Fetched collections
 
-A collection is a Git repository of modules or base-image catalogs that
+A collection is a Git repository of components or base-image catalogs that
 `repo.kdl` names under `sources`.
 
 - `src/parse/remote.rs` refuses a source URL that is not `https://`, and a
@@ -60,34 +60,34 @@ A collection is a Git repository of modules or base-image catalogs that
 - Pinning is optional. A source with no `sha256` is unpinned, and every fetch
   of it takes whatever its ref holds at that time. `tect check` warns about
   each unpinned source (`src/dispatch.rs`).
-- An image lists only the modules under `modules/`, and `check`, `generate`
+- An image lists only the components under `components/`, and `check`, `generate`
   and `build` read no collection. The image grammar in `src/parse/image.rs`
   refuses a `source` block, and `parse_entry` refuses a `pin`. A collection
-  reaches the image only through a copy into `modules/`.
-- Under enforcement, `tect` refuses a copy from an unpinned module collection
-  (`src/import.rs` `verified`), whichever command makes it. An unpinned
-  base-image library is still fetched (`src/base.rs` `fetch`). See *Known
-  gaps*.
+  reaches the image only through a copy into `components/`.
+- Under enforcement, `tect` refuses a copy from an unpinned component collection
+  (`src/import.rs` `verified`), whichever command makes it. `tect create
+  image` vendors a base component through the same check
+  (`import::cached_member`).
 - A collection is never signature-verified. The hash pin and the review of
   `repo.kdl` are the controls. See *Accepted risks*.
-- A module copy refuses a symbolic link (`src/init.rs` `copy_below`), so a
-  collection cannot copy a file from outside itself into `modules/`. `tect
-  fetch modules` stages the copy first, so a refused copy leaves the module
+- A component copy refuses a symbolic link (`src/init.rs` `copy_below`), so a
+  collection cannot copy a file from outside itself into `components/`. `tect
+  fetch components` stages the copy first, so a refused copy leaves the component
   as it was.
-- The `update-modules` workflow runs `tect fetch modules` with a token that
+- The `update-components` workflow runs `tect fetch components` with a token that
   can push a branch and open a pull request. What it copies reaches `main`
   only through the review of that pull request.
 
-### Assets a module downloads
+### Assets a component downloads
 
-An `asset` in `module.kdl` pins a download that the module's own script
+An `asset` in `manifest.kdl` pins a download that the component's own script
 fetches while its layer builds.
 
 - An asset whose URL ends in `.git` is cloned, and its commit is the
   verifier. On the build host, `tect` resolves that commit with
   `protocol.ext.allow=never` (`src/provenance/build.rs` `clone_commit`), so the
   resolution cannot run a command through the `ext::` transport.
-- The clone itself runs in the module's layer, as trusted module code, under
+- The clone itself runs in the component's layer, as trusted component code, under
   Git's own protocol policy. An asset URL is not held to `https://`.
 - `tect build` records the resolved commit of each cloned asset in the build
   record. If the commit does not resolve, then `tect build` names the asset
@@ -212,7 +212,6 @@ reopen it.
 
 Each gap is current behaviour that a control does not yet cover.
 
-- Enforcement does not refuse an unpinned base-image library.
 - A repository with no `tect-version` takes each new `tect` release on its
   next build, with no warning from `tect check`.
 - A `Containerfile.inc` fragment's `RUN` lines run outside the network rule.
@@ -227,15 +226,15 @@ These parts work with no network:
 
 - a `dir` source, which reads a local collection;
 - the sources cache, which holds each pinned collection by its pin;
-- `tect check` and `tect generate`, which read the repository's own modules;
+- `tect check` and `tect generate`, which read the repository's own components;
 - installer media that carries the image in its own storage.
 
 These parts need the network:
 
-- `tect import module` from a Git source, and each new fetch of an unpinned
+- `tect import component` from a Git source, and each new fetch of an unpinned
   one;
 - a run of `tect.sh` in a repository with no `tect-version`;
 - a registry pull of the base image, and the digest lookup of a base named by
   tag (`src/provenance/build.rs` `base`);
 - the commit lookup of each cloned asset;
-- a module step that the network rule leaves open.
+- a component step that the network rule leaves open.

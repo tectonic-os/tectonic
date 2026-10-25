@@ -1,0 +1,12 @@
+schema-version 1
+
+description "The smallest component a repository can hold"
+
+targets "fedora"
+
+copr "example/tools"
+
+packages "fastfetch" enablerepo="updates-testing"
+packages "example-tool" enablerepo="example/tools"
+
+package-groups "core"

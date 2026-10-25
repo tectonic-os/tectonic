@@ -2,7 +2,7 @@
 source: tests/golden.rs
 ---
   x something sits between `renovate` and `version`
-    ,-[tests/repos/broken-asset/modules/core/pins/module.kdl:11:9]
+    ,-[tests/repos/broken-asset/components/core/pins/manifest.kdl:11:9]
  10 |         manual "someone watches the release feed"
  11 |         version "1.0.0"
     :         ^^^|^^^
@@ -13,7 +13,7 @@ source: tests/golden.rs
         pin being tracked, silently
 
   x the pin is declared `renovate` and `manual`
-    ,-[tests/repos/broken-asset/modules/core/pins/module.kdl:10:9]
+    ,-[tests/repos/broken-asset/components/core/pins/manifest.kdl:10:9]
   9 |         renovate datasource="github-releases" depName="owner/repo"
  10 |         manual "someone watches the release feed"
     :         ^^^|^^
@@ -24,7 +24,7 @@ source: tests/golden.rs
         "why nothing tracks it"`
 
   x the pin has a malformed sha256
-   ,-[tests/repos/broken-asset/modules/core/pins/module.kdl:8:5]
+   ,-[tests/repos/broken-asset/components/core/pins/manifest.kdl:8:5]
  7 | asset "tracked-and-manual" {
  8 |     pin {
    :     ^|^
@@ -34,7 +34,7 @@ source: tests/golden.rs
   help: sha256sum output, lowercase
 
   x the pin says nothing about how it is kept current
-    ,-[tests/repos/broken-asset/modules/core/pins/module.kdl:18:5]
+    ,-[tests/repos/broken-asset/components/core/pins/manifest.kdl:18:5]
  17 | asset "no-tracking" {
  18 |     pin {
     :     ^|^
@@ -45,7 +45,7 @@ source: tests/golden.rs
         "why nothing tracks it"`
 
   x the pin declares no `sha256`
-    ,-[tests/repos/broken-asset/modules/core/pins/module.kdl:18:5]
+    ,-[tests/repos/broken-asset/components/core/pins/manifest.kdl:18:5]
  17 | asset "no-tracking" {
  18 |     pin {
     :     ^|^
@@ -57,7 +57,7 @@ source: tests/golden.rs
         instead, and declares none
 
   x the URL has an unknown placeholder {tag}
-    ,-[tests/repos/broken-asset/modules/core/pins/module.kdl:18:5]
+    ,-[tests/repos/broken-asset/components/core/pins/manifest.kdl:18:5]
  17 | asset "no-tracking" {
  18 |     pin {
     :     ^|^

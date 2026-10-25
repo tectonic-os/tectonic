@@ -3,13 +3,14 @@ schema-version 1
 image {
     name "Broken Key"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking"
+    base-image {
+        fedora-bootc-44
     }
 
-    modules {
-        module "core/keys"
-        module "core/signer"
+    core {
+        keys
+    }
+    core {
+        signer
     }
 }

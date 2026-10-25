@@ -6,24 +6,17 @@ Tectonic v{version}
 What will the image be called? [example]
 Beta
 
-  1) example.invalid/collected:1  A base only the collection knows about
-  2) quay.io/fedora/fedora-bootc:44  Fedora 44, as this collection describes it
+  1) quay.io/fedora/fedora-bootc:44 (base-image/fedora)  Fedora, as this collection describes it
+  2) example.invalid/collected:1 (upstream/base-image/collected)  A base only the collection knows about
 What is the base image for this image? [1-2, 0 for none]: 2
-
-quay.io/fedora/fedora-bootc:44 needs the following modules:
-    upstream/fedora-family
-
-Add them now? (Yes/No)
-Yes
 
 
 example/
-├── modules/
-│   ├── fedora-family/
-│   │   ├── lib/
-│   │   │   └── + family.sh
-│   │   └── + module.kdl
-│   └── + modules.lock.kdl
+├── components/
+│   ├── base-image/
+│   │   └── collected/
+│   │       └── + manifest.kdl
+│   └── ~ components.lock.kdl  base-image/collected recorded
 ├── + beta.image.kdl
 └── ~ repo.kdl  example set as the default image
 ==== exit 0

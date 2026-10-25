@@ -142,9 +142,9 @@ fn record(env: &dyn Fn(&str) -> Option<String>) -> Json {
             ]),
         ),
         (
-            "modules",
+            "components",
             Json::array(
-                pairs(&env("MODULE_HASHES").unwrap_or_default())
+                pairs(&env("COMPONENT_HASHES").unwrap_or_default())
                     .iter()
                     .filter(|f| f.len() == 2)
                     .map(|f| {
@@ -163,7 +163,7 @@ fn record(env: &dyn Fn(&str) -> Option<String>) -> Json {
                     .filter(|f| f.len() == 4)
                     .map(|f| {
                         Json::object([
-                            ("module", Json::string(f[0])),
+                            ("component", Json::string(f[0])),
                             ("name", Json::string(f[1])),
                             ("selector", Json::string(f[2])),
                             ("resolved", Json::string(f[3])),
@@ -188,7 +188,7 @@ fn record(env: &dyn Fn(&str) -> Option<String>) -> Json {
 #[cfg(feature = "fuzzing")]
 pub fn fuzz_arguments(raw: &str) {
     let env = |name: &str| match name {
-        "MODULE_HASHES" | "ASSET_RESOLUTIONS" => Some(raw.to_string()),
+        "COMPONENT_HASHES" | "ASSET_RESOLUTIONS" => Some(raw.to_string()),
         _ => None,
     };
     let _ = record(&env).render();
@@ -283,7 +283,7 @@ mod tests {
                 "IMAGE_ID" => "example",
                 "SOURCE_COMMIT" => "deadbeef",
                 "BUILD_BACKEND" => "buildah",
-                "MODULE_HASHES" => "core/hello|aaa apps/browser|bbb",
+                "COMPONENT_HASHES" => "core/hello|aaa apps/browser|bbb",
                 "ASSET_RESOLUTIONS" => "mods/xone|xone|B7|3484f60",
                 _ => return None,
             }))

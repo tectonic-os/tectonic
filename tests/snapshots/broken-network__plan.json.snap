@@ -19,9 +19,9 @@ source: tests/golden/harness.rs
   },
   "assets": [
     {
-      "module": "core/fetcher",
+      "component": "core/fetcher",
       "name": "tool",
-      "manifest": "modules/core/fetcher/module.kdl",
+      "manifest": "components/core/fetcher/manifest.kdl",
       "pin": {
         "locator": "https://github.com/owner/tool/releases/download/v{version}/tool.tar.gz",
         "selector": "1.0.0",
@@ -34,9 +34,9 @@ source: tests/golden/harness.rs
       }
     },
     {
-      "module": "core/asset-only",
+      "component": "core/asset-only",
       "name": "tool",
-      "manifest": "modules/core/asset-only/module.kdl",
+      "manifest": "components/core/asset-only/manifest.kdl",
       "pin": {
         "locator": "https://github.com/owner/tool/releases/download/v{version}/tool.tar.gz",
         "selector": "1.0.0",
@@ -68,6 +68,8 @@ source: tests/golden/harness.rs
         "bootloader": "grub2"
       },
       "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
         "scap_content": "",
@@ -75,32 +77,7 @@ source: tests/golden/harness.rs
         "provides": [
           "rechunking"
         ],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -117,7 +94,7 @@ source: tests/golden/harness.rs
           "default": true,
           "pr": true,
           "siblings": [],
-          "modules": [
+          "components": [
             {
               "path": "fedora-family",
               "flavour": null,
@@ -128,14 +105,20 @@ source: tests/golden/harness.rs
                 "build-environment"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "90fed2e5b6c345fb0d615059da327f1499bdd2b1748756caf0e3e772455466f9",
+                "defined": null,
+                "content": "893be5ba24118e8a9f68ae39f30c20b7c415dca45f18aa406c8c8f00f02b375b",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -148,6 +131,8 @@ source: tests/golden/harness.rs
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [
                 {
@@ -161,9 +146,13 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "0178bff68faa4388f15ca68fffa530efef0b882c4e142bdb92c8f0bd3f3fd7b4",
+                "defined": null,
+                "content": "c8207a96d5ceeed98fc5ef3b0e7853f47b2f6ede78efd153784531d9c639b745",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -176,14 +165,20 @@ source: tests/golden/harness.rs
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "70ccaa7afc7ec3c653ae149fcffe3ea3f37496324e945e88eff19c0032ac78fd",
+                "defined": null,
+                "content": "41b4646d1a76519666611cf2770a41c627cbd5df5411672dd1201f573fad4db1",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -196,14 +191,20 @@ source: tests/golden/harness.rs
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "28a6087ac68384bbc6a6ffe287a28e75b108e9a66c8c4aa11af1173da28889a1",
+                "defined": null,
+                "content": "fbead409b6b7c0fb0c496ab4bbea459be059999f7ef2729e6e03cbad0447fecd",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -216,14 +217,20 @@ source: tests/golden/harness.rs
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "ecc25ec08388b203ec01025517fb51c930bb476c3da392f610c0a61290956071",
+                "defined": null,
+                "content": "a200889542fd8add6f02c5a06b3ef6e7a750a04c688f885f8fce81e8633ca403",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -236,14 +243,20 @@ source: tests/golden/harness.rs
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "1aa6833f36a676db124355253f18039ec9567bee5d4ca720a93d7168f2897ee8",
+                "defined": null,
+                "content": "5cf6025dba4e199a21893c520bc77066754d1d7d0a0978b62c04c4347a4a7752",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -255,9 +268,9 @@ source: tests/golden/harness.rs
           "verify_exceptions": [],
           "assets": [
             {
-              "module": "core/fetcher",
+              "component": "core/fetcher",
               "name": "tool",
-              "manifest": "modules/core/fetcher/module.kdl",
+              "manifest": "components/core/fetcher/manifest.kdl",
               "pin": {
                 "locator": "https://github.com/owner/tool/releases/download/v{version}/tool.tar.gz",
                 "selector": "1.0.0",
@@ -270,9 +283,9 @@ source: tests/golden/harness.rs
               }
             },
             {
-              "module": "core/asset-only",
+              "component": "core/asset-only",
               "name": "tool",
-              "manifest": "modules/core/asset-only/module.kdl",
+              "manifest": "components/core/asset-only/manifest.kdl",
               "pin": {
                 "locator": "https://github.com/owner/tool/releases/download/v{version}/tool.tar.gz",
                 "selector": "1.0.0",

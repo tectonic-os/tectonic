@@ -3,6 +3,7 @@
 use crate::diag::{Issue, Issues, Source, Span};
 use crate::layout;
 use crate::model::image::{List, NetRule, Network, Seed, Workflow, SCHEMA_VERSION, TECT_VERSION};
+use crate::model::options::Value;
 use crate::model::remote::Kind as SourceKind;
 use crate::parse::image::IMAGE;
 use crate::parse::remote::{parse_source, SOURCES};
@@ -14,13 +15,13 @@ use common::json::Json;
 use kdl::{KdlDocument, KdlNode};
 use std::path::Path;
 
-/// What a module layer's steps may reach, under `security-policy`. Lifted out
+/// What a component layer's steps may reach, under `security-policy`. Lifted out
 /// of `REPO` so the policy block holds it by name.
 #[rustfmt::skip]
-const NETWORK: Node = Node::new("network", "The rule that decides whether each step of a module layer reaches the network.").about("Controls network access while the image builds. The user can open the network to every step, or with `strict` open it only for the modules that declare a need, so an undeclared download fails the build. `packages` and `scripts` set the rule for one kind of step.").example("\"strict\"")
+const NETWORK: Node = Node::new("network", "The rule that decides whether each step of a component layer reaches the network.").about("Controls network access while the image builds. The user can open the network to every step, or with `strict` open it only for the components that declare a need, so an undeclared download fails the build. `packages` and `scripts` set the rule for one kind of step.").example("\"strict\"")
     .arg(Arg::MaybeOne(&["allow", "strict"]), Say::new("`{}` is not a network rule",
         "not a rule",
-        "`network \"strict\"` holds every module to what it declares; a block sets \
+        "`network \"strict\"` holds every component to what it declares; a block sets \
          `packages` and `scripts` one at a time"))
     .once("a second rule would contradict the first")
     .children(&[
@@ -32,32 +33,32 @@ const NETWORK: Node = Node::new("network", "The rule that decides whether each s
             .values(&[
                 ("`allow`", "Every package step reaches the network."),
                 ("`strict`", "Every package step reaches the network, because a package step \
-                  runs only where the module declares packages, a COPR or a repo file."),
+                  runs only where the component declares packages, a COPR or a repo file."),
                 ("`deny`", "Every package step runs under `--network=none`."),
             ]),
         Node::new("scripts", "The rule that every script step runs under.").example("\"strict\"")
             .arg(Arg::One(&["allow", "strict", "deny"]), Say::new(
                 "`{}` is not a network rule", "not a rule",
-                "`scripts` takes `allow`, `strict` or `deny`; under `strict` a module \
+                "`scripts` takes `allow`, `strict` or `deny`; under `strict` a component \
                  opens its script step with `network \"scripts\"`"))
             .once("")
             .values(&[
                 ("`allow`", "Every script step reaches the network."),
-                ("`strict`", "A script step reaches the network only if its module declares \
+                ("`strict`", "A script step reaches the network only if its component declares \
                   `network \"scripts\"`."),
                 ("`deny`", "Every script step runs under `--network=none`."),
             ])
             .notes(&[
-                "If the rule is `strict` or `deny`, then `tect check` names each module that \
+                "If the rule is `strict` or `deny`, then `tect check` names each component that \
                  ships a Containerfile fragment. The rule does not reach the `RUN` lines of a \
                  fragment.",
             ]),
     ], Say::new("unknown node `{}` in network", "not part of the schema",
         "a network block holds `packages` and `scripts`"))
     .lists(&[
-        ("A module layer runs two kinds of step:", &[
-            "A package step installs the repo files, the COPRs and the packages of the module.",
-            "A script step runs the `module.sh` of the module and its finalize hook.",
+        ("A component layer runs two kinds of step:", &[
+            "A package step installs the repo files, the COPRs and the packages of the component.",
+            "A script step runs the `component.sh` of the component and its finalize hook.",
         ]),
     ])
     .values(&[
@@ -72,7 +73,7 @@ const NETWORK: Node = Node::new("network", "The rule that decides whether each s
 /// repo.kdl's grammar, and the whole of it.
 #[rustfmt::skip]
 pub const REPO: Node = Node::new("repo",
-    "What is true of the repository as a whole, apart from its images.").about("`repo.kdl` sits at the root of the repository and holds what applies to every image in it: which `tect` release builds it, where its modules come from, which CI workflows run and which security rules every image follows. The images themselves live in image files beside it.").scaffolds(&["schema-version", "name", "sources", "workflows", "renovate"])
+    "What is true of the repository as a whole, apart from its images.").about("`repo.kdl` sits at the root of the repository and holds what applies to every image in it: which `tect` release builds it, where its components come from, which CI workflows run and which security rules every image follows. The images themselves live in image files beside it.").scaffolds(&["schema-version", "name", "sources", "workflows", "renovate"])
     .children(&[
         Node::new("schema-version", "The schema release that this repository is written against.").about("The schema version tells `tect` which reader to use for the repository. A repository written against an earlier release keeps building, because the version picks the reader. `tect create repo` writes it, and `tect` never changes it.").example("1")
             .arg(Arg::Int, Say::new("`{}` needs a number", "not a version", "`schema-version 1`"))
@@ -130,35 +131,35 @@ pub const REPO: Node = Node::new("repo",
                 "`pr-image \"workstation\"`, since a pull request builds one target"))
             .once(""),
         Node::new("seed",
-            "The image that this repository publishes as a starting point for a new repository.").about("A seed lets another user start a new repository from this one. `tect generate` writes the base, the module list and the collections of the named image into the seed, so a new repository starts from the same image.").example("\"workstation\" collection=\"owner\"")
+            "The image that this repository publishes as a starting point for a new repository.").about("A seed lets another user start a new repository from this one. `tect generate` writes the base, the component list and the collections of the named image into the seed, so a new repository starts from the same image.").example("\"workstation\" collection=\"owner\"")
             .arg(Arg::Str, Say::new("`{}` needs an image name", "no image given",
                 "`seed \"workstation\" collection=\"owner\"`, naming one of the images declared \
                  at the root"))
             .once("a repository publishes one seed")
             .props(&[
                 Prop { name: "collection", kind: Kind::Str,
-                    desc: "The collection that this repository publishes its own modules as.",
+                    desc: "The collection that this repository publishes its own components as.",
                     say: Say::new("`{}` must be a collection name", "not a string", ""),
-                    missing: Say::new("`{}` says nothing about where its modules are published",
+                    missing: Say::new("`{}` says nothing about where its components are published",
                         "no `collection`",
                         "`{} collection=\"owner\"`, one of the collections in `sources`: every \
-                         module in a seed is fetched through one, so a repository publishing no \
+                         component in a seed is fetched through one, so a repository publishing no \
                          collection of its own has nothing a seeded repository can import") },
             ], Say::new("unknown seed property `{}`", "not part of the schema",
                 "a seed accepts `collection`"))
             .lists(&[
                 ("`tect generate` writes the seed to `generated/seed.kdl`. The seed carries:", &[
                     "the base of the image;",
-                    "the module list of the image;",
-                    "the collections that those modules come from.",
+                    "the component list of the image;",
+                    "the collections that those components come from.",
                 ]),
             ])
             .notes(&[
                 "The seed carries no name, URL or owner of this repository.",
-                "The seed names each module through the collection it is fetched from, so \
+                "The seed names each component through the collection it is fetched from, so \
                  `collection=` names a collection in `sources`. A repository is seedable only \
-                 if it publishes its own `modules/` as a collection.",
-                "If the seed image lists a module that no collection can import, then `tect` \
+                 if it publishes its own `components/` as a collection.",
+                "If the seed image lists a component that no collection can import, then `tect` \
                  reports it, because a new repository could not build that seed.",
             ]),
         Node::new("workflows", "The CI workflows that `tect generate` writes into `.github/workflows/`.").about("Names the GitHub Actions workflows that `tect generate` writes and keeps current, and sets when scheduled builds, publishing and scans run. The repository gets only the workflows named here.").scaffolds(&[""]).example("at=\"12:30\"")
@@ -197,7 +198,7 @@ pub const REPO: Node = Node::new("repo",
                             desc: "The cron line that this workflow runs on, in UTC. It replaces \
                                 the schedule that `at` places.",
                             say: Say::new("`{}` must be a cron line", "not a string",
-                                "`update-modules schedule=\"30 5 * * 1\"`"),
+                                "`update-components schedule=\"30 5 * * 1\"`"),
                             missing: Say::NONE },
                     ], Say::new("unknown workflow property `{}`", "not part of the schema",
                         "a workflow takes `schedule`; `at` on the block moves every schedule at \
@@ -225,16 +226,15 @@ pub const REPO: Node = Node::new("repo",
                  and leaves one the user wrote in place.",
             ]),
         Node::new("sources",
-            "The module and base-image libraries this repository reads.").about("Lists typed libraries that this repository reads from a local directory or fetches from an HTTPS Git repository. A `modules` source feeds imports. A `base-images` source is the base catalog. Every source declares exactly one of `dir` and `url`: `dir` names a directory on this machine, and `url` names an HTTPS Git repository.").scaffolds(&["modules", "base-images"])
+            "The component libraries this repository reads.").about("Lists the libraries that this repository reads from a local directory or fetches from an HTTPS Git repository. A `components` source holds components and base components alike: `tect import component` copies a component from it, and `tect create image` offers its bases. Every source declares exactly one of `dir` and `url`: `dir` names a directory on this machine, and `url` names an HTTPS Git repository.").scaffolds(&["components"])
             .once("a second block would split one registry in two")
             .empty(Say::new("`sources` has no sources in it", "empty block",
                 "omit the block entirely; a repository that reads no library declares nothing here"))
             .children(&SOURCES, Say::new("unknown node `{}` in `sources`", "not part of the schema",
-                "a source is `modules` or `base-images`, each named by the alias its content \
-                 uses"))
+                "a source is `components`, named by the alias its content uses"))
             .notes(&[
-                "`tect import module` copies a module from a `modules` source to \
-                 `modules/<name>`, and `modules/modules.lock.kdl` records the source.",
+                "`tect import component` copies a component from a `components` source to \
+                 `components/<name>`, and `components/components.lock.kdl` records the source.",
             ]),
         Node::new("manifest",
             "Whether a build stamps the generated manifest onto the image as an OCI label.").about("The build writes a manifest of what went into the image into the image itself. This block decides whether the build also stamps an OCI label that points at that file, so a tool that reads image labels can find it.")
@@ -270,8 +270,8 @@ pub const REPO: Node = Node::new("repo",
                     ])
                     .lists(&[
                         ("Each check runs in the command named before it:", &[
-                            "`tect import module`, `tect create image` and `tect set \
-                             conforms`: the library a module is copied from is pinned to a \
+                            "`tect import component`, `tect create image` and `tect set \
+                             conforms`: the library a component is copied from is pinned to a \
                              tag and its hash.",
                             "`tect build`: the base tag resolves to a manifest digest.",
                             "`tect build`: the repository is at a commit.",
@@ -280,18 +280,18 @@ pub const REPO: Node = Node::new("repo",
                         ]),
                     ])
                     .notes(&[
-                        "`tect` also reports a `module.sh` or `finalize.sh` that reaches the \
+                        "`tect` also reports a `component.sh` or `finalize.sh` that reaches the \
                          network with no `asset` that declares the download. This report does \
                          not depend on `enforce`.",
-                        "`tect` refuses a module that tracks its library and no longer \
-                         matches its entry in the module lock. This refusal does not depend on \
+                        "`tect` refuses a component that tracks its library and no longer \
+                         matches its entry in the component lock. This refusal does not depend on \
                          `enforce`.",
                     ]),
             ], Say::new("unknown node `{}` in audit", "not part of the schema",
                 "an audit block holds `enforce`"))
             .lists(&[
                 ("`tect` records these provenance facts whether or not this block exists:", &[
-                    "the hash of each module;",
+                    "the hash of each component;",
                     "the source of each import;",
                     "the digest of the base tag;",
                     "the commit of each cloned asset.",
@@ -329,10 +329,10 @@ fn network(node: &KdlNode) -> Network {
 /// likes.
 #[rustfmt::skip]
 pub(crate) const IMAGE_FILE: Node = Node::new("image file",
-    "The images that a file named `image.kdl` or `<name>.image.kdl` holds.").about("An image file holds its schema version and one or more images. Each image says what it is called, which base it builds on and which modules it is made of.").scaffolds(&["schema-version", "image"])
+    "The images that a file named `image.kdl` or `<name>.image.kdl` holds.").about("An image file holds its schema version and one or more images. Each image says what it is called, which base it builds on and which components it is made of.").scaffolds(&["schema-version", "image"])
     .children(&[FILE_SCHEMA_VERSION, IMAGE], Say::new("unknown top-level node `{}`", "not part of the schema",
-        "an image file holds `schema-version` and `image` nodes; `base`, `flavours` and `modules` are \
-         declared inside one, because they are what the image is"))
+        "an image file holds `schema-version` and `image` nodes; an image's components, its base \
+         among them, are path segments inside its `image` node"))
     .notes(&[
         "A root `.kdl` file is an image file only if it is named `image.kdl` or ends in \
          `.image.kdl`. `tect` reports each other root `.kdl` file and does not read it.",
@@ -435,7 +435,7 @@ pub fn pinned_unverified(root: &Path) -> Option<String> {
 
 /// The collections a `sources` block declares, read out of text: what a
 /// repository that is not written yet will have, which is the only thing
-/// `create repo` can offer modules against. Anything wrong with the block is
+/// `create repo` can offer components against. Anything wrong with the block is
 /// reported where the repository is read.
 pub fn sources_in(text: &str) -> Vec<crate::model::remote::Collection> {
     let src = Source::new(layout::REPO_FILE, text);
@@ -571,8 +571,43 @@ impl List {
             list.parse_file(&src, &text, name == layout::REPO_FILE, &mut issues);
         }
 
+        list.load_bases(root, &mut issues);
         list.check_images(&mut issues);
         (list, issues)
+    }
+
+    /// Loads each image's base from its base component. The manifest holds
+    /// the reference, the family and what the base ships, so every reader of
+    /// the list needs the base loaded. The layout check reads the family, so
+    /// it runs once the base is in.
+    fn load_bases(&mut self, root: &Path, issues: &mut Issues) {
+        let disk = crate::parse::disk::Disk::default();
+        let version = self.schema_version;
+        let repo_src = self.repo_src.clone();
+        check_keyword_dirs(root, issues);
+        for image in &mut self.images {
+            // A segment that only organises lists nothing where no component
+            // is at its path.
+            image.entries.retain(|entry| {
+                !entry.organises || layout::is_component(&layout::component(root, &entry.path))
+            });
+            image.base_entry = take_base(image, root, issues);
+            if let Some(held) = &image.base_entry {
+                let component = crate::model::component::Component::load(
+                    &held.entry,
+                    image,
+                    root,
+                    &disk,
+                    version,
+                    &repo_src,
+                    issues,
+                );
+                let base = component
+                    .and_then(|component| based(held, component, root, &image.src, issues));
+                image.base = base;
+            }
+            image.check_layout(issues);
+        }
     }
 
     /// One file, which is either an image or the repo context.
@@ -747,7 +782,7 @@ impl List {
     }
 
     /// Whether the seeded image is one a seeded repository could resolve: it
-    /// carries module names and nothing else, so every one of them has to be
+    /// carries component names and nothing else, so every one of them has to be
     /// fetchable from a collection this repository declares.
     fn check_seed(&self, seed: &Seed, issues: &mut Issues) {
         let Some(image) = self.images.iter().find(|i| i.id == seed.image) else {
@@ -767,7 +802,7 @@ impl List {
         let declared = |name: &str| {
             self.sources
                 .iter()
-                .any(|c| c.kind == SourceKind::Modules && c.name == name)
+                .any(|c| c.kind == SourceKind::Components && c.name == name)
         };
         if !declared(&seed.collection) {
             issues.push(
@@ -779,14 +814,37 @@ impl List {
                     &self.repo_src,
                 )
                 .help(
-                    "a repository is seedable only if it publishes its own modules/ as a \
+                    "a repository is seedable only if it publishes its own components/ as a \
                      collection, and declares it in `sources` under the owner they are imported \
                      as: that is what a seeded repository fetches them through",
                 ),
             );
         }
 
-        for entry in &image.entries {
+        // An inline definition lives in the image file alone, so no
+        // collection holds it for a seeded repository to fetch.
+        for entry in image
+            .entries
+            .iter()
+            .chain(image.base_entry.iter().map(|held| &held.entry))
+            .filter(|entry| entry.inline.is_some())
+        {
+            issues.push(
+                Issue::new(
+                    format!(
+                        "`{}` is defined inline, so the seed cannot name it",
+                        entry.path
+                    ),
+                    &image.src,
+                )
+                .at(entry.span, "defined in the image file")
+                .help(
+                    "a seed lists a component by its collection's name; move the definition into \
+                     components/ and publish it with the collection",
+                ),
+            );
+        }
+        for entry in image.entries.iter().filter(|entry| entry.inline.is_none()) {
             let qualified = entry.qualified(&seed.collection);
             let owner = qualified.split('/').next().unwrap_or_default();
             if declared(owner) {
@@ -802,7 +860,7 @@ impl List {
                     format!("`{owner}` is not declared in `sources`"),
                 )
                 .help(
-                    "a seed lists a module by name and nothing else, so one nothing can import \
+                    "a seed lists a component by name and nothing else, so one nothing can import \
                      leaves a seeded repository unbuildable",
                 ),
             );
@@ -1164,6 +1222,233 @@ pub fn at_text((hour, minute): (u32, u32)) -> String {
     format!("{hour:02}:{minute:02}")
 }
 
+/// Takes the one listed component that declares `base` out of the image's
+/// entries. Its segment's `digest` and `signed` are the tool's, so they leave
+/// its options. A base builds every target, so a flavour cannot gate it.
+fn take_base(
+    image: &mut crate::model::image::Image,
+    root: &Path,
+    issues: &mut Issues,
+) -> Option<crate::model::image::BaseEntry> {
+    let bases: Vec<usize> = (0..image.entries.len())
+        .filter(|at| declares_base(&image.entries[*at], &image.src, root))
+        .collect();
+    let src = image.src.clone();
+    match bases[..] {
+        [] => {
+            issues.push(
+                Issue::new(format!("`{}` lists no base", image.id), &src)
+                    .at(image.span, "nothing to build on")
+                    .help(
+                        "list a base component, such as `base-image { fedora-bootc { version \
+                         \"44\" } }`, or define one inline with `base \"<image reference>\"`",
+                    ),
+            );
+            return None;
+        }
+        [_, _, ..] => {
+            let mut issue = Issue::new(format!("`{}` lists two bases", image.id), &src)
+                .help("an image builds on one base; a second base is a second image");
+            for at in &bases {
+                issue = issue.at(image.entries[*at].span, "a base");
+            }
+            issues.push(issue);
+            // A base builds no layer, so no base stays behind as an entry.
+            for at in bases.iter().rev() {
+                image.entries.remove(*at);
+            }
+            return None;
+        }
+        [_] => {}
+    }
+    let mut entry = image.entries.remove(bases[0]);
+    if entry.flavour.is_some() {
+        issues.push(
+            Issue::new(format!("the base `{}` sits in a flavour", entry.path), &src)
+                .at(entry.span, "gated to one flavour")
+                .help("a base builds every target, so it is listed outside `flavour`"),
+        );
+    }
+    let mut take = |name: &str| {
+        let (taken, kept) = std::mem::take(&mut entry.options)
+            .into_iter()
+            .partition(|(held, ..)| held == name);
+        entry.options = kept;
+        taken
+    };
+    let digests: Vec<(String, Vec<Value>, Span)> = take("digest");
+    let signs: Vec<(String, Vec<Value>, Span)> = take("signed");
+    for found in [&digests, &signs] {
+        if let [(name, _, first), (_, _, again), ..] = &found[..] {
+            issues.push(
+                Issue::new(format!("`{name}` is declared twice"), &src)
+                    .at(*first, "first here")
+                    .at(*again, "and again here"),
+            );
+        }
+    }
+    let digest = match digests.first() {
+        None => None,
+        Some((_, values, span)) => match &values[..] {
+            [Value::String(digest)] => Some(digest.clone()),
+            _ => {
+                issues.push(
+                    Issue::new("`digest` needs a digest", &src)
+                        .at(*span, "not one digest")
+                        .help("`digest \"sha256:...\"`, the digest of the base image reference"),
+                );
+                None
+            }
+        },
+    };
+    let signed = match signs.first() {
+        None => false,
+        Some((_, values, span)) => match &values[..] {
+            [Value::Bool(signed)] => *signed,
+            _ => {
+                issues.push(
+                    Issue::new("`signed` needs #true or #false", &src)
+                        .at(*span, "not a boolean")
+                        .help(
+                            "`signed #false` records that this base publishes no cosign \
+                             signature; base-sig-probe.yml keeps it current",
+                        ),
+                );
+                false
+            }
+        },
+    };
+    Some(crate::model::image::BaseEntry {
+        entry,
+        digest,
+        signed,
+    })
+}
+
+/// Answers whether the entry's component declares `base`. A manifest that
+/// cannot be read is no base here, and its load reports it.
+fn declares_base(entry: &crate::model::image::Entry, src: &Source, root: &Path) -> bool {
+    let based = |nodes: &[kdl::KdlNode]| nodes.iter().any(|node| node.name().value() == "base");
+    match &entry.inline {
+        Some(spans) => based(&crate::parse::image::nodes_at(src, spans)),
+        None => std::fs::read_to_string(layout::manifest(root, &entry.path))
+            .ok()
+            .and_then(|text| text.parse::<KdlDocument>().ok())
+            .is_some_and(|doc| based(doc.nodes())),
+    }
+}
+
+/// Refuses a top-level component whose name is an image node, because the
+/// image file could not list it by its segment.
+fn check_keyword_dirs(root: &Path, issues: &mut Issues) {
+    let Ok(dirs) = std::fs::read_dir(layout::components(root)) else {
+        return;
+    };
+    for dir in dirs.flatten() {
+        let name = dir.file_name().to_string_lossy().into_owned();
+        if dir.path().is_dir() && crate::parse::image::is_keyword(&name) {
+            let src = Source::new(dir.path().display().to_string(), String::new());
+            issues.push(
+                Issue::new(
+                    format!("components/{name} is named after an image node"),
+                    &src,
+                )
+                .help(format!(
+                    "`{name}` means itself inside `image`, so the image file cannot list \
+                         this directory; rename it"
+                )),
+            );
+        }
+    }
+}
+
+/// Builds the image's base from its base component. A component that does not
+/// declare `base` names no base.
+fn based(
+    held: &crate::model::image::BaseEntry,
+    component: crate::model::component::Component,
+    root: &Path,
+    src: &Source,
+    issues: &mut Issues,
+) -> Option<crate::model::image::Base> {
+    let Some(facts) = component.base else {
+        issues.push(
+            Issue::new(format!("`{}` is not a base", held.entry.path), src)
+                .at(held.entry.span, "names no base image")
+                .help("a base component declares `base \"<image reference>\"` and its `family`"),
+        );
+        return None;
+    };
+    // A base names what the build starts from, and the build gives it no
+    // layer. Work it ships would be dropped without a word.
+    let dir = layout::component(root, &component.dir);
+    let ships = [
+        layout::SCRIPT,
+        layout::REPO_SCRIPT,
+        layout::PACKAGES_SCRIPT,
+        layout::FINALIZE_SCRIPT,
+        layout::FRAGMENT,
+    ]
+    .iter()
+    .any(|file| dir.join(file).is_file())
+        || dir.join(layout::OVERLAY).is_dir()
+        || !component.packages.is_empty()
+        || !component.groups.is_empty()
+        || !component.coprs.is_empty();
+    if ships {
+        issues.push(
+            Issue::new(
+                format!(
+                    "`{}` is a base, and a base builds no layer",
+                    held.entry.path
+                ),
+                src,
+            )
+            .at(
+                held.entry.span,
+                "its packages, scripts or files/ would not build",
+            )
+            .help("move that work into a component that the base imports"),
+        );
+    }
+    // A reference that ends in its version is a registry tag, so the tag is
+    // tracked where the base names no tracker of its own.
+    let tracker = component
+        .options
+        .into_iter()
+        .find(|opt| opt.name == "version")
+        .and_then(|opt| opt.renovate)
+        .or_else(|| {
+            facts.template.strip_suffix(":$version").map(|repository| {
+                crate::model::options::VersionTracker {
+                    datasource: "docker".to_string(),
+                    dep_name: repository.to_string(),
+                    extract_version: None,
+                }
+            })
+        });
+    Some(crate::model::image::Base {
+        path: held.entry.path.clone(),
+        image: match &held.digest {
+            Some(digest) => format!("{}@{digest}", facts.image),
+            None => facts.image,
+        },
+        family: facts.family,
+        provides: component.provides,
+        requires: component.requires,
+        imports: component.imports,
+        src: component.src,
+        satisfies: component.satisfies,
+        signed: held.signed,
+        scap_content: facts.scap_content,
+        bootloaders: facts.bootloaders,
+        files: component.files,
+        imported: component.imported,
+        tracker,
+        span: held.entry.span,
+    })
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -1216,7 +1501,7 @@ mod tests {
         let dir = root("file-schemas", "schema-version 1\n");
         std::fs::write(
             dir.join(layout::IMAGE_FILE),
-            "schema-version 2\n\nimage { name \"Example\"; base \"example\"; modules { module \"hello\" } }\n",
+            "schema-version 2\n\nimage { name \"Example\"; example; hello }\n",
         )
         .unwrap();
         let (_, issues) = List::load(&dir);
@@ -1227,24 +1512,27 @@ mod tests {
 
         std::fs::write(
             dir.join(layout::IMAGE_FILE),
-            "schema-version 1\n\nimage { name \"Example\"; base \"example\"; modules { module \"hello\" } }\n",
+            "schema-version 1\n\nimage { name \"Example\"; example; hello }\n",
         )
         .unwrap();
-        std::fs::create_dir_all(dir.join("modules/hello")).unwrap();
-        let manifest = dir.join("modules/hello/module.kdl");
+        std::fs::create_dir_all(dir.join("components/hello")).unwrap();
+        let manifest = dir.join("components/hello/manifest.kdl");
         std::fs::write(&manifest, "packages \"hello\"\n").unwrap();
         let missing = crate::load(&dir).issues.plain();
-        assert!(missing.contains("module.kdl"), "{missing}");
+        assert!(missing.contains("manifest.kdl"), "{missing}");
         assert!(
             missing.contains("this file declares no `schema-version`"),
             "{missing}"
         );
 
         std::fs::write(&manifest, "schema-version 2\n\npackages \"hello\"\n").unwrap();
-        let module = crate::load(&dir).issues.plain();
-        assert!(module.contains("module.kdl declares schema"), "{module}");
-        assert!(module.contains("version 2, but"), "{module}");
-        assert!(module.contains("repo.kdl declares 1"), "{module}");
+        let component = crate::load(&dir).issues.plain();
+        assert!(
+            component.contains("manifest.kdl declares schema"),
+            "{component}"
+        );
+        assert!(component.contains("version 2, but"), "{component}");
+        assert!(component.contains("repo.kdl declares 1"), "{component}");
         std::fs::remove_dir_all(dir).unwrap();
     }
 
@@ -1392,7 +1680,7 @@ colour "blue"
     #[test]
     fn a_declared_schedule_replaces_the_one_at_places() {
         let (declared, said) = workflows(
-            "schema-version 1\nworkflows {\n    build\n    update-modules schedule=\"0 3 * * 0\"\n}\n",
+            "schema-version 1\nworkflows {\n    build\n    update-components schedule=\"0 3 * * 0\"\n}\n",
         );
         assert!(said.is_empty(), "{said}");
         let schedule = |file: &str| {
@@ -1401,7 +1689,10 @@ colour "blue"
                 .find(|declared| declared.file == file)
                 .and_then(|declared| declared.schedule.clone())
         };
-        assert_eq!(schedule("update-modules.yml").as_deref(), Some("0 3 * * 0"));
+        assert_eq!(
+            schedule("update-components.yml").as_deref(),
+            Some("0 3 * * 0")
+        );
         assert_eq!(schedule("build.yml").as_deref(), Some("30 12 * * *"));
     }
 
@@ -1564,12 +1855,12 @@ schema-version 1
 name "Tectonic"
 sources {
     collections "x" {}
-    modules "owner" branch="main" {
+    components "owner" branch="main" {
         url "https://example.invalid/library"
         unpinned
         version "v1"
         version "v2"
-        subtree "modules"
+        subtree "components"
     }
 }
 "#,

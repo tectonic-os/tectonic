@@ -1,0 +1,7 @@
+schema-version 1
+
+description "Runs from a gated fragment that carries no gate"
+
+targets "fedora"
+
+fragment position="after"

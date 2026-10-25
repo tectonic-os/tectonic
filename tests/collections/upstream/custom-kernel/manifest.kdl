@@ -1,0 +1,7 @@
+schema-version 1
+
+description "A kernel the image pins, swapped in over the base's own"
+
+targets "fedora"
+
+arg "KERNEL"

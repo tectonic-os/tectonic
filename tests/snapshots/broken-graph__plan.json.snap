@@ -34,6 +34,8 @@ source: tests/golden/harness.rs
       "allows": [],
       "layout": null,
       "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
         "scap_content": "",
@@ -43,48 +45,7 @@ source: tests/golden/harness.rs
           "boot policy",
           "selinux-policy"
         ],
-        "witnesses": {
-          "apparmor-policy": [
-            "/usr/bin/apparmor-policy",
-            "/usr/sbin/apparmor-policy"
-          ],
-          "boot policy": [
-            "/usr/bin/boot policy",
-            "/usr/sbin/boot policy"
-          ],
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "nothing": [
-            "/usr/bin/nothing",
-            "/usr/sbin/nothing"
-          ],
-          "package-manager": [
-            "/usr/bin/package-manager",
-            "/usr/sbin/package-manager"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [
           "bootc-base"
         ],
@@ -103,7 +64,7 @@ source: tests/golden/harness.rs
           "default": true,
           "pr": true,
           "siblings": [],
-          "modules": [
+          "components": [
             {
               "path": "core/one",
               "flavour": null,
@@ -116,6 +77,8 @@ source: tests/golden/harness.rs
                 "apparmor-policy",
                 "nothing"
               ],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [
                 {
@@ -129,9 +92,13 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "d59be8e0d9d821d396866a89596a40a2b3c81244406063a0a70ca35cfca1748b",
+                "defined": null,
+                "content": "62b3f836a737326e0092ce4bc7c63d694f6cabe74ca03a2726114b0bcd38171b",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -147,14 +114,20 @@ source: tests/golden/harness.rs
                 "shell-tools"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "6886009e87c2b9f16b766edd764750dddf1fd0c0b1309d4c51a6541279e41b19",
+                "defined": null,
+                "content": "8cd9695dd9e92a193ead8d1f983c545515d65bb514fd3313e04c83ab91ffb871",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -163,20 +136,26 @@ source: tests/golden/harness.rs
               "path": "core/three",
               "flavour": null,
               "variant": null,
-              "description": "Provides the same capability as another enabled module",
+              "description": "Provides the same capability as another enabled component",
               "options": {},
               "provides": [
                 "shell-tools"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "50167da21c1c54e2dcdc98560a36955865765d2c086e0d39b0061c32d8431997",
+                "defined": null,
+                "content": "8d275468dd52beea4750eef06656b8134779e449061c93d13f5960bc6cc3e103",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -184,9 +163,7 @@ source: tests/golden/harness.rs
           ],
           "suppressed": [],
           "secrets": [],
-          "contract_files": [
-            "/usr/sbin/semodule"
-          ],
+          "contract_files": [],
           "verify_exceptions": [],
           "assets": [],
           "overlay_files": {},

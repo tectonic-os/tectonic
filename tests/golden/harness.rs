@@ -41,8 +41,8 @@ pub(super) fn normalize_snapshot_body(text: &str) -> String {
 
 pub(super) fn assert_golden(name: &str, file: &str, actual: &str) {
     let mut settings = insta::Settings::clone_current();
-    // A module file lives under tests/golden/, so insta's default resolves
-    // beside it; the snapshots belong to the crate, not the module.
+    // A component file lives under tests/golden/, so insta's default resolves
+    // beside it; the snapshots belong to the crate, not the component.
     settings.set_snapshot_path(crate_dir().join("tests/snapshots"));
     settings.set_prepend_module_to_snapshot(false);
     settings.set_omit_expression(true);
@@ -91,33 +91,31 @@ pub(super) fn copy(from: &Path, to: &Path) {
     }
 }
 
-/// Lays the fixture base catalog where the fetch of the default libraries
-/// would put it, so a sealed run reads a catalog instead of the network.
+/// Lays the fixture base components where the fetch of the default library
+/// would put them, so a sealed run offers bases instead of reaching the
+/// network.
 pub(super) fn seed_bases(root: &Path) {
     let keyed = tect::import::cache_path(root, tect::base::LIBRARY_URL, "HEAD")
         .expect("the default library URL hashes");
     let collections = crate_dir().join("tests/collections/upstream");
-    let core = keyed.join("base-images/core");
-    std::fs::create_dir_all(&core).unwrap();
-    for entry in std::fs::read_dir(&collections).unwrap().flatten() {
-        let name = entry.file_name();
-        if name.to_string_lossy().ends_with(".base.kdl") {
-            std::fs::copy(entry.path(), core.join(name)).unwrap();
-        }
-    }
+    copy(
+        &collections.join("base-image"),
+        &keyed.join("components/base-image"),
+    );
+    // The fixture bases import the family adapter, so the cache holds it too.
+    copy(
+        &collections.join("fedora-family"),
+        &keyed.join("components/fedora-family"),
+    );
 }
 
-/// The same, with the fixture module tree as well, for a flow whose offer has
-/// to read what the default modules library holds.
+/// The same, with the fixture component tree as well, for a flow whose offer has
+/// to read what the default components library holds.
 pub(super) fn seed_library(root: &Path) {
-    seed_bases(root);
     let keyed = tect::import::cache_path(root, tect::base::LIBRARY_URL, "HEAD")
         .expect("the default library URL hashes");
     let collections = crate_dir().join("tests/collections/upstream");
-    copy(&collections, &keyed.join("modules"));
-    for stray in ["fedora.base.kdl", "collected.base.kdl"] {
-        let _ = std::fs::remove_file(keyed.join("modules").join(stray));
-    }
+    copy(&collections, &keyed.join("components"));
 }
 
 /// Every file under `dir`, which is what an import wrote.

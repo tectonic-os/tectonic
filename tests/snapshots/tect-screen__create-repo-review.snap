@@ -8,7 +8,7 @@ Buffer {
         "  name  Example                                                                 ",
         "  provider  github.com/someone                                                  ",
         "  github repo  not created                                                      ",
-        "  libraries  tectonic-modules, core                                             ",
+        "  libraries  tectonic-components                                                ",
         "  image  none                                                                   ",
         "  workflows  none                                                               ",
         "  scripts kept  Containerfile.skeleton                                          ",

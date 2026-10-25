@@ -37,37 +37,14 @@ source: tests/golden/harness.rs
         "bootloader": ""
       },
       "base": {
+        "path": "base-image/debian-forky",
+        "defined": null,
         "image": "docker.io/library/debian:forky",
         "family": "debian",
         "scap_content": "",
         "signed": false,
         "provides": [],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -84,7 +61,7 @@ source: tests/golden/harness.rs
           "default": true,
           "pr": true,
           "siblings": [],
-          "modules": [],
+          "components": [],
           "suppressed": [],
           "secrets": [],
           "contract_files": [],
@@ -115,37 +92,14 @@ source: tests/golden/harness.rs
         "bootloader": ""
       },
       "base": {
+        "path": "base-image/arch-bootc-latest",
+        "defined": null,
         "image": "ghcr.io/someone/arch-bootc:latest",
         "family": "arch",
         "scap_content": "",
         "signed": false,
         "provides": [],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -162,7 +116,7 @@ source: tests/golden/harness.rs
           "default": false,
           "pr": false,
           "siblings": [],
-          "modules": [],
+          "components": [],
           "suppressed": [],
           "secrets": [],
           "contract_files": [],

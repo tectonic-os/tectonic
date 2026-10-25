@@ -5,7 +5,7 @@ use crate::model::image::{Entry, Image};
 use crate::parse::disk::Disk;
 use std::collections::{BTreeMap, BTreeSet};
 
-/// Every path an overlay puts in the image, to the modules shipping it, as
+/// Every path an overlay puts in the image, to the components shipping it, as
 /// indices into the image's entries in build order.
 pub type Index = BTreeMap<String, Vec<usize>>;
 
@@ -13,20 +13,20 @@ pub type Index = BTreeMap<String, Vec<usize>>;
 pub fn index(image: &Image, disk: &Disk) -> Index {
     let mut shipped: Index = BTreeMap::new();
     for (index, entry) in image.entries.iter().enumerate() {
-        let Some(module) = &entry.module else {
+        let Some(component) = &entry.component else {
             continue;
         };
-        for path in disk.overlays.get(&module.dir).into_iter().flatten() {
+        for path in disk.overlays.get(&component.dir).into_iter().flatten() {
             shipped.entry(path.clone()).or_default().push(index);
         }
-        for key in &module.keys {
+        for key in &component.keys {
             shipped.entry(key.public.clone()).or_default().push(index);
         }
     }
     shipped
 }
 
-/// Every path a later module overwrites, as the path, the entry writing it and
+/// Every path a later component overwrites, as the path, the entry writing it and
 /// the co-installed entry it lands on top of. Both readers walk this.
 fn pairs<'a>(
     image: &'a Image,
@@ -52,10 +52,10 @@ pub fn check(image: &Image, shipped: &Index, issues: &mut Issues) {
     let mut used: Vec<BTreeSet<&str>> = vec![BTreeSet::new(); entries.len()];
 
     for (path, later, earlier) in pairs(image, shipped) {
-        let Some(module) = &entries[later].module else {
+        let Some(component) = &entries[later].component else {
             continue;
         };
-        if let Some(decl) = module.overrides.iter().find(|d| &d.name == path) {
+        if let Some(decl) = component.overrides.iter().find(|d| &d.name == path) {
             used[later].insert(decl.name.as_str());
             continue;
         }
@@ -65,7 +65,7 @@ pub fn check(image: &Image, shipped: &Index, issues: &mut Issues) {
                     "`{}` overwrites `{path}`, which `{}` also ships",
                     entries[later].path, entries[earlier].path
                 ),
-                &module.src,
+                &component.src,
             )
             .help(format!(
                 "overlays are copied in build order, so this one wins and the other file never reaches the image. \
@@ -75,42 +75,42 @@ pub fn check(image: &Image, shipped: &Index, issues: &mut Issues) {
     }
 
     for (index, entry) in entries.iter().enumerate() {
-        let Some(module) = &entry.module else {
+        let Some(component) = &entry.component else {
             continue;
         };
-        for decl in &module.overrides {
+        for decl in &component.overrides {
             if used[index].contains(decl.name.as_str()) {
                 continue;
             }
             issues.push(
                 Issue::new(
                     format!(
-                        "`{}` overrides `{}`, which no earlier module ships",
+                        "`{}` overrides `{}`, which no earlier component ships",
                         entry.path, decl.name
                     ),
-                    &module.src,
+                    &component.src,
                 )
                 .at(decl.span, "nothing to replace")
-                .help("an override is checked, so it cannot outlive the collision it was added for; drop it, or check the path against what the other module actually ships"),
+                .help("an override is checked, so it cannot outlive the collision it was added for; drop it, or check the path against what the other component actually ships"),
             );
         }
     }
 }
 
-/// The collisions `check` would report that involve one of the modules just
+/// The collisions `check` would report that involve one of the components just
 /// added, read off the same resolved index and build order `check` used. An
 /// import calls this the moment it has written the tree.
 pub fn collisions(image: &Image, shipped: &Index, brought: &BTreeSet<String>) -> Vec<String> {
     let entries = &image.entries;
     let mut out: Vec<String> = Vec::new();
     for (path, later, earlier) in pairs(image, shipped) {
-        let Some(module) = &entries[later].module else {
+        let Some(component) = &entries[later].component else {
             continue;
         };
         if !brought.contains(&entries[later].path) && !brought.contains(&entries[earlier].path) {
             continue;
         }
-        if module.overrides.iter().any(|decl| &decl.name == path) {
+        if component.overrides.iter().any(|decl| &decl.name == path) {
             continue;
         }
         out.push(format!(
@@ -122,7 +122,7 @@ pub fn collisions(image: &Image, shipped: &Index, brought: &BTreeSet<String>) ->
     out
 }
 
-/// Two modules land in the same image unless they are gated to different
+/// Two components land in the same image unless they are gated to different
 /// flavours.
 fn coinstalled(a: &Entry, b: &Entry) -> bool {
     if a.path == b.path {

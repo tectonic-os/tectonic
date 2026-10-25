@@ -1,0 +1,5 @@
+schema-version 1
+
+description "A component no declared collection provides"
+
+targets "fedora"

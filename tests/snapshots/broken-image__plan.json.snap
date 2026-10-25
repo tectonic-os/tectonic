@@ -47,7 +47,7 @@ source: tests/golden/harness.rs
           "default": true,
           "pr": true,
           "siblings": [],
-          "modules": [],
+          "components": [],
           "suppressed": [],
           "secrets": [],
           "contract_files": [],

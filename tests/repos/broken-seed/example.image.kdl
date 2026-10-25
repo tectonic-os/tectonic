@@ -3,11 +3,11 @@ schema-version 1
 image {
     name "Example"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
+    base-image {
+        fedora-bootc-44
     }
 
-    modules {
-        module "core/hello"
+    core {
+        hello
     }
 }
