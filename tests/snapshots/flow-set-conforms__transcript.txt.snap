@@ -7,14 +7,14 @@ A `conforms` turns the scan on: every build measures `example` against the profi
   2) ospp  Protection Profile for General Purpose Operating Systems
 Which profile? [1-2, 0 for none]: 1
 
-Import the modules claiming these rules? (Yes/No)
+Import the components claiming these rules? (Yes/No)
 Yes
 
 
 example/
-├── modules/
+├── components/
 │   ├── sshd/
-│   │   └── + module.kdl
-│   └── + modules.lock.kdl
-└── ~ example.image.kdl  measured against `standard`, and sshd added to modules
+│   │   └── + manifest.kdl
+│   └── ~ components.lock.kdl  sshd recorded
+└── ~ example.image.kdl  measured against `standard`, and sshd added to components
 ==== exit 0

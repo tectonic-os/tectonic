@@ -1,14 +1,14 @@
 # The `tect` CLI
 
-`tect` is the one tool that manages a bootc image repository. The user describes each image in KDL files, and `tect` turns those files into the Containerfiles and the CI workflows that build the image. `tect` works out the module order, the options, the names and the tags in one place, so the build scripts hold no logic of their own and the user can see what goes into each image.
+`tect` is the one tool that manages a bootc image repository. The user describes each image in KDL files, and `tect` turns those files into the Containerfiles and the CI workflows that build the image. `tect` works out the component order, the options, the names and the tags in one place, so the build scripts hold no logic of their own and the user can see what goes into each image.
 
 ## Where it runs
 
 `tect` runs in three places:
 
-- On the user's machine, it scaffolds the repository and its images, modules and keys. It checks the KDL files, writes the build files, and builds and boots an image.
+- On the user's machine, it scaffolds the repository and its images, components and keys. It checks the KDL files, writes the build files, and builds and boots an image.
 - In CI, the generated workflows call it to write the build files, build and publish each image, and scan it.
-- Inside a build, the generated Containerfile calls it to write the image identity, record what the build resolved and check the finished image. A module script can call `tect fetch` to download a payload and check it against its hash.
+- Inside a build, the generated Containerfile calls it to write the image identity, record what the build resolved and check the finished image. A component script can call `tect fetch` to download a payload and check it against its hash.
 
 ## Global options
 
@@ -28,30 +28,30 @@ Every command takes these options, before or after its own words. [`tect`](#tect
 | [`tect create repo [name]`](#tect-create-repo) | start a repository of images | [repository&nbsp;layout](schema/repository.md) |
 | [`tect create git`](#tect-create-git) | initialise git and the ignore file in a directory |  |
 | [`tect create scripts [name]...`](#tect-create-scripts) | keep a copy of a script tect supplies in scripts/ | [`scripts/`](schema/repository.md) |
-| [`tect set library [kind]`](#tect-set-library) | add a module or base-image library | [`repo.kdl`&nbsp;›&nbsp;`sources`](schema/repo.md#sources) |
+| [`tect set library`](#tect-set-library) | add a component library | [`repo.kdl`&nbsp;›&nbsp;`sources`](schema/repo.md#sources) |
 
 ### Image
 
 | Command | Description | Schema |
 | --- | --- | --- |
 | [`tect create image [name]`](#tect-create-image) | add an image, with its name and the base it builds on | [`image.kdl`](schema/image.md) |
-| [`tect create flavour [name]`](#tect-create-flavour) | add a gated module set an image also publishes | [`image.kdl`&nbsp;›&nbsp;`flavours`](schema/image.md#image-flavours) |
+| [`tect create flavour [name]`](#tect-create-flavour) | add a gated component set an image also publishes | [`image.kdl`&nbsp;›&nbsp;`flavours`](schema/image.md#image-flavours) |
 
-### Modules
+### Components
 
 | Command | Description | Schema |
 | --- | --- | --- |
-| [`tect create module [name]`](#tect-create-module) | write a module, and offer to list it in an image | [`module.kdl`](schema/module.md) |
-| [`tect import module [name]`](#tect-import-module) | copy a module from a library repo.kdl declares into this repository | [`modules.lock.kdl`](schema/lock.md) |
-| [`tect set module [path]`](#tect-set-module) | make an imported module the repository's own | [`modules.lock.kdl`](schema/lock.md) |
-| [`tect fetch modules [path]...`](#tect-fetch-modules) | refresh each tracked module from its library | [`modules.lock.kdl`](schema/lock.md) |
+| [`tect create component [name]`](#tect-create-component) | write a component, and offer to list it in an image | [`manifest.kdl`](schema/component.md) |
+| [`tect import component [name]`](#tect-import-component) | copy a component from a library repo.kdl declares into this repository | [`components.lock.kdl`](schema/lock.md) |
+| [`tect set component [path]`](#tect-set-component) | make an imported component the repository's own | [`components.lock.kdl`](schema/lock.md) |
+| [`tect fetch components [path]...`](#tect-fetch-components) | refresh each tracked component from its library | [`components.lock.kdl`](schema/lock.md) |
 
 ### Keys
 
 | Command | Description | Schema |
 | --- | --- | --- |
-| [`tect create key [kind]`](#tect-create-key) | generate a key one of this repository's modules declares | [`module.kdl`&nbsp;›&nbsp;`key`](schema/module.md#key) |
-| [`tect set key [kind]`](#tect-set-key) | record a key that already exists, in place of generating one | [`module.kdl`&nbsp;›&nbsp;`key`](schema/module.md#key) |
+| [`tect create key [kind]`](#tect-create-key) | generate a key one of this repository's components declares | [`manifest.kdl`&nbsp;›&nbsp;`key`](schema/component.md#key) |
+| [`tect set key [kind]`](#tect-set-key) | record a key that already exists, in place of generating one | [`manifest.kdl`&nbsp;›&nbsp;`key`](schema/component.md#key) |
 
 ### Check and generate
 
@@ -82,7 +82,7 @@ Every command takes these options, before or after its own words. [`tect`](#tect
 | --- | --- | --- |
 | [`tect section [image]`](#tect-section) | print the Containerfile section an image generates |  |
 | [`tect graph`](#tect-graph) | print what provides what, and what the base carries |  |
-| [`tect why [module]`](#tect-why) | print one module's trust read-out, byte by byte |  |
+| [`tect why [component]`](#tect-why) | print one component's trust read-out, byte by byte |  |
 | [`tect plan`](#tect-plan) | print every fact this repository derives, as json |  |
 | [`tect summary [target]`](#tect-summary) | print what one target is made of, as a markdown table |  |
 | [`tect sbom [target]`](#tect-sbom) | print the pinned payloads one target carries, as SPDX |  |
@@ -95,7 +95,7 @@ Every command takes these options, before or after its own words. [`tect`](#tect
 | Command | Description | Schema |
 | --- | --- | --- |
 | [`tect set conforms [image]`](#tect-set-conforms) | choose the benchmark profile an image is measured by | [`image.kdl`&nbsp;›&nbsp;`conforms`](schema/image.md#image-conforms) |
-| [`tect set claims [module]`](#tect-set-claims) | choose the benchmark rules a module claims to cover | [`module.kdl`&nbsp;›&nbsp;`satisfies`](schema/module.md#satisfies) |
+| [`tect set claims [component]`](#tect-set-claims) | choose the benchmark rules a component claims to cover | [`manifest.kdl`&nbsp;›&nbsp;`satisfies`](schema/component.md#satisfies) |
 | [`tect coverage [image]`](#tect-coverage) | print who claims each rule the image conforms to | [`image.kdl`&nbsp;›&nbsp;`conforms`](schema/image.md#image-conforms) |
 | [`tect scap content`](#tect-scap-content) | print the datastream the target is measured with |  |
 | [`tect scap tailoring`](#tect-scap-tailoring) | print the tailoring the target is scanned with |  |
@@ -106,10 +106,10 @@ Every command takes these options, before or after its own words. [`tect`](#tect
 
 | Command | Description | Schema |
 | --- | --- | --- |
-| [`tect fetch <what> <url> <sha256> [target] [extra]...`](#tect-fetch) | download one payload, verify it, and place it | [`module.kdl`&nbsp;›&nbsp;`asset`](schema/module.md#asset) |
+| [`tect fetch <what> <url> <sha256> [target] [extra]...`](#tect-fetch) | download one payload, verify it, and place it | [`manifest.kdl`&nbsp;›&nbsp;`asset`](schema/component.md#asset) |
 | [`tect os-release`](#tect-os-release) | write the image identity the build ARGs carry | [`image.kdl`&nbsp;›&nbsp;`image`](schema/image.md#image) |
 | [`tect build-record`](#tect-build-record) | write the record of what the build resolved |  |
-| [`tect validate-image`](#tect-validate-image) | run every check a built image has to pass | [`module.kdl`&nbsp;›&nbsp;`allow-verify`](schema/module.md#allow-verify) |
+| [`tect validate-image`](#tect-validate-image) | run every check a built image has to pass | [`manifest.kdl`&nbsp;›&nbsp;`allow-verify`](schema/component.md#allow-verify) |
 
 ### CLI tool
 
@@ -189,7 +189,7 @@ It asks, in order:
    give the account.
 3. On GitHub, choose whether to create the remote repository now.
 4. Choose whether to add a first image. Then name it and choose its base.
-5. If the base needs modules, choose whether to add them.
+5. If the base needs components, choose whether to add them.
 6. If the repository syncs to a host, choose the CI workflows. Then choose
    whether images publish and scan only on scheduled builds, and give the daily
    build time.
@@ -215,10 +215,18 @@ It asks, in order:
 
 ```text
 example/
+├── components/
+│   ├── base-image/
+│   │   └── fedora/
+│   │       └── + manifest.kdl
+│   ├── fedora-family/
+│   │   ├── lib/
+│   │   │   └── + family.sh
+│   │   └── + manifest.kdl
+│   ├── + .gitkeep
+│   └── + components.lock.kdl
 ├── disk_config/
 │   └── + disk.toml
-├── modules/
-│   └── + .gitkeep
 ├── scripts/
 │   └── + Containerfile.skeleton
 ├── + .dockerignore
@@ -231,7 +239,7 @@ example/
 ```
 
 > [!WARNING]
-> The `tectonic-modules` source that `repo.kdl` declares is `unpinned`. Each
+> The `tectonic-components` source that `repo.kdl` declares is `unpinned`. Each
 > fetch takes the head of its branch, and no hash checks what arrives. To pin
 > it, add `version` and `sha256` beside its `url`.
 
@@ -272,10 +280,15 @@ It asks, in order:
 1. Name the image. The repository name is the default.
 2. Choose the base from the catalog. If `--base` names a base outside the
    catalog, then choose its family.
-3. If the base needs modules that the image does not list, such as the family
-   adapter, choose whether to add them from the declared collections. Each
-   one is copied into `modules/` and recorded in `modules/modules.lock.kdl`. A
-   module the repository already holds is listed as it is.
+3. If the base imports no build environment, choose whether to add the
+   family adapter. If the base requires a component that the image does not
+   list, choose whether to add its providers. Each one comes from the declared
+   collections, is copied into `components/` and is recorded in
+   `components/components.lock.kdl`. A component the repository already holds
+   is listed as it is.
+
+The components a library base imports are copied into `components/` beside
+it, and the image file lists none of them.
 
 **Usage:** `tect create image [OPTIONS] [name]`
 
@@ -294,38 +307,37 @@ It asks, in order:
 
 ```text
 example/
-├── modules/
-│   ├── fedora-family/
-│   │   ├── lib/
-│   │   │   └── + family.sh
-│   │   └── + module.kdl
-│   └── + modules.lock.kdl
+├── components/
+│   ├── base-image/
+│   │   └── collected/
+│   │       └── + manifest.kdl
+│   └── ~ components.lock.kdl  base-image/collected recorded
 ├── + beta.image.kdl
 └── ~ repo.kdl  example set as the default image
 ```
 
 > [!NOTE]
 > A base outside the catalog asks for its family and writes no `provides`.
-> `tect check` then reports each capability that no module provides.
+> `tect check` then reports each capability that no component provides.
 >
 > If the repository declares no `default-image`, then a second image adds one
 > to `repo.kdl` that names the first image. A bare `tect build` then builds what
 > it built before.
 >
-> To offer the base's modules, it reads the declared collections, and fetches a
+> To offer the base's components, it reads the declared collections, and fetches a
 > collection that is not on this machine. With no terminal, it fetches
 > nothing.
 >
-> The base's modules are the family adapter and a provider of each capability
-> that the base requires. The family adapter is the module that `supports` the
+> The base's components are the family adapter and a provider of each capability
+> that the base requires. The family adapter is the component that `targets` the
 > family and `provides "build-environment"`.
 
 ## `tect create flavour`
 
 Adds a flavour to an image. A flavour is a second build of the image with more
-modules, published as `<image>-<flavour>` beside the image. This command
-declares the flavour in the image's `flavours` block. To add a module to the
-flavour, run `tect create module` or `tect import module` and choose the
+components, published as `<image>-<flavour>` beside the image. This command
+declares the flavour in the image's `flavours` block. To add a component to the
+flavour, run `tect create component` or `tect import component` and choose the
 flavour.
 
 It asks, in order:
@@ -362,18 +374,15 @@ image {
     url "https://github.com/someone/example"
     issues-url "https://github.com/someone/example/issues"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking" "initramfs-generation" "luks-initramfs" "selinux-policy" "ssh" "bootc" "bootupctl" "podman" "crun"
-        signed #false
-        scap-content "ssg-fedora-ds.xml"
-    }
-
     layout {
         bootloader "grub2"
     }
 
-    modules {
+    base-image {
+        fedora {
+            version "44"
+            signed #false
+        }
     }
     flavours {
         dx
@@ -388,61 +397,61 @@ image {
 > It refuses a name that the image already declares, and `none`, which names
 > the image's own build.
 
-## `tect create module`
+## `tect create component`
 
-Writes a new module, `modules/<name>/module.kdl`, and offers to list it in an
+Writes a new component, `components/<name>/manifest.kdl`, and offers to list it in an
 image. The name can be a path, so `apps/firefox` writes
-`modules/apps/firefox/module.kdl`.
+`components/apps/firefox/manifest.kdl`.
 
 It asks, in order:
 
-1. Name the module.
+1. Name the component.
 2. Optionally describe it.
 3. Optionally restrict it to named base families.
 4. Choose whether it installs packages, then name them.
 5. Choose the images and flavours that list it.
 
-**Usage:** `tect create module [OPTIONS] [name]`
+**Usage:** `tect create component [OPTIONS] [name]`
 
 | Argument | Description |
 | --- | --- |
-| `<name>` | the module name, which can be a path under `modules/` |
+| `<name>` | the component name, which can be a path under `components/` |
 
 | Option | Description |
 | --- | --- |
-| `--image <name>` | list the module in this image or flavour; repeatable |
-| `--pkg <name>` | a package the module installs; repeatable |
+| `--image <name>` | list the component in this image or flavour; repeatable |
+| `--pkg <name>` | a package the component installs; repeatable |
 | `--with <verb=value>` | one more line in the manifest, such as `--with provides=browser`; repeatable |
 
-**Schema:** [`module.kdl`](schema/module.md)
+**Schema:** [`manifest.kdl`](schema/component.md)
 
 **What it writes:**
 
 ```text
 example/
-├── modules/
+├── components/
 │   └── my-editor/
-│       └── + module.kdl
-└── ~ example.image.kdl  my-editor added to modules
+│       └── + manifest.kdl
+└── ~ example.image.kdl  my-editor added to components
 ```
 
 > [!NOTE]
-> With no `supports` declaration, a module supports every base family. It
-> writes packages outside a family gate so every supported family installs
+> With no `targets` declaration, a component targets every base family. It
+> writes packages outside a family gate so every targeted family installs
 > them. A package name that differs by family goes in a `family` block.
 > The build installs them through the family adapter, with `dnf install -y` on
 > Fedora and RHEL, and with `apt-get update`, `apt-get install -y` and
 > `apt-get clean` on Debian and Ubuntu.
 >
-> An image and one of its own flavours cannot both list the module. The image
+> An image and one of its own flavours cannot both list the component. The image
 > entry already reaches every flavour of that image.
 >
-> No image is an answer. The module exists, and no image lists it yet. Leaving
+> No image is an answer. The component exists, and no image lists it yet. Leaving
 > the picker writes nothing.
 
 ## `tect create key`
 
-Generates a key that a module in the repository declares. The public half goes
+Generates a key that a component in the repository declares. The public half goes
 under `keys/public/`, at the path it has in the image. The private half goes
 under `keys/private/`, which git ignores.
 
@@ -453,7 +462,7 @@ It makes each kind with its own tool:
 - `openssl profile="module-signing"` makes the Secure Boot certificate that
   signs the kernel and its modules. Set the private half as the `MOK_PRIVKEY`
   repository secret, and `$MOK_KEY_PATH` points a local build at it. It
-  writes the `format` that the module declares, and `sign-file` and `mokutil`
+  writes the `format` that the component declares, and `sign-file` and `mokutil`
   read DER.
 - `openssl profile="pcr-signing"` makes the RSA pair that signs the PCR 11
   policy of a sealed UKI. Set the private half as the `PCR_PRIVKEY` repository
@@ -474,14 +483,14 @@ It asks for one step:
 
 | Argument | Description |
 | --- | --- |
-| `<kind>` | the kind of key, as a module declares it |
+| `<kind>` | the kind of key, as a component declares it |
 
 | Option | Description |
 | --- | --- |
-| `--module <name>` | which module, where two of them declare the same kind |
+| `--component <name>` | which component, where two of them declare the same kind |
 | `--cn <name>` | the certificate common name; the repository directory name by default |
 
-**Schema:** [`module.kdl`&nbsp;›&nbsp;`key`](schema/module.md#key)
+**Schema:** [`manifest.kdl`&nbsp;›&nbsp;`key`](schema/component.md#key)
 
 > [!WARNING]
 > It never replaces an existing key, because a private half cannot be
@@ -494,8 +503,8 @@ It asks for one step:
 > If `.gitignore` does not cover `keys/private/`, then it says so and does not
 > edit the file.
 >
-> If no module declares the kind, then it names a module in the declared
-> collections that does, and the `tect import module` line that adds it.
+> If no component declares the kind, then it names a component in the declared
+> collections that does, and the `tect import component` line that adds it.
 
 ## `tect create scripts`
 
@@ -503,7 +512,7 @@ Copies a script that `tect` supplies into `scripts/`, where the repository
 owns it. Git tracks the copy, the user can review and change it, and a `tect`
 upgrade does not replace it. The scripts are:
 
-- `Containerfile.skeleton`, the Containerfile around the generated module layers
+- `Containerfile.skeleton`, the Containerfile around the generated component layers
 - `lint.sh`, `tect.sh`, `smoke.sh` and `vm.sh`, which `tect generate` otherwise
   writes into `generated/scripts/`
 
@@ -532,23 +541,28 @@ It asks for one step:
 >
 > `tect create repo` asks the same question, with the skeleton chosen.
 
-## `tect import module`
+## `tect import component`
 
-Copies a module from a library into `modules/<name>`, and records it in
-`modules/modules.lock.kdl`: the library, the module's path there, the
+Copies a component from a library into `components/<name>`, and records it in
+`components/components.lock.kdl`: the library, the component's path there, the
 library's revision and the content hash. The repository holds the copy, so a
 fetch never changes it.
 
 It asks, in order:
 
-1. Choose the image or flavour the modules are for, or none.
-2. Choose the modules. A module that the image's base family cannot build is
-   listed as unavailable, with the reason beside it.
-3. If the repository already holds a module at that path, choose to list the
-   local module or to import the library's under another name. The name
+1. Choose the image or flavour the components are for, or none.
+2. Choose the components. A component that the image's base family cannot build,
+   and a base component, are listed as unavailable, with the reason beside
+   them.
+3. If the repository already holds a component at that path, choose to list the
+   local component or to import the library's under another name. The name
    offered is `<name>@1`.
-4. Choose whether to add the modules that they require.
-5. If a module provides a capability that an entry in the same image or
+4. If several library components provide one capability that they require,
+   choose one. Then choose whether to add the components that they require. A
+   requirement whose `provider` reads an option takes the answer as that
+   option's value on the component's entry, and the provider is copied in
+   without an entry of its own.
+5. If a component provides a capability that an entry in the same image or
    flavour declares exclusive, or the other way round, choose to replace that
    entry or cancel.
 6. Choose whether to generate the CI workflows that they make runnable.
@@ -556,29 +570,29 @@ It asks, in order:
    against.
 8. Choose whether the copies track upstream.
 
-**Usage:** `tect import module [OPTIONS] [name]`
+**Usage:** `tect import component [OPTIONS] [name]`
 
 | Argument | Description |
 | --- | --- |
-| `<name>` | one module, as `<name>` or `<owner>/<name>` |
+| `<name>` | one component, as `<name>` or `<owner>/<name>` |
 
 | Option | Description |
 | --- | --- |
-| `--image <name>` | list the module in this image or flavour |
+| `--image <name>` | list the component in this image or flavour |
 | `--datastream <file>` | the SCAP content the profile offer is read out of; the family's installed copy by default, and no content is no offer |
-| `--dependencies` | add provider modules for dependencies the selected modules require |
+| `--dependencies` | add provider components for dependencies the selected components require |
 
-**Schema:** [`modules.lock.kdl`](schema/lock.md)
+**Schema:** [`components.lock.kdl`](schema/lock.md)
 
 **What it writes:**
 
 ```text
 example/
-├── modules/
+├── components/
 │   ├── browser/
-│   │   └── + module.kdl
-│   └── + modules.lock.kdl
-└── ~ example.image.kdl  browser added to modules
+│   │   └── + manifest.kdl
+│   └── ~ components.lock.kdl  browser recorded
+└── ~ example.image.kdl  browser added to components
 ```
 
 > [!WARNING]
@@ -593,18 +607,20 @@ example/
 > A bare name is searched for in every library. `<owner>/<name>` picks
 > between two libraries that both hold it.
 >
-> It refuses a module that the image already lists, and a module that the
+> It refuses a component that the image already lists, and a component that the
 > image's base family cannot build.
 >
 > A tracked copy carries `track` in its lock entry. An untracked copy is the
 > repository's own, and its entry keeps where it came from.
 >
 > Without a terminal, the copies are tracked, and an image lists them only
-> where `--image` names one. A named module at a path the repository already
+> where `--image` names one. A named component at a path the repository already
 > holds is refused, and so is an exclusive clash. A provider that
-> `--dependencies` brings is listed as the repository holds it.
+> `--dependencies` brings is listed as the repository holds it. If several
+> library components provide one requirement, then `--dependencies` refuses and
+> names each.
 >
-> If the user declines a required module, then the file stays valid, and
+> If the user declines a required component, then the file stays valid, and
 > `tect check` names the import that would satisfy it.
 
 ## `tect set workflows`
@@ -642,21 +658,18 @@ example/
 
 ## `tect set library`
 
-Adds a library to the `sources` block in `repo.kdl`: the default library of
-that kind, or a source the user types. A source of the same kind and alias is
-replaced, so the declaration moves to what the user chose.
+Adds a library to the `sources` block in `repo.kdl`: the default library, or
+a source the user types. A library holds components and base components alike. A
+source with the same alias is replaced, so the declaration moves to what the
+user chose.
 
 It asks, in order:
 
-1. Choose the default library of that kind, or another source.
+1. Choose the default library, or another source.
 2. For another source, give its alias, its HTTPS Git URL and the directory
    inside the repository.
 
-**Usage:** `tect set library [kind]`
-
-| Argument | Description |
-| --- | --- |
-| `<kind>` | the kind of library: `base-images` or `modules` |
+**Usage:** `tect set library`
 
 **Schema:** [`repo.kdl`&nbsp;›&nbsp;`sources`](schema/repo.md#sources)
 
@@ -671,7 +684,7 @@ It asks, in order:
 
 1. If the repository holds several images, choose one.
 2. Choose the profile.
-3. Choose whether to import the collection modules that claim rules of the
+3. Choose whether to import the collection components that claim rules of the
    profile that nothing in the image claims yet.
 
 **Usage:** `tect set conforms [OPTIONS] [image]`
@@ -690,11 +703,11 @@ It asks, in order:
 
 ```text
 example/
-├── modules/
+├── components/
 │   ├── sshd/
-│   │   └── + module.kdl
-│   └── + modules.lock.kdl
-└── ~ example.image.kdl  measured against `standard`, and sshd added to modules
+│   │   └── + manifest.kdl
+│   └── ~ components.lock.kdl  sshd recorded
+└── ~ example.image.kdl  measured against `standard`, and sshd added to components
 ```
 
 > [!NOTE]
@@ -707,39 +720,39 @@ example/
 > If no `--datastream` is given and no SCAP content is installed for the
 > image's family, then it stops and names `scap-security-guide`.
 >
-> The import offer covers collection modules only. A module in the repository
-> needs a line in the image's `modules` block, and `tect check` names it.
+> The import offer covers collection components only. A component in the repository
+> needs its path segments in the image, and `tect check` names it.
 
 ## `tect set claims`
 
-Chooses the benchmark rules that a module in the repository claims to cover,
+Chooses the benchmark rules that a component in the repository claims to cover,
 and writes their numbers into its `satisfies` block. A claim says what the
-module supplies, and `tect scap` measures whether the built image keeps it.
+component supplies, and `tect scap` measures whether the built image keeps it.
 
 It asks, in order:
 
 1. Choose the profile that the rules come from.
-2. Choose the rules that the module claims.
+2. Choose the rules that the component claims.
 
-**Usage:** `tect set claims [OPTIONS] [module]`
+**Usage:** `tect set claims [OPTIONS] [component]`
 
 | Argument | Description |
 | --- | --- |
-| `<module>` | the module in the repository |
+| `<component>` | the component in the repository |
 
 | Option | Description |
 | --- | --- |
-| `--datastream <file>` | the SCAP content the rules are read out of; the installed copy for the module's first declared family by default, and required when the module declares no family restriction |
+| `--datastream <file>` | the SCAP content the rules are read out of; the installed copy for the component's first declared family by default, and required when the component declares no family restriction |
 
-**Schema:** [`module.kdl`&nbsp;›&nbsp;`satisfies`](schema/module.md#satisfies)
+**Schema:** [`manifest.kdl`&nbsp;›&nbsp;`satisfies`](schema/component.md#satisfies)
 
 **What it writes:**
 
 ```text
 example/
-└── modules/
+└── components/
     └── sshd/
-        └── ~ module.kdl  claiming one rule of `standard`
+        └── ~ manifest.kdl  claiming one rule of `standard`
 ```
 
 > [!NOTE]
@@ -754,8 +767,8 @@ example/
 >
 > No rule removes the `satisfies` block. Leaving the picker changes nothing.
 >
-> A module that declares `supports` uses the installed content for its first
-> named family by default. A module with no `supports` declaration has no
+> A component that declares `targets` uses the installed content for its first
+> named family by default. A component with no `targets` declaration has no
 > single default, so name `--datastream`. If that content is not installed, the
 > command stops and names `scap-security-guide`.
 >
@@ -766,7 +779,7 @@ example/
 
 Records the public half of a key that the user already holds, in place of
 generating one. Use it for an existing cosign key, MOK certificate or SSH key.
-It writes to the path that the module's `public` declaration gives.
+It writes to the path that the component's `public` declaration gives.
 
 It asks, in order:
 
@@ -777,14 +790,14 @@ It asks, in order:
 
 | Argument | Description |
 | --- | --- |
-| `<kind>` | the kind of key, as a module declares it |
+| `<kind>` | the kind of key, as a component declares it |
 
 | Option | Description |
 | --- | --- |
-| `--module <name>` | which module, where two of them declare the same kind |
+| `--component <name>` | which component, where two of them declare the same kind |
 | `--from <path>` | the public half to record |
 
-**Schema:** [`module.kdl`&nbsp;›&nbsp;`key`](schema/module.md#key)
+**Schema:** [`manifest.kdl`&nbsp;›&nbsp;`key`](schema/component.md#key)
 
 > [!WARNING]
 > It never replaces an existing key.
@@ -801,23 +814,23 @@ It asks, in order:
 > - `pcr-signing` takes a bare PEM public key.
 > - `ssh-keygen` takes an OpenSSH key line.
 
-## `tect set module`
+## `tect set component`
 
-Makes an imported module the repository's own copy. The module stops tracking
-its library, so `tect fetch modules` passes it over, and the user may edit it.
+Makes an imported component the repository's own copy. The component stops tracking
+its library, so `tect fetch components` passes it over, and the user may edit it.
 With no `--untracked`, it asks first. With no terminal, it needs the flag.
 
-**Usage:** `tect set module [OPTIONS] [path]`
+**Usage:** `tect set component [OPTIONS] [path]`
 
 | Argument | Description |
 | --- | --- |
-| `<path>` | the module, by its path under `modules/` |
+| `<path>` | the component, by its path under `components/` |
 
 | Option | Description |
 | --- | --- |
 | `--untracked` | stop tracking its library, without asking |
 
-**Schema:** [`modules.lock.kdl`](schema/lock.md)
+**Schema:** [`components.lock.kdl`](schema/lock.md)
 
 > [!NOTE]
 > The lock entry keeps the library, the path and the content hash, so `tect
@@ -826,8 +839,8 @@ With no `--untracked`, it asks first. With no terminal, it needs the flag.
 ## `tect check`
 
 Reads every file in the repository and reports each problem at the line that
-caused it. Run it after an edit. The last line counts the images, the modules,
-the flavours and the listed modules that the base already provides.
+caused it. Run it after an edit. The last line counts the images, the components,
+the flavours and the listed components that the base already provides.
 
 **Usage:** `tect check [OPTIONS]`
 
@@ -840,21 +853,21 @@ the flavours and the listed modules that the base already provides.
 >
 > - A collection describes a base differently from the catalog.
 > - A collection is `unpinned`.
-> - An image `conforms` to a profile, and no listed module claims a rule of it.
-> - A `module.kdl` sits inside the directory of another collection module.
+> - An image `conforms` to a profile, and no listed component claims a rule of it.
+> - A `manifest.kdl` sits inside the directory of another collection component.
 >
 > With `--datastream`, it also counts the rules of each declared profile that
-> no listed module claims, and names the modules that would claim them.
+> no listed component claims, and names the components that would claim them.
 > `tect scap content` prints the path to give it.
 
 ## `tect generate`
 
 Writes the build files, and the CI workflows that `repo.kdl` names. Run it
 after a change to a KDL file. `tect build` refuses build files that are not
-current. It reads only the repository's own modules. It writes:
+current. It reads only the repository's own components. It writes:
 
 - `generated/<image>/Containerfile`, one for each image
-- `generated/<image>/modules/<module>.sh`, the build script of each module
+- `generated/<image>/components/<component>.sh`, the build script of each component
 - `generated/<image>/finalize.sh`
 - `generated/<image>/graph.md` and `graph.json`, the capability graph
 - `generated/plan.json`
@@ -867,7 +880,7 @@ current. It reads only the repository's own modules. It writes:
 **Schema:** [`generated/`](schema/repository.md)
 
 > [!NOTE]
-> It clears `generated/` first, so the files of a removed image or module go
+> It clears `generated/` first, so the files of a removed image or component go
 > too. It removes only the workflows that `tect` ships, and keeps the
 > repository's own.
 >
@@ -945,7 +958,7 @@ missing. `spawn` boots it with systemd-vmspawn, which cannot boot an `iso`.
 > installed machine updates from `$IMAGE_REGISTRY`. `run iso` keeps the installed disk
 > under `out/bootiso/storage/`, so a reboot tests what was installed.
 >
-> If a module imports `passwd.hashed-password.*`, then `run` and `spawn` add a
+> If a component imports `passwd.hashed-password.*`, then `run` and `spawn` add a
 > `tect` account for the console and ask for its password. `VM_USER` changes the
 > account, and `VM_PASSWORD_HASH` gives a crypt(5) hash for a run with no
 > terminal. The account is set on the first boot only.
@@ -1006,7 +1019,7 @@ boot a qcow2 or raw disk with systemd-vmspawn
 
 ## `tect section`
 
-Prints the generated Containerfile module section of one image, or of the
+Prints the generated Containerfile component section of one image, or of the
 default image if none is named.
 
 **Usage:** `tect section [image]`
@@ -1029,16 +1042,16 @@ base already carries.
 
 ## `tect why`
 
-Prints what one module is and where every byte of it came from. It lists the
+Prints what one component is and where every byte of it came from. It lists the
 targets that build it, what it provides and requires, and what it claims to
 harden. It also lists the collection and pin it came from, whether it was
 edited since, what it fetches, and whether it adds a package repository.
 
-**Usage:** `tect why [OPTIONS] [module]`
+**Usage:** `tect why [OPTIONS] [component]`
 
 | Argument | Description |
 | --- | --- |
-| `<module>` | the module name |
+| `<component>` | the component name |
 
 | Option | Description |
 | --- | --- |
@@ -1053,17 +1066,17 @@ edited since, what it fetches, and whether it adds a package repository.
 > this `tect` does not read, and names both versions. `tect plan --json` still
 > prints the document.
 >
-> A module that tracks its library and was edited since its import is refused,
-> so `tect why` stops. An untracked module edited since its import is said
+> A component that tracks its library and was edited since its import is refused,
+> so `tect why` stops. An untracked component edited since its import is said
 > plainly, and it is not an error.
 >
-> `tect` does not read a `repo` file, so it points at the file and prints the
+> `tect` does not read a `repo.sh` file, so it points at the file and prints the
 > URLs it found.
 
 ## `tect coverage`
 
-Prints each rule of the profile that an image `conforms` to, with the module
-that claims it. If no module claims a rule, then it names a module in the
+Prints each rule of the profile that an image `conforms` to, with the component
+that claims it. If no component claims a rule, then it names a component in the
 repository or its collections that would. It uses the default image if none is
 named, and a terminal picks one.
 
@@ -1091,7 +1104,7 @@ named, and a terminal picks one.
 > gets markdown, so `tect coverage > report.md` exports it.
 >
 > A rule with an empty `Number` cell has no number that a `satisfies` can name,
-> so no module can claim it.
+> so no component can claim it.
 
 ## `tect plan`
 
@@ -1117,7 +1130,7 @@ it first.
 
 ## `tect summary`
 
-Prints a markdown table of what one target is made of. Each row is a module
+Prints a markdown table of what one target is made of. Each row is a component
 that the target builds, with its description and the options it resolved. A CI
 build writes the table into its job summary.
 
@@ -1143,7 +1156,7 @@ came from, so CI merges this into the SBOM that the scan produces.
 
 Reads the report of one scan against the datastream that produced it, and
 prints what they say about the target as markdown. The report shows what each
-module claimed and what was measured, the score against each profile of the
+component claimed and what was measured, the score against each profile of the
 datastream, and what stopped passing since the last scan.
 
 **Usage:** `tect scap [OPTIONS] [arf.xml] [COMMAND]`
@@ -1165,9 +1178,9 @@ datastream, and what stopped passing since the last scan.
 > rule is a fault in the declaration, and the image is not at fault. A declared
 > profile that the datastream does not carry is a finding.
 >
-> A claimed rule that the image fails names the module that claimed it. If
-> another module replaced a file of the claiming module, then it names that
-> module too.
+> A claimed rule that the image fails names the component that claimed it. If
+> another component replaced a file of the claiming component, then it names that
+> component too.
 >
 > `--baseline` keeps a pass set. A rule that passed the last scan and fails now
 > is a finding, and each run writes the new pass set, so a deliberate
@@ -1247,33 +1260,33 @@ It runs inside a build:
 | `<target>` | the path, the directory or the executable name that the kind places |
 | `<extra>` | for `tree`, more arguments to tar; for `bin`, the file inside the archive |
 
-**Schema:** [`module.kdl`&nbsp;›&nbsp;`asset`](schema/module.md#asset)
+**Schema:** [`manifest.kdl`&nbsp;›&nbsp;`asset`](schema/component.md#asset)
 
-## `tect fetch modules`
+## `tect fetch components`
 
-Refreshes each tracked module from the library that its lock entry names, as
-`sources` in `repo.kdl` declares that library now. It replaces the module's
-files, and records the new content hash and revision in the lock. A module
-whose library has not moved stays as it is. The scheduled `update-modules`
+Refreshes each tracked component from the library that its lock entry names, as
+`sources` in `repo.kdl` declares that library now. It replaces the component's
+files, and records the new content hash and revision in the lock. A component
+whose library has not moved stays as it is. The scheduled `update-components`
 workflow runs it and opens a pull request.
 
-**Usage:** `tect fetch modules [path]...`
+**Usage:** `tect fetch components [path]...`
 
 | Argument | Description |
 | --- | --- |
-| `<path>` | the modules, by their path under `modules/`; every tracked module if absent |
+| `<path>` | the components, by their path under `components/`; every tracked component if absent |
 
-**Schema:** [`modules.lock.kdl`](schema/lock.md)
+**Schema:** [`components.lock.kdl`](schema/lock.md)
 
 > [!WARNING]
-> A tracked module whose content no longer matches its lock entry stops the
+> A tracked component whose content no longer matches its lock entry stops the
 > update before anything is written. Undo the edit, or make the copy the
-> repository's own with `tect set module <path> --untracked`.
+> repository's own with `tect set component <path> --untracked`.
 
 > [!NOTE]
-> A tracked module whose directory is missing is copied again. A module that
-> another module's directory holds has its own lock entry, so the refresh of
-> the outer module leaves it in place.
+> A tracked component whose directory is missing is copied again. A component that
+> another component's directory holds has its own lock entry, so the refresh of
+> the outer component leaves it in place.
 
 ## `tect registry namespace`
 
@@ -1337,7 +1350,7 @@ Writes the image identity, which the build arguments carry, into
 Writes `/usr/share/tectonic/build.json`, the record of what the build resolved.
 The baked `manifest.json` beside it holds what the repository declared. The
 record holds the digest of the base, the commit of each cloned asset, the source
-commit, the `tect` release, the target, the content hash of each module, and
+commit, the `tect` release, the target, the content hash of each component, and
 whether enforcement was on.
 
 No file under `generated/` holds the record, so `tect verify` never compares
@@ -1348,9 +1361,9 @@ it. The record changes with each build.
 ## `tect validate-image`
 
 Runs every check that a built image has to pass. The build gives it the preset
-files of the enabled modules, and it fails on each one that the image does not
+files of the enabled components, and it fails on each one that the image does not
 have.
 
 **Usage:** `tect validate-image`
 
-**Schema:** [`module.kdl`&nbsp;›&nbsp;`allow-verify`](schema/module.md#allow-verify)
+**Schema:** [`manifest.kdl`&nbsp;›&nbsp;`allow-verify`](schema/component.md#allow-verify)

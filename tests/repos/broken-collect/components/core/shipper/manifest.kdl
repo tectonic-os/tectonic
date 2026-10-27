@@ -1,0 +1,5 @@
+schema-version 1
+
+description "Ships a file whose collector is enabled but refused"
+
+targets "fedora"

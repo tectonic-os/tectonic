@@ -3,9 +3,8 @@ schema-version 1
 image {
     name "Broken Flavours"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking"
+    base-image {
+        fedora-bootc-44
     }
 
     flavours {
@@ -14,11 +13,13 @@ image {
         dev
     }
 
-    modules {
-        module "core/hello"
+    core {
+        hello
+    }
 
-        flavour "server" {
-            module "core/hello"
+    flavour "server" {
+        core {
+            hello
         }
     }
 }

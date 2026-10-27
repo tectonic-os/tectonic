@@ -1,0 +1,7 @@
+schema-version 1
+
+description "A flatpak application, which the base satisfies the runtime for"
+
+targets "fedora"
+
+requires "flatpak"

@@ -1,28 +1,24 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
-  x `missing` declares `boot "uki-db"` but no ungated module provides `boot-
-  | chain-uki`
-    ,-[tests/repos/uki/image.kdl:31:1]
- 30 | 
- 31 | image {
+  x `missing` declares `boot-chain "uki-db"` but no ungated component provides
+  | `boot-chain-uki`
+    ,-[tests/repos/uki/image.kdl:25:1]
+ 24 | 
+ 25 | image {
     : ^^|^^
     :   `-- incomplete UKI chain
- 32 |     id "missing"
+ 26 |     id "missing"
     `----
-  help: uki would satisfy it; add it to this image. Nothing is included
-        automatically, so the list stays the complete statement of what is in
-        the image
+  help: `uki` would satisfy it; add it to this image
 
-  x `missing` declares `boot "uki-db"` but no ungated module provides
+  x `missing` declares `boot-chain "uki-db"` but no ungated component provides
   | `secureboot-enrolment`
-    ,-[tests/repos/uki/image.kdl:31:1]
- 30 | 
- 31 | image {
+    ,-[tests/repos/uki/image.kdl:25:1]
+ 24 | 
+ 25 | image {
     : ^^|^^
     :   `-- incomplete UKI chain
- 32 |     id "missing"
+ 26 |     id "missing"
     `----
-  help: enrolment would satisfy it; add it to this image. Nothing is included
-        automatically, so the list stays the complete statement of what is in
-        the image
+  help: `enrolment` would satisfy it; add it to this image

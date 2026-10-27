@@ -1,0 +1,209 @@
+---
+source: tests/golden/harness.rs
+---
+{
+  "schema_version": 1,
+  "default_image": "bare-component",
+  "default_image_name": "Bare Component",
+  "pr_image": "bare-component",
+  "default_target": "bare-component",
+  "default_published": "bare-component",
+  "pr_target": "bare-component",
+  "pr_published": "bare-component",
+  "ungated_target": "bare-component",
+  "ungated_published": "bare-component",
+  "cache_image": "bare-component-cache",
+  "workflows": [],
+  "audit": {
+    "enforce": false
+  },
+  "assets": [],
+  "images": [
+    {
+      "id": "bare-component",
+      "name": "Bare Component",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "description": "",
+      "keywords": [],
+      "logo_url": "",
+      "conforms": "",
+      "boot": "",
+      "allows": [],
+      "layout": {
+        "filesystem": "",
+        "bootloader": "grub2"
+      },
+      "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "scap_content": "",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "witnesses": {},
+        "requires": [],
+        "satisfies": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "bare-component",
+          "image": "bare-component",
+          "flavour": null,
+          "published": "bare-component",
+          "conforms": "",
+          "allows": [],
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "components": [
+            {
+              "path": "hello",
+              "flavour": null,
+              "variant": null,
+              "description": "",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "met_by": {},
+              "removes": [],
+              "files": {},
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "defined": null,
+                "content": "c2d1623de00f1d529cc0d583f23f4f963307b32a8ebdd8a2aec003fd1b829cc9",
+                "repo": false,
+                "imported": null
+              },
+              "origin": {
+                "how": "listed"
+              },
+              "satisfies": [],
+              "refuses": []
+            },
+            {
+              "path": "menu",
+              "flavour": null,
+              "variant": null,
+              "description": "",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "met_by": {},
+              "removes": [],
+              "files": {},
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "defined": null,
+                "content": "b54feb522c877f97d2eb1c03b82c1cae4c35f4ef6cdda08bad9e7f788f672173",
+                "repo": false,
+                "imported": null
+              },
+              "origin": {
+                "how": "listed"
+              },
+              "satisfies": [],
+              "refuses": []
+            },
+            {
+              "path": "apps",
+              "flavour": null,
+              "variant": null,
+              "description": "",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "met_by": {},
+              "removes": [],
+              "files": {},
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "defined": null,
+                "content": "f0c9ce6caf1bf31e3982de3365cb90c3f79ff140a8e42796cb2b711edaf5a06f",
+                "repo": false,
+                "imported": null
+              },
+              "origin": {
+                "how": "listed"
+              },
+              "satisfies": [],
+              "refuses": []
+            },
+            {
+              "path": "apps/editor",
+              "flavour": null,
+              "variant": null,
+              "description": "",
+              "options": {},
+              "provides": [],
+              "requires": [
+                "apps"
+              ],
+              "met_by": {
+                "apps": {
+                  "how": "listed",
+                  "provider": "apps"
+                }
+              },
+              "removes": [],
+              "files": {},
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "defined": null,
+                "content": "d3b3189e72b2564dd629a1e7262f0ee1e059fab537ce4b4b6e2ec08f9d59130d",
+                "repo": false,
+                "imported": null
+              },
+              "origin": {
+                "how": "listed"
+              },
+              "satisfies": [],
+              "refuses": []
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "overlay_files": {
+            "/etc/motd": "hello"
+          },
+          "overlay_overridden": [],
+          "collected_files": {
+            "apps": [
+              {
+                "file": "justfile.inc",
+                "staged": "/usr/share/menu/justfile.apps.d/0500-apps.part"
+              }
+            ],
+            "apps/editor": [
+              {
+                "file": "justfile.inc",
+                "staged": "/usr/share/menu/justfile.apps.d/0500-apps-editor.part"
+              }
+            ]
+          },
+          "collect_destinations": [
+            "/usr/share/menu/justfile.apps"
+          ]
+        }
+      ]
+    }
+  ]
+}

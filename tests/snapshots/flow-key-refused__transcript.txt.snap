@@ -3,10 +3,10 @@ source: tests/golden/harness.rs
 ---
 Tectonic v{version}
 
-Error: The signed-kernel module declares the secureboot key, and its manifest refuses it.
+Error: The signed-kernel component declares the secureboot key, and its manifest refuses it.
 
   x `bits` is a number from 2048 to 16384
-   ,-[./modules/signed-kernel/module.kdl:8:50]
+   ,-[./components/signed-kernel/manifest.kdl:8:50]
  7 | key "secureboot" {
  8 |     generator "openssl" profile="module-signing" bits=1024
    :                                                  ^^^^|^^^^

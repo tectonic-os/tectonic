@@ -91,7 +91,7 @@ fn flags(matches: &ArgMatches) -> Result<dispatch::Flags, Error> {
         owner: one("owner"),
         host: one("host"),
         images: many("image"),
-        module: one("module"),
+        component: one("component"),
         cn: one("cn"),
         from: one("from"),
         base: one("base"),

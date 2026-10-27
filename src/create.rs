@@ -2,9 +2,7 @@
 //! `Prompt`.
 
 use crate::copy;
-use crate::diag::Issues;
 use crate::layout;
-use crate::model::remote::Kind as SourceKind;
 use common::prompt::Prompt;
 pub use common::ui::tree::Change;
 use common::ui::{Answer, Choice};
@@ -18,7 +16,7 @@ pub const HOST: &str = "github.com";
 const GH_INSTALL: &str = "install gh from https://github.com/cli/cli";
 
 /// The family-adapter role makes a family's package manager usable from
-/// a build layer. Every family needs it filled by a different module.
+/// a build layer. Every family needs it filled by a different component.
 const BUILD_ENVIRONMENT: &str = "build-environment";
 
 pub fn origin(host: &str, owner: &str) -> String {
@@ -251,7 +249,7 @@ impl Repo {
         let image = match prev {
             Some(prev) if from > Field::Base => prev.image.clone(),
             _ => {
-                // The `base` row is inside the image, so re-entering at it does
+                // The base row is inside the image, so re-entering at it does
                 // not re-ask whether there is one.
                 let wanted = given.image.is_some()
                     || from == Field::Base
@@ -498,7 +496,7 @@ impl Libraries {
 fn offered() -> Vec<(&'static str, &'static str, &'static str)> {
     std::iter::once((
         SKELETON_FILE,
-        "the Containerfile around the generated module layers",
+        "the Containerfile around the generated component layers",
         crate::init::SKELETON,
     ))
     .chain(
@@ -694,8 +692,11 @@ pub struct Image {
     /// library's pin.
     vendored: Vec<crate::import::Found>,
     /// Names the library providers the offer took that the repository
-    /// already holds. The image lists the local module, and the tree says so.
+    /// already holds. The image lists the local component, and the tree says so.
     kept: Vec<String>,
+    /// Holds the path and the manifest of a base component that `apply`
+    /// writes, for a typed reference that no base component names.
+    own: Option<(String, String)>,
 }
 
 /// The repository that a scaffolded image is written into.
@@ -741,7 +742,7 @@ impl Image {
         if file.exists() {
             return Err(format!("{} is already there", file.display()));
         }
-        let (mut list, _) = crate::model::image::List::load(root);
+        let (list, _) = crate::model::image::List::load(root);
         let names_default = implicit_default(&list).filter(|was| *was != id);
         let url = url.or_else(|| {
             list.images
@@ -750,25 +751,9 @@ impl Image {
                 .map(|image| image.url.clone())
         });
 
-        // A repository with no base-image library has no catalog to pick from,
-        // and the offer is the one flow that writes one. A repository not
-        // written yet has its answer from the libraries question instead.
-        if root.join(layout::REPO_FILE).is_file()
-            && !list
-                .sources
-                .iter()
-                .any(|source| source.kind == SourceKind::BaseImages)
-            && prompt.asks()
-            && prompt.confirm(copy::NO_BASE_LIBRARY, copy::YES, copy::NO)?
-        {
-            if let Some(set) = crate::set::Library::adding(SourceKind::BaseImages, prompt)? {
-                report(root, &set.apply(root)?);
-                list = crate::model::image::List::load(root).0;
-            }
-        }
         // A repository that is not written yet gets the block its libraries
         // answer is about to write, which is the only thing `create repo` has
-        // to offer modules against. Both halves read the library through its
+        // to offer components against. Both halves read the library through its
         // source cache, which a declared library that is not on this machine is
         // fetched into first.
         let scaffolded;
@@ -780,31 +765,36 @@ impl Image {
             false => list.sources.as_slice(),
         };
         if let Err(why) = crate::base::fetch(root, sources) {
-            eprintln!("tect: {why}; the catalog holds only what is already on this machine");
+            eprintln!("tect: {why}; the bases offered are only what is already on this machine");
         }
-        let mut catalog_issues = Issues::default();
-        let bases = crate::base::catalog(root, sources, &mut catalog_issues);
-        if !catalog_issues.is_empty() {
-            return Err(catalog_issues.plain());
-        }
+        let bases = crate::base::catalog(root, sources);
         let base = match base {
             Some(given) => given,
             None => choose_base(&bases, prev.map(|prev| prev.base.as_str()), prompt)?,
         };
         let base = catalogued(&bases, base);
+        // The image names a base component by its path.
+        // A path that names no component is a typo.
+        // Written as a reference, it would fail only when the build pulls it.
+        if crate::base::find(&bases, &base).is_none() && crate::model::image::is_local_path(&base) {
+            return Err(format!(
+                "`{base}` names no base component in the repository or a library; give an image \
+                 reference with a tag, such as `quay.io/fedora/fedora-bootc:44`"
+            ));
+        }
         let family = match crate::base::find(&bases, &base) {
             Some(known) => known.family.clone(),
             None => prompt.text(
                 None,
                 copy::BASE_FAMILY,
-                "`--base`, naming a base the catalog knows",
+                "`--base`, naming a base component the repository or a library holds",
                 bases.first().map(|base| base.family.as_str()),
             )?,
         };
         let disk = crate::parse::disk::Disk::scan(root);
         let known = crate::base::find(&bases, &base);
-        let roles = roles(known);
         let index = crate::provider::Index::scan(root, sources, &disk, false);
+        let roles = roles(known, &index);
         let mut wanted = wanted(&index, &family, &roles);
         // Network is used only while the user can answer the provider question
         // and the local collections leave a required role unresolved. The
@@ -829,12 +819,12 @@ impl Image {
         };
         let seed = match take_wanted {
             true => seeded(&wanted),
-            false => String::new(),
+            false => Vec::new(),
         };
         // A provider the repository already holds is listed as it is, so a
         // local fork is never copied over.
         let holds = |provider: &crate::provider::Provider| {
-            layout::is_module(&layout::module(root, &provider.name))
+            layout::is_component(&layout::component(root, &provider.name))
         };
         let kept: Vec<String> = match take_wanted {
             true => wanted
@@ -864,6 +854,56 @@ impl Image {
                 .collect::<Result<Vec<_>, String>>()?,
             false => Vec::new(),
         };
+        let mut vendored = vendored;
+        let (component, own, version, digest) = match known {
+            Some(known) => {
+                let held = layout::is_component(&layout::component(root, &known.name));
+                let from = match known.owner.as_deref().filter(|_| !held) {
+                    Some(owner) => crate::import::cached_member(
+                        root,
+                        sources,
+                        list.audit_enforce,
+                        owner,
+                        &known.name,
+                    )?
+                    .ok_or_else(|| {
+                        format!("`{owner}/{}` is no longer in its library", known.name)
+                    })?,
+                    None => crate::import::Found {
+                        owner: known.owner.clone().unwrap_or_default(),
+                        name: known.name.clone(),
+                        dir: layout::component(root, &known.name),
+                    },
+                };
+                // The base's imports are copied in beside it and listed nowhere.
+                let copying: Vec<String> = vendored
+                    .iter()
+                    .map(|found| found.name.clone())
+                    .chain(std::iter::once(known.name.clone()))
+                    .collect();
+                let imports = crate::import::imports_of(
+                    root,
+                    sources,
+                    list.audit_enforce,
+                    from.clone(),
+                    &copying,
+                )?;
+                if !held {
+                    vendored.push(from);
+                }
+                vendored.extend(imports);
+                (known.name.clone(), None, known.version.clone(), None)
+            }
+            None => {
+                let OwnBase {
+                    path,
+                    manifest,
+                    version,
+                    digest,
+                } = own_base(root, &base, &family)?;
+                (path.clone(), Some((path, manifest)), version, digest)
+            }
+        };
         let held = prev
             .filter(|prev| prev.base == base)
             .and_then(|prev| prev.bootloader.as_deref());
@@ -871,9 +911,11 @@ impl Image {
         let text = image_kdl(
             &name,
             url.as_deref(),
-            &base,
-            &family,
-            known,
+            &BaseLine {
+                path: &component,
+                version: version.as_deref(),
+                digest: digest.as_deref(),
+            },
             bootloader.as_deref(),
             &seed,
         );
@@ -888,6 +930,7 @@ impl Image {
             names_default,
             vendored,
             kept,
+            own,
         })
     }
 
@@ -898,15 +941,20 @@ impl Image {
             .iter()
             .map(|from| (from, from.name.as_str()))
             .collect();
-        // The copies track their library. `import module` opens on the same
+        // The copies track their library. `import component` opens on the same
         // answer.
         let mut wrote = crate::import::vendor_all(root, &list.sources, &copies, true)?;
         wrote.extend(self.kept.iter().map(|name| {
             (
-                PathBuf::from(layout::MODULES).join(name),
+                PathBuf::from(layout::COMPONENTS).join(name),
                 Change::Updated("already here, so the image lists it as it is".to_string()),
             )
         }));
+        if let Some((path, text)) = &self.own {
+            let file = layout::manifest(root, path);
+            crate::init::put(&file, text)?;
+            wrote.push((under(root, &file), Change::Created));
+        }
         crate::init::put(&self.file, &self.text)?;
         wrote.push((under(root, &self.file), Change::Created));
         if let Some(was) = &self.names_default {
@@ -1040,11 +1088,76 @@ impl Flavour {
     }
 }
 
-/// The image reference a typed `--base` stands for: a catalogued base's own
-/// reference, whether the name was that reference or the catalog name, and the
-/// typed name itself where the catalog does not know it.
+/// What a typed `--base` stands for: the path of the base component it names
+/// by its path or its image reference, and the typed reference itself where
+/// no base component names it.
 fn catalogued(bases: &[crate::base::Base], base: String) -> String {
-    crate::base::find(bases, &base).map_or(base, |known| known.image.clone())
+    crate::base::find(bases, &base).map_or(base, |known| known.name.clone())
+}
+
+/// Holds a base component that `create image` writes for a typed reference
+/// that no base component names, so a custom base stays one command away.
+struct OwnBase {
+    path: String,
+    manifest: String,
+    /// Holds the reference's tag. The image sets it as the base's `version`.
+    /// Renovate then keeps the value current.
+    version: Option<String>,
+    /// Holds the reference's digest. The image sets it on its base entry.
+    digest: Option<String>,
+}
+
+/// Writes the base component for a typed reference. Its path comes from the
+/// reference's last part. A tag becomes the component's `version` option.
+fn own_base(root: &Path, image: &str, family: &str) -> Result<OwnBase, String> {
+    let (undigested, digest) = match image.split_once('@') {
+        Some((before, digest)) => (before, Some(digest.to_string())),
+        None => (image, None),
+    };
+    let (repository, version) = match undigested.rsplit_once(':') {
+        Some((repository, tag)) if !tag.contains('/') => (repository, Some(tag.to_string())),
+        _ => (undigested, None),
+    };
+    let last = repository.rsplit('/').next().unwrap_or(repository);
+    let stem: String = last
+        .to_lowercase()
+        .chars()
+        .map(|c| match c.is_ascii_alphanumeric() {
+            true => c,
+            false => '-',
+        })
+        .collect();
+    let stem = stem.trim_matches('-');
+    let stem = match stem.starts_with(|c: char| c.is_ascii_lowercase()) {
+        true => stem.to_string(),
+        false => format!("base-{stem}"),
+    };
+    let path = format!("base-image/{stem}");
+    if layout::component(root, &path).exists() {
+        return Err(format!(
+            "components/{path} is already there and names another base; `--base {path}` builds on it"
+        ));
+    }
+    let block = match family.is_empty() {
+        true => String::new(),
+        false => format!(" {{\n    family \"{family}\"\n}}"),
+    };
+    let reference = match &version {
+        Some(tag) => format!(
+            "base \"{repository}:$version\"{block}\n\noption \"version\" type=\"string\" {{\n    default \"{tag}\"\n}}\n"
+        ),
+        None => format!("base \"{repository}\"{block}\n"),
+    };
+    let manifest = format!(
+        "schema-version {}\n\n{reference}",
+        crate::model::image::SCHEMA_VERSION
+    );
+    Ok(OwnBase {
+        path,
+        manifest,
+        version,
+        digest,
+    })
 }
 
 /// An unknown base stays available because the catalog cannot constrain a base
@@ -1055,11 +1168,11 @@ fn choose_base(
     prompt: &Prompt,
 ) -> Result<String, String> {
     let mut options = base_options(bases);
-    let at = current.and_then(|held| bases.iter().position(|base| base.image == held));
+    let at = current.and_then(|held| bases.iter().position(|base| base.name == held));
     if prompt.draws() && !options.is_empty() {
         options.push(Choice::new(copy::OTHER_BASE, copy::OTHER_BASE_ABOUT));
         return match ask_one(prompt, copy::IMAGE_BASE, &options, at)? {
-            Some(chosen) if chosen < bases.len() => Ok(bases[chosen].image.clone()),
+            Some(chosen) if chosen < bases.len() => Ok(bases[chosen].name.clone()),
             Some(_) => prompt.text(
                 None,
                 copy::BASE_IMAGE,
@@ -1070,7 +1183,7 @@ fn choose_base(
         };
     }
     match ask_one(prompt, copy::IMAGE_BASE, &options, at)? {
-        Some(chosen) => Ok(bases[chosen].image.clone()),
+        Some(chosen) => Ok(bases[chosen].name.clone()),
         None => prompt.text(
             None,
             copy::BASE_IMAGE,
@@ -1083,7 +1196,7 @@ fn choose_base(
 fn base_options(bases: &[crate::base::Base]) -> Vec<Choice> {
     bases
         .iter()
-        .map(|base| Choice::new(&base.image, &base.about))
+        .map(|base| Choice::new(base.label(), &base.about))
         .collect()
 }
 
@@ -1117,15 +1230,15 @@ fn bootloader_options(offered: &[String]) -> Vec<Choice> {
         .collect()
 }
 
-/// Module creation keeps repository ownership separate from image listing.
-pub struct Module {
+/// Component creation keeps repository ownership separate from image listing.
+pub struct Component {
     path: String,
     file: PathBuf,
     text: String,
     listing: Listing,
 }
 
-impl Module {
+impl Component {
     pub fn collect(
         root: &Path,
         name: Option<String>,
@@ -1135,7 +1248,7 @@ impl Module {
         prompt: &Prompt,
     ) -> Result<Self, String> {
         let list = crate::model::image::List::editable(root).map_err(|issues| issues.plain())?;
-        let name = prompt.text(name, copy::MODULE_NAME, "a name argument", None)?;
+        let name = prompt.text(name, copy::COMPONENT_NAME, "a name argument", None)?;
         let path = name
             .split('/')
             .map(crate::init::id)
@@ -1143,42 +1256,43 @@ impl Module {
             .join("/");
         let file = layout::manifest(root, &path);
         if file.exists() {
-            return Err(format!("modules/{path} is already there"));
+            return Err(format!("components/{path} is already there"));
         }
 
         let description = match with.iter().any(|(verb, _)| verb == "description") {
             true => String::new(),
             false => prompt.text(
                 None,
-                copy::MODULE_DESCRIPTION,
+                copy::COMPONENT_DESCRIPTION,
                 "`--with description=...`",
                 Some(""),
             )?,
         };
-        let supports: Vec<String> = match with.iter().any(|(verb, _)| verb == "supports") {
+        let targets: Vec<String> = match with.iter().any(|(verb, _)| verb == "targets") {
             true => Vec::new(),
             false => prompt
                 .text(
                     None,
-                    copy::MODULE_SUPPORTS,
-                    "`--with supports=...`",
+                    copy::COMPONENT_SUPPORTS,
+                    "`--with targets=...`",
                     Some(""),
                 )?
                 .split_whitespace()
                 .map(str::to_string)
                 .collect(),
         };
-        let pkgs =
-            match pkgs.is_empty() && prompt.confirm(copy::MODULE_PACKAGES, copy::YES, copy::NO)? {
-                true => prompt
-                    .text(None, copy::PACKAGE_NAMES, "`--pkg`", Some(""))?
-                    .split_whitespace()
-                    .map(str::to_string)
-                    .collect(),
-                false => pkgs,
-            };
+        let pkgs = match pkgs.is_empty()
+            && prompt.confirm(copy::COMPONENT_PACKAGES, copy::YES, copy::NO)?
+        {
+            true => prompt
+                .text(None, copy::PACKAGE_NAMES, "`--pkg`", Some(""))?
+                .split_whitespace()
+                .map(str::to_string)
+                .collect(),
+            false => pkgs,
+        };
 
-        let text = module_kdl(&description, &supports, &pkgs, &with)?;
+        let text = component_kdl(&description, &targets, &pkgs, &with)?;
         let listing = Listing::collect_from(&list, images, prompt)?;
         listing.refuse_duplicate(&list, &path)?;
         Ok(Self {
@@ -1202,9 +1316,9 @@ impl Module {
     }
 }
 
-fn module_kdl(
+fn component_kdl(
     description: &str,
-    supports: &[String],
+    targets: &[String],
     pkgs: &[String],
     with: &[(String, String)],
 ) -> Result<String, String> {
@@ -1216,13 +1330,13 @@ fn module_kdl(
         sections.push(format!("description \"{}\"", quotable(description)?));
     }
     let mut declarations: Vec<String> = Vec::new();
-    if !supports.is_empty() {
-        let families = supports
+    if !targets.is_empty() {
+        let families = targets
             .iter()
             .map(|family| Ok(format!("\"{}\"", quotable(family)?)))
             .collect::<Result<Vec<_>, String>>()?
             .join(" ");
-        declarations.push(format!("supports {families}"));
+        declarations.push(format!("targets {families}"));
     }
     for (verb, value) in with {
         declarations.push(format!("{} \"{}\"", quotable(verb)?, quotable(value)?));
@@ -1288,7 +1402,7 @@ impl Listed {
 }
 
 impl Listing {
-    /// Duplicate checks run per module because one answer can select several
+    /// Duplicate checks run per component because one answer can select several
     /// images.
     pub fn collect(root: &Path, given: Vec<String>, prompt: &Prompt) -> Result<Self, String> {
         let list = crate::model::image::List::editable(root).map_err(|issues| issues.plain())?;
@@ -1394,7 +1508,7 @@ impl Listing {
         })
     }
 
-    /// Duplicate checks compare `name` within each selected image. A module
+    /// Duplicate checks compare `name` within each selected image. A component
     /// gated to two flavours conflicts only where the flavours overlap.
     pub fn refuse_duplicate(
         &self,
@@ -1433,7 +1547,7 @@ impl Listing {
         list: &crate::model::image::List,
         path: &str,
     ) -> Result<Vec<(PathBuf, Change)>, String> {
-        self.apply_declaration(list, &[path])
+        self.apply_declaration(list, &[(path, "")])
     }
 
     pub fn cancelled(&self) -> bool {
@@ -1486,7 +1600,7 @@ impl Listing {
     pub(crate) fn apply_declaration(
         &self,
         list: &crate::model::image::List,
-        declarations: &[&str],
+        declarations: &[(&str, &str)],
     ) -> Result<Vec<(PathBuf, Change)>, String> {
         match self {
             Self::Cancelled => Ok(Vec::new()),
@@ -1495,8 +1609,9 @@ impl Listing {
                 Ok(Vec::new())
             }
             Self::Declined { .. } => {
-                for name in declarations {
-                    let shown = wrap(&listed_in(None)[1..], &leaf(name));
+                for (name, block) in declarations {
+                    let (chain, line) = placed(None, name, block);
+                    let shown = wrap(&chain, &line);
                     println!(
                         "next, to build it, list it in an image:\n {}",
                         shown.replace('\n', "\n ")
@@ -1508,16 +1623,12 @@ impl Listing {
                 let mut wrote: Vec<(PathBuf, Vec<String>)> = Vec::new();
                 for target in listed {
                     let mut taken: Vec<String> = Vec::new();
-                    for name in declarations {
+                    for (name, block) in declarations {
                         if holds(list, target, name).is_some() {
                             continue;
                         }
-                        append(
-                            &target.file,
-                            &target.image,
-                            &listed_in(target.flavour.as_deref()),
-                            &leaf(name),
-                        )?;
+                        let (chain, line) = placed(target.flavour.as_deref(), name, block);
+                        append(&target.file, &target.image, &chain, &line)?;
                         taken.push((*name).to_string());
                     }
                     if taken.is_empty() {
@@ -1539,7 +1650,7 @@ impl Listing {
                     .map(|(file, added)| {
                         (
                             file,
-                            Change::Updated(format!("{} added to modules", crate::said(&added))),
+                            Change::Updated(format!("{} added to components", crate::said(&added))),
                         )
                     })
                     .collect())
@@ -1564,10 +1675,6 @@ fn holds<'a>(
             && crate::resolve::meet(into.flavour.as_deref(), entry.flavour.as_deref())
     })?;
     Some((image, entry))
-}
-
-fn leaf(name: &str) -> String {
-    format!("module \"{name}\"")
 }
 
 /// Listing and flavour gating are one question at two depths. A single image
@@ -1615,12 +1722,32 @@ fn target_rows(
     rows
 }
 
+/// The flavour block an entry is listed in. An ungated entry sits in the
+/// image block itself.
 fn listed_in(flavour: Option<&str>) -> Vec<(&str, Option<&str>)> {
-    let mut chain = vec![("modules", None)];
-    if let Some(flavour) = flavour {
-        chain.push(("flavour", Some(flavour)));
-    }
-    chain
+    flavour
+        .map(|flavour| ("flavour", Some(flavour)))
+        .into_iter()
+        .collect()
+}
+
+/// Places a component path: the blocks that hold its last segment, and the
+/// line that lists it. `block` holds the option values the entry sets, or is
+/// empty.
+fn placed<'a>(
+    flavour: Option<&'a str>,
+    name: &'a str,
+    block: &str,
+) -> (Vec<(&'a str, Option<&'a str>)>, String) {
+    let mut chain = listed_in(flavour);
+    let (parents, last) = name.rsplit_once('/').unwrap_or(("", name));
+    chain.extend(
+        parents
+            .split('/')
+            .filter(|part| !part.is_empty())
+            .map(|part| (part, None)),
+    );
+    (chain, format!("{last}{block}"))
 }
 
 fn wrap(blocks: &[(&str, Option<&str>)], leaf: &str) -> String {
@@ -1662,51 +1789,43 @@ fn append(
                 .map(|line| format!("{indent}    {line}\n"))
                 .collect(),
         ),
-        false => (close, format!("{} ", declaration.replace('\n', " "))),
+        // A node that shares the block's line ends at a `;`, or the new node
+        // would read as its argument.
+        false => {
+            let end = text[..close].trim_end().len();
+            let gap = match text[..end].ends_with(['{', ';']) {
+                true => " ",
+                false => "; ",
+            };
+            (end, format!("{gap}{}", declaration.replace('\n', " ")))
+        }
     };
     text.insert_str(at, &line);
     std::fs::write(file, text).map_err(|err| format!("{}: {err}", file.display()))
 }
 
-/// Removes the line that lists `name` in one image, and keeps every other byte
-/// in place. A node that shares its line with another one loses only its own
-/// text.
-pub(crate) fn unlist(
+/// Removes the segment that lists `name` in one image of `file`, whose text
+/// is `text`, and keeps every other byte in place. The calling command writes
+/// the result, so a refusal leaves the file as it was.
+pub(crate) fn unlisting(
     file: &Path,
+    text: &str,
     image: &str,
     flavour: Option<&str>,
     name: &str,
-) -> Result<(), String> {
-    let mut text =
-        std::fs::read_to_string(file).map_err(|err| format!("{}: {err}", file.display()))?;
-    let span = crate::parse::image::entry_span(&text, image, &listed_in(flavour), name)
-        .ok_or_else(|| format!("{} does not list `{name}` in `{image}`", file.display()))?;
-    let from = span.offset;
-    // A node's span stops before its `;`, which goes with it on a shared line.
-    let after = &text[span.offset + span.len..];
-    let to = match after.trim_start_matches([' ', '\t']).strip_prefix(';') {
-        Some(rest) => text.len() - rest.trim_start_matches([' ', '\t']).len(),
-        None => span.offset + span.len,
-    };
-    let start = text[..from].rfind('\n').map_or(0, |at| at + 1);
-    let end = text[to..].find('\n').map_or(text.len(), |at| to + at + 1);
-    let alone = text[start..from].trim().is_empty() && text[to..end].trim().is_empty();
-    // The last node on a shared line takes the blanks in front of it too.
-    let last = text[to..end].trim().is_empty();
-    match (alone, last) {
-        (true, _) => text.replace_range(start..end, ""),
-        (false, true) => {
-            let from = text[..from].trim_end_matches([' ', '\t']).len();
-            text.replace_range(from..to, "");
-        }
-        (false, false) => text.replace_range(from..to, ""),
-    }
-    std::fs::write(file, text).map_err(|err| format!("{}: {err}", file.display()))
+) -> Result<String, String> {
+    let root = file.parent().unwrap_or(Path::new("."));
+    let mut chain = listed_in(flavour);
+    chain.extend(crate::parse::image::segments(name));
+    crate::parse::image::unlisted(text, image, &chain, |path| {
+        layout::is_component(&layout::component(root, path))
+    })
+    .map_err(|err| format!("{} {err}", file.display()))
 }
 
 #[cfg(feature = "fuzzing")]
 pub fn fuzz_rewrite(file: &Path) {
-    let _ = append(file, "fuzz", &[("modules", None)], "module \"fuzz\"");
+    let _ = append(file, "fuzz", &[], "fuzz");
 }
 
 /// A fresh image needs the family adapter and every provider required by its
@@ -1735,8 +1854,19 @@ fn wanted<'a>(
 
 /// A provider list shorter than these roles means an unread collection may
 /// still supply an answer.
-fn roles(base: Option<&crate::base::Base>) -> Vec<&str> {
-    std::iter::once(BUILD_ENVIRONMENT)
+fn roles<'a>(base: Option<&'a crate::base::Base>, index: &crate::provider::Index) -> Vec<&'a str> {
+    // A base whose imports bring no build environment leaves the image to list
+    // the family's build environment itself. A base written from an image
+    // reference imports nothing, so it is one of those.
+    let lacks = base.is_none_or(|base| {
+        !index
+            .fitting(BUILD_ENVIRONMENT, &base.family)
+            .iter()
+            .any(|provider| base.imports.contains(&provider.name))
+    });
+    lacks
+        .then_some(BUILD_ENVIRONMENT)
+        .into_iter()
         .chain(
             base.into_iter()
                 .flat_map(|base| base.requires.iter().map(String::as_str)),
@@ -1753,7 +1883,7 @@ fn offer(
     current: bool,
 ) -> Result<bool, String> {
     if prompt.asks() {
-        println!("{base} needs the following modules:");
+        println!("{base} needs the following components:");
         for provider in wanted {
             println!("\x20   {}", provider.qualified());
         }
@@ -1767,21 +1897,64 @@ fn yes_no_options() -> [Choice; 2] {
     [Choice::new(copy::YES, ""), Choice::new(copy::NO, "")]
 }
 
-fn seeded(wanted: &[&crate::provider::Provider]) -> String {
+fn seeded(wanted: &[&crate::provider::Provider]) -> Vec<String> {
     wanted
         .iter()
-        .map(|provider| format!("\x20       module \"{}\"\n", provider.name))
+        .map(|provider| provider.name.clone())
         .collect()
+}
+
+/// Writes component paths as nested segments, each line indented four
+/// spaces a level. A run of paths that share a first segment shares its
+/// block. Each path's body lines go inside its own segment, ahead of the
+/// segments below it.
+fn tree(entries: &[(&str, Vec<String>)]) -> String {
+    let mut out = String::new();
+    let mut at = 0;
+    while at < entries.len() {
+        let head = entries[at].0.split('/').next().unwrap_or_default();
+        let run = entries[at..]
+            .iter()
+            .take_while(|(path, _)| path.split('/').next() == Some(head))
+            .count();
+        let mut body: Vec<String> = Vec::new();
+        let mut below: Vec<(&str, Vec<String>)> = Vec::new();
+        for (path, lines) in &entries[at..at + run] {
+            match path.split_once('/') {
+                Some((_, rest)) => below.push((rest, lines.clone())),
+                None => body.extend(lines.iter().cloned()),
+            }
+        }
+        let inner: String = body
+            .iter()
+            .map(|line| format!("{line}\n"))
+            .chain(std::iter::once(tree(&below)))
+            .collect::<String>()
+            .lines()
+            .map(|line| format!("    {line}\n"))
+            .collect();
+        out.push_str(&match inner.is_empty() {
+            true => format!("{head}\n"),
+            false => format!("{head} {{\n{inner}}}\n"),
+        });
+        at += run;
+    }
+    out
+}
+
+/// Holds what the base's segment writes.
+struct BaseLine<'a> {
+    path: &'a str,
+    version: Option<&'a str>,
+    digest: Option<&'a str>,
 }
 
 fn image_kdl(
     name: &str,
     url: Option<&str>,
-    base: &str,
-    family: &str,
-    known: Option<&crate::base::Base>,
+    base: &BaseLine,
     bootloader: Option<&str>,
-    modules: &str,
+    components: &[String],
 ) -> String {
     let layout = match bootloader {
         Some(bootloader) => format!(
@@ -1799,46 +1972,36 @@ fn image_kdl(
         ),
         None => String::new(),
     };
-    let mut ships = String::new();
-    if let Some(known) = known {
-        for (node, names) in [("provides", &known.provides), ("requires", &known.requires)] {
-            if !names.is_empty() {
-                let listed: Vec<String> = names.iter().map(|name| format!("\"{name}\"")).collect();
-                ships.push_str(&format!("\x20       {node} {}\n", listed.join(" ")));
-            }
-        }
-        // The signature probe can correct only a written line. An omission
-        // would leave it no declaration to repair.
-        ships.push_str(&format!("\x20       signed #{}\n", known.signed));
-        if !known.scap_content.is_empty() {
-            ships.push_str(&format!(
-                "\x20       scap-content \"{}\"\n",
-                known.scap_content
-            ));
-        }
-    }
+    // Renovate keeps a written version current. The signature probe can
+    // correct only a written line, and it starts from the claim that no
+    // signature is published.
+    let pins: Vec<String> = [("version", base.version), ("digest", base.digest)]
+        .into_iter()
+        .filter_map(|(node, value)| Some(format!("{node} \"{}\"", value?)))
+        .chain(std::iter::once("signed #false".to_string()))
+        .collect();
+    let entries: Vec<(&str, Vec<String>)> = std::iter::once((base.path, pins))
+        .chain(components.iter().map(|path| (path.as_str(), Vec::new())))
+        .collect();
+    let members: String = tree(&entries)
+        .lines()
+        .map(|line| format!("\x20   {line}\n"))
+        .collect();
     format!(
         "schema-version {}\n\
          \n\
          image {{\n\
          \x20   name \"{name}\"\n\
          {urls}\n\
-         \x20   base \"{base}\" {{\n\
-         \x20       family \"{family}\"\n\
-         {ships}\
-         \x20   }}\n\
-         \n\
          {layout}\
-         \x20   modules {{\n\
-         {modules}\
-         \x20   }}\n\
+         {members}\
          }}\n",
         crate::model::image::SCHEMA_VERSION
     )
 }
 
 /// The outer repository would read a nested repository as
-/// its own modules and images.
+/// its own components and images.
 fn refuse_nesting(root: &Path) -> Result<(), String> {
     let full = match root.is_absolute() {
         true => root.to_path_buf(),
@@ -1942,9 +2105,9 @@ fn create_remote(owner: &str, id: &str) -> Result<(), String> {
 mod tests {
     use super::*;
 
-    /// One module fills both roles, so the offer names it once.
+    /// One component fills both roles, so the offer names it once.
     #[test]
-    fn a_module_filling_two_roles_is_offered_once() {
+    fn a_component_filling_two_roles_is_offered_once() {
         let root = crate::provider::tests::two_providers("wanted");
         let index =
             crate::provider::Index::local(&root, &[], &crate::parse::disk::Disk::scan(&root));
@@ -1993,14 +2156,12 @@ mod tests {
 
 image {
     name "Example"
-    base "example" { family "fedora" }
+    example { base "example" { family "fedora"; }; }
     flavours {
         dev
         server
     }
-    modules {
-        flavour "dev" { module "one" }
-    }
+    flavour "dev" { one }
 }
 "#,
         )
@@ -2018,7 +2179,9 @@ image {
         assert_eq!(listing.targets().len(), 2);
 
         let (list, _) = crate::model::image::List::load(&root);
-        let wrote = listing.apply_declaration(&list, &["one", "two"]).unwrap();
+        let wrote = listing
+            .apply_declaration(&list, &[("one", ""), ("two", "")])
+            .unwrap();
         assert_eq!(wrote.len(), 1);
         let Change::Updated(description) = &wrote[0].1 else {
             panic!("an existing image file is updated")
@@ -2029,61 +2192,98 @@ image {
         );
 
         let image = std::fs::read_to_string(root.join("image.kdl")).unwrap();
-        assert_eq!(image.matches("module \"one\"").count(), 2, "{image}");
-        assert_eq!(image.matches("module \"two\"").count(), 2, "{image}");
+        for name in ["one", "two"] {
+            assert_eq!(
+                crate::parse::image::listings(&image, name),
+                [Some("dev".to_string()), Some("server".to_string())],
+                "{image}"
+            );
+        }
         let _ = std::fs::remove_dir_all(root);
     }
 
-    /// One catalog row, for a test that needs a known base rather than a
+    /// One offered base, for a test that needs a known base rather than a
     /// library on disk.
     fn base(
         name: &str,
         image: &str,
-        family: &str,
-        provides: &[&str],
+        version: Option<&str>,
         bootloaders: &[&str],
     ) -> crate::base::Base {
         crate::base::Base {
             name: name.to_string(),
+            owner: Some("ublue".to_string()),
             image: image.to_string(),
-            family: family.to_string(),
-            provides: provides.iter().map(|name| name.to_string()).collect(),
+            family: "fedora".to_string(),
+            provides: vec!["rechunking".to_string()],
             requires: Vec::new(),
+            imports: Vec::new(),
             about: format!("what {name} ships"),
-            signed: false,
+            version: version.map(str::to_string),
             scap_content: String::new(),
             bootloaders: bootloaders.iter().map(|b| b.to_string()).collect(),
-            span: crate::diag::Span::default(),
         }
     }
 
-    /// A base and an unknown one write different images: a catalogued base
-    /// writes every property the library holds for it.
+    /// A base the repository wrote from an image reference imports nothing. A
+    /// hand-written base may import only its identity. Neither brings a build
+    /// environment, so an image on either still needs the family's.
     #[test]
-    fn a_catalogued_base_writes_what_it_ships_and_an_unknown_one_writes_nothing() {
-        let bazzite = "ghcr.io/ublue-os/bazzite:stable";
-        let seeded = base(
-            "bazzite",
-            bazzite,
-            "fedora",
-            &["rechunking", "flatpak"],
-            &["grub2"],
-        );
+    fn a_base_that_imports_no_build_environment_offers_one() {
+        let root = std::env::temp_dir().join(format!("tect-roles-{}", std::process::id()));
+        for (path, provides) in [
+            ("fedora/build-environment", "build-environment"),
+            ("identity", "os-release"),
+        ] {
+            crate::init::put(
+                &root.join("components").join(path).join("manifest.kdl"),
+                &format!("schema-version 1\n\nprovides \"{provides}\"\n"),
+            )
+            .unwrap();
+        }
+        let index =
+            crate::provider::Index::local(&root, &[], &crate::parse::disk::Disk::scan(&root));
+        let own = base("base-image/own", "quay.io/own/own:1", None, &[]);
+        let mut identity_only = base("base-image/named", "quay.io/named/named:1", None, &[]);
+        identity_only.imports = vec!["identity".to_string()];
+        let mut library = base("base-image/library", "quay.io/lib/lib:1", None, &[]);
+        library.imports = vec!["fedora/build-environment".to_string()];
+        let offered = [
+            roles(Some(&own), &index),
+            roles(Some(&identity_only), &index),
+            roles(Some(&library), &index),
+            roles(None, &index),
+        ];
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(offered[0], [BUILD_ENVIRONMENT]);
+        assert_eq!(offered[1], [BUILD_ENVIRONMENT]);
+        assert!(offered[2].is_empty());
+        assert_eq!(offered[3], [BUILD_ENVIRONMENT]);
+    }
+
+    /// The image lists the base component by its segments and sets its
+    /// version. The signature probe corrects only a written `signed` line.
+    #[test]
+    fn an_image_names_its_base_component_and_sets_its_version() {
         let known = image_kdl(
             "Bazzite",
             None,
-            bazzite,
-            "fedora",
-            crate::base::find(std::slice::from_ref(&seeded), bazzite),
+            &BaseLine {
+                path: "base-image/bazzite",
+                version: Some("stable"),
+                digest: None,
+            },
             Some("grub2"),
-            "",
+            &[],
         );
         assert!(
             known.starts_with("schema-version 1\n\nimage {\n"),
             "{known}"
         );
         assert!(
-            known.contains("        provides \"rechunking\" \"flatpak\"\n"),
+            known.contains(
+                "    base-image {\n        bazzite {\n            version \"stable\"\n            signed #false\n        }\n    }\n"
+            ),
             "{known}"
         );
         assert!(
@@ -2094,11 +2294,13 @@ image {
         let shared = image_kdl(
             "Server",
             Some("https://github.com/someone/example"),
-            bazzite,
-            "fedora",
+            &BaseLine {
+                path: "base-image/own",
+                version: None,
+                digest: None,
+            },
             None,
-            None,
-            "",
+            &[],
         );
         assert!(
             shared.contains("    url \"https://github.com/someone/example\"\n")
@@ -2106,48 +2308,23 @@ image {
                     .contains("    issues-url \"https://github.com/someone/example/issues\"\n"),
             "{shared}"
         );
+        assert!(!shared.contains("        version"), "{shared}");
+        assert!(!shared.contains("layout"), "{shared}");
 
-        let row = |bootloaders: &[&str]| crate::base::Base {
-            name: "own".to_string(),
-            image: "example.invalid/own:1".to_string(),
-            family: "fedora".to_string(),
-            provides: Vec::new(),
-            requires: Vec::new(),
-            about: "what a collection describes".to_string(),
-            signed: true,
-            scap_content: String::new(),
-            bootloaders: bootloaders.iter().map(|b| b.to_string()).collect(),
-            span: crate::diag::Span::default(),
-        };
-        let described = row(&["grub2", "systemd"]);
-        let extended = image_kdl(
-            "Own",
-            None,
-            &described.image,
-            "fedora",
-            Some(&described),
-            None,
-            "",
+        assert_eq!(
+            component_kdl("", &[], &[], &[]).unwrap(),
+            "schema-version 1\n"
         );
-        assert!(extended.contains("        signed #true\n"), "{extended}");
-
-        let unknown = image_kdl(
-            "Own",
-            None,
-            "example.invalid/own:1",
-            "fedora",
-            None,
-            None,
-            "",
-        );
-        assert!(!unknown.contains("provides"), "{unknown}");
-        assert!(!unknown.contains("layout"), "{unknown}");
-
-        assert_eq!(module_kdl("", &[], &[], &[]).unwrap(), "schema-version 1\n");
 
         // One bootloader is written without a question. Two are asked, opened
-        // on the row's default, and an unattended run takes it.
-        let one = row(&["grub2"]);
+        // on the base's default, and an unattended run takes it.
+        let one = base("base-image/one", "example.invalid/one:1", None, &["grub2"]);
+        let described = base(
+            "base-image/two",
+            "example.invalid/two:1",
+            None,
+            &["grub2", "systemd"],
+        );
         assert_eq!(
             choose_bootloader(Some(&one), None, &Prompt::scripted(Vec::new())).unwrap(),
             Some("grub2".to_string())
@@ -2169,31 +2346,62 @@ image {
             choose_bootloader(None, None, &Prompt::silent()).unwrap(),
             None
         );
-        assert!(
-            unknown.contains("base \"example.invalid/own:1\" {\n        family \"fedora\"\n"),
-            "{unknown}"
-        );
     }
 
-    /// A typed `--base` naming the catalog name writes the image reference the
-    /// catalog holds for it, and an unknown name passes through.
+    /// A typed `--base` naming a base component's path or reference stands for
+    /// that component, and an unknown reference passes through.
     #[test]
-    fn a_base_is_canonicalised_from_its_catalog_name() {
-        let seeded = base(
-            "bazzite",
+    fn a_base_is_canonicalised_to_its_component() {
+        let bases = [base(
+            "base-image/bazzite",
             "ghcr.io/ublue-os/bazzite:stable",
-            "fedora",
-            &[],
+            None,
             &["grub2"],
-        );
-        let bases = [seeded];
-        assert_eq!(
-            catalogued(&bases, "bazzite".to_string()),
-            "ghcr.io/ublue-os/bazzite:stable"
-        );
+        )];
+        for typed in ["base-image/bazzite", "ghcr.io/ublue-os/bazzite:stable"] {
+            assert_eq!(catalogued(&bases, typed.to_string()), "base-image/bazzite");
+        }
         assert_eq!(
             catalogued(&bases, "ghcr.io/other/unknown:1".to_string()),
             "ghcr.io/other/unknown:1"
+        );
+    }
+
+    /// Asking again opens on the base already chosen.
+    #[test]
+    fn the_base_picker_opens_on_the_base_held() {
+        let bases = [
+            base("base-image/one", "example.invalid/one:1", None, &["grub2"]),
+            base("base-image/two", "example.invalid/two:1", None, &["grub2"]),
+        ];
+        let chosen = choose_base(
+            &bases,
+            Some("base-image/two"),
+            &Prompt::scripted(vec![String::new()]),
+        )
+        .unwrap();
+        assert_eq!(chosen, "base-image/two");
+    }
+
+    /// A typed reference no component names gets a base component of its own,
+    /// which keeps a custom base one command away.
+    #[test]
+    fn an_unknown_reference_gets_a_base_component() {
+        let root = std::env::temp_dir().join(format!("tect-own-base-{}", std::process::id()));
+        let own = own_base(&root, "ghcr.io/other/Unknown_Base:1.2@sha256:abc", "fedora")
+            .expect("nothing is in the way");
+        assert_eq!(own.path, "base-image/unknown-base");
+        assert_eq!(own.version.as_deref(), Some("1.2"));
+        assert_eq!(own.digest.as_deref(), Some("sha256:abc"));
+        assert_eq!(
+            own.manifest,
+            "schema-version 1\n\nbase \"ghcr.io/other/Unknown_Base:$version\" {\n    family \"fedora\"\n}\n\noption \"version\" type=\"string\" {\n    default \"1.2\"\n}\n"
+        );
+        let untagged = own_base(&root, "localhost:5000/own", "").expect("nothing is in the way");
+        assert_eq!(untagged.version, None);
+        assert_eq!(
+            untagged.manifest,
+            "schema-version 1\n\nbase \"localhost:5000/own\"\n"
         );
     }
 
@@ -2203,24 +2411,23 @@ image {
     #[test]
     fn every_library_name_is_a_name() {
         use crate::model::image::is_name;
-        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/collections/upstream");
-        let mut issues = crate::diag::Issues::default();
-        let mut bases = Vec::new();
-        for path in crate::base::base_files(&dir) {
-            let (base, _) = crate::parse::bases::read_base(&path, &mut issues)
-                .unwrap_or_else(|| panic!("{} describes no base", path.display()));
-            bases.push(base);
-        }
-        assert!(issues.is_empty(), "{}", issues.plain());
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/collections");
+        let sources: Vec<crate::model::remote::Collection> = ["upstream", "ublue"]
+            .into_iter()
+            .map(|name| crate::model::remote::Collection {
+                kind: crate::model::remote::Kind::Components,
+                name: name.to_string(),
+                at: crate::model::remote::At::Dir(dir.join(name).display().to_string()),
+                span: crate::diag::Span::default(),
+            })
+            .collect();
+        let bases = crate::base::catalog(Path::new("/nonexistent"), &sources);
+        assert_eq!(bases.len(), 3);
         for base in bases {
             assert!(is_name(&base.family), "{}", base.image);
             for name in &base.provides {
                 assert!(is_name(name), "{} provides {name}", base.image);
             }
-        }
-        for row in &crate::base::CAPABILITIES {
-            assert!(is_name(row.name), "capability {}", row.name);
-            assert!(row.path.is_none_or(|p| p.starts_with('/')), "{}", row.name);
         }
     }
 
@@ -2236,33 +2443,37 @@ image {
             image_kdl(
                 "Example",
                 None,
-                "quay.io/fedora/fedora-bootc:44",
-                "fedora",
+                &BaseLine {
+                    path: "base-image/fedora",
+                    version: None,
+                    digest: None,
+                },
                 None,
-                None,
-                "",
+                &[],
             ),
         )
         .unwrap();
 
-        let chain = listed_in(Some("dx"));
-        append(&file, "Example", &chain, "module \"dev-tools\"").unwrap();
+        let (chain, line) = placed(Some("dx"), "tools/dev-tools", "");
+        append(&file, "Example", &chain, &line).unwrap();
         let written = std::fs::read_to_string(&file).unwrap();
         let nested = [
-            "    modules {",
-            "        flavour \"dx\" {",
-            "            module \"dev-tools\"",
+            "    flavour \"dx\" {",
+            "        tools {",
+            "            dev-tools",
             "        }",
             "    }",
         ]
         .join("\n");
         assert!(written.contains(&nested), "{written}");
 
-        append(&file, "Example", &chain, "module \"editor\"").unwrap();
+        let (chain, line) = placed(Some("dx"), "tools/editor", " { theme \"dark\"; }");
+        append(&file, "Example", &chain, &line).unwrap();
         let written = std::fs::read_to_string(&file).unwrap();
         assert_eq!(written.matches("flavour \"dx\"").count(), 1);
+        assert_eq!(written.matches("tools {").count(), 1);
         assert!(
-            written.contains("module \"dev-tools\"\n            module \"editor\"\n"),
+            written.contains("dev-tools\n            editor { theme \"dark\"; }\n"),
             "{written}"
         );
 
@@ -2275,44 +2486,167 @@ image {
         let _ = std::fs::remove_dir_all(root);
     }
 
+    /// `apps/gone` is the only segment in `apps`, so `apps` goes with it.
+    /// An empty segment would otherwise list the component at its own path.
     #[test]
     fn unlisting_removes_only_the_named_entry() {
         let root = std::env::temp_dir().join(format!("tect-unlist-{}", std::process::id()));
         let file = root.join("image.kdl");
         crate::init::put(
             &file,
-            "image {\n    name \"one\"\n    modules {\n        module \"kept\"; module \"trailing\"\n        module \"gone\"\n        flavour \"dev\" { module \"inline\"; module \"also\" }\n    }\n}\n",
+            "image {\n    name \"one\"\n    kept; trailing\n    apps {\n        gone\n    }\n    flavour \"dev\" { inline; also }\n}\n",
         )
         .unwrap();
 
-        unlist(&file, "one", None, "gone").unwrap();
-        unlist(&file, "one", Some("dev"), "inline").unwrap();
-        unlist(&file, "one", None, "trailing").unwrap();
-        assert_eq!(
-            std::fs::read_to_string(&file).unwrap(),
-            "image {\n    name \"one\"\n    modules {\n        module \"kept\";\n        flavour \"dev\" { module \"also\" }\n    }\n}\n"
-        );
-        assert!(crate::parse::image::block_close(
+        let text = unlisting(
+            &file,
             &std::fs::read_to_string(&file).unwrap(),
             "one",
-            &[("modules", None)]
+            None,
+            "apps/gone",
         )
-        .is_some());
-        assert!(unlist(&file, "one", None, "absent").is_err());
+        .unwrap();
+        crate::init::put(&file, &text).unwrap();
+        let text = unlisting(
+            &file,
+            &std::fs::read_to_string(&file).unwrap(),
+            "one",
+            Some("dev"),
+            "inline",
+        )
+        .unwrap();
+        crate::init::put(&file, &text).unwrap();
+        let text = unlisting(
+            &file,
+            &std::fs::read_to_string(&file).unwrap(),
+            "one",
+            None,
+            "trailing",
+        )
+        .unwrap();
+        crate::init::put(&file, &text).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&file).unwrap(),
+            "image {\n    name \"one\"\n    kept;\n    flavour \"dev\" { also }\n}\n"
+        );
+        assert!(unlisting(
+            &file,
+            &std::fs::read_to_string(&file).unwrap(),
+            "one",
+            None,
+            "absent"
+        )
+        .is_err());
         std::fs::remove_dir_all(root).unwrap();
     }
 
+    /// Unlists `name` from `text`, as the image file of a repository whose
+    /// `hardware/nvidia` is a component.
+    fn unlisted(
+        case: &str,
+        text: &str,
+        flavour: Option<&str>,
+        name: &str,
+    ) -> Result<String, String> {
+        let root = std::env::temp_dir().join(format!("tect-unlist-{case}-{}", std::process::id()));
+        let file = root.join("image.kdl");
+        crate::init::put(&file, text).unwrap();
+        crate::init::put(&root.join("components/hardware/nvidia/manifest.kdl"), "").unwrap();
+        let out = unlisting(&file, text, "one", flavour, name);
+        std::fs::remove_dir_all(root).unwrap();
+        out
+    }
+
     #[test]
-    fn a_cancelled_listing_does_not_create_a_module() {
-        let root = std::env::temp_dir().join(format!("tect-cancel-module-{}", std::process::id()));
-        let module = Module {
+    fn unlisting_keeps_a_parent_that_holds_another_segment() {
+        let image = "image {\n    name \"one\"\n    apps {\n        gone\n        kept\n    }\n}\n";
+        assert_eq!(
+            unlisted("kept", image, None, "apps/gone").unwrap(),
+            "image {\n    name \"one\"\n    apps {\n        kept\n    }\n}\n"
+        );
+    }
+
+    #[test]
+    fn unlisting_removes_every_parent_it_empties() {
+        let image = "image {\n    name \"one\"\n    a {\n        b {\n            c\n        }\n    }\n    kept\n}\n";
+        assert_eq!(
+            unlisted("deep", image, None, "a/b/c").unwrap(),
+            "image {\n    name \"one\"\n    kept\n}\n"
+        );
+    }
+
+    /// The flavour block stays, because it declares no segment of its own.
+    #[test]
+    fn unlisting_a_flavour_s_last_entry_keeps_the_flavour_block() {
+        let image = "image {\n    name \"one\"\n    flavour \"dev\" {\n        tools {\n            gone\n        }\n    }\n}\n";
+        assert_eq!(
+            unlisted("flavour", image, Some("dev"), "tools/gone").unwrap(),
+            "image {\n    name \"one\"\n    flavour \"dev\" {\n    }\n}\n"
+        );
+    }
+
+    #[test]
+    fn unlisting_finds_a_path_through_a_repeated_parent() {
+        let image =
+            "image {\n    name \"one\"\n    hardware { audio-a }\n    hardware { audio-b }\n}\n";
+        assert_eq!(
+            unlisted("repeated", image, None, "hardware/audio-b").unwrap(),
+            "image {\n    name \"one\"\n    hardware { audio-a }\n}\n"
+        );
+    }
+
+    /// `hardware/nvidia` is a component on disk, so emptying its block keeps
+    /// it listed.
+    #[test]
+    fn unlisting_keeps_a_parent_that_is_a_component() {
+        let image = "image {\n    name \"one\"\n    hardware {\n        nvidia {\n            cuda\n        }\n    }\n}\n";
+        assert_eq!(
+            unlisted("component", image, None, "hardware/nvidia/cuda").unwrap(),
+            "image {\n    name \"one\"\n    hardware {\n        nvidia\n    }\n}\n"
+        );
+    }
+
+    /// `variant="lean"` chooses what `hardware/nvidia` builds, so it outlives
+    /// the emptied block.
+    #[test]
+    fn unlisting_keeps_the_properties_of_a_component_parent() {
+        let image = "image {\n    name \"one\"\n    hardware {\n        nvidia variant=\"lean\" {\n            cuda\n        }\n    }\n}\n";
+        assert_eq!(
+            unlisted("variant", image, None, "hardware/nvidia/cuda").unwrap(),
+            "image {\n    name \"one\"\n    hardware {\n        nvidia variant=\"lean\"\n    }\n}\n"
+        );
+    }
+
+    /// `fragment position="after"` belongs to the definition, so it is no
+    /// segment below `tools`.
+    #[test]
+    fn unlisting_an_inline_definition_removes_it() {
+        let image = "image {\n    name \"one\"\n    tools {\n        fragment position=\"after\"\n    }\n    kept\n}\n";
+        assert_eq!(
+            unlisted("inline", image, None, "tools").unwrap(),
+            "image {\n    name \"one\"\n    kept\n}\n"
+        );
+    }
+
+    #[test]
+    fn unlisting_a_segment_that_holds_segments_is_refused() {
+        let image = "image {\n    name \"one\"\n    hardware {\n        nvidia {\n            cuda\n        }\n    }\n}\n";
+        let refused = unlisted("holds", image, None, "hardware/nvidia").unwrap_err();
+        assert!(refused.contains("with cuda below it"), "{refused}");
+    }
+
+    #[test]
+    fn a_cancelled_listing_does_not_create_a_component() {
+        let root =
+            std::env::temp_dir().join(format!("tect-cancel-component-{}", std::process::id()));
+        let component = Component {
             path: "hello".into(),
-            file: root.join("modules/hello/module.kdl"),
+            file: root.join("components/hello/manifest.kdl"),
             text: "description \"hello\"\n".into(),
             listing: Listing::Cancelled,
         };
-        assert!(module.apply(&root).unwrap().is_empty());
-        assert!(!module.file.exists());
+        assert!(component.apply(&root).unwrap().is_empty());
+        assert!(!component.file.exists());
         let _ = std::fs::remove_dir_all(root);
     }
 
@@ -2379,17 +2713,15 @@ image {
         );
         let bases = vec![
             base(
-                "fedora-bootc-44",
+                "base-image/fedora-bootc",
                 "quay.io/fedora/fedora-bootc:44",
-                "fedora",
-                &["rechunking", "bootc"],
+                Some("44"),
                 &["grub2"],
             ),
             base(
-                "ubuntu-26-04",
+                "base-image/ubuntu",
                 "docker.io/library/ubuntu:26.04",
-                "ubuntu",
-                &[],
+                Some("26.04"),
                 &["grub2", "systemd"],
             ),
         ];
@@ -2400,7 +2732,7 @@ image {
             screen().picker(copy::IMAGE_BASE, &options, None, "enter confirms", 0),
         );
         assert_screen(
-            "create-image-add-modules",
+            "create-image-add-components",
             screen().picker(
                 copy::BRING_FOR_BASE,
                 &yes_no_options(),

@@ -1,0 +1,20 @@
+schema-version 1
+
+image {
+    name "Bare Component"
+
+    base-image {
+        fedora-bootc-44
+    }
+
+    layout {
+        bootloader "grub2"
+    }
+
+    hello
+    menu
+    apps
+    apps {
+        editor
+    }
+}

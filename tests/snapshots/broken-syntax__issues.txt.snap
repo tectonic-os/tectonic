@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
   x tests/repos/broken-syntax/image.kdl is not valid KDL
    ,-[tests/repos/broken-syntax/image.kdl:3:7]
@@ -31,9 +31,9 @@ source: tests/golden.rs
    :    `-- not part of the schema
  4 |     accent "red"
    `----
-  help: an image file holds `schema-version` and `image` nodes; `base`,
-        `flavours` and `modules` are declared inside one, because they are
-        what the image is
+  help: an image file holds `schema-version` and `image` nodes; an image's
+        components, its base among them, are path segments inside its `image`
+        node
 
   x tests/repos/broken-syntax/second.image.kdl declares no image
   help: an image file holds at least one `image` node: `image { name "Name" }

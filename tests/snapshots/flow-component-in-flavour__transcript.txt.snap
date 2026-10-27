@@ -1,0 +1,25 @@
+---
+source: tests/golden.rs
+---
+Tectonic v{version}
+
+component name: dev-tools
+
+description (optional) []: A set of developer tools
+
+supported base families, separated by spaces (optional) []: fedora
+
+Does this component install packages? (Yes/No)
+No
+
+  1) example  Example
+  2) example/dx
+Which images list it? [1-2, several, 0 for none]: 2
+
+
+example/
+├── components/
+│   └── dev-tools/
+│       └── + manifest.kdl
+└── ~ example.image.kdl  dev-tools added to components
+==== exit 0

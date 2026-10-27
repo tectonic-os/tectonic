@@ -3,45 +3,46 @@
 use crate::diag::{Issue, Issues};
 use crate::model::image::{Entry, Image};
 use std::cmp::Reverse;
-use std::collections::{BTreeMap, BinaryHeap};
+use std::collections::BinaryHeap;
 
 /// The build order, as list indices.
 pub fn sort(image: &Image, issues: &mut Issues) -> Vec<usize> {
-    // Many modules may provide one capability, and a module that needs it
+    // Many components may provide one capability, and a component that needs it
     // builds after every one of them.
-    let mut offered: BTreeMap<&str, Vec<usize>> = BTreeMap::new();
-    for (index, entry) in image.entries.iter().enumerate() {
-        let Some(module) = &entry.module else {
-            continue;
-        };
-        for decl in &module.provides {
-            offered.entry(decl.name.as_str()).or_default().push(index);
-        }
-    }
+    let offered = |name: &str| -> Vec<usize> {
+        image
+            .entries
+            .iter()
+            .enumerate()
+            .filter(|(_, entry)| entry.component.as_ref().is_some_and(|m| m.answers(name)))
+            .map(|(index, _)| index)
+            .collect()
+    };
 
     let n = image.entries.len();
     let mut waits_on: Vec<Vec<usize>> = vec![Vec::new(); n];
     for (index, entry) in image.entries.iter().enumerate() {
-        let Some(module) = &entry.module else {
+        let Some(component) = &entry.component else {
             continue;
         };
-        for decl in &module.requires {
-            for &provider in offered.get(decl.name.as_str()).into_iter().flatten() {
+        // A remover takes away what every provider of the name installed.
+        for decl in component.requires.iter().chain(&component.removes) {
+            for provider in offered(&decl.name) {
                 if provider != index {
                     waits_on[index].push(provider);
                 }
             }
         }
-        // A module shipping MAC policy is one too: the layer calls the helper
+        // A component shipping MAC policy is one too: the layer calls the helper
         // the provider installed, so it builds after whoever provides the MAC
         // even though it requires nothing of it.
-        let soft = module
+        let soft = component
             .after
             .iter()
             .map(|decl| decl.name.as_str())
-            .chain(module.policies.iter().copied());
+            .chain(component.policies.iter().copied());
         for name in soft {
-            for &provider in offered.get(name).into_iter().flatten() {
+            for provider in offered(name) {
                 let drags_below_gate =
                     entry.flavour.is_none() && image.entries[provider].flavour.is_some();
                 if provider != index && !drags_below_gate {
@@ -101,7 +102,7 @@ pub fn apply(image: &mut Image, order: &[usize]) {
         .collect();
 }
 
-/// Everything left when the sort runs out of ready modules is waiting on
+/// Everything left when the sort runs out of ready components is waiting on
 /// something else that is also waiting, so the message names the edges.
 /// Reporting only that an order could not be found says nothing about which.
 fn report_cycle(image: &Image, waits_on: &[Vec<usize>], remaining: &[usize], issues: &mut Issues) {
@@ -110,9 +111,9 @@ fn report_cycle(image: &Image, waits_on: &[Vec<usize>], remaining: &[usize], iss
         None => image.entries[index].path.clone(),
     };
 
-    let mut issue = Issue::new("the module graph has a cycle", &image.src).help(
+    let mut issue = Issue::new("the component graph has a cycle", &image.src).help(
         "a requirement implies ordering, so a cycle has no build order at all; \
-         drop one of the edges, or split the module that closes it",
+         drop one of the edges, or split the component that closes it",
     );
     for (index, providers) in waits_on.iter().enumerate() {
         if remaining[index] == 0 {

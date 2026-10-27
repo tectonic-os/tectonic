@@ -1,36 +1,26 @@
 ---
 source: tests/golden/harness.rs
 ---
-  x unknown node `source` in `modules`
-    ,-[tests/repos/broken-pin/image.kdl:18:9]
- 17 |         }
- 18 |         source "one" {
-    :         ^^^|^^
-    :            `-- not part of the schema
- 19 |             module "remote"
+  x `source` takes no argument
+    ,-[tests/repos/broken-pin/image.kdl:16:5]
+ 15 |     }
+ 16 |     source "one" {
+    :     ^^^|^^
+    :        `-- a path segment
+ 17 |         remote
     `----
-  help: `modules` holds `module` entries and `flavour` blocks; `tect import
-        module` copies a library module into `modules/`
+  help: `source` is no image node, so it reads as a component path, and a path
+        segment takes no argument
 
-  x `loose` carries a `pin`
-    ,-[tests/repos/broken-pin/image.kdl:13:13]
- 12 |         module "loose" {
- 13 |             pin {
-    :             ^|^
-    :              `-- an entry names a module under modules/
- 14 |                 url "http://example.com/modules.zip"
+  x `loose/pin` is not a component
+    ,-[tests/repos/broken-pin/image.kdl:11:9]
+ 10 |     loose {
+ 11 |         pin {
+    :         ^|^
+    :          `-- nothing to build
+ 12 |             url "http://example.com/components.zip"
     `----
-  help: `tect import module <name>` copies a library module into `modules/`
-        and records where it came from in `modules/modules.lock.kdl`; the
-        image then lists it by its path
-
-  x `loose` is not a module
-    ,-[tests/repos/broken-pin/image.kdl:12:9]
- 11 |     modules {
- 12 |         module "loose" {
-    :         ^^^|^^
-    :            `-- nothing to build
- 13 |             pin {
-    `----
-  help: give modules/loose a module.kdl, a module.sh, a files/ directory, a
-        Containerfile.inc or a file that another module collects
+  help: give components/loose/pin a manifest.kdl, a component.sh, a repo.sh, a
+        packages.sh, a finalize.sh, a files/ directory, a Containerfile.inc or
+        a file that another component collects, or define it inline with a
+        manifest node such as `packages`

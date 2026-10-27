@@ -37,6 +37,8 @@ source: tests/golden/harness.rs
         "bootloader": "grub2"
       },
       "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
         "scap_content": "",
@@ -44,32 +46,7 @@ source: tests/golden/harness.rs
         "provides": [
           "rechunking"
         ],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -97,7 +74,7 @@ source: tests/golden/harness.rs
               "published": "renovate-beta"
             }
           ],
-          "modules": [
+          "components": [
             {
               "path": "fedora-family",
               "flavour": null,
@@ -108,14 +85,20 @@ source: tests/golden/harness.rs
                 "build-environment"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "90fed2e5b6c345fb0d615059da327f1499bdd2b1748756caf0e3e772455466f9",
+                "defined": null,
+                "content": "893be5ba24118e8a9f68ae39f30c20b7c415dca45f18aa406c8c8f00f02b375b",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -131,6 +114,8 @@ source: tests/golden/harness.rs
               },
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [
                 {
@@ -144,9 +129,13 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "ac0da42d9406cbcaf4874e67443534bcc8900f6115e387848cad1d1ea4f6bb6f",
+                "defined": null,
+                "content": "97b8dfa80bc98b20c40b4bf3bbb9993c62a1915eee0a26fc30636fe188b57044",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -161,6 +150,8 @@ source: tests/golden/harness.rs
               },
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [
                 {
@@ -174,9 +165,13 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "cbd5b99594064db253a0da8f7201ca0c83c87ff0e3b37cedd9a69e7058fd078d",
+                "defined": null,
+                "content": "36d3856b67abbd26da0eb450cec7d0d4b96b1833d7d87cad40e673aa31408886",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -191,6 +186,8 @@ source: tests/golden/harness.rs
               },
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [
                 {
@@ -204,9 +201,13 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "8c2091938db61afb8597e7499297005af43146b4a628add892f97f87a471ec48",
+                "defined": null,
+                "content": "72ccfe481ba1956dfab74ebaeb61aba802464dba992d55b7d1a3e497e561f501",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -237,7 +238,7 @@ source: tests/golden/harness.rs
               "published": "renovate"
             }
           ],
-          "modules": [
+          "components": [
             {
               "path": "fedora-family",
               "flavour": null,
@@ -248,14 +249,20 @@ source: tests/golden/harness.rs
                 "build-environment"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "90fed2e5b6c345fb0d615059da327f1499bdd2b1748756caf0e3e772455466f9",
+                "defined": null,
+                "content": "893be5ba24118e8a9f68ae39f30c20b7c415dca45f18aa406c8c8f00f02b375b",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -271,6 +278,8 @@ source: tests/golden/harness.rs
               },
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [
                 {
@@ -284,9 +293,13 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "ac0da42d9406cbcaf4874e67443534bcc8900f6115e387848cad1d1ea4f6bb6f",
+                "defined": null,
+                "content": "97b8dfa80bc98b20c40b4bf3bbb9993c62a1915eee0a26fc30636fe188b57044",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -301,6 +314,8 @@ source: tests/golden/harness.rs
               },
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [
                 {
@@ -314,9 +329,13 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "cbd5b99594064db253a0da8f7201ca0c83c87ff0e3b37cedd9a69e7058fd078d",
+                "defined": null,
+                "content": "36d3856b67abbd26da0eb450cec7d0d4b96b1833d7d87cad40e673aa31408886",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -331,6 +350,8 @@ source: tests/golden/harness.rs
               },
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [
                 {
@@ -344,9 +365,13 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "8c2091938db61afb8597e7499297005af43146b4a628add892f97f87a471ec48",
+                "defined": null,
+                "content": "72ccfe481ba1956dfab74ebaeb61aba802464dba992d55b7d1a3e497e561f501",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -362,6 +387,8 @@ source: tests/golden/harness.rs
               },
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [
                 {
@@ -375,9 +402,13 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "ac0da42d9406cbcaf4874e67443534bcc8900f6115e387848cad1d1ea4f6bb6f",
+                "defined": null,
+                "content": "97b8dfa80bc98b20c40b4bf3bbb9993c62a1915eee0a26fc30636fe188b57044",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []

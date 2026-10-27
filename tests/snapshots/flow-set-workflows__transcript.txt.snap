@@ -5,9 +5,9 @@ source: tests/golden/harness.rs
   2) [x] build-disk  builds a disk image with bootc-image-builder
   3) [x] base-sig-probe  measures what each base signs and ships, and fixes it
   4) [x] cleanup-registry  prunes old versions of the images off the registry
-  5) [ ] (unavailable) kernel-freshness  needs a module taking a KERNEL arg
+  5) [ ] (unavailable) kernel-freshness  needs a component taking a KERNEL arg
   6) [x] smoke-test  installs the image to a disk and boots it under qemu
-  7) [x] update-modules  refreshes tracked modules and opens a pull request
+  7) [x] update-components  refreshes tracked components and opens a pull request
 Which workflows? [1-7, several, 0 for none]: 1 3
 
 Publish images only on scheduled builds? (Yes/No)

@@ -1,37 +1,28 @@
 //! The `image` node: what an image calls itself, builds on, and is made of.
 
 use crate::diag::{Issue, Issues, Source, Span};
-use crate::model::image::{is_name, Base, Decl, Entry, Flavour, Image};
+use crate::model::component::Refusal;
+use crate::model::image::{is_name, Decl, Entry, Flavour, Image};
 use crate::model::image::{Layout, List, NO_FLAVOUR};
-use crate::model::module::Refusal;
 use crate::parse::prop;
 use crate::parse::schema::{Arg, Kind, Node, Prop, Say, NEEDS_VALUE};
-use crate::parse::{bool_arg, check_capability, child, flag, kids, options};
+use crate::parse::{bool_arg, child, flag, kids, options};
 use crate::parse::{string_arg, string_args, text};
 use kdl::{KdlDocument, KdlNode};
 
-/// A list entry, which is the same node ungated and inside a flavour block.
+/// A path segment, which is the same node ungated and inside a flavour block.
+/// The image parse reads what its children mean, because a child is a
+/// manifest node, an option or a further segment.
 #[rustfmt::skip]
-const ENTRY: Node = Node::new("module", "One module of the image, which the list entry names by its path under `modules/`.").about("Adds one module to the image. The entry can also set the options that the module declares, or select one of its variants.").example("\"core/bootloader\"").minimal()
-    .arg(Arg::Str, Say::new("`module` needs a path", "no path given",
-        "`module \"core/flatpak\"`, the path relative to modules/"))
-    .props(&[
-        Prop { name: "variant", kind: Kind::Str,
-            desc: "Which of the module's declared variants this image builds.",
-            say: Say::new("`variant` must be a string", "not a string", ""),
-            missing: Say::NONE },
-    ], Say::new("unknown module property `{}`", "not part of the schema",
-        "a list entry accepts `variant`; options are set as child nodes"))
-    .children(&[
-        Node::new("",
-            "An option that the module declares, which this image sets in a child node named after the option.").example("fonts \"JetBrainsMono\" \"FiraCode\""),
-    ], Say::NONE)
+const SEGMENT: Node = Node::new("", "One part of a component path, which lists the component at that path or holds further parts.").about("Names one directory of a component path under `components/`. A segment lists the component at its path. If no component is there, then the segment only holds the segments below it. A child with an argument sets an option that the component declares, such as `version \"44\"`. A child with no argument is the next segment. A segment that holds a manifest node, such as `packages` or `base`, defines its component inline, and no directory is needed.").example("desktop-environment")
     .notes(&[
-        "A nested name such as `hardening/coredumps` names the directories that the module is \
-         grouped in under `modules/`. Each part of the name is a name in its own right.",
-        "An entry names a module under `modules/` only. `tect import module` copies a module \
-         from a library into `modules/` and records where it came from in \
-         `modules/modules.lock.kdl`.",
+        "A component that the image file defines inline must not also be a component under \
+         `components/`. `tect check` refuses the pair and names both.",
+        "`tect import component` copies a component from a library into `components/` and \
+         records where it came from in `components/components.lock.kdl`.",
+        "The base is the listed component that declares `base`. Its segment also takes \
+         `digest` and `signed`, which record the digest and the signature state of its \
+         reference.",
     ]);
 
 /// The root filesystems the installer formats.
@@ -46,7 +37,7 @@ pub(crate) const BOOT_CHAINS: &[&str] = &["uki-shim", "uki-db"];
 /// The image file's grammar, and the whole of it.
 #[rustfmt::skip]
 pub const IMAGE: Node = Node::new("image",
-    "One image, which declares its names, its base and every module that it is made of.").about("Declares one bootable operating system image: its names, the base it builds on, how the installer lays it down and the modules that make it up. The build publishes the image under its `id`.").scaffolds(&["name", "url", "issues-url", "base", "layout", "modules"])
+    "One image, which declares its names and every component that it is made of, its base among them.").about("Declares one bootable operating system image: its names, how the installer lays it down and the components that make it up. Each component is a path of segments, such as `desktop-environment { kde-plasma }`, and one of them is the base that every layer builds on. The build publishes the image under its `id`.").scaffolds(&["name", "url", "issues-url", "layout", ""])
     .minimal()
     .arg(Arg::None, Say::new("`image` takes no argument", "the name belongs in the block",
         "`image { id \"{}\" }` is the machine name, and `name` is the human one it derives from \
@@ -88,81 +79,12 @@ pub const IMAGE: Node = Node::new("image",
             .notes(&["A scan reports the result. A failed rule fails `tect scap` only if \
                 `audit { enforce #true }` is set."]),
 
-        Node::new("boot", "The UKI boot chain, which is owner-signed through shim or enrolled directly into Secure Boot.").about("Builds the image to boot as a unified kernel image (UKI) under Secure Boot. `uki-shim` boots through shim with a key the owner signs, and `uki-db` enrolls the key directly into the firmware key database.").example("\"uki-shim\"")
+        Node::new("boot-chain", "The UKI boot chain, which is owner-signed through shim or enrolled directly into Secure Boot.").about("Builds the image to boot as a unified kernel image (UKI) under Secure Boot. `uki-shim` boots through shim with a key the owner signs, and `uki-db` enrolls the key directly into the firmware key database.").example("\"uki-shim\"")
             .arg(Arg::One(BOOT_CHAINS), Say::new("`{}` is not a boot chain",
                 "not a boot chain",
-                "`boot \"uki-shim\"` for owner-signed through shim, or `boot \"uki-db\"` for direct \
-                 enrollment into the firmware key database"))
+                "`boot-chain \"uki-shim\"` for owner-signed through shim, or `boot-chain \"uki-db\"` for \
+                 direct enrollment into the firmware key database"))
             .once(""),
-
-        Node::new("base", "The Linux image that every layer builds on. Its block declares what a build on the base can assume.").about("The base is the upstream bootc image that the custom image starts from. Its block tells `tect` what the base already has, so `tect` checks each module against it and skips a module that the base already covers.").scaffolds(&["family", "provides", "signed", "scap-content"]).example("\"quay.io/fedora/fedora-bootc:44\"")
-            .arg(Arg::Str, Say::new("`base` needs an image reference", "no image given",
-                "`base \"quay.io/fedora/fedora-bootc:44\"`, emitted verbatim as the generated FROM"))
-            .once("an image builds on one base; a second family is a second image")
-            .missing(Say::new("`image` declares no `base`", "nothing to build on",
-                "`base \"quay.io/fedora/fedora-bootc:44\" { family \"fedora\" }`, naming the image \
-                 every layer builds on"))
-            .children(&[
-                Node::new("family", "The optional family used for family-specific module content and compatibility checks.").about("The family, such as `fedora` or `debian`, selects family-specific module content and is checked against every module that restricts its supported families. When it is omitted, `tect` takes only ungated module content and skips family compatibility checks.").example("\"fedora\"")
-                    .arg(Arg::Str, Say::new("`family` needs a name", "no family given",
-                        "`family \"fedora\"`, matched against each explicit module `supports` restriction"))
-                    .once(""),
-                Node::new("provides", "The capabilities that the upstream image already ships, which the build checks the finished image for.").about("Lists what the base image already ships, such as `bootc`. `tect` skips a module that provides only what the base already has, and the build checks the finished image for each name.").example("\"rechunking\" \"bootc\"")
-                    .arg(Arg::Strs, Say::NONE)
-                    .lists(&[
-                        ("If the base provides every capability that a listed module provides, \
-                          then `tect` suppresses the module:", &[
-                            "The module is not ordered or built, and nothing it ships reaches the \
-                             image.",
-                            "The generated graph lists the module, and `plan.json` carries it \
-                             beside the modules that did build.",
-                            "The options and variants of the module still resolve. `tect` checks \
-                             a value set on one and puts it in the plan, but the value reaches no \
-                             layer.",
-                        ]),
-                    ])
-                    .notes(&[
-                        "A module that the base covers only in part still builds. If that module \
-                         declares a capability that the base already provides, then `tect` \
-                         reports an error.",
-                    ]),
-                Node::new("requires",
-                    "The capabilities that an enabled module must provide before the base is usable.").example("\"bootc-base\"")
-                    .arg(Arg::Strs, Say::NONE),
-                Node::new("satisfies",
-                    "An audit declaration of the benchmarks and rules that the base image \
-                     already satisfies. `tect` records it and certifies nothing.")
-                    .once("a base makes one claim set; a second block splits it")
-                    .children(crate::parse::module::BENCHMARKS, Say::NONE),
-                Node::new("signed", "Whether the base publishes a cosign signature.").about("Records whether the publisher of the base signs it with cosign. The build does not verify the signature. The `base-sig-probe` workflow keeps the value current.").example("#true")
-                    .arg(Arg::Bool, Say::new("`signed` needs #true or #false", "not a boolean",
-                        "`signed #false` records that this base publishes no cosign signature; \
-                         base-sig-probe.yml keeps it current"))
-                    .once(""),
-                Node::new("scap-content", "The SSG datastream file that a scan of an image on this base reads.").about("Names the SCAP content file that measures an image on this base, as a filename in the content directory. Each EL release publishes its own datastream, so the `rhel` family has no default and a scan of a `rhel` image needs this line. `tect create image` copies it from the base file of the library.").example("\"ssg-cs10-ds.xml\"")
-                    .arg(Arg::Str, Say::new("`scap-content` needs a filename", "no file given",
-                        "`scap-content \"ssg-cs10-ds.xml\"`, a datastream in the SSG content directory"))
-                    .once(""),
-            ], Say::new("unknown base property `{}`", "not part of the schema",
-                "a base accepts `family`, `provides`, `requires`, `satisfies`, `signed` and \
-                 `scap-content`"))
-            .lists(&[
-                ("The reference can carry a digest after its tag:", &[
-                    "`tect` strips the digest before it looks up the catalog, so a pinned base is \
-                     still the base of the catalog.",
-                    "`tect create image --base` writes the same `family`, `provides` and \
-                     `requires` for a tag with a digest and for a tag without one. Renovate bumps \
-                     the half that the image file writes.",
-                    "`tect build` records a declared digest verbatim. It records a bare tag as the \
-                     digest that the registry answers with.",
-                    "If the base is `signed #false`, then the digest is the strongest trust root on \
-                     offer.",
-                ]),
-            ])
-            .notes(&[
-                "The build record says what one build got. Only a digest in the image file says \
-                 what the next build gets.",
-            ]),
 
         Node::new("layout", "What the installer lays down if the answer of the base family is not the one that the image wants.").about("Each base family comes with installer defaults for the filesystem, composefs, the generic image and the administrator group. This block replaces those defaults for this image, so the installer lays the image down the way it needs. No family supplies a bootloader, so a declared `layout` names `bootloader`.").scaffolds(&["bootloader"])
             .arg(Arg::None, Say::new("`layout` takes no argument", "the declarations belong in the block",
@@ -204,26 +126,26 @@ pub const IMAGE: Node = Node::new("image",
                  and `bootloader`")),
 
         Node::new("allow-remediation",
-            "One rule an installed module refuses that this image lets remediation set anyway.").about("A module can refuse a hardening rule because the rule breaks what the module does. This lets one image accept that rule anyway, for a machine where the reason of the module does not apply. `because=` records why.").example("\"grub2_nousb_argument\" because=\"this machine has no USB keyboard\"")
+            "One rule an installed component refuses that this image lets remediation set anyway.").about("A component can refuse a hardening rule because the rule breaks what the component does. This lets one image accept that rule anyway, for a machine where the reason of the component does not apply. `because=` records why.").example("\"grub2_nousb_argument\" because=\"this machine has no USB keyboard\"")
             .arg(Arg::Str, Say::new("`allow-remediation` needs a rule ID", "nothing named",
                 "`allow-remediation \"grub2_nousb_argument\" because=\"this machine has no USB \
                  keyboard\"`"))
             .unique(Say::new("`{}` is allowed twice", "already allowed above", ""))
             .props(&[
                 Prop { name: "because", kind: Kind::Str,
-                    desc: "Why this image overrides the module's judgement.",
+                    desc: "Why this image overrides the component's judgement.",
                     say: Say::new("`because` must be a string", "not a string", ""),
                     missing: Say::NONE },
             ], Say::new("unknown `allow-remediation` property `{}`", "not part of the schema",
                 "`allow-remediation` accepts `because`")),
 
-        Node::new("flavours", "The flavours that this image publishes beside its ungated build.").about("A flavour builds a variant of the same image with extra modules, such as a `dev` build with developer tools, and publishes it as `<id>-<flavour>`. Flavours suit two builds that share almost every module.")
+        Node::new("flavours", "The flavours that this image publishes beside its ungated build.").about("A flavour builds a variant of the same image with extra components, such as a `dev` build with developer tools, and publishes it as `<id>-<flavour>`. Flavours suit two builds that share almost every component.")
             .once("a second block would split one set of flavours in two")
             .empty(Say::new("`flavours` has no flavours in it", "empty block",
                 "omit the block entirely to build one unnamed image"))
             .children(&[
                 Node::new("",
-                    "One flavour that publishes a gated module set as `<id>-<flavour>`, where \
+                    "One flavour that publishes a gated component set as `<id>-<flavour>`, where \
                      `<flavour>` is the node name.").example("dev")
                     .arg(Arg::None, Say::new("a flavour takes no arguments", "unexpected value",
                         "the flavour's name is the node name: `desktop default=#true`"))
@@ -245,104 +167,277 @@ pub const IMAGE: Node = Node::new("image",
                         "a flavour accepts `default`, `pr-build` and `conforms`")),
             ], Say::NONE)
             .notes(&[
-                "An image builds one target for its ungated module set and one more for each \
+                "An image builds one target for its ungated component set and one more for each \
                  flavour. The targets publish as `<id>` and `<id>-<flavour>`.",
-                "A flavour gates modules inside one image. A module listed inside \
-                 `flavour \"dev\"` builds only for that target, and each other module builds for \
+                "A flavour gates components inside one image. A component listed inside \
+                 `flavour \"dev\"` builds only for that target, and each other component builds for \
                  every target.",
                 "The `conforms=` of a flavour measures that flavour. The `conforms` of the image \
                  measures the ungated target only.",
             ]),
 
-        Node::new("modules", "Every module that the image is made of, whether a flavour gates it or not.").about("Lists every module that the image is made of. Each module is a directory under `modules/` in this repository.")
-            .once("a second block would split one list in two")
-            .missing(Say::new("`image` has no `modules` block", "nothing in it",
-                "an image with no modules is almost certainly a mistake; the block is required \
-                 even when empty"))
-            .children(&[
-                ENTRY,
-                Node::new("flavour", "The modules one flavour adds, which build only for that flavour.").about("Lists the modules that build only for one flavour. Every module outside a `flavour` block builds for every target.").example("\"dev\"")
-                    .arg(Arg::Str, Say::new("`flavour` needs a flavour name", "no name given",
-                        "`flavour \"desktop\" { module \"...\" }`"))
-                    .children(&[ENTRY],
-                        Say::new("`{}` is not allowed inside a flavour block",
-                            "only `module` belongs here",
-                            "flavour blocks do not nest; a module gated to two flavours is listed \
-                             under each, and `tect import module` copies a library module into \
-                             `modules/`")),
-            ], Say::new("unknown node `{}` in `modules`", "not part of the schema",
-                "`modules` holds `module` entries and `flavour` blocks; `tect import module` \
-                 copies a library module into `modules/`")),
-    ], Say::new("unknown image property `{}`", "not part of the schema",
-        "an image accepts `id`, `name`, `pretty-name`, `url`, `issues-url`, `description`, \
-         `keywords`, `logo-url`, `conforms`, `boot` and `allow-remediation`, and the `base`, \
-         `layout`, `flavours` and `modules` blocks"));
+        Node::new("flavour", "The components one flavour adds, which build only for that flavour.").about("Holds the path segments of the components that build only for one flavour. Every component outside a `flavour` block builds for every target.").example("\"dev\"")
+            .arg(Arg::Str, Say::new("`flavour` needs a flavour name", "no name given",
+                "`flavour \"desktop\" { tools { devtools } }`")),
 
-/// Where a declaration goes: the offset of the closing brace of the last block
-/// on `chain`, walking down from the image `image` names. An empty chain is the
-/// image's own brace. Appending is a text splice over this offset.
-pub fn block_close(kdl: &str, image: &str, chain: &[(&str, Option<&str>)]) -> Option<usize> {
-    let doc: KdlDocument = kdl.parse().ok()?;
-    let mut node = doc
+        SEGMENT,
+    ], Say::NONE);
+
+/// Answers whether `name` is a node of the image grammar. Every other node
+/// inside `image` is a path segment.
+pub fn is_keyword(name: &str) -> bool {
+    IMAGE
+        .children
+        .iter()
+        .any(|node| !node.name.is_empty() && node.name == name)
+}
+
+/// Answers whether `name` is a node of the manifest grammar, which makes the
+/// segment that holds it an inline definition.
+fn is_manifest_node(name: &str) -> bool {
+    crate::parse::component::COMPONENT
+        .children
+        .iter()
+        .any(|node| !node.name.is_empty() && node.name == name)
+}
+
+/// Answers whether a segment's child declares part of an inline definition.
+/// A manifest node in use carries an argument, a property or a block. A bare
+/// child is therefore a segment, even where a manifest node has its name.
+fn declares(kid: &KdlNode) -> bool {
+    is_manifest_node(kid.name().value()) && (!kid.entries().is_empty() || kid.children().is_some())
+}
+
+/// Answers whether a segment's child is the next segment. A child with an
+/// argument sets an option, and a child that declares belongs to a definition.
+fn is_segment(kid: &KdlNode) -> bool {
+    !kid.entries().iter().any(|entry| entry.name().is_none()) && !declares(kid)
+}
+
+/// Finds the node at the end of `chain`, walking down from the image that
+/// `image` names. An empty chain is the image node itself.
+fn descend<'a>(
+    doc: &'a KdlDocument,
+    image: &str,
+    chain: &[(&str, Option<&str>)],
+) -> Option<&'a KdlNode> {
+    let image = doc
         .nodes()
         .iter()
         .filter(|node| node.name().value() == "image")
         .find(|node| text(node, "name") == image)?;
-    for (name, arg) in chain {
-        node = kids(node).iter().find(|node| {
-            node.name().value() == *name && (arg.is_none() || string_arg(node) == *arg)
-        })?;
+    Some(trail(image, chain)?.pop().unwrap_or(image))
+}
+
+/// Finds the nodes that spell `chain` below `node`, outermost first. A path
+/// may be spelled out in more than one segment of the same name, so each
+/// candidate is tried in turn. A candidate with a block is tried first,
+/// because only a block holds further nodes.
+fn trail<'a>(node: &'a KdlNode, chain: &[(&str, Option<&str>)]) -> Option<Vec<&'a KdlNode>> {
+    let Some(((name, arg), rest)) = chain.split_first() else {
+        return Some(Vec::new());
+    };
+    let matching: Vec<&KdlNode> = kids(node)
+        .iter()
+        .filter(|kid| kid.name().value() == *name && (arg.is_none() || string_arg(kid) == *arg))
+        .collect();
+    let blocks = matching.iter().filter(|kid| kid.children().is_some());
+    let bare = matching.iter().filter(|kid| kid.children().is_none());
+    blocks.chain(bare).find_map(|kid| {
+        let mut found = trail(kid, rest)?;
+        found.insert(0, kid);
+        Some(found)
+    })
+}
+
+/// Removes the segment at the end of `chain` and keeps every other byte in
+/// place. A segment that the removal empties goes too, because an empty
+/// segment would list the component at its own path. If `held` answers that
+/// a component is at the emptied segment's path, then the segment keeps its
+/// name and loses only its empty block. A segment that holds further
+/// segments is refused, because removing it would unlist them as well.
+pub fn unlisted(
+    kdl: &str,
+    image: &str,
+    chain: &[(&str, Option<&str>)],
+    held: impl Fn(&str) -> bool,
+) -> Result<String, String> {
+    let doc: KdlDocument = kdl.parse().map_err(|_| "is not valid KDL".to_string())?;
+    let path: Vec<&str> = chain
+        .iter()
+        .filter(|(_, arg)| arg.is_none())
+        .map(|(name, _)| *name)
+        .collect();
+    let named = path.join("/");
+    let nodes = doc
+        .nodes()
+        .iter()
+        .filter(|node| node.name().value() == "image")
+        .find(|node| text(node, "name") == image)
+        .and_then(|node| trail(node, chain))
+        .ok_or_else(|| format!("does not list `{named}` in `{image}`"))?;
+    let target = nodes
+        .last()
+        .ok_or_else(|| format!("does not list `{named}` in `{image}`"))?;
+    let below: Vec<&str> = kids(target)
+        .iter()
+        .filter(|kid| is_segment(kid))
+        .map(|kid| kid.name().value())
+        .collect();
+    if !below.is_empty() {
+        return Err(format!(
+            "lists `{named}` with {} below it, so unlisting it would unlist them too",
+            below.join(", ")
+        ));
     }
+    // A segment ancestor keeps its offset when a later node is cut, so each
+    // one is found again by where it starts.
+    let ancestors: Vec<(usize, String)> = nodes[..nodes.len() - 1]
+        .iter()
+        .zip(chain)
+        .filter(|(_, (_, arg))| arg.is_none())
+        .scan(Vec::new(), |parts: &mut Vec<&str>, (node, (name, _))| {
+            parts.push(name);
+            Some((Span::from(node.span()).offset, parts.join("/")))
+        })
+        .collect();
+    let mut out = kdl.to_string();
+    cut(&mut out, target.span().into());
+    for (offset, path) in ancestors.iter().rev() {
+        let Some(doc) = out.parse::<KdlDocument>().ok() else {
+            break;
+        };
+        let Some(node) = starting_at(doc.nodes(), *offset) else {
+            break;
+        };
+        if node
+            .children()
+            .is_none_or(|block| !block.nodes().is_empty())
+        {
+            break;
+        }
+        let span: Span = node.span().into();
+        if held(path) {
+            let end = span.offset + span.len;
+            let open = out[span.offset..end]
+                .rfind('{')
+                .map_or(end, |at| span.offset + at);
+            let from = out[..open].trim_end().len();
+            out.replace_range(from..end, "");
+            break;
+        }
+        cut(&mut out, span);
+    }
+    Ok(out)
+}
+
+/// Finds the node whose text starts at `offset`.
+fn starting_at(nodes: &[KdlNode], offset: usize) -> Option<&KdlNode> {
+    nodes
+        .iter()
+        .find_map(|node| match Span::from(node.span()).offset == offset {
+            true => Some(node),
+            false => starting_at(kids(node), offset),
+        })
+}
+
+/// Removes one node's text. A node that shares its line with another one
+/// loses only its own text.
+fn cut(text: &mut String, span: Span) {
+    let from = span.offset;
+    // A node's span stops before its `;`, which goes with it on a shared line.
+    let after = &text[span.offset + span.len..];
+    let to = match after.trim_start_matches([' ', '\t']).strip_prefix(';') {
+        Some(rest) => text.len() - rest.trim_start_matches([' ', '\t']).len(),
+        None => span.offset + span.len,
+    };
+    let start = text[..from].rfind('\n').map_or(0, |at| at + 1);
+    let end = text[to..].find('\n').map_or(text.len(), |at| to + at + 1);
+    let alone = text[start..from].trim().is_empty() && text[to..end].trim().is_empty();
+    // The last node on a shared line takes the blanks in front of it too.
+    let last = text[to..end].trim().is_empty();
+    match (alone, last) {
+        (true, _) => text.replace_range(start..end, ""),
+        (false, true) => {
+            let from = text[..from].trim_end_matches([' ', '\t']).len();
+            text.replace_range(from..to, "");
+        }
+        (false, false) => text.replace_range(from..to, ""),
+    }
+}
+
+/// Where a declaration goes: the offset of the closing brace of the last block
+/// on `chain`, walking down from the image `image` names. An empty chain is the
+/// image's own brace. A node with no block has no brace, so it answers None.
+/// Appending is a text splice over this offset.
+pub fn block_close(kdl: &str, image: &str, chain: &[(&str, Option<&str>)]) -> Option<usize> {
+    let doc: KdlDocument = kdl.parse().ok()?;
+    let node = descend(&doc, image, chain)?;
+    node.children()?;
     let span: Span = node.span().into();
     kdl[..span.offset + span.len].rfind('}')
 }
 
-/// Finds the span of the `module` node that lists `name` inside the blocks
-/// `chain` names, under the image called `image`.
-pub fn entry_span(
-    kdl: &str,
-    image: &str,
-    chain: &[(&str, Option<&str>)],
-    name: &str,
-) -> Option<Span> {
-    let doc: KdlDocument = kdl.parse().ok()?;
-    let mut node = doc
-        .nodes()
+/// Lists the flavour of each listing of `path` in the file, None for an
+/// ungated one. A segment that only organises lists nothing, so the path
+/// must end on a node that the parse reads as an entry.
+pub fn listings(kdl: &str, path: &str) -> Vec<Option<String>> {
+    let Ok(doc) = kdl.parse::<KdlDocument>() else {
+        return Vec::new();
+    };
+    let src = Source::new("image.kdl", kdl);
+    doc.nodes()
         .iter()
         .filter(|node| node.name().value() == "image")
-        .find(|node| text(node, "name") == image)?;
-    for (block, arg) in chain {
-        node = kids(node).iter().find(|node| {
-            node.name().value() == *block && (arg.is_none() || string_arg(node) == *arg)
-        })?;
+        .flat_map(|node| Image::parse(node, &src, &mut Issues::default()).entries)
+        .filter(|entry| entry.path == path && !entry.organises)
+        .map(|entry| entry.flavour)
+        .collect()
+}
+
+/// Reads back the nodes of an inline definition, which the entry holds by
+/// their spans in the image file.
+pub(crate) fn nodes_at(src: &Source, spans: &[Span]) -> Vec<KdlNode> {
+    fn walk(nodes: &[KdlNode], spans: &[Span], out: &mut Vec<KdlNode>) {
+        for node in nodes {
+            if spans.contains(&Span::from(node.span())) {
+                out.push(node.clone());
+            }
+            walk(kids(node), spans, out);
+        }
     }
-    kids(node)
-        .iter()
-        .find(|node| node.name().value() == "module" && string_arg(node) == Some(name))
-        .map(|node| node.span().into())
+    let mut out = Vec::new();
+    if let Ok(doc) = src.text().parse::<KdlDocument>() {
+        walk(doc.nodes(), spans, &mut out);
+    }
+    out
+}
+
+/// The chain of segment nodes that spells a component path.
+pub fn segments(path: &str) -> Vec<(&str, Option<&str>)> {
+    path.split('/').map(|part| (part, None)).collect()
 }
 
 /// The span an image's `conforms` declaration takes, which is the node itself
 /// where there is one and an empty span where the next one would go: in front
-/// of `base`, which is where the schema lists it. `None` only when the file
-/// declares no image by that name.
+/// of the first path segment, and otherwise in front of the image's closing
+/// brace. `None` only when the file declares no image by that name.
 pub fn conforms_span(kdl: &str, image: &str) -> Option<Span> {
     let doc: KdlDocument = kdl.parse().ok()?;
-    let node = doc
-        .nodes()
-        .iter()
-        .filter(|node| node.name().value() == "image")
-        .find(|node| text(node, "name") == image)?;
-    let at = |name: &str| -> Option<Span> {
+    let node = descend(&doc, image, &[])?;
+    let at = |want: &dyn Fn(&str) -> bool| -> Option<Span> {
         kids(node)
             .iter()
-            .find(|kid| kid.name().value() == name)
+            .find(|kid| want(kid.name().value()))
             .map(|kid| kid.span().into())
     };
-    match (at("conforms"), at("base")) {
+    match (
+        at(&|name| name == "conforms"),
+        at(&|name| !is_keyword(name) || name == "flavour"),
+    ) {
         (Some(span), _) => Some(span),
-        (None, Some(base)) => Some(Span {
-            offset: base.offset,
+        (None, Some(first)) => Some(Span {
+            offset: first.offset,
             len: 0,
         }),
         (None, None) => block_close(kdl, image, &[]).map(|offset| Span { offset, len: 0 }),
@@ -366,6 +461,14 @@ fn decls(node: &KdlNode, name: &str) -> Vec<Decl> {
 
 impl List {
     pub(super) fn parse_image(&mut self, node: &KdlNode, src: &Source, issues: &mut Issues) {
+        self.images.push(Image::parse(node, src, issues));
+    }
+}
+
+impl Image {
+    /// Reads one `image` node. The base and the components load with the
+    /// repository, because they need its manifests.
+    fn parse(node: &KdlNode, src: &Source, issues: &mut Issues) -> Self {
         let mut image = Image {
             src: src.clone(),
             id: text(node, "id"),
@@ -380,8 +483,10 @@ impl List {
                 .collect(),
             logo_url: text(node, "logo-url"),
             conforms: text(node, "conforms"),
-            boot: text(node, "boot"),
+            boot: text(node, "boot-chain"),
             base: None,
+            base_entry: None,
+            defined: Vec::new(),
             layout: None,
             allows: kids(node)
                 .iter()
@@ -400,51 +505,17 @@ impl List {
             span: node.name().span().into(),
         };
 
-        if let Some(base) = child(node, "base") {
-            image.parse_base(base, issues);
-        }
         if let Some(layout) = child(node, "layout") {
             image.parse_layout(layout);
         }
         if let Some(flavours) = child(node, "flavours") {
             image.parse_flavours(flavours, issues);
         }
-        if let Some(modules) = child(node, "modules") {
-            image.parse_modules(modules, issues);
-        }
+        image.parse_segments(node, issues);
 
         image.check_id(issues);
-        image.check_layout(issues);
         image.check_flavours(issues);
-        self.images.push(image);
-    }
-}
-
-impl Image {
-    fn parse_base(&mut self, node: &KdlNode, issues: &mut Issues) {
-        let src = &self.src.clone();
-        let Some(image) = string_arg(node) else {
-            return;
-        };
-
-        let base = Base {
-            image: image.to_string(),
-            family: text(node, "family"),
-            provides: decls(node, "provides"),
-            requires: decls(node, "requires"),
-            satisfies: child(node, "satisfies")
-                .map(|block| crate::parse::module::coverages(block, src, issues))
-                .unwrap_or_default(),
-            signed: child(node, "signed").and_then(bool_arg).unwrap_or(false),
-            scap_content: text(node, "scap-content"),
-            span: node.name().span().into(),
-        };
-
-        for decl in base.provides.iter().chain(&base.requires) {
-            check_capability(&decl.name, decl.span, src, issues);
-        }
-
-        self.base = Some(base);
+        image
     }
 
     fn parse_layout(&mut self, node: &KdlNode) {
@@ -468,7 +539,7 @@ impl Image {
     /// Half an answer is the one state that would reach `bootc install` on a
     /// default nobody chose. An image that declares no layout at all is left
     /// alone: it publishes, and it builds no install media.
-    fn check_layout(&mut self, issues: &mut Issues) {
+    pub(super) fn check_layout(&mut self, issues: &mut Issues) {
         let src = &self.src.clone();
         let (Some(layout), Some(base)) = (&self.layout, &self.base) else {
             return;
@@ -480,7 +551,7 @@ impl Image {
                     .at(layout.span, "no bootloader")
                     .help(
                         "no family answers the bootloader: `bootloader \"grub2\"` here, from what \
-                         the base's file in its base-images library lists",
+                         what the base component lists",
                     ),
             );
         } else if !missing.is_empty() {
@@ -569,7 +640,7 @@ impl Image {
         }
         // `generated/<id>/` is a sibling of the one directory the repository
         // shares between images, so an image called `lib` would write its
-        // Containerfile and scripts over the helper library every module build
+        // Containerfile and scripts over the helper library every component build
         // mounts at `/ctx/lib`.
         if self.id == crate::layout::LIB {
             issues.push(
@@ -618,103 +689,164 @@ impl Image {
         }
     }
 
-    fn parse_modules(&mut self, block: &KdlNode, issues: &mut Issues) {
+    /// Reads every path segment of the image, ungated and inside each
+    /// `flavour` block.
+    fn parse_segments(&mut self, image: &KdlNode, issues: &mut Issues) {
         let src = &self.src.clone();
-        for node in kids(block) {
-            match node.name().value() {
-                "module" => {
-                    if let Some(entry) = self.parse_entry(node, None, issues) {
-                        self.entries.push(entry);
-                    }
+        for node in kids(image) {
+            let name = node.name().value();
+            if name != "flavour" {
+                if !is_keyword(name) {
+                    self.parse_segment(node, "", None, issues);
                 }
-                "flavour" => {
-                    let Some(name) = string_arg(node).map(str::to_string) else {
-                        continue;
-                    };
-                    if !self.flavours.iter().any(|f| f.name == name) {
-                        let known: Vec<&str> =
-                            self.flavours.iter().map(|f| f.name.as_str()).collect();
-                        issues.push(
-                            Issue::new(format!("`{name}` is not a declared flavour"), src)
-                                .at(node.name().span(), "no such flavour")
-                                .help(if known.is_empty() {
-                                    "no flavours are declared; add a `flavours` block above"
-                                        .to_string()
-                                } else {
-                                    format!("declared flavours: {}", known.join(", "))
-                                }),
-                        );
-                    }
-                    for inner in kids(node) {
-                        if inner.name().value() == "module" {
-                            let entry = self.parse_entry(inner, Some(name.clone()), issues);
-                            self.entries.extend(entry);
-                        }
-                    }
-                }
-                _ => {}
+                continue;
+            }
+            let Some(flavour) = string_arg(node).map(str::to_string) else {
+                continue;
+            };
+            if !self.flavours.iter().any(|f| f.name == flavour) {
+                let known: Vec<&str> = self.flavours.iter().map(|f| f.name.as_str()).collect();
+                issues.push(
+                    Issue::new(format!("`{flavour}` is not a declared flavour"), src)
+                        .at(node.name().span(), "no such flavour")
+                        .help(if known.is_empty() {
+                            "no flavours are declared; add a `flavours` block above".to_string()
+                        } else {
+                            format!("declared flavours: {}", known.join(", "))
+                        }),
+                );
+            }
+            for inner in kids(node) {
+                self.parse_segment(inner, "", Some(&flavour), issues);
             }
         }
     }
 
-    fn parse_entry(
-        &self,
+    /// Reads one path segment and the segments below it. A child with an
+    /// argument sets an option, and a child with no argument is the next
+    /// segment. A manifest node among the children makes the segment an
+    /// inline definition, and then every child with an argument belongs to
+    /// the definition.
+    fn parse_segment(
+        &mut self,
         node: &KdlNode,
-        flavour: Option<String>,
+        parent: &str,
+        flavour: Option<&str>,
         issues: &mut Issues,
-    ) -> Option<Entry> {
-        let src = &self.src;
-        let path = string_arg(node)?.to_string();
-
-        if let Some(dup) = self
+    ) {
+        let src = &self.src.clone();
+        let name = node.name().value();
+        let path = match parent.is_empty() {
+            true => name.to_string(),
+            false => format!("{parent}/{name}"),
+        };
+        let span: Span = node.name().span().into();
+        if node.entries().iter().any(|entry| entry.name().is_none()) {
+            let help = match parent.is_empty() {
+                true => format!(
+                    "`{name}` is no image node, so it reads as a component path, and a path \
+                     segment takes no argument"
+                ),
+                false => format!(
+                    "a child with an argument sets an option of `{parent}`, and `{name}` is \
+                     one of those inside a segment of its own"
+                ),
+            };
+            issues.push(
+                Issue::new(format!("`{name}` takes no argument"), src)
+                    .at(span, "a path segment")
+                    .help(help),
+            );
+            return;
+        }
+        if !crate::model::image::is_local_path(&path) {
+            issues.push(
+                Issue::new(format!("`{path}` is not a component path"), src)
+                    .at(span, "not a path under components/")
+                    .help(
+                        "a segment is lowercase letters, digits and dashes, starting with a letter",
+                    ),
+            );
+            return;
+        }
+        for entry in node.entries() {
+            if let Some(key) = entry.name().map(|key| key.value()) {
+                if key != "variant" || entry.value().as_string().is_none() {
+                    issues.push(
+                        Issue::new(format!("`{key}` is not a property of `{path}`"), src)
+                            .at(entry.span(), "not part of the schema")
+                            .help("a segment accepts `variant=\"<name>\"`; options are set as child nodes"),
+                    );
+                }
+            }
+        }
+        let defines = kids(node).iter().any(declares);
+        let mut inline = Vec::new();
+        let mut options = Vec::new();
+        let mut nested = Vec::new();
+        for kid in kids(node) {
+            // `digest` and `signed` belong to a base's segment, even where the
+            // segment defines the base inline.
+            let tool = matches!(kid.name().value(), "digest" | "signed");
+            match (defines && !tool, !is_segment(kid)) {
+                (true, true) => inline.push(Span::from(kid.span())),
+                (false, true) => options.push((
+                    kid.name().value().to_string(),
+                    options::args(kid),
+                    kid.name().span().into(),
+                )),
+                (_, false) => nested.push(kid),
+            }
+        }
+        let flavour = flavour.map(str::to_string);
+        let variant = prop(node, "variant").map(str::to_string);
+        let organises = !nested.is_empty() && options.is_empty() && !defines && variant.is_none();
+        // A segment that only organises adds nothing to a segment of the same
+        // path, so a path may be spelled out more than once to reach its
+        // children.
+        let held = self
             .entries
             .iter()
-            .find(|e| e.path == path && e.flavour == flavour)
-        {
-            issues.push(
-                Issue::new(format!("`{path}` is listed twice"), src)
-                    .at(dup.span, "first here")
-                    .at(node.name().span(), "and again here")
-                    .help("a module builds once per flavour it is listed under"),
-            );
-            return None;
-        }
-
-        let mut options = Vec::new();
-        for child in kids(node) {
-            // A `pin` would otherwise read as an option the module does not
-            // declare. That message never says how a library module reaches
-            // an image.
-            if child.name().value() == "pin" {
+            .position(|entry| entry.path == path && entry.flavour == flavour);
+        if let Some(at) = held.filter(|_| !organises) {
+            let dup = &self.entries[at];
+            if !dup.organises {
                 issues.push(
-                    Issue::new(format!("`{path}` carries a `pin`"), src)
-                        .at(
-                            child.name().span(),
-                            "an entry names a module under modules/",
-                        )
-                        .help(
-                            "`tect import module <name>` copies a library module into \
-                             `modules/` and records where it came from in \
-                             `modules/modules.lock.kdl`; the image then lists it by its path",
-                        ),
+                    Issue::new(format!("`{path}` is listed twice"), src)
+                        .at(dup.span, "first here")
+                        .at(span, "and again here")
+                        .help("a component builds once per flavour it is listed under"),
                 );
-                continue;
+            } else {
+                if defines {
+                    self.defined.push(path.clone());
+                }
+                let dup = &mut self.entries[at];
+                dup.variant = variant;
+                dup.options = options;
+                dup.span = span;
+                dup.inline = defines.then_some(inline);
+                dup.organises = false;
             }
-            options.push((
-                child.name().value().to_string(),
-                options::args(child),
-                child.name().span().into(),
-            ));
+        } else if held.is_none() {
+            if defines {
+                self.defined.push(path.clone());
+            }
+            self.entries.push(Entry {
+                path: path.clone(),
+                flavour: flavour.clone(),
+                variant,
+                options,
+                span,
+                component: None,
+                imported_by: None,
+                inline: defines.then_some(inline),
+                organises,
+            });
         }
-
-        Some(Entry {
-            path,
-            flavour,
-            variant: prop(node, "variant").map(str::to_string),
-            options,
-            span: node.name().span().into(),
-            module: None,
-        })
+        for kid in nested {
+            self.parse_segment(kid, &path, flavour.as_deref(), issues);
+        }
     }
 
     fn check_flavours(&self, issues: &mut Issues) {
@@ -760,65 +892,81 @@ mod tests {
         issues.findings()
     }
 
+    /// Writes a repository whose `components/` holds `dirs`, each a path and
+    /// its manifest. The image file holds `text`.
+    fn repository(name: &str, text: &str, dirs: &[(&str, &str)]) -> std::path::PathBuf {
+        let root = std::env::temp_dir().join(format!("tect-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("the temporary directory is writable");
+        std::fs::write(root.join("repo.kdl"), "schema-version 1\n")
+            .expect("the temporary directory is writable");
+        std::fs::write(root.join("image.kdl"), format!("schema-version 1\n{text}"))
+            .expect("the temporary directory is writable");
+        for (dir, manifest) in dirs {
+            let dir = root.join("components").join(dir);
+            std::fs::create_dir_all(&dir).expect("the temporary directory is writable");
+            std::fs::write(
+                dir.join("manifest.kdl"),
+                format!("schema-version 1\n{manifest}"),
+            )
+            .expect("the temporary directory is writable");
+        }
+        root
+    }
+
+    /// Loads `text` as the one image of a repository whose base component
+    /// `x` is on the `fedora` family.
     fn semantic_messages(text: &str) -> Vec<String> {
-        let doc: KdlDocument = text.parse().expect("valid KDL");
-        let src = Source::new("image.kdl", text);
-        let mut issues = Issues::default();
-        let mut list = List::empty(std::path::Path::new("."));
-        list.parse_image(&doc.nodes()[0], &src, &mut issues);
+        let root = repository(
+            "semantic",
+            text,
+            &[("x", "base \"x\" { family \"fedora\"; }\n")],
+        );
+        let (_, issues) = List::load(&root);
+        let _ = std::fs::remove_dir_all(&root);
         issues.findings()
     }
 
     /// The three places a `conforms` can land: over the one that is there,
-    /// in front of `base`, and last of all in an image with no base at all.
+    /// in front of the first segment, and last of all in an image that lists
+    /// nothing.
     #[test]
     fn the_span_a_conforms_takes_is_the_node_or_where_the_next_one_goes() {
-        let held =
-            "image {\n    name \"E\"\n    conforms \"standard\"\n    base \"x\" {\n    }\n}\n";
+        let held = "image {\n    name \"E\"\n    conforms \"standard\"\n    x\n}\n";
         let span = conforms_span(held, "E").expect("the image is there");
         assert_eq!(
             &held[span.offset..span.offset + span.len],
             "conforms \"standard\""
         );
 
-        let bare = "image {\n    name \"E\"\n\n    base \"x\" {\n    }\n}\n";
+        let bare = "image {\n    name \"E\"\n    layout { bootloader \"grub2\" }\n\n    x\n}\n";
         let span = conforms_span(bare, "E").expect("the image is there");
         assert_eq!(span.len, 0);
-        assert!(bare[span.offset..].starts_with("base \"x\""));
+        assert!(bare[span.offset..].starts_with("x\n"));
 
-        let baseless = "image {\n    name \"E\"\n}\n";
-        let span = conforms_span(baseless, "E").expect("the image is there");
-        assert_eq!((span.len, &baseless[span.offset..]), (0, "}\n"));
+        let empty = "image {\n    name \"E\"\n}\n";
+        let span = conforms_span(empty, "E").expect("the image is there");
+        assert_eq!((span.len, &empty[span.offset..]), (0, "}\n"));
 
         assert!(conforms_span(held, "Other").is_none());
     }
 
-    /// Every shape the golden corpus has no broken fixture for.
+    /// Every shape of the image grammar that the golden corpus has no broken
+    /// fixture for.
     #[test]
     fn the_table_catches_what_the_corpus_does_not() {
         let found = messages(
             r#"
 image "stray" {
     id
-    base "quay.io/fedora/fedora-bootc:44" {
-        signed "yes"
-        colour "red"
-    }
-    base "quay.io/fedora/fedora-bootc:43"
+    boot-chain "uki-db"
+    boot-chain "uki-shim"
     flavours {
         dev sparkle=#true
         dim default="yes"
         bad "arg"
     }
-    modules {
-        flavour "dev" {
-            packages
-        }
-        module
-        module "core/one" flavor="x"
-        drives
-    }
-    palette "red"
+    flavour
 }
 "#,
         );
@@ -827,95 +975,306 @@ image "stray" {
             [
                 "`image` takes no argument",
                 "`id` needs a value",
-                "`signed` needs #true or #false",
-                "unknown base property `colour`",
-                "`base` is declared twice",
+                "`boot-chain` is declared twice",
                 "unknown flavour property `sparkle`",
                 "`default` must be #true or #false",
                 "a flavour takes no arguments",
-                "`packages` is not allowed inside a flavour block",
-                "`module` needs a path",
-                "unknown module property `flavor`",
-                "unknown node `drives` in `modules`",
-                "unknown image property `palette`",
+                "`flavour` needs a flavour name",
                 "`image` declares no `name`",
             ]
         );
     }
 
+    /// The segment shapes the parse refuses, because the schema reads every
+    /// segment as the catch-all node.
     #[test]
-    fn a_base_family_is_optional() {
-        let found =
-            messages("image {\n    name \"Example\"\n    base \"example\"\n    modules { }\n}\n");
-        assert!(found.is_empty(), "{found:?}");
+    fn a_segment_takes_no_argument_and_a_name_the_path_rule_allows() {
+        let found = semantic_messages(
+            "image {\n name \"X\"\n x\n palette \"red\"\n Bad_Name\n tools flavor=\"x\"\n}",
+        );
+        for wanted in [
+            "`palette` takes no argument",
+            "`Bad_Name` is not a component path",
+            "`flavor` is not a property of `tools`",
+        ] {
+            assert!(
+                found.iter().any(|message| message.contains(wanted)),
+                "{wanted}: {found:?}"
+            );
+        }
     }
 
     #[test]
-    fn the_modules_block_ends_at_a_closing_brace() {
-        let text = "image {\n    name \"X\"\n    modules {\n        module \"one\"\n    }\n}\n";
-        let at = block_close(text, "X", &[("modules", None)]).expect("a modules block");
+    fn the_image_block_ends_at_a_closing_brace() {
+        let text = "image {\n    name \"X\"\n    tools {\n        one\n    }\n}\n";
+        let at = block_close(text, "X", &[("tools", None)]).expect("a tools block");
         assert_eq!(&text[at..=at], "}");
         assert_eq!(&text[at - 5..at], "\n    ");
-    }
-
-    #[test]
-    fn a_source_block_ends_at_its_closing_brace() {
-        let text = "image {\n    name \"X\"\n    modules {\n        source \"one\" {\n            module \"a\"\n        }\n        source \"two\" {}\n    }\n}\n";
-        let chain = [("modules", None), ("source", Some("one"))];
-        let at = block_close(text, "X", &chain).expect("a source block");
-        assert_eq!(&text[at..=at], "}");
-        assert!(text[..at].ends_with("module \"a\"\n        "));
+        assert!(block_close(text, "X", &[("tools", None), ("one", None)]).is_none());
     }
 
     /// Two images in one file, which is what makes the name part of the walk.
     #[test]
     fn a_block_is_found_under_the_image_that_was_named() {
-        let text = "image {\n    name \"A\"\n    modules { }\n}\nimage {\n    name \"B\"\n    modules {\n    }\n}\n";
-        let at = block_close(text, "B", &[("modules", None)]).expect("B's modules block");
-        assert!(text[..at].ends_with("modules {\n    "), "{at}");
-        assert!(block_close(text, "C", &[("modules", None)]).is_none());
+        let text = "image {\n    name \"A\"\n    flavour \"dev\" { }\n}\nimage {\n    name \"B\"\n    flavour \"dev\" {\n    }\n}\n";
+        let chain = [("flavour", Some("dev"))];
+        let at = block_close(text, "B", &chain).expect("B's flavour block");
+        assert!(text[..at].ends_with("flavour \"dev\" {\n    "), "{at}");
+        assert!(block_close(text, "C", &chain).is_none());
         let whole = block_close(text, "A", &[]).expect("A's own brace");
         assert!(whole < at);
     }
 
     #[test]
     fn an_empty_flavours_block_is_a_block_with_nothing_in_it() {
-        let found = messages(
-            r#"
-image {
-    name "X"
-    base "quay.io/fedora/fedora-bootc:44" { family "fedora" }
-    flavours { }
-    modules { }
-}
-"#,
-        );
+        let found = messages("image {\n    name \"X\"\n    flavours { }\n    x\n}\n");
         assert_eq!(found, ["`flavours` has no flavours in it"]);
     }
 
     #[test]
-    fn boot_accepts_only_one_known_chain() {
+    fn boot_chain_accepts_only_one_known_chain() {
         for chain in BOOT_CHAINS {
             assert!(messages(&format!(
-                "image {{\n name \"X\"\n boot \"{chain}\"\n base \"x\" {{ family \"fedora\" }}\n modules {{ }}\n}}"
+                "image {{\n name \"X\"\n boot-chain \"{chain}\"\n x\n}}"
             ))
             .is_empty());
         }
         assert_eq!(
-            messages(
-                "image {\n name \"X\"\n boot \"grub\"\n boot \"uki-db\"\n base \"x\" { family \"fedora\" }\n modules { }\n}"
-            ),
-            ["`grub` is not a boot chain", "`boot` is declared twice"]
+            messages("image {\n name \"X\"\n boot-chain \"grub\"\n x\n}"),
+            ["`grub` is not a boot chain"]
         );
     }
 
     #[test]
     fn a_uki_chain_refuses_a_conflicting_layout() {
         let found = semantic_messages(
-            "image {\n name \"X\"\n boot \"uki-db\"\n base \"x\" { family \"fedora\" }\n layout { filesystem \"xfs\"\n composefs #false\n generic-image #false\n bootloader \"grub2\" }\n modules { }\n}",
+            "image {\n name \"X\"\n boot-chain \"uki-db\"\n x\n layout { filesystem \"xfs\"\n composefs #false\n generic-image #false\n bootloader \"grub2\" }\n}",
         );
         assert!(found
             .iter()
             .any(|message| message.contains("conflicts with its UKI chain")));
+    }
+
+    /// `base-image` holds a library base below it, so it is an organising
+    /// directory and a definition may sit at its path. The definition carries
+    /// a digest, which reaches the generated `FROM`.
+    #[test]
+    fn an_inline_base_at_an_organising_directory_builds_on_its_reference() {
+        let root = repository(
+            "inline-base",
+            "image {\n name \"X\"\n base-image {\n  base \"quay.io/fedora/fedora-bootc:44\" { family \"fedora\"; }\n  digest \"sha256:abc\"\n }\n}\n",
+            &[("base-image/fedora-bootc", "base \"quay.io/fedora/fedora-bootc:44\"\n")],
+        );
+        let (list, issues) = List::load(&root);
+        let _ = std::fs::remove_dir_all(&root);
+        assert!(issues.findings().is_empty(), "{:?}", issues.findings());
+        let base = list.images[0]
+            .base
+            .as_ref()
+            .expect("the definition is a base");
+        assert_eq!(base.path, "base-image");
+        assert_eq!(base.image, "quay.io/fedora/fedora-bootc:44@sha256:abc");
+        assert_eq!(base.family, "fedora");
+        assert!(base.answers(crate::parse::component::BASE_IMAGE));
+    }
+
+    #[test]
+    fn an_inline_definition_that_meets_a_component_is_refused_naming_both() {
+        let root = repository(
+            "inline-clash",
+            "image {\n name \"X\"\n x\n tools {\n  packages \"vim\"\n }\n}\n",
+            &[
+                ("x", "base \"x\" { family \"fedora\"; }\n"),
+                ("tools", "packages \"vim\"\n"),
+            ],
+        );
+        let found = crate::load(&root).issues.findings();
+        let _ = std::fs::remove_dir_all(&root);
+        assert!(
+            found.iter().any(|message| message
+                .contains("`tools` is defined inline, and components/tools is a component too")),
+            "{found:?}"
+        );
+    }
+
+    #[test]
+    fn a_second_base_is_refused() {
+        let root = repository(
+            "two-bases",
+            "image {\n name \"X\"\n x\n y\n}\n",
+            &[("x", "base \"x\"\n"), ("y", "base \"y\"\n")],
+        );
+        let (_, issues) = List::load(&root);
+        let _ = std::fs::remove_dir_all(&root);
+        assert!(
+            issues
+                .findings()
+                .iter()
+                .any(|message| message.contains("`x` lists two bases")),
+            "{:?}",
+            issues.findings()
+        );
+    }
+
+    #[test]
+    fn a_top_level_component_named_after_an_image_node_is_refused() {
+        let root = repository(
+            "keyword-dir",
+            "image {\n name \"X\"\n x\n}\n",
+            &[
+                ("x", "base \"x\"\n"),
+                ("boot-chain/uki", "packages \"a\"\n"),
+            ],
+        );
+        let (_, issues) = List::load(&root);
+        let _ = std::fs::remove_dir_all(&root);
+        assert!(
+            issues
+                .findings()
+                .iter()
+                .any(|message| message
+                    .contains("components/boot-chain is named after an image node")),
+            "{:?}",
+            issues.findings()
+        );
+    }
+
+    /// `hardware` holds no component, so it lists nothing. Its second
+    /// spelling only reaches a further child.
+    #[test]
+    fn an_organising_segment_lists_nothing_and_may_repeat() {
+        let root = repository(
+            "organise",
+            "image {\n name \"X\"\n x\n hardware { nvidia }\n hardware { audio }\n}\n",
+            &[
+                ("x", "base \"x\"\n"),
+                ("hardware/nvidia", "packages \"a\"\n"),
+                ("hardware/audio", "packages \"b\"\n"),
+            ],
+        );
+        let (list, issues) = List::load(&root);
+        let _ = std::fs::remove_dir_all(&root);
+        assert!(issues.findings().is_empty(), "{:?}", issues.findings());
+        let paths: Vec<&str> = list.images[0]
+            .entries
+            .iter()
+            .map(|entry| entry.path.as_str())
+            .collect();
+        assert_eq!(paths, ["hardware/nvidia", "hardware/audio"]);
+    }
+
+    #[test]
+    fn a_child_with_an_argument_sets_an_option_and_one_without_is_a_segment() {
+        let root = repository(
+            "options",
+            "image {\n name \"X\"\n x\n hardware {\n  nvidia {\n   version \"550\"\n   cuda\n  }\n }\n}\n",
+            &[("x", "base \"x\"\n")],
+        );
+        let (list, _) = List::load(&root);
+        let _ = std::fs::remove_dir_all(&root);
+        let entries = &list.images[0].entries;
+        let nvidia = entries
+            .iter()
+            .find(|entry| entry.path == "hardware/nvidia")
+            .expect("nvidia sets an option, so it lists its component");
+        assert_eq!(nvidia.options[0].0, "version");
+        assert!(entries
+            .iter()
+            .any(|entry| entry.path == "hardware/nvidia/cuda"));
+    }
+
+    /// Loads a repository whose base component `x` is on the `fedora` family,
+    /// and returns every finding the full resolution reports.
+    fn resolved(case: &str, image: &str, dirs: &[(&str, &str)]) -> Vec<String> {
+        let mut all = vec![("x", "base \"x\" { family \"fedora\"; }\n")];
+        all.extend_from_slice(dirs);
+        let root = repository(case, image, &all);
+        let found = crate::load(&root).issues.findings();
+        let _ = std::fs::remove_dir_all(&root);
+        found
+    }
+
+    fn holds(found: &[String], wanted: &str) {
+        assert!(
+            found.iter().any(|message| message.contains(wanted)),
+            "{wanted}: {found:?}"
+        );
+    }
+
+    #[test]
+    fn an_inline_definition_is_held_to_the_manifest_grammar() {
+        let found = resolved(
+            "inline-grammar",
+            "image {\n name \"X\"\n x\n tools {\n  packages \"vim\"\n  palette \"red\"\n }\n}\n",
+            &[],
+        );
+        holds(&found, "unknown node `palette`");
+    }
+
+    /// `digest` under `base` would be dropped, and the build would start from
+    /// an unpinned reference.
+    #[test]
+    fn a_block_under_base_is_refused() {
+        let found = resolved(
+            "base-block",
+            "image {\n name \"X\"\n base-image {\n  base \"quay.io/x:1\" { digest \"sha256:ab\" }\n }\n}\n",
+            &[],
+        );
+        holds(&found, "`base` holds no `digest`");
+    }
+
+    #[test]
+    fn a_hand_written_base_image_capability_is_refused() {
+        let found = resolved(
+            "base-image-by-hand",
+            "image {\n name \"X\"\n x\n tools {\n  provides \"base-image\"\n }\n}\n",
+            &[],
+        );
+        holds(&found, "`base-image` is what a `base` node provides");
+    }
+
+    #[test]
+    fn a_malformed_signed_and_a_second_digest_are_refused() {
+        let found = semantic_messages(
+            "image {\n name \"X\"\n x {\n  signed \"true\"\n  digest \"sha256:ab\"\n  digest \"sha256:cd\"\n }\n}",
+        );
+        holds(&found, "`signed` needs #true or #false");
+        holds(&found, "`digest` is declared twice");
+    }
+
+    #[test]
+    fn a_seed_refuses_an_inline_definition() {
+        let root = repository(
+            "seed-inline",
+            "image {\n name \"example\"\n x\n tools {\n  packages \"vim\"\n }\n}\n",
+            &[("x", "base \"x\" { family \"fedora\"; }\n")],
+        );
+        std::fs::write(
+            root.join("repo.kdl"),
+            "schema-version 1\nsources {\n components \"owner\" { dir \".\" }\n}\nseed \"example\" collection=\"owner\"\n",
+        )
+        .expect("the temporary directory is writable");
+        let (_, issues) = List::load(&root);
+        let _ = std::fs::remove_dir_all(&root);
+        holds(
+            &issues.findings(),
+            "`tools` is defined inline, so the seed cannot name it",
+        );
+    }
+
+    /// `fragment position="after"` carries a property alone, and it is still
+    /// a manifest node. Only a definition gets the refusal that it ships no
+    /// Containerfile.inc.
+    #[test]
+    fn a_manifest_node_with_a_property_alone_defines_inline() {
+        let found = resolved(
+            "inline-fragment",
+            "image {\n name \"X\"\n x\n tools {\n  fragment position=\"after\"\n }\n}\n",
+            &[],
+        );
+        holds(
+            &found,
+            "`tools` declares `fragment` but ships no Containerfile.inc",
+        );
     }
 }

@@ -1,7 +1,0 @@
-schema-version 1
-
-description "Ships a fragment beside its standard layer"
-
-supports "fedora"
-
-fragment

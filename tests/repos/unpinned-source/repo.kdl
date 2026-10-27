@@ -4,7 +4,7 @@ name "Unpinned Source"
 seed "example" collection="tectonic-os"
 
 sources {
-    modules "tectonic-os" {
+    components "tectonic-os" {
         url "https://github.com/tectonic-os/modules"
         version "main"
         unpinned "the library this tool is published alongside, followed at its branch head"

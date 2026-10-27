@@ -1,13 +1,13 @@
-<a id="modules.lock.kdl"></a>
+<a id="components.lock.kdl"></a>
 
-# `modules.lock.kdl`
+# `components.lock.kdl`
 
-Location: `modules/modules.lock.kdl`, at the root of `modules/`.
+Location: `components/components.lock.kdl`, at the root of `components/`.
 
-When `tect import module` copies a module into this repository, it records the module here. The entry keeps where the module came from and what its content hashed to, so `tect check`, `tect generate` and `tect build` can tell whether the copy has changed since.
+When `tect import component` copies a component into this repository, it records the component here. The entry keeps where the component came from and what its content hashed to, so `tect check`, `tect generate` and `tect build` can tell whether the copy has changed since.
 
 ```kdl
-module "browser" {
+component "browser" {
     library "tectonic-os"
     path "browser"
     content "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
@@ -16,126 +16,126 @@ module "browser" {
 
 | Field | Accepts | Description |
 | --- | --- | --- |
-| [`module`](#module) (required,&nbsp;unique) | *string*, then {&nbsp;[fields](#module-fields)&nbsp;} | One imported module, by its path under `modules/`. |
+| [`component`](#component) (required,&nbsp;unique) | *string*, then {&nbsp;[fields](#component-fields)&nbsp;} | One imported component, by its path under `components/`. |
 
 > [!NOTE]
-> `tect import module` writes the whole file. The user does not edit it, and every command that reads the images refuses an entry that does not read.
+> `tect import component` writes the whole file. The user does not edit it, and every command that reads the images refuses an entry that does not read.
 >
-> `tect fetch modules` copies each tracked module again from its library, and records the new `content` and `component-version`. `tect set module <path> --untracked` drops `track` and keeps the rest of the entry.
+> `tect fetch components` copies each tracked component again from its library, and records the new `content` and `component-version`. `tect set component <path> --untracked` drops `track` and keeps the rest of the entry.
 >
-> The entry is keyed by the local path, so one library module imported twice under two names has two entries.
+> The entry is keyed by the local path, so one library component imported twice under two names has two entries.
 >
-> `plan.json` carries the same hash for each module, so `tect verify` fails on a module edited without a new `tect generate`.
+> `plan.json` carries the same hash for each component, so `tect verify` fails on a component edited without a new `tect generate`.
 >
-> If a tracked module's content no longer matches its entry, or its directory is missing, then every command that reads the images refuses it, `tect build` included. `audit` does not change this.
+> If a tracked component's content no longer matches its entry, or its directory is missing, then every command that reads the images refuses it, `tect build` included. `audit` does not change this.
 >
-> If an untracked module's content no longer matches its entry, then `tect why` reads the edit out. The copy is the repository's own, so no command refuses it.
+> If an untracked component's content no longer matches its entry, then `tect why` reads the edit out. The copy is the repository's own, so no command refuses it.
 
-<a id="module"></a>
+<a id="component"></a>
 
-## `module` (required, unique)
+## `component` (required, unique)
 
-One imported module, by its path under `modules/`.
+One imported component, by its path under `components/`.
 
 ```kdl
-module "browser" {
+component "browser" {
     library "tectonic-os"
     path "browser"
     content "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
 }
 ```
 
-Accepts: *string*, then {&nbsp;[fields](#module-fields)&nbsp;}
+Accepts: *string*, then {&nbsp;[fields](#component-fields)&nbsp;}
 
-<a id="module-fields"></a>
+<a id="component-fields"></a>
 
 | Field | Accepts | Description |
 | --- | --- | --- |
-| [`library`](#module-library) (required) | *string* | The library the module was imported from, as `sources` in `repo.kdl` names it. |
-| [`path`](#module-path) (required) | *string* | The path of the module inside the library. It differs from the entry's own path when the module was imported under another name. |
-| [`url`](#module-url) (optional) | *string* | The Git URL of the library, for a library that `tect` fetched. |
-| [`component-version`](#module-component-version) (optional) | *string* | The revision of the library that the module was taken at, for a library that `tect` fetched. |
-| [`content`](#module-content) (required) | *string* | The hash that the module directory had at import. |
-| [`track`](#module-track) (optional) |  | Marks a copy that tracks its library. An untracked copy is the repository's own. |
+| [`library`](#component-library) (required) | *string* | The library the component was imported from, as `sources` in `repo.kdl` names it. |
+| [`path`](#component-path) (required) | *string* | The path of the component inside the library. It differs from the entry's own path when the component was imported under another name. |
+| [`url`](#component-url) (optional) | *string* | The Git URL of the library, for a library that `tect` fetched. |
+| [`component-version`](#component-component-version) (optional) | *string* | The revision of the library that the component was taken at, for a library that `tect` fetched. |
+| [`content`](#component-content) (required) | *string* | The hash that the component directory had at import. |
+| [`track`](#component-track) (optional) |  | Marks a copy that tracks its library. An untracked copy is the repository's own. |
 
-<a id="module-library"></a>
+<a id="component-library"></a>
 
 ### `library` (required)
 
-The library the module was imported from, as `sources` in `repo.kdl` names it.
+The library the component was imported from, as `sources` in `repo.kdl` names it.
 
 ```kdl
-module "browser" {
+component "browser" {
     library "tectonic-os"
 }
 ```
 
 Accepts: *string*
 
-<a id="module-path"></a>
+<a id="component-path"></a>
 
 ### `path` (required)
 
-The path of the module inside the library. It differs from the entry's own path when the module was imported under another name.
+The path of the component inside the library. It differs from the entry's own path when the component was imported under another name.
 
 ```kdl
-module "browser" {
+component "browser" {
     path "browser"
 }
 ```
 
 Accepts: *string*
 
-<a id="module-url"></a>
+<a id="component-url"></a>
 
 ### `url` (optional)
 
 The Git URL of the library, for a library that `tect` fetched.
 
 ```kdl
-module "browser" {
+component "browser" {
     url "https://github.com/tectonic-os/library.git"
 }
 ```
 
 Accepts: *string*
 
-<a id="module-component-version"></a>
+<a id="component-component-version"></a>
 
 ### `component-version` (optional)
 
-The revision of the library that the module was taken at, for a library that `tect` fetched.
+The revision of the library that the component was taken at, for a library that `tect` fetched.
 
 ```kdl
-module "browser" {
+component "browser" {
     component-version "v0.6.51"
 }
 ```
 
 Accepts: *string*
 
-<a id="module-content"></a>
+<a id="component-content"></a>
 
 ### `content` (required)
 
-The hash that the module directory had at import.
+The hash that the component directory had at import.
 
 ```kdl
-module "browser" {
+component "browser" {
     content "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
 }
 ```
 
 Accepts: *string*
 
-<a id="module-track"></a>
+<a id="component-track"></a>
 
 ### `track` (optional)
 
 Marks a copy that tracks its library. An untracked copy is the repository's own.
 
 ```kdl
-module "browser" {
+component "browser" {
     track
 }
 ```

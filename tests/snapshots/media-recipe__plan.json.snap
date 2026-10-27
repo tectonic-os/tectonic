@@ -37,37 +37,14 @@ source: tests/golden/harness.rs
         "bootloader": "grub2"
       },
       "base": {
+        "path": "base-image/debian-forky",
+        "defined": null,
         "image": "docker.io/library/debian:forky",
         "family": "debian",
         "scap_content": "",
         "signed": false,
         "provides": [],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -84,25 +61,31 @@ source: tests/golden/harness.rs
           "default": true,
           "pr": true,
           "siblings": [],
-          "modules": [
+          "components": [
             {
               "path": "core/luks",
               "flavour": null,
               "variant": null,
-              "description": "The LUKS initramfs witness, carried by a module and not by the base",
+              "description": "The LUKS initramfs witness, carried by a component and not by the base",
               "options": {},
               "provides": [
                 "luks-initramfs"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "ccdf0059176c186c6137140022550f05625abce0bda4226971635e96aa13aa49",
+                "defined": null,
+                "content": "c54d668a97aeac1c5aea2e887e1cccbb65b36531e9fbbee6eb85bd3f3c19e2dc",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []

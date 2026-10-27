@@ -1,13 +1,15 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
-  x `core/hello` is not a module
-    ,-[tests/repos/wrong-pin/image.kdl:12:9]
- 11 |     modules {
- 12 |         module "core/hello"
-    :         ^^^|^^
-    :            `-- nothing to build
- 13 |     }
+  x `core/hello` is not a component
+    ,-[tests/repos/wrong-pin/image.kdl:11:9]
+ 10 |     core {
+ 11 |         hello
+    :         ^^|^^
+    :           `-- nothing to build
+ 12 |     }
     `----
-  help: give modules/core/hello a module.kdl, a module.sh, a files/ directory,
-        a Containerfile.inc or a file that another module collects
+  help: give components/core/hello a manifest.kdl, a component.sh, a repo.sh,
+        a packages.sh, a finalize.sh, a files/ directory, a Containerfile.inc
+        or a file that another component collects, or define it inline with a
+        manifest node such as `packages`

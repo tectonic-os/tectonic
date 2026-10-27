@@ -1,0 +1,9 @@
+schema-version 1
+
+description "apt, which every Debian-family build layer reaches for"
+
+targets "debian" "ubuntu"
+
+provides "build-environment"
+
+helpers "lib/family.sh"

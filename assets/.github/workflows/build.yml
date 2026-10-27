@@ -67,7 +67,7 @@ jobs:
 
           base="$(git merge-base "origin/${BASE_REF}" HEAD)"
           changed="$(git diff --name-only "$base" HEAD \
-            | grep -E '^([^/]+\.kdl|modules/.*/module\.kdl)$' || true)"
+            | grep -E '^([^/]+\.kdl|components/.*/manifest\.kdl)$' || true)"
           if [ -z "$changed" ]; then
             echo "No manifest changed against ${BASE_REF}, nothing to do."
             exit 0
@@ -93,11 +93,11 @@ jobs:
             echo "tect ${version}: hash updated."
           fi
 
-          while IFS='|' read -r module name file version pinned from url; do
+          while IFS='|' read -r component name file version pinned from url; do
             grep -qxF "$file" <<< "$changed" || continue
             [ -n "$pinned" ] || continue
             if [ "$from" = "manual" ]; then
-              echo "${module} ${name}: hash is maintained by hand, skipping."
+              echo "${component} ${name}: hash is maintained by hand, skipping."
               continue
             fi
 
@@ -115,14 +115,14 @@ jobs:
             rm -f "${RUNNER_TEMP}/asset"
 
             if [ "$actual" = "$pinned" ]; then
-              echo "${module} ${name} ${version}: hash already matches."
+              echo "${component} ${name} ${version}: hash already matches."
               continue
             fi
             sed -i "s/sha256 \"${pinned}\"/sha256 \"${actual}\"/" "$file"
             fixed+=("${name} ${version}")
-            echo "${module} ${name} ${version}: hash updated."
+            echo "${component} ${name} ${version}: hash updated."
           done < <(./scripts/tect.sh plan --json | jq -r '.assets[]
-            | [.module, .name, .manifest, (.pin.selector // ""), (.pin.verifier // ""),
+            | [.component, .name, .manifest, (.pin.selector // ""), (.pin.verifier // ""),
                .pin.from, (.pin.resolved // "")] | join("|")')
 
           ./scripts/tect.sh generate
@@ -199,7 +199,7 @@ jobs:
 
       - name: Discover and run kernel-freshness tests
         run: |
-          mapfile -t dirs < <(find modules -name test_kernel_freshness.py -type f -exec dirname {} \; | sort -u)
+          mapfile -t dirs < <(find components -name test_kernel_freshness.py -type f -exec dirname {} \; | sort -u)
           for d in "${dirs[@]}"; do
             echo "==> Running tests in ${d}..."
             python3 -m unittest discover -s "$d" -v
@@ -434,7 +434,7 @@ jobs:
             name="SECRET_${id^^}"
             value="${!name:-}"
             if [ -z "$value" ]; then
-              echo "::warning::a module declares the build secret '${id}'," \
+              echo "::warning::a component declares the build secret '${id}'," \
                 "but this workflow passes no ${name}. Building without it."
               continue
             fi
@@ -726,7 +726,7 @@ jobs:
           ref: ${{ needs.checksums.outputs.ref }}
 
       # Nothing when the target declares no `conforms`, which is an image
-      # asking not to be measured. A module's `satisfies` does not open this
+      # asking not to be measured. A component's `satisfies` does not open this
       # gate, and every step below is gated on it.
       - name: What this target is measured with
         id: content
@@ -835,7 +835,7 @@ jobs:
           # then decides the target is not Fedora and skips every rule.
           #
           # Every rule in the datastream at the declared profile's values, so
-          # one run answers what the modules claimed and what the image scores.
+          # one run answers what the components claimed and what the image scores.
           # oscap exits non-zero whenever any rule fails, which is expected.
           ./scripts/tect.sh scap tailoring --target "$TARGET" \
             --datastream "$DATASTREAM" > "${RUNNER_TEMP}/tailoring.xml"

@@ -3,38 +3,30 @@ schema-version 1
 image {
     id "shim"
     name "Shim"
-    boot "uki-shim"
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "bootupctl" "luks-initramfs"
+    boot-chain "uki-shim"
+    base-image {
+        fedora-bootc-44
     }
-    modules {
-        module "uki"
-        module "enrolment"
-    }
+    uki
+    enrolment
 }
 
 image {
     id "db"
     name "DB"
-    boot "uki-db"
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "bootupctl" "luks-initramfs"
+    boot-chain "uki-db"
+    base-image {
+        fedora-bootc-44
     }
-    modules {
-        module "uki"
-        module "enrolment"
-    }
+    uki
+    enrolment
 }
 
 image {
     id "missing"
     name "Missing"
-    boot "uki-db"
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "bootupctl" "luks-initramfs"
+    boot-chain "uki-db"
+    base-image {
+        fedora-bootc-44
     }
-    modules { }
 }

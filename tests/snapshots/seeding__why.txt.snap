@@ -4,7 +4,7 @@ source: tests/golden/harness.rs
 ==== markdown
 # flatpak
 
-A module imported from the collection this repository publishes
+A component imported from the collection this repository publishes
 
 ## Where it is built
 
@@ -30,13 +30,13 @@ Nothing. It declares no `satisfies`.
 
 | Content | Hash |
 | --- | --- |
-| declared | `92b59a9174674c7508a790d68206326d8816d9b17a472093acace7b6ee01a114` |
+| declared | `deb16d7bc597e50fb1c20f6f0fbd4d550031efaaf306125a53679675367c12be` |
 
 | Collection | Locator | Selector | Verifier | Tracker |
 | --- | --- | --- | --- | --- |
 | `tectonic-os` | https://github.com/tectonic-os/modules | v1.0.0 | not declared | none |
 
-It tracks its library, and its content still matches what was imported. An edit to it stops `tect check`, `tect generate` and `tect build`.
+**It has been edited since it was imported**, and it tracks its library, so `tect check`, `tect generate` and `tect build` refuse it.
 
 ## What it pulls in
 
@@ -44,16 +44,17 @@ Nothing. It declares no `asset`.
 
 ## Third-party repositories
 
-None. It declares no `copr` and ships no `repo` file.
+None. It declares no `copr` and ships no `repo.sh` file.
 
 ==== json
 {
-  "module": "flatpak",
-  "description": "A module imported from the collection this repository publishes",
+  "component": "flatpak",
+  "description": "A component imported from the collection this repository publishes",
   "images": [
     "example"
   ],
   "suppressed": [],
+  "imported_by": [],
   "provides": [
     {
       "capability": "flatpak",
@@ -73,7 +74,7 @@ None. It declares no `copr` and ships no `repo` file.
   "groups": [],
   "coprs": [],
   "satisfies": [],
-  "content": "92b59a9174674c7508a790d68206326d8816d9b17a472093acace7b6ee01a114",
+  "content": "deb16d7bc597e50fb1c20f6f0fbd4d550031efaaf306125a53679675367c12be",
   "built": null,
   "imported": {
     "collection": "tectonic-os",
@@ -86,18 +87,29 @@ None. It declares no `copr` and ships no `repo` file.
     },
     "tracked": true
   },
-  "modified": false,
+  "modified": true,
   "fetches": [],
   "repo": null
 }
 ==== unknown
-  x `nosuch` is not a module this repository lists
-  help: modules: drivers, fedora-family, flatpak, hello
+  x `components/flatpak` tracks its library, and its content no longer matches
+  | its lock entry
+   ,-[tests/repos/seeding/components/components.lock.kdl:1:1]
+ 1 | component "flatpak" {
+   : ^^^^|^^^^
+   :     `-- this entry
+ 2 |     library "tectonic-os"
+   `----
+  help: undo the edit to `components/flatpak`, or run `tect set component
+        flatpak --untracked` to make the copy the repository's own
+
+  x `nosuch` is not a component this repository lists
+  help: components: drivers, fedora-family, flatpak, hello
 
 ==== from the baked manifest, with no repository
 # flatpak
 
-A module imported from the collection this repository publishes
+A component imported from the collection this repository publishes
 
 ## Where it is built
 
@@ -125,13 +137,13 @@ Nothing. It declares no `satisfies`.
 
 | Content | Hash |
 | --- | --- |
-| declared | `92b59a9174674c7508a790d68206326d8816d9b17a472093acace7b6ee01a114` |
+| declared | `deb16d7bc597e50fb1c20f6f0fbd4d550031efaaf306125a53679675367c12be` |
 
 | Collection | Locator | Selector | Verifier | Tracker |
 | --- | --- | --- | --- | --- |
 | `tectonic-os` | https://github.com/tectonic-os/modules | v1.0.0 | not declared | none |
 
-It tracks its library, and its content still matches what was imported. An edit to it stops `tect check`, `tect generate` and `tect build`.
+**It has been edited since it was imported**, and it tracks its library, so `tect check`, `tect generate` and `tect build` refuse it.
 
 ## What it pulls in
 
@@ -139,7 +151,7 @@ Nothing. It declares no `asset`.
 
 ## Third-party repositories
 
-None. It declares no `copr` and ships no `repo` file.
+None. It declares no `copr` and ships no `repo.sh` file.
 
 ==== the names it knows
 drivers, fedora-family, flatpak, hello
@@ -148,7 +160,7 @@ drivers, fedora-family, flatpak, hello
 
 | Content | Hash |
 | --- | --- |
-| declared | `92b59a9174674c7508a790d68206326d8816d9b17a472093acace7b6ee01a114` |
+| declared | `deb16d7bc597e50fb1c20f6f0fbd4d550031efaaf306125a53679675367c12be` |
 | observed by the build | `not what was declared` |
 
 **The two documents disagree**, which they cannot if both came from this build.
@@ -157,4 +169,4 @@ drivers, fedora-family, flatpak, hello
 | --- | --- | --- | --- | --- |
 | `tectonic-os` | https://github.com/tectonic-os/modules | v1.0.0 | not declared | none |
 
-It tracks its library, and its content still matches what was imported. An edit to it stops `tect check`, `tect generate` and `tect build`.
+**It has been edited since it was imported**, and it tracks its library, so `tect check`, `tect generate` and `tect build` refuse it.

@@ -3,41 +3,41 @@
 
 use crate::diag::{Issues, Source};
 use crate::layout;
-use crate::model::module::Key;
+use crate::model::component::Key;
 use kdl::KdlDocument;
 use std::collections::BTreeMap;
 use std::path::Path;
 
 #[derive(Default)]
 pub struct Disk {
-    /// Key kind to every module declaring it and what each declaration says,
+    /// Key kind to every component declaring it and what each declaration says,
     /// which is where `create key` learns everything but the kind.
     pub keys: BTreeMap<String, Vec<(String, Key)>>,
-    /// Key kind to the module whose declaration of it the manifest refuses, and
+    /// Key kind to the component whose declaration of it the manifest refuses, and
     /// the refusals rendered. `create key` then names the value to fix
-    /// instead of a module to import.
+    /// instead of a component to import.
     pub refused_keys: BTreeMap<String, (String, String)>,
-    /// Collected filename to the module that collects it, so a contribution
+    /// Collected filename to the component that collects it, so a contribution
     /// whose consumer is not enabled can name what to enable.
     pub collectors: BTreeMap<String, String>,
-    /// Module directory to every path its files/ overlay puts in the image.
+    /// Component directory to every path its files/ overlay puts in the image.
     pub overlays: BTreeMap<String, Vec<String>>,
 }
 
 impl Disk {
-    /// Every module directory on disk, whether or not an image lists it.
-    pub fn modules(&self) -> impl Iterator<Item = &String> {
+    /// Every component directory on disk, whether or not an image lists it.
+    pub fn components(&self) -> impl Iterator<Item = &String> {
         self.overlays.keys()
     }
 
-    /// Whether the directory under `modules/` is a module.
-    pub fn is_module(&self, dir: &str) -> bool {
+    /// Whether the directory under `components/` is a component.
+    pub fn is_component(&self, dir: &str) -> bool {
         self.overlays.contains_key(dir)
     }
 
-    /// A module may ship only a file that another module collects, and the
-    /// collected names come from the manifests. If any module collects a file,
-    /// then a second walk counts that file as the mark of a module.
+    /// A component may ship only a file that another component collects, and the
+    /// collected names come from the manifests. If any component collects a file,
+    /// then a second walk counts that file as the mark of a component.
     pub fn scan(root: &Path) -> Self {
         let first = Self::walk(root, &[]);
         if first.collectors.is_empty() {
@@ -50,23 +50,23 @@ impl Disk {
     fn walk(root: &Path, collected: &[String]) -> Self {
         let mut out = Self::default();
 
-        let modules = layout::modules(root);
-        let found = layout::module_dirs(
-            &modules,
+        let components = layout::components(root);
+        let found = layout::component_dirs(
+            &components,
             |path| {
-                layout::is_module(path) || collected.iter().any(|file| path.join(file).is_file())
+                layout::is_component(path) || collected.iter().any(|file| path.join(file).is_file())
             },
             |name| name == "_template",
         );
         for path in found {
-            let manifest = path.join(layout::MODULE_FILE);
+            let manifest = path.join(layout::MANIFEST_FILE);
             let name = path
-                .strip_prefix(&modules)
+                .strip_prefix(&components)
                 .unwrap_or(&path)
                 .display()
                 .to_string();
             // A family overlay puts paths in the image too, so an override
-            // one module gates and another does not is still two modules
+            // one component gates and another does not is still two components
             // writing one path.
             let mut paths = overlay_paths(&path.join(layout::OVERLAY));
             for (gated, _) in layout::FAMILY_DIRS {
@@ -98,7 +98,8 @@ impl Disk {
                     "key" => {
                         let src = Source::new(manifest.display().to_string(), text.clone());
                         let mut refused = Issues::default();
-                        let Some(key) = crate::parse::module::parse_key(node, &src, &mut refused)
+                        let Some(key) =
+                            crate::parse::component::parse_key(node, &src, &mut refused)
                         else {
                             out.refuse_key(args().next(), &name, &doc, &src, refused);
                             continue;
@@ -117,12 +118,12 @@ impl Disk {
 }
 
 impl Disk {
-    /// Keeps the first module that declares `kind` with a refused key. A key
+    /// Keeps the first component that declares `kind` with a refused key. A key
     /// with no kind has nothing `create key` can name.
     fn refuse_key(
         &mut self,
         kind: Option<&str>,
-        module: &str,
+        component: &str,
         doc: &KdlDocument,
         src: &Source,
         mut refused: Issues,
@@ -130,10 +131,15 @@ impl Disk {
         let Some(kind) = kind else {
             return;
         };
-        crate::parse::schema::check_doc(doc, &crate::parse::module::MODULE, src, &mut refused);
+        crate::parse::schema::check_doc(
+            doc,
+            &crate::parse::component::COMPONENT,
+            src,
+            &mut refused,
+        );
         self.refused_keys
             .entry(kind.to_string())
-            .or_insert_with(|| (module.to_string(), refused.plain()));
+            .or_insert_with(|| (component.to_string(), refused.plain()));
     }
 }
 

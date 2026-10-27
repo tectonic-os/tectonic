@@ -28,10 +28,10 @@ pub const CONFORMS_BY_HAND: &str = "nothing can be asked here; write `conforms \
                                     into the image, and `tect scap content` prints the \
                                     datastream it is then measured with";
 
-/// The same, for the rules a module claims: the manifest was always the
+/// The same, for the rules a component claims: the manifest was always the
 /// interface, and a claim is a number read out of a datastream or nothing.
 pub const CLAIMS_BY_HAND: &str = "nothing can be asked here; write `satisfies { <benchmark> \
-                                  \"<number>\" }` into the module, and `tect scap content` \
+                                  \"<number>\" }` into the component, and `tect scap content` \
                                   prints the datastream those numbers are read out of";
 
 /// A top-level block put back where it was, else at the end of the file.
@@ -66,7 +66,7 @@ pub fn fuzz_rewrites(text: &str) {
     let spans = [
         crate::parse::repo::workflows_span(text),
         crate::parse::image::conforms_span(text, "fuzz"),
-        crate::parse::module::satisfies_span(text),
+        crate::parse::component::satisfies_span(text),
     ];
     for span in spans {
         let _ = splice(text, span, "fuzz \"value\"");
@@ -489,7 +489,7 @@ pub(crate) fn cost(measured: &str, enforce: bool) -> String {
 }
 
 /// The benchmark profile one image is measured against, and whatever claiming
-/// modules the offer alongside it brought.
+/// components the offer alongside it brought.
 pub struct Conforms {
     /// The image file, as the image was read from.
     file: PathBuf,
@@ -497,7 +497,7 @@ pub struct Conforms {
     image: String,
     profile: String,
     brought: Vec<String>,
-    bring: Option<crate::import::Module>,
+    bring: Option<crate::import::Component>,
 }
 
 impl Conforms {
@@ -518,7 +518,7 @@ impl Conforms {
     }
 
     /// Which image, then which profile out of the content a scan of it would
-    /// read, then whether to bring the modules claiming its rules. Leaving
+    /// read, then whether to bring the components claiming its rules. Leaving
     /// either picker is `None` and writes nothing.
     pub fn collect(
         root: &Path,
@@ -527,7 +527,7 @@ impl Conforms {
         prompt: &Prompt,
     ) -> Result<Option<Self>, Error> {
         let crate::Loaded { list, .. } = crate::load(root);
-        // The offer may bring a library module, so it reads the libraries
+        // The offer may bring a library component, so it reads the libraries
         // already on this machine. Resolution reads none.
         let disk = crate::parse::disk::Disk::scan(root);
         let index = crate::provider::Index::scan(root, &list.sources, &disk, false);
@@ -603,7 +603,7 @@ impl Conforms {
             profile: profile.name().to_string(),
             brought: bring
                 .as_ref()
-                .map(crate::import::Module::brought)
+                .map(crate::import::Component::brought)
                 .unwrap_or_default(),
             bring,
         }))
@@ -627,7 +627,7 @@ impl Conforms {
             Change::Updated(match self.brought.is_empty() {
                 true => format!("measured against `{}`", self.profile),
                 false => format!(
-                    "measured against `{}`, and {} added to modules",
+                    "measured against `{}`, and {} added to components",
                     self.profile,
                     crate::said(&self.brought)
                 ),
@@ -636,8 +636,8 @@ impl Conforms {
         Ok(wrote)
     }
 
-    /// In place of the declaration that was there, else in front of `base`,
-    /// which is where the schema lists it.
+    /// In place of the declaration that was there, else in front of the first
+    /// path segment.
     fn spliced(&self, text: &str) -> Result<String, String> {
         let was = parse::image::conforms_span(text, &self.image)
             .ok_or_else(|| format!("{} declares no image `{}`", self.file.display(), self.image))?;
@@ -709,7 +709,7 @@ fn claim_options(content: &Content, rules: &[(&String, &BTreeSet<String>)]) -> V
         .collect()
 }
 
-/// The benchmark numbers one module claims, chosen out of the rules a profile
+/// The benchmark numbers one component claims, chosen out of the rules a profile
 /// selects. A claim is recorded here and measured by `tect scap`; nothing in
 /// this command reads a scan.
 pub struct Claims {
@@ -727,7 +727,7 @@ pub struct Claims {
 }
 
 impl Claims {
-    /// Which profile the rules come out of, then which of them this module
+    /// Which profile the rules come out of, then which of them this component
     /// claims, opening on what it already declares. Leaving either picker is
     /// `None` and writes nothing.
     pub fn collect(
@@ -736,22 +736,22 @@ impl Claims {
         datastream: Option<PathBuf>,
         prompt: &Prompt,
     ) -> Result<Option<Self>, Error> {
-        let file = Path::new(layout::MODULES)
+        let file = Path::new(layout::COMPONENTS)
             .join(named)
-            .join(layout::MODULE_FILE);
+            .join(layout::MANIFEST_FILE);
         if !root.join(&file).is_file() {
             return Err(Error::Invocation(format!(
-                "`{named}` is not a module this repository holds; there is no {}",
+                "`{named}` is not a component this repository holds; there is no {}",
                 file.display()
             )));
         }
-        let summary = parse::module::summary(&root.join(&file));
-        let family = match summary.supports.first() {
+        let summary = parse::component::summary(&root.join(&file));
+        let family = match summary.targets.first() {
             Some(family) => family.as_str(),
             None if datastream.is_some() => "",
             None => {
                 return Err(Error::Invocation(format!(
-                    "`{named}` declares no `supports` restriction, so it has no default SCAP \
+                    "`{named}` declares no `targets` restriction, so it has no default SCAP \
                      content; give `--datastream <file>`"
                 )))
             }
@@ -846,7 +846,7 @@ impl Claims {
     }
 
     fn spliced(&self, text: &str) -> String {
-        splice(text, parse::module::satisfies_span(text), &self.block())
+        splice(text, parse::component::satisfies_span(text), &self.block())
     }
 
     /// One benchmark node, since declaring one twice is a diagnostic, and one
@@ -868,7 +868,7 @@ impl Claims {
     }
 }
 
-/// Which modules elsewhere claim rules the profile selects that the image does
+/// Which components elsewhere claim rules the profile selects that the image does
 /// not have, as the question whether to bring them. A claimant the repository
 /// owns needs a line, which `check`'s conformance notice already says.
 fn offer(
@@ -913,14 +913,14 @@ mod tests {
     #[test]
     fn a_one_line_sources_block_takes_a_source() {
         let library = Library {
-            kind: crate::model::remote::Kind::BaseImages,
+            kind: crate::model::remote::Kind::Components,
             alias: "core".to_string(),
             at: LibraryAt::Default(crate::base::default_library(
-                crate::model::remote::Kind::BaseImages,
+                crate::model::remote::Kind::Components,
             )),
         };
         let out = library
-            .spliced("schema-version 1\n\nsources { modules \"one\" { dir \"../one\" } }\n")
+            .spliced("schema-version 1\n\nsources { components \"one\" { dir \"../one\" } }\n")
             .expect("the splice is text");
         let issues = crate::parse::schema::check_text(&out, &crate::parse::repo::REPO, false)
             .unwrap_or_else(|err| panic!("{err}: {out:?}"));
@@ -928,18 +928,18 @@ mod tests {
     }
 
     /// The declaration replaces the one that was there and goes in front of
-    /// `base` otherwise, which is where the schema lists it.
+    /// the first path segment otherwise.
     #[test]
     fn the_profile_replaces_the_one_that_was_there() {
         let text =
-            "image {\n    name \"Example\"\n\n    conforms \"standard\"\n\n    base \"x\" {\n    }\n}\n";
+            "image {\n    name \"Example\"\n\n    conforms \"standard\"\n\n    x {\n    }\n}\n";
         assert_eq!(
             conforms("ospp").spliced(text).unwrap(),
             text.replace("\"standard\"", "\"ospp\"")
         );
     }
 
-    /// An image with no `base` for it to stand in front of still gets one.
+    /// An image with no segment for it to stand in front of still gets one.
     #[test]
     fn an_image_with_nothing_to_stand_in_front_of_still_takes_one() {
         assert_eq!(
@@ -961,22 +961,22 @@ mod tests {
 
     fn claims(profile: &str, numbers: &[&str]) -> Claims {
         Claims {
-            file: PathBuf::from("modules/one/module.kdl"),
+            file: PathBuf::from("components/one/manifest.kdl"),
             profile: profile.to_string(),
             numbers: numbers.iter().map(|n| n.to_string()).collect(),
             claimed: numbers.len(),
         }
     }
 
-    /// SCAP content is family-specific, so a base-agnostic module has no
+    /// SCAP content is family-specific, so a base-agnostic component has no
     /// installed default.
     #[test]
     fn base_agnostic_claims_need_a_datastream() {
         let root = std::env::temp_dir().join(format!("tect-claims-any-{}", std::process::id()));
-        let module = root.join("modules/editor");
-        std::fs::create_dir_all(&module).unwrap();
+        let component = root.join("components/editor");
+        std::fs::create_dir_all(&component).unwrap();
         std::fs::write(
-            module.join(layout::MODULE_FILE),
+            component.join(layout::MANIFEST_FILE),
             "schema-version 1\n\npackages \"nano\"\n",
         )
         .unwrap();
@@ -1006,9 +1006,9 @@ mod tests {
         );
     }
 
-    /// A module that declared none gets the block at the end.
+    /// A component that declared none gets the block at the end.
     #[test]
-    fn a_module_with_no_block_gets_one_at_the_end() {
+    fn a_component_with_no_block_gets_one_at_the_end() {
         assert_eq!(
             claims("ospp", &["1.1.1.1"]).spliced("description \"one\"\n"),
             "description \"one\"\n\nsatisfies {\n    ospp \"1.1.1.1\"\n}\n"
@@ -1035,12 +1035,12 @@ mod tests {
         let manifest = "description \"one\"\n\nsatisfies {\n    \"\" \"1.1.1.1\"\n}\n";
         let dir = std::env::temp_dir().join(format!("tect-claims-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let file = dir.join(layout::MODULE_FILE);
+        let file = dir.join(layout::MANIFEST_FILE);
         std::fs::write(&file, manifest).unwrap();
 
         // What `collect` carries over: the lenient read keeps a number the
         // strict one refused, and no picker ever showed it.
-        let held = parse::module::summary(&file).satisfies;
+        let held = parse::component::summary(&file).satisfies;
         assert_eq!(held, ["1.1.1.1"]);
         std::fs::remove_dir_all(dir).unwrap();
 
@@ -1072,9 +1072,9 @@ mod tests {
 
     #[test]
     fn a_rewritten_block_keeps_each_declared_schedule() {
-        let text = "workflows {\n    build\n    update-modules schedule=\"0 3 * * 0\"\n}\n";
+        let text = "workflows {\n    build\n    update-components schedule=\"0 3 * * 0\"\n}\n";
         assert_eq!(
-            set(&["build", "update-modules"], DEFAULT_AT).spliced(text),
+            set(&["build", "update-components"], DEFAULT_AT).spliced(text),
             text
         );
     }

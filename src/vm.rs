@@ -18,7 +18,7 @@ const SCRIPT: &str = "vm.sh";
 /// buildroot in `setfiles`, and a Debian one is refused for omitting
 /// `VERSION_ID` from os-release. The generated `build-disk.yml` gates on this
 /// same constant.
-use crate::parse::module::rpm;
+use crate::parse::component::rpm;
 
 /// What the container image is converted into, and what each one is.
 const TYPES: [(&str, &str); 3] = [
@@ -140,8 +140,8 @@ fn live_env(list: &crate::model::image::List, name: &str, image: &str) -> String
         .collect()
 }
 
-/// The loaded list, because a capability a module provides reaches the recipe
-/// through `Entry::module`, which `List::load` leaves empty. An image whose
+/// The loaded list, because a capability a component provides reaches the recipe
+/// through `Entry::component`, which `List::load` leaves empty. An image whose
 /// LUKS support is `deb/bootc-base`'s provide would otherwise carry no
 /// `luksInitramfs` and be refused an encrypted install.
 fn staged_list(root: &Path) -> crate::model::image::List {
@@ -256,8 +256,8 @@ fn access(root: &Path, kind: &str, opts: &Options) -> Access {
     }
 }
 
-fn imports_passwords(root: &Path, module: &str) -> bool {
-    let mut dirs = vec![crate::layout::module(root, module).join(crate::layout::OVERLAY)];
+fn imports_passwords(root: &Path, component: &str) -> bool {
+    let mut dirs = vec![crate::layout::component(root, component).join(crate::layout::OVERLAY)];
     while let Some(dir) = dirs.pop() {
         let Ok(entries) = std::fs::read_dir(dir) else {
             continue;
@@ -433,13 +433,22 @@ mod tests {
         crate::init::put(&root.join("repo.kdl"), "schema-version 1\nname \"Deb\"\n").unwrap();
         crate::init::put(
             &root.join("deb.image.kdl"),
-            "schema-version 1\n\nimage {\n    name \"deb\"\n\n    base \"docker.io/library/debian:forky\" {\n\
-             \x20       family \"debian\"\n    }\n\n    modules {\n        module \"login\"\n    }\n}\n",
+            "schema-version 1\n\nimage {\n    name \"deb\"\n\n    base-image {\n        debian\n    }\n\n    login\n}\n",
         )
         .unwrap();
+        for (path, image, family) in [
+            ("debian", "docker.io/library/debian:forky", "debian"),
+            ("fedora", "quay.io/fedora/fedora-bootc:44", "fedora"),
+        ] {
+            crate::init::put(
+                &root.join(format!("components/base-image/{path}/manifest.kdl")),
+                &format!("schema-version 1\n\nbase \"{image}\" {{ family \"{family}\"; }}\n"),
+            )
+            .unwrap();
+        }
         crate::init::put(
-            &root.join("modules/login/module.kdl"),
-            "schema-version 1\n\ndescription \"login\"\nsupports \"debian\"\nkey \"ssh\" {\n    generator \"ssh-keygen\"\n    public \"/usr/lib/tectonic/authorized_keys\"\n    private \"id_ed25519\"\n}\n",
+            &root.join("components/login/manifest.kdl"),
+            "schema-version 1\n\ndescription \"login\"\ntargets \"debian\"\nkey \"ssh\" {\n    generator \"ssh-keygen\"\n    public \"/usr/lib/tectonic/authorized_keys\"\n    private \"id_ed25519\"\n}\n",
         )
         .unwrap();
         let opts = |image: Option<&str>| Options {
@@ -455,7 +464,7 @@ mod tests {
         assert!(declared.ssh_key.is_none());
         crate::init::put(
             &root.join(
-                "modules/login/files/usr/lib/systemd/system/systemd-sysusers.service.d/login.conf",
+                "components/login/files/usr/lib/systemd/system/systemd-sysusers.service.d/login.conf",
             ),
             "[Service]\nImportCredential=passwd.hashed-password.*\n",
         )
@@ -532,8 +541,7 @@ mod tests {
         // refuse every repository and nothing else would catch it.
         crate::init::put(
             &root.join("fed.image.kdl"),
-            "schema-version 1\n\nimage {\n    name \"fed\"\n\n    base \"quay.io/fedora/fedora-bootc:44\" {\n\
-             \x20       family \"fedora\"\n    }\n\n    modules {\n    }\n}\n",
+            "schema-version 1\n\nimage {\n    name \"fed\"\n\n    base-image {\n        fedora\n    }\n\n}\n",
         )
         .unwrap();
         crate::init::put(
@@ -615,14 +623,19 @@ mod tests {
         assert!(unknown.contains("not a target"), "{unknown}");
     }
 
-    /// Staging from `List::load` leaves a module-provided capability out, and
+    /// Staging from `List::load` leaves a component-provided capability out, and
     /// the installer then refuses an encrypted install.
     #[test]
-    fn a_module_provided_capability_reaches_the_staged_recipe() {
+    fn a_component_provided_capability_reaches_the_staged_recipe() {
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/repos/media-recipe");
         let root = std::env::temp_dir().join(format!("tect-media-recipe-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
-        for file in ["repo.kdl", "deb.image.kdl", "modules/core/luks/module.kdl"] {
+        for file in [
+            "repo.kdl",
+            "deb.image.kdl",
+            "components/core/luks/manifest.kdl",
+            "components/base-image/debian-forky/manifest.kdl",
+        ] {
             let body = std::fs::read_to_string(fixture.join(file)).expect("the fixture file reads");
             crate::init::put(&root.join(file), &body).expect("the fixture file writes");
         }

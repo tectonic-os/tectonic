@@ -5,9 +5,9 @@ Tectonic v{version}
 
 
 example/
-├── modules/
+├── components/
 │   ├── browser/
-│   │   └── + module.kdl
-│   └── + modules.lock.kdl
-└── ~ example.image.kdl  browser added to modules
+│   │   └── + manifest.kdl
+│   └── ~ components.lock.kdl  browser recorded
+└── ~ example.image.kdl  browser added to components
 ==== exit 0

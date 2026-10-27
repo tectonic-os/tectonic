@@ -3,17 +3,19 @@ schema-version 1
 image {
     name "Broken lock"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
+    base-image {
+        fedora-bootc-44
     }
 
     layout {
         bootloader "grub2"
     }
 
-    modules {
-        module "fedora-family"
-        module "core/edited"
-        module "core/owned"
+    fedora-family
+    core {
+        edited
+    }
+    core {
+        owned
     }
 }

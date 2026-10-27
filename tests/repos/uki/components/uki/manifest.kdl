@@ -1,0 +1,5 @@
+schema-version 1
+
+description "UKI provider fixture"
+targets "fedora"
+provides "boot-chain-uki"

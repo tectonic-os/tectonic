@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
   x `image` takes no argument
    ,-[tests/repos/broken-image/image.kdl:3:1]
@@ -23,28 +23,6 @@ source: tests/golden.rs
   help: `name "Tectonic"` is os-release NAME, which the boot menu and the
         desktop read
 
-  x `image` declares no `base`
-   ,-[tests/repos/broken-image/image.kdl:3:1]
- 2 | 
- 3 | image "argument" {
-   : ^^|^^
-   :   `-- nothing to build on
- 4 |     id "Not An Id"
-   `----
-  help: `base "quay.io/fedora/fedora-bootc:44" { family "fedora" }`, naming
-        the image every layer builds on
-
-  x `image` has no `modules` block
-   ,-[tests/repos/broken-image/image.kdl:3:1]
- 2 | 
- 3 | image "argument" {
-   : ^^|^^
-   :   `-- nothing in it
- 4 |     id "Not An Id"
-   `----
-  help: an image with no modules is almost certainly a mistake; the block is
-        required even when empty
-
   x invalid image name `Not An Id`
    ,-[tests/repos/broken-image/image.kdl:3:1]
  2 | 
@@ -55,3 +33,14 @@ source: tests/golden.rs
    `----
   help: it becomes an image tag, a cache tag and the default hostname, all of
         which restrict it
+
+  x `Not An Id` lists no base
+   ,-[tests/repos/broken-image/image.kdl:3:1]
+ 2 | 
+ 3 | image "argument" {
+   : ^^|^^
+   :   `-- nothing to build on
+ 4 |     id "Not An Id"
+   `----
+  help: list a base component, such as `base-image { fedora-bootc { version
+        "44" } }`, or define one inline with `base "<image reference>"`

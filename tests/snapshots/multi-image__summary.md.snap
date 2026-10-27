@@ -1,8 +1,8 @@
 ---
 source: tests/golden.rs
 ---
-1 module, 0 gated to `base`.
+1 component, 0 gated to `base`.
 
-| Module | Description | Options | Satisfies | Refuses |
+| Component | Description | Options | Satisfies | Refuses |
 | --- | --- | --- | --- | --- |
-| `core/shared` | A module both images in this repository enable |  |  |  |
+| `core/shared` | A component both images in this repository enable |  |  |  |

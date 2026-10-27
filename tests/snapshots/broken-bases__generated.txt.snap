@@ -16,7 +16,7 @@ cd "$(dirname "$0")/.."
 [ -f repo.kdl ] || cd ..
 
 # scripts/ is absent unless the repository keeps a copy of a script.
-roots=(generated/lib modules)
+roots=(generated/lib components)
 for dir in generated/scripts scripts; do
     [ ! -d "$dir" ] || roots+=("$dir")
 done
@@ -25,9 +25,9 @@ mapfile -t scripts < <(find "${roots[@]}" \
     -name '*.sh' -type f ! \( -path '*/files/*' \
     \( -path '*/libexec/*' -o -path '*/system-generators/*' \) \) -print)
 # A `repo` file is shell and carries no extension.
-mapfile -t repos < <(find modules -name repo -type f -print)
-# What a module ships to run on the machine, and each names its shell.
-mapfile -t helpers < <(find modules -path '*/files/*' -type f \
+mapfile -t repos < <(find components -name repo -type f -print)
+# What a component ships to run on the machine, and each names its shell.
+mapfile -t helpers < <(find components -path '*/files/*' -type f \
     \( -path '*/libexec/*' -o -path '*/system-generators/*' \) -print)
 shfmt=(shfmt -i 4 -ci -bn -sr)
 counted="${#scripts[@]} scripts, ${#repos[@]} repo files and ${#helpers[@]} helpers"

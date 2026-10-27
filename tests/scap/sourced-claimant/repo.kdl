@@ -2,7 +2,7 @@ schema-version 1
 name "Sourced"
 
 sources {
-    modules "held" {
+    components "held" {
         dir "collection"
     }
 }

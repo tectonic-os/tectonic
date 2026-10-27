@@ -3,8 +3,8 @@ schema-version 1
 image {
     name "Debian"
 
-    base "docker.io/library/debian:forky" {
-        family "debian"
+    base-image {
+        debian-forky-debian
     }
 
     layout {
@@ -12,9 +12,11 @@ image {
         bootloader "systemd"
     }
 
-    modules {
-        module "debian-family"
-        module "core/menu"
-        module "core/shared"
+    debian-family
+    core {
+        menu
+    }
+    core {
+        shared
     }
 }

@@ -1,8 +1,0 @@
-module "flatpak" {
-    library "tectonic-os"
-    path "flatpak"
-    url "https://github.com/tectonic-os/modules"
-    component-version "v1.0.0"
-    content "92b59a9174674c7508a790d68206326d8816d9b17a472093acace7b6ee01a114"
-    track
-}

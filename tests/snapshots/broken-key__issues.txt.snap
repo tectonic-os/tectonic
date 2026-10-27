@@ -2,7 +2,7 @@
 source: tests/golden.rs
 ---
   x unknown key property `when`
-   ,-[tests/repos/broken-key/modules/core/keys/module.kdl:7:14]
+   ,-[tests/repos/broken-key/components/core/keys/manifest.kdl:7:14]
  6 | 
  7 | key "cosign" when="published" {
    :              ^^^^^^^^|^^^^^^^
@@ -12,7 +12,7 @@ source: tests/golden.rs
   help: a key carries its kind, and everything else as child nodes
 
   x `gpg` is not a generator the tool has
-   ,-[tests/repos/broken-key/modules/core/keys/module.kdl:8:5]
+   ,-[tests/repos/broken-key/components/core/keys/manifest.kdl:8:5]
  7 | key "cosign" when="published" {
  8 |     generator "gpg"
    :     ^^^^|^^^^
@@ -23,7 +23,7 @@ source: tests/golden.rs
         picks one of them by name
 
   x `format` must be "pem" or "der"
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:9:44]
+    ,-[tests/repos/broken-key/components/core/keys/manifest.kdl:9:44]
   8 |     generator "gpg"
   9 |     public "etc/pki/containers/cosign.pub" format="jwk"
     :                                            ^^^^^^|^^^^^
@@ -32,7 +32,7 @@ source: tests/golden.rs
     `----
 
   x `profile` must be "module-signing", "pcr-signing" or "tls-ca"
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:14:25]
+    ,-[tests/repos/broken-key/components/core/keys/manifest.kdl:14:25]
  13 | key "secureboot" {
  14 |     generator "openssl" profile="signing" bits=1
     :                         ^^^^^^^^|^^^^^^^^
@@ -41,7 +41,7 @@ source: tests/golden.rs
     `----
 
   x `bits` is a number from 2048 to 16384
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:14:43]
+    ,-[tests/repos/broken-key/components/core/keys/manifest.kdl:14:43]
  13 | key "secureboot" {
  14 |     generator "openssl" profile="signing" bits=1
     :                                           ^^^|^^
@@ -50,7 +50,7 @@ source: tests/golden.rs
     `----
 
   x unknown `public` property `encoding`
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:15:48]
+    ,-[tests/repos/broken-key/components/core/keys/manifest.kdl:15:48]
  14 |     generator "openssl" profile="signing" bits=1
  15 |     public "/usr/share/secureboot/sb_cert.der" encoding="der"
     :                                                ^^^^^^^|^^^^^^
@@ -60,7 +60,7 @@ source: tests/golden.rs
   help: `public` accepts `format`
 
   x unknown node `passphrase` in a key
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:17:5]
+    ,-[tests/repos/broken-key/components/core/keys/manifest.kdl:17:5]
  16 |     private ".hidden"
  17 |     passphrase "hunter2"
     :     ^^^^^|^^^^
@@ -70,7 +70,7 @@ source: tests/golden.rs
   help: a key holds `generator`, `public` and `private`
 
   x key `secureboot` is declared twice
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:20:1]
+    ,-[tests/repos/broken-key/components/core/keys/manifest.kdl:20:1]
  19 | 
  20 | key "secureboot" {
     : ^|^
@@ -79,7 +79,7 @@ source: tests/golden.rs
     `----
 
   x `key` needs a kind
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:26:1]
+    ,-[tests/repos/broken-key/components/core/keys/manifest.kdl:26:1]
  25 | 
  26 | key
     : ^|^
@@ -88,7 +88,7 @@ source: tests/golden.rs
   help: `key "cosign" { ... }`, the kind being what `tect create key` names
 
   x a `key` needs `generator`
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:26:1]
+    ,-[tests/repos/broken-key/components/core/keys/manifest.kdl:26:1]
  25 | 
  26 | key
     : ^|^
@@ -96,7 +96,7 @@ source: tests/golden.rs
     `----
 
   x a `key` needs `public`
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:26:1]
+    ,-[tests/repos/broken-key/components/core/keys/manifest.kdl:26:1]
  25 | 
  26 | key
     : ^|^
@@ -104,7 +104,7 @@ source: tests/golden.rs
     `----
 
   x a `key` needs `private`
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:26:1]
+    ,-[tests/repos/broken-key/components/core/keys/manifest.kdl:26:1]
  25 | 
  26 | key
     : ^|^
@@ -112,7 +112,7 @@ source: tests/golden.rs
     `----
 
   x `etc/pki/containers/cosign.pub` is not an absolute path in the image
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:9:5]
+    ,-[tests/repos/broken-key/components/core/keys/manifest.kdl:9:5]
   8 |     generator "gpg"
   9 |     public "etc/pki/containers/cosign.pub" format="jwk"
     :     ^^^|^^
@@ -120,10 +120,10 @@ source: tests/golden.rs
  10 |     private "keys/cosign.key"
     `----
   help: it is the path the built image ships the public half at, and the
-        module's files/ overlay is what puts it there
+        component's files/ overlay is what puts it there
 
   x `.hidden` is not a filename
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:16:5]
+    ,-[tests/repos/broken-key/components/core/keys/manifest.kdl:16:5]
  15 |     public "/usr/share/secureboot/sb_cert.der" encoding="der"
  16 |     private ".hidden"
     :     ^^^|^^^
@@ -134,7 +134,7 @@ source: tests/golden.rs
         so it is a plain name
 
   x `core/keys` has no public half for its secureboot key
-    ,-[tests/repos/broken-key/modules/core/keys/module.kdl:20:1]
+    ,-[tests/repos/broken-key/components/core/keys/manifest.kdl:20:1]
  19 | 
  20 | key "secureboot" {
     : ^|^

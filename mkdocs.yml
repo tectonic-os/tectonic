@@ -33,12 +33,10 @@ nav:
           - Layout: schema/repository.md
           - repo.kdl: schema/repo.md
           - image.kdl: schema/image.md
-      - Modules:
-          - Layout: schema/modules.md
-          - module.kdl: schema/module.md
-          - modules.lock.kdl: schema/lock.md
-      - Assets:
-          - Base images: schema/bases.md
+      - Components:
+          - Layout: schema/components.md
+          - manifest.kdl: schema/component.md
+          - components.lock.kdl: schema/lock.md
   - Project:
       - Changelog: changelog.md
       - Contributing: contributing.md

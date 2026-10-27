@@ -34,6 +34,8 @@ source: tests/golden/harness.rs
       "allows": [],
       "layout": null,
       "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
         "scap_content": "",
@@ -42,33 +44,8 @@ source: tests/golden/harness.rs
           "rechunking"
         ],
         "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "cosign-key": [
-            "/usr/bin/cosign-key",
-            "/usr/sbin/cosign-key"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
+          "secureboot-key": [
+            "/usr/share/secureboot/sb_cert.der"
           ]
         },
         "requires": [],
@@ -87,7 +64,7 @@ source: tests/golden/harness.rs
           "default": true,
           "pr": true,
           "siblings": [],
-          "modules": [
+          "components": [
             {
               "path": "core/keys",
               "flavour": null,
@@ -98,6 +75,8 @@ source: tests/golden/harness.rs
                 "secureboot-key"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {
                 "secureboot-key": "/usr/share/secureboot/sb_cert.der"
               },
@@ -105,9 +84,13 @@ source: tests/golden/harness.rs
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "22d8fbdd05af345e915e6e85e257e6dd0f3973a02e6e85b82550a2b57c95f5a8",
+                "defined": null,
+                "content": "89992c3b4b68be2b7e2e6bebdd9362f520dd55722785435cbbc5ba6a0d3a6629",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -122,14 +105,20 @@ source: tests/golden/harness.rs
               "requires": [
                 "cosign-key"
               ],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "c44a8a26f1b200e41b9257b3cd35d5710ab781dd28c8b818e01bfe439405d404",
+                "defined": null,
+                "content": "f4ec478fe7587b5b940d0c91dd7afe02eecc4804439d074e34f711f12534c8f5",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []

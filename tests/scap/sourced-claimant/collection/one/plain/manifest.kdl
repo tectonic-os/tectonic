@@ -1,0 +1,5 @@
+schema-version 1
+
+description "Claims no rule of the profile"
+
+targets "fedora"

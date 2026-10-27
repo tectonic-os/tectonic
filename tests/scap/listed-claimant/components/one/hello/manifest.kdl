@@ -1,0 +1,9 @@
+schema-version 1
+
+description "Claims one of the profile's rules"
+
+targets "fedora"
+
+satisfies {
+    cis-fedora "1.1.1.1"
+}

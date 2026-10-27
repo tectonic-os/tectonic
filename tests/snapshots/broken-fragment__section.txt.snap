@@ -1,10 +1,10 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 ### Base Image
 FROM ${BASE} AS rootfs
 
-## Module layers
+## Component layers
 
 # ---- /opt build root ----
 RUN mv /opt /opt.bak && mkdir /opt
@@ -15,49 +15,49 @@ RUN if [ -L /usr/local ]; then mv /usr/local /usr/local.bak && \
     /usr/local/lib /usr/local/lib64 /usr/local/libexec /usr/local/share /usr/local/src; fi
 
 # ---- core/early ----
-# verbatim from modules/core/early/Containerfile.inc:
-COPY --from=ctx /modules/core/early/hostname /etc/hostname
+# verbatim from components/core/early/Containerfile.inc:
+COPY --from=ctx /components/core/early/hostname /etc/hostname
 RUN echo "building ${FLAVOUR}" > /usr/share/early
 
-RUN --mount=type=bind,from=ctx,source=/modules/core/early,target=/ctx/modules/core/early \
+RUN --mount=type=bind,from=ctx,source=/components/core/early,target=/ctx/components/core/early \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
-    --mount=type=bind,from=ctx,source=/generated/broken-fragment/modules/core/early.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-fragment/components/core/early.sh,target=/ctx/component.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/module.sh
+    bash /ctx/component.sh
 
 # ---- flavour gate ----
 ARG FLAVOUR
 
 # ---- [dev] ----
 # ---- core/silent ----
-RUN --mount=type=bind,from=ctx,source=/modules/core/silent,target=/ctx/modules/core/silent \
+RUN --mount=type=bind,from=ctx,source=/components/core/silent,target=/ctx/components/core/silent \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
-    --mount=type=bind,from=ctx,source=/generated/broken-fragment/modules/core/silent@dev.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-fragment/components/core/silent@dev.sh,target=/ctx/component.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/module.sh
+    bash /ctx/component.sh
 
-# verbatim from modules/core/silent/Containerfile.inc:
+# verbatim from components/core/silent/Containerfile.inc:
 RUN echo silent > /usr/share/silent
 
 # ---- [dev] ----
 # ---- core/mismatched ----
-# verbatim from modules/core/mismatched/Containerfile.inc:
+# verbatim from components/core/mismatched/Containerfile.inc:
 RUN FLAVOUR_GATE=server echo mismatched > /usr/share/mismatched
 
-RUN --mount=type=bind,from=ctx,source=/modules/core/mismatched,target=/ctx/modules/core/mismatched \
+RUN --mount=type=bind,from=ctx,source=/components/core/mismatched,target=/ctx/components/core/mismatched \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
-    --mount=type=bind,from=ctx,source=/generated/broken-fragment/modules/core/mismatched@dev.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-fragment/components/core/mismatched@dev.sh,target=/ctx/component.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/module.sh
+    bash /ctx/component.sh
 
 # ---- image version ----
 ARG IMAGE_VERSION=dev
@@ -77,10 +77,6 @@ ARG SCAP_REFUSED=
 ARG IMAGE_ID="broken-fragment"
 ARG IMAGE_NAME="Broken Fragment"
 ARG IMAGE_REGISTRY=""
-
-# ---- os-release ----
-RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
-    IMAGE_VERSION="${IMAGE_VERSION}" IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" /ctx/tect os-release
 
 # ---- finalize ----
 RUN --mount=type=bind,from=ctx,source=/generated/broken-fragment/finalize.sh,target=/ctx/finalize.sh \

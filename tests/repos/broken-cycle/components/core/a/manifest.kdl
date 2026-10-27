@@ -1,0 +1,8 @@
+schema-version 1
+
+description "Requires what requires it back"
+
+targets "fedora"
+
+provides "a"
+requires "b"

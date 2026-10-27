@@ -4,13 +4,14 @@ image {
     name "Listed"
     conforms "standard"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking"
+    base-image {
+        fedora-bootc-44
     }
 
-    modules {
-        module "one/hello"
-        module "one/broken"
+    one {
+        hello
+    }
+    one {
+        broken
     }
 }

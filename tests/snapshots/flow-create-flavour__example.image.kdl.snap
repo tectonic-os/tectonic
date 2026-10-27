@@ -8,18 +8,15 @@ image {
     url "https://github.com/someone/example"
     issues-url "https://github.com/someone/example/issues"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking" "initramfs-generation" "luks-initramfs" "selinux-policy" "ssh" "bootc" "bootupctl" "podman" "crun"
-        signed #false
-        scap-content "ssg-fedora-ds.xml"
-    }
-
     layout {
         bootloader "grub2"
     }
 
-    modules {
+    base-image {
+        fedora {
+            version "44"
+            signed #false
+        }
     }
     flavours {
         dx

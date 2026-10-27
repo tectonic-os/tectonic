@@ -3,7 +3,7 @@
 //! Every pin in the tree fills the same four slots: the locator says where it
 //! comes from, the selector which version, the verifier what proves you got
 //! that one, and the tracker who keeps the selector current. `asset`, an
-//! out-of-tree module and a collection each hold the one `pin` table; the base
+//! out-of-tree component and a collection each hold the one `pin` table; the base
 //! carries locator and selector joined in the image reference, and `signed` as
 //! its verifier.
 
@@ -167,10 +167,14 @@ const FETCHES: [&str; 8] = [
     "go install",
 ];
 
-/// The scripts a module runs, which are the two places it can fetch from --
-/// each also under a family directory, where the same script runs on one family
-/// alone and can fetch just as undeclared.
-const SCRIPTS: [&str; 2] = ["module.sh", "finalize.sh"];
+/// The scripts a component runs, which are the places it can fetch from. Each
+/// also sits under a family directory, where it runs on one family alone and
+/// can fetch just as undeclared.
+const SCRIPTS: [&str; 3] = [
+    crate::layout::SCRIPT,
+    crate::layout::PACKAGES_SCRIPT,
+    crate::layout::FINALIZE_SCRIPT,
+];
 
 fn scripts() -> Vec<String> {
     SCRIPTS
@@ -184,15 +188,15 @@ fn scripts() -> Vec<String> {
         .collect()
 }
 
-/// A module that reaches the network with nothing declaring what it pulls.
+/// A component that reaches the network with nothing declaring what it pulls.
 /// Always on, whatever the posture: no record can describe an undeclared fetch
 /// after the fact.
 pub fn check_fetch(
-    module: &crate::model::module::Module,
+    component: &crate::model::component::Component,
     dir: &std::path::Path,
     issues: &mut crate::diag::Issues,
 ) {
-    if !module.assets.is_empty() {
+    if !component.assets.is_empty() {
         return;
     }
     for script in scripts() {
@@ -210,9 +214,9 @@ pub fn check_fetch(
             crate::diag::Issue::new(
                 format!(
                     "`{}` fetches in {script} with nothing declaring what",
-                    module.path
+                    component.path
                 ),
-                &module.src,
+                &component.src,
             )
             .at(
                 Span::default(),
@@ -228,7 +232,7 @@ pub fn check_fetch(
     }
 }
 
-/// Reports a module whose declarations need a network step that repo.kdl
+/// Reports a component whose declarations need a network step that repo.kdl
 /// closes. The build would fail on its first lookup, so the check names the
 /// rule that closed the step.
 pub fn check_network(
@@ -237,12 +241,12 @@ pub fn check_network(
     root: &std::path::Path,
     issues: &mut crate::diag::Issues,
 ) {
-    // A `deny` rule closes the step whatever the module declares, so the
+    // A `deny` rule closes the step whatever the component declares, so the
     // declaration is no way out of it.
     let reopen = match scripts_rule {
         crate::model::image::NetRule::Deny => {
             "set `scripts \"strict\"` in repo.kdl's `security-policy { network }` and declare \
-             `network \"scripts\"`, or leave this module out of the image"
+             `network \"scripts\"`, or leave this component out of the image"
         }
         crate::model::image::NetRule::Allow | crate::model::image::NetRule::Strict => {
             "declare `network \"scripts\"`, which a `strict` rule in repo.kdl opens the \
@@ -252,84 +256,84 @@ pub fn check_network(
     let base_family = image.base.as_ref().map_or("", |b| b.family.as_str());
     use crate::diag::Issue;
     for entry in &image.entries {
-        let Some(module) = entry.module.as_ref() else {
+        let Some(component) = entry.component.as_ref() else {
             continue;
         };
-        if !module.standard_layer {
-            if let Some(span) = module.network {
+        if !component.standard_layer {
+            if let Some(span) = component.network {
                 issues.push(
                     Issue::new(
-                        format!("`{}` declares a script step it has not got", module.path),
-                        &module.src,
+                        format!("`{}` declares a script step it has not got", component.path),
+                        &component.src,
                     )
                     .at(span, "no standard layer")
                     .help(
                         "`standard-layer #false` leaves the fragment the only thing this \
-                           module emits, and a fragment's own RUN lines are emitted as written",
+                           component emits, and a fragment's own RUN lines are emitted as written",
                     ),
                 );
             }
             continue;
         }
-        if !module.access.packages
-            && crate::emit::module_build::installs_packages(image, entry, module, root)
+        if !component.access.packages
+            && crate::emit::component_build::installs_packages(image, entry, component, root)
         {
             issues.push(
                 Issue::new(
                     format!(
                         "`{}` installs packages, and repo.kdl denies the package step the network",
-                        module.path
+                        component.path
                     ),
-                    &module.src,
+                    &component.src,
                 )
                 .help(
                     "set `packages \"allow\"` in repo.kdl's `security-policy { network }`, or leave this \
-                       module out of the image",
+                       component out of the image",
                 ),
             );
         }
-        if module.access.scripts {
+        if component.access.scripts {
             continue;
         }
-        match module.network {
+        match component.network {
             Some(span) => issues.push(
                 Issue::new(
                     format!(
                         "`{}` declares that its scripts reach the network, and repo.kdl denies it",
-                        module.path
+                        component.path
                     ),
-                    &module.src,
+                    &component.src,
                 )
                 .at(span, "denied by `scripts \"deny\"`")
                 .help(
                     "set `scripts \"strict\"` in repo.kdl's `security-policy { network }` to honour this \
-                       declaration, or leave this module out of the image",
+                       declaration, or leave this component out of the image",
                 ),
             ),
             None => {
-                for asset in &module.assets {
+                for asset in &component.assets {
                     issues.push(
                         Issue::new(
                             format!(
                                 "`{}` declares an asset its script step cannot fetch",
-                                module.path
+                                component.path
                             ),
-                            &module.src,
+                            &component.src,
                         )
                         .at(asset.span, "fetched with the network closed")
                         .help(reopen),
                     );
                 }
-                let dir = crate::layout::module(root, &entry.path);
+                let dir = crate::layout::component(root, &entry.path);
                 if let Some((script, verb)) = installer(&dir, base_family) {
                     issues.push(
                         Issue::new(
                             format!(
                                 "`{}` installs packages in {script}, and its script step has \
                                  no network",
-                                module.path
+                                component.path
                             ),
-                            &module.src,
+                            &component.src,
                         )
                         .at(
                             Span::default(),
@@ -370,7 +374,7 @@ const HELPERS: [&str; 6] = [
     "ensure_checkpolicy",
 ];
 
-/// Returns the first script of the module that calls a package manager, and
+/// Returns the first script of the component that calls a package manager, and
 /// the call. The family directories this base does not select never run, so
 /// they are not read.
 fn installer(dir: &std::path::Path, base_family: &str) -> Option<(String, &'static str)> {
@@ -379,8 +383,10 @@ fn installer(dir: &std::path::Path, base_family: &str) -> Option<(String, &'stat
             .into_iter()
             .map(|gated| format!("{gated}/")),
     );
+    // `packages.sh` runs in the package step, which has the network.
+    let script_step = [crate::layout::SCRIPT, crate::layout::FINALIZE_SCRIPT];
     for root in roots {
-        for name in SCRIPTS {
+        for name in script_step {
             let script = format!("{root}{name}");
             let Ok(text) = std::fs::read_to_string(dir.join(&script)) else {
                 continue;
@@ -420,7 +426,7 @@ fn reaches(line: &str, verb: &str) -> bool {
     }
 }
 
-/// The modules whose Containerfile fragment a closed script rule does not
+/// The components whose Containerfile fragment a closed script rule does not
 /// reach. A fragment's own `RUN` lines are emitted as written, so the rule
 /// cannot govern them. That is a limit, and a silent limit is what makes a
 /// rule read wider than it is, so `check` names each one.
@@ -434,9 +440,9 @@ pub fn ungoverned(
     image
         .entries
         .iter()
-        .filter_map(|entry| entry.module.as_ref())
-        .filter(|module| module.fragment.is_some())
-        .map(|module| module.path.clone())
+        .filter_map(|entry| entry.component.as_ref())
+        .filter(|component| component.fragment.is_some())
+        .map(|component| component.path.clone())
         .collect()
 }
 
@@ -482,6 +488,23 @@ pub fn enforce_build(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_install_in_packages_sh_needs_no_script_network() {
+        let dir = std::env::temp_dir().join(format!("tect-installer-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join(crate::layout::PACKAGES_SCRIPT),
+            "dnf5 install -y vim\n",
+        )
+        .unwrap();
+        let in_packages = installer(&dir, "fedora");
+        std::fs::write(dir.join(crate::layout::SCRIPT), "dnf5 install -y vim\n").unwrap();
+        let in_script = installer(&dir, "fedora");
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(in_packages, None);
+        assert_eq!(in_script, Some(("component.sh".to_string(), "dnf5 ")));
+    }
 
     #[test]
     fn an_installer_starts_a_command() {

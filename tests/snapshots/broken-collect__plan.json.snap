@@ -34,6 +34,8 @@ source: tests/golden/harness.rs
       "allows": [],
       "layout": null,
       "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
         "scap_content": "",
@@ -41,32 +43,7 @@ source: tests/golden/harness.rs
         "provides": [
           "rechunking"
         ],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -83,7 +60,7 @@ source: tests/golden/harness.rs
           "default": true,
           "pr": true,
           "siblings": [],
-          "modules": [
+          "components": [
             {
               "path": "core/menu",
               "flavour": null,
@@ -92,14 +69,20 @@ source: tests/golden/harness.rs
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "d61620eebc2ebd47dec3bc2c395eae8fc4ce59172c96fe0f80699552b5e2d7fe",
+                "defined": null,
+                "content": "230dc232f392a08f23990e73df8c5ea5946a2b1e4d7f4d07c6ba4499fbb0f2b5",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -112,14 +95,20 @@ source: tests/golden/harness.rs
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "d286fb683ef1945097a02ff0b4272eb398c0477fd8552723ade8fdeed36dcaf0",
+                "defined": null,
+                "content": "7df8d45e92866e3e0a31de2fbd1b42eaba0aa3df3f9e07bab24fd226c039a61c",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -132,14 +121,20 @@ source: tests/golden/harness.rs
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "f90e0f0f628fe28779464aedc0b53480def0bdcbe5ec3b40237bc8a99c0623dd",
+                "defined": null,
+                "content": "d3bc1d00abfafb0e74d42bb426e25c4d5c80795cb7b8d329587061095e343510",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -152,14 +147,20 @@ source: tests/golden/harness.rs
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "86308a307e7aadc5ab9b3aa8a86bf4e82bc341e3e8eff0348898374e535fbd45",
+                "defined": null,
+                "content": "3eb321679de82c90dbe6ba756b7a5faf49663394c1a8ed0c0940aa48d2583a81",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []

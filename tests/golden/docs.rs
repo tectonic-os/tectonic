@@ -211,13 +211,13 @@ const WRITTEN: &[Written] = &[
         file: Some("example.image.kdl"),
     },
     Written {
-        words: "create module",
-        flow: "flow-create-module",
+        words: "create component",
+        flow: "flow-create-component",
         file: None,
     },
     Written {
-        words: "import module",
-        flow: "flow-import-module",
+        words: "import component",
+        flow: "flow-import-component",
         file: None,
     },
     Written {

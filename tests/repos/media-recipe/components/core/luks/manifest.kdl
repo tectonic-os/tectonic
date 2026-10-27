@@ -1,0 +1,7 @@
+schema-version 1
+
+description "The LUKS initramfs witness, carried by a component and not by the base"
+
+targets "debian"
+
+provides "luks-initramfs"

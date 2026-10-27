@@ -1,0 +1,5 @@
+schema-version 1
+
+description "A coredumps namesake, from the second collection"
+
+targets "fedora"

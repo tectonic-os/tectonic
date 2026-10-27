@@ -1,8 +1,27 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
+  x `core/second` overwrites `/etc/sudoers.d/99-hardening`, which `core/first`
+  | also ships
+  help: overlays are copied in build order, so this one wins and the other
+        file never reaches the image. Rename one of the two, or declare
+        `overrides "/etc/sudoers.d/99-hardening"` here if replacing it is the
+        point
+
+  x `core/third` overrides `/usr/lib/nothing.conf`, which no earlier component
+  | ships
+   ,-[tests/repos/broken-overlay/components/core/third/manifest.kdl:7:1]
+ 6 | 
+ 7 | overrides "/usr/lib/nothing.conf"
+   : ^^^^|^^^^
+   :     `-- nothing to replace
+   `----
+  help: an override is checked, so it cannot outlive the collision it was
+        added for; drop it, or check the path against what the other component
+        actually ships
+
   x mode for `/etc/duplicate.conf` is declared twice
-    ,-[tests/repos/broken-overlay/modules/core/bad-modes/module.kdl:12:1]
+    ,-[tests/repos/broken-overlay/components/core/bad-modes/manifest.kdl:12:1]
  11 | mode "/etc/duplicate.conf" "0440"
  12 | mode "/etc/duplicate.conf" "0600"
     : ^^|^
@@ -11,7 +30,7 @@ source: tests/golden.rs
     `----
 
   x `etc/relative.conf` is not a normal absolute overlay path
-   ,-[tests/repos/broken-overlay/modules/core/bad-modes/module.kdl:7:6]
+   ,-[tests/repos/broken-overlay/components/core/bad-modes/manifest.kdl:7:6]
  6 | 
  7 | mode "etc/relative.conf" "0440"
    :      ^^^^^^^^^|^^^^^^^^^
@@ -22,7 +41,7 @@ source: tests/golden.rs
         example.conf`
 
   x `0880` is not an octal file mode
-   ,-[tests/repos/broken-overlay/modules/core/bad-modes/module.kdl:8:28]
+   ,-[tests/repos/broken-overlay/components/core/bad-modes/manifest.kdl:8:28]
  7 | mode "etc/relative.conf" "0440"
  8 | mode "/etc/non-octal.conf" "0880"
    :                            ^^^|^^
@@ -32,7 +51,7 @@ source: tests/golden.rs
   help: a chmod file mode such as `0440`
 
   x file mode `10000` is out of range
-    ,-[tests/repos/broken-overlay/modules/core/bad-modes/module.kdl:9:31]
+    ,-[tests/repos/broken-overlay/components/core/bad-modes/manifest.kdl:9:31]
   8 | mode "/etc/non-octal.conf" "0880"
   9 | mode "/etc/out-of-range.conf" "10000"
     :                               ^^^|^^^
@@ -41,7 +60,7 @@ source: tests/golden.rs
     `----
 
   x `` is not an octal file mode
-    ,-[tests/repos/broken-overlay/modules/core/bad-modes/module.kdl:10:24]
+    ,-[tests/repos/broken-overlay/components/core/bad-modes/manifest.kdl:10:24]
   9 | mode "/etc/out-of-range.conf" "10000"
  10 | mode "/etc/empty.conf" ""
     :                        ^|
@@ -51,29 +70,10 @@ source: tests/golden.rs
   help: a chmod file mode such as `0440`
 
   x `core/bad-modes` declares a mode for a file it does not ship
-    ,-[tests/repos/broken-overlay/modules/core/bad-modes/module.kdl:13:6]
+    ,-[tests/repos/broken-overlay/components/core/bad-modes/manifest.kdl:13:6]
  12 | mode "/etc/duplicate.conf" "0600"
  13 | mode "/etc/missing.conf" "0440"
     :      ^^^^^^^^^|^^^^^^^^^
     :               `-- /etc/missing.conf is missing from every `files/`
     `----
   help: shipping the overlay file is what makes its mode meaningful
-
-  x `core/second` overwrites `/etc/sudoers.d/99-hardening`, which `core/first`
-  | also ships
-  help: overlays are copied in build order, so this one wins and the other
-        file never reaches the image. Rename one of the two, or declare
-        `overrides "/etc/sudoers.d/99-hardening"` here if replacing it is the
-        point
-
-  x `core/third` overrides `/usr/lib/nothing.conf`, which no earlier module
-  | ships
-   ,-[tests/repos/broken-overlay/modules/core/third/module.kdl:7:1]
- 6 | 
- 7 | overrides "/usr/lib/nothing.conf"
-   : ^^^^|^^^^
-   :     `-- nothing to replace
-   `----
-  help: an override is checked, so it cannot outlive the collision it was
-        added for; drop it, or check the path against what the other module
-        actually ships

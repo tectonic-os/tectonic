@@ -3,9 +3,8 @@ schema-version 1
 image {
     name "Renovate"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking"
+    base-image {
+        fedora-bootc-44
     }
 
     layout {
@@ -16,17 +15,23 @@ image {
         beta
     }
 
-    modules {
-        module "fedora-family"
-        module "apps/browser" {
+    fedora-family
+    apps {
+        browser {
             lang-version "2"
             // version "0.0"
             version "128.0"
         }
-        module "apps/editor"
-        module "apps/image-viewer@1" { version "3.1"; }
-        flavour "beta" {
-            module "apps/browser" {
+    }
+    apps {
+        editor
+    }
+    apps {
+        image-viewer@1 { version "3.1"; }
+    }
+    flavour "beta" {
+        apps {
+            browser {
                 version "129.0"
             }
         }

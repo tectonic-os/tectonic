@@ -1,20 +1,20 @@
-//! Given a capability, which module provides it: over the repository, over
+//! Given a capability, which component provides it: over the repository, over
 //! what it has already imported, and over the collections it declares.
 //!
 //! One index: five callers ask the same question.
 
 use crate::model::remote::{Collection, Kind as SourceKind};
+use crate::parse::component::Summary;
 use crate::parse::disk::Disk;
-use crate::parse::module::Summary;
 use crate::{layout, parse};
 use std::collections::BTreeSet;
 use std::path::Path;
 
-/// One module that could satisfy a requirement, and what it takes to get it.
+/// One component that could satisfy a requirement, and what it takes to get it.
 pub struct Provider {
-    /// The collection it comes from, absent for a module the repository owns.
+    /// The collection it comes from, absent for a component the repository owns.
     pub owner: Option<String>,
-    /// Its directory under `modules/`, or its path inside the collection.
+    /// Its directory under `components/`, or its path inside the collection.
     pub name: String,
     /// Already on this machine, so an image can list it without an import.
     pub here: bool,
@@ -45,16 +45,16 @@ impl Provider {
     }
 }
 
-/// Every module a repository could reach, the ones already on it first —
+/// Every component a repository could reach, the ones already on it first —
 /// and the declared collections this scan never looked in, so that nothing
 /// reading the index states as fact what it did not check.
 pub struct Index {
     held: Vec<Provider>,
-    /// Declared module collections not on this machine, which a scan that does
+    /// Declared component collections not on this machine, which a scan that does
     /// not fetch skips: empty when every one was read, and empty when none were
     /// declared, which `sourced` tells apart.
     unread: Vec<String>,
-    /// Whether the repository declares a module collection at all.
+    /// Whether the repository declares a component collection at all.
     sourced: bool,
     /// Why a fetching scan fell back to what was already here. `None` where it
     /// did not fetch, or where the fetch worked.
@@ -62,14 +62,14 @@ pub struct Index {
 }
 
 impl Index {
-    /// The repository's own modules and nothing else, for resolution.
+    /// The repository's own components and nothing else, for resolution.
     pub fn local(root: &Path, sources: &[Collection], disk: &Disk) -> Self {
         Self {
             held: own(root, disk),
             unread: Vec::new(),
             sourced: sources
                 .iter()
-                .any(|collection| collection.kind == SourceKind::Modules),
+                .any(|collection| collection.kind == SourceKind::Components),
             unreached: None,
         }
     }
@@ -91,7 +91,7 @@ impl Index {
         Self {
             held: out,
             unreached,
-            // The module collections `catalog` just skipped: a source counts
+            // The component collections `catalog` just skipped: a source counts
             // as read only where the tree it names is. Two sources naming one
             // library share a cache directory, so the other kind's subtree
             // being there does not make this one read. A base-image source is
@@ -101,7 +101,7 @@ impl Index {
                 true => Vec::new(),
                 false => sources
                     .iter()
-                    .filter(|collection| collection.kind == SourceKind::Modules)
+                    .filter(|collection| collection.kind == SourceKind::Components)
                     .filter(|collection| {
                         !crate::import::cached(root, collection).is_some_and(|dir| {
                             dir.join(collection.subtree().unwrap_or("")).is_dir()
@@ -112,7 +112,7 @@ impl Index {
             },
             sourced: sources
                 .iter()
-                .any(|collection| collection.kind == SourceKind::Modules),
+                .any(|collection| collection.kind == SourceKind::Components),
         }
     }
 
@@ -140,7 +140,7 @@ impl Index {
     /// silence carries one voice. Empty where the scan was complete.
     pub fn unsearched(&self) -> String {
         // A scan that tried and failed is not a scan that skipped: saying
-        // `tect import module` fetches it, to someone whose fetch has just
+        // `tect import component` fetches it, to someone whose fetch has just
         // been refused, is the wrong sentence.
         if let Some(why) = &self.unreached {
             return format!(
@@ -151,43 +151,59 @@ impl Index {
         match named.len() {
             0 => String::new(),
             1 => format!(
-                "The {} collection is declared but not on this machine, so nothing read it: `tect import module` fetches it",
+                "The {} collection is declared but not on this machine, so nothing read it: `tect import component` fetches it",
                 named.join(", ")
             ),
             _ => format!(
-                "The {} collections are declared but not on this machine, so nothing read them: `tect import module` fetches them",
+                "The {} collections are declared but not on this machine, so nothing read them: `tect import component` fetches them",
                 named.join(", ")
             ),
         }
     }
 
-    /// Every module declaring `capability`, the repository's own first.
+    /// Every component that meets `capability`, the repository's own first. A
+    /// component meets it by its own name or by a declared name under it, the
+    /// rule `Component::answers` keeps for an image.
     pub fn of(&self, capability: &str) -> Vec<&Provider> {
         self.held
             .iter()
-            .filter(|held| held.declares.provides.iter().any(|has| has == capability))
+            .filter(|held| {
+                crate::resolve::answers(
+                    &held.name,
+                    held.declares.provides.iter().map(String::as_str),
+                    capability,
+                )
+            })
             .collect()
     }
 
-    /// Every module declaring `capability` that supports `family`, the
+    /// Every component declaring `capability` that targets `family`, the
     /// repository's own first. An adapter role is filled per family, so `of`
     /// alone would hand a fedora image the deb adapter whenever the deb one
-    /// sorts first.
+    /// sorts first. A base fits no requirement, because an image lists its
+    /// one base itself.
     pub fn fitting(&self, capability: &str, family: &str) -> Vec<&Provider> {
         self.of(capability)
             .into_iter()
-            .filter(|held| crate::resolve::supports(&held.declares.supports, family))
+            .filter(|held| crate::resolve::targets(&held.declares.targets, family))
+            .filter(|held| {
+                !held
+                    .declares
+                    .provides
+                    .iter()
+                    .any(|name| name == crate::parse::component::BASE_IMAGE)
+            })
             .collect()
     }
 
-    /// The module filling a role on one family: it provides the capability the
-    /// role is named by, and it supports the family. Every family needs the
-    /// same role filled by a different module.
+    /// The component filling a role on one family: it provides the capability the
+    /// role is named by, and it targets the family. Every family needs the
+    /// same role filled by a different component.
     pub fn adapter(&self, capability: &str, family: &str) -> Option<&Provider> {
         self.fitting(capability, family).into_iter().next()
     }
 
-    /// Every module declaring a key of this kind.
+    /// Every component declaring a key of this kind.
     pub fn declaring_key(&self, kind: &str) -> Vec<&Provider> {
         self.held
             .iter()
@@ -195,8 +211,8 @@ impl Index {
             .collect()
     }
 
-    /// Every module claiming one of these benchmark numbers, which answers
-    /// which modules help an image conform once the numbers are the ones the
+    /// Every component claiming one of these benchmark numbers, which answers
+    /// which components help an image conform once the numbers are the ones the
     /// declared profile's rules are reached by.
     pub fn claiming(&self, numbers: &BTreeSet<String>) -> Vec<&Provider> {
         self.held
@@ -210,18 +226,9 @@ impl Index {
             .collect()
     }
 
-    /// Every module offering one capability, which answers whether a notice
-    /// pointing at one has anything to point at.
-    pub fn providing(&self, capability: &str) -> Vec<&Provider> {
-        self.held
-            .iter()
-            .filter(|held| held.declares.provides.iter().any(|p| p == capability))
-            .collect()
-    }
-
     /// The one an image entry names, which is how what an image already has is
-    /// read back off its declaration. An entry names a module under
-    /// `modules/`, never a library member.
+    /// read back off its declaration. An entry names a component under
+    /// `components/`, never a library member.
     pub fn at(&self, dir: &str) -> Option<&Provider> {
         self.held
             .iter()
@@ -229,14 +236,14 @@ impl Index {
     }
 }
 
-/// Every module directory the repository holds.
+/// Every component directory the repository holds.
 fn own(root: &Path, disk: &Disk) -> Vec<Provider> {
-    disk.modules()
+    disk.components()
         .map(|dir| Provider {
             owner: None,
             name: dir.clone(),
             here: true,
-            declares: parse::module::summary(&layout::manifest(root, dir)),
+            declares: parse::component::summary(&layout::manifest(root, dir)),
         })
         .collect()
 }
@@ -252,20 +259,20 @@ pub(crate) mod tests {
             std::env::temp_dir().join(format!("tect-providers-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         crate::init::put(
-            &root.join("modules/both/module.kdl"),
-            "schema-version 1\n\nsupports \"fedora\"\n\nprovides \"x\" \"y\"\n",
+            &root.join("components/both/manifest.kdl"),
+            "schema-version 1\n\ntargets \"fedora\"\n\nprovides \"x\" \"y\"\n",
         )
         .unwrap();
         crate::init::put(
-            &root.join("modules/other/module.kdl"),
-            "schema-version 1\n\nsupports \"fedora\"\n\nprovides \"y\"\n",
+            &root.join("components/other/manifest.kdl"),
+            "schema-version 1\n\ntargets \"fedora\"\n\nprovides \"y\"\n",
         )
         .unwrap();
         root
     }
 
     #[test]
-    fn an_entry_finds_the_module_it_names() {
+    fn an_entry_finds_the_component_it_names() {
         let root = two_providers("at");
         let index = Index::local(&root, &[], &Disk::scan(&root));
         let found = index.at("other").map(|held| held.name.as_str());

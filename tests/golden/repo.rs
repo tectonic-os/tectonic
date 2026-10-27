@@ -119,8 +119,8 @@ fn verify(name: &str, root: &Path) {
     assert_golden(name, "verify.txt", &out);
 }
 
-/// `create image` and `create module`, from flags alone: the URL a second image
-/// takes from the repository, what the splice does to both image files a module
+/// `create image` and `create component`, from flags alone: the URL a second image
+/// takes from the repository, what the splice does to both image files a component
 /// is listed in, and that the result checks.
 fn create_into(name: &str, root: &Path) {
     let here = given(root);
@@ -143,7 +143,7 @@ fn create_into(name: &str, root: &Path) {
     .unwrap()
     .apply(&here)
     .unwrap();
-    tect::create::Module::collect(
+    tect::create::Component::collect(
         &here,
         Some("My Editor".into()),
         vec!["nano".into()],
@@ -154,7 +154,7 @@ fn create_into(name: &str, root: &Path) {
     .unwrap()
     .apply(&here)
     .unwrap();
-    tect::create::Module::collect(
+    tect::create::Component::collect(
         &here,
         Some("plain".into()),
         Vec::new(),
@@ -166,47 +166,10 @@ fn create_into(name: &str, root: &Path) {
     .apply(&here)
     .unwrap();
 
-    let repo = root.join("repo.kdl");
-    let collections = crate_dir().join("tests/collections");
-    let text = std::fs::read_to_string(&repo).unwrap().replace(
-        "sources {\n",
-        &format!(
-            "sources {{\n    modules \"upstream\" {{ dir {:?} }}\n",
-            collections.join("upstream").display()
-        ),
-    );
-    std::fs::write(&repo, text).unwrap();
-    let (list, issues, _) = tect::declarations(&here);
-    assert!(issues.is_empty(), "{}", issues.plain());
-    tect::import::Module::collect(
-        tect::import::Request {
-            name: Some("upstream/fedora-family".into()),
-            image: Some("example".into()),
-            datastream: None,
-            dependencies: false,
-        },
-        &here,
-        &list.sources,
-        false,
-        &silent,
-    )
-    .unwrap_or_else(|err| panic!("{}", err.message()))
-    .apply(&here, &list.sources)
-    .unwrap();
-    // One import names one image, and an unattended second import of a held
-    // path is refused, so the second image lists the copy by hand.
-    let server = root.join("server.image.kdl");
-    let listed = std::fs::read_to_string(&server).unwrap().replace(
-        "        module \"my-editor\"\n",
-        "        module \"my-editor\"\n        module \"fedora-family\"\n",
-    );
-    assert!(listed.contains("module \"fedora-family\""), "{listed}");
-    std::fs::write(&server, listed).unwrap();
-
     let mut out = String::new();
     for file in [
-        "modules/my-editor/module.kdl",
-        "modules/plain/module.kdl",
+        "components/my-editor/manifest.kdl",
+        "components/plain/manifest.kdl",
         "example.image.kdl",
         "server.image.kdl",
     ] {
@@ -222,16 +185,16 @@ fn create_into(name: &str, root: &Path) {
     assert_golden(name, "create.txt", &out);
 }
 
-/// `import module`, against two collections on this machine: what one name
+/// `import component`, against two collections on this machine: what one name
 /// resolves to, what a name both of them carry does, and that the tree it wrote
-/// checks like any other module.
+/// checks like any other component.
 fn copied(name: &str, root: &Path) {
     let mut out = String::new();
     let collections = crate_dir().join("tests/collections");
     std::fs::write(
         root.join("repo.kdl"),
         format!(
-            "schema-version 1\nname \"Imported\"\nsources {{\n    modules \"upstream\" {{ dir {:?} }}\n    modules \"community\" {{ dir {:?} }}\n}}\n",
+            "schema-version 1\nname \"Imported\"\nsources {{\n    components \"upstream\" {{ dir {:?} }}\n    components \"community\" {{ dir {:?} }}\n}}\n",
             collections.join("upstream").display(),
             collections.join("community").display()
         ),
@@ -247,8 +210,12 @@ fn copied(name: &str, root: &Path) {
     }
 
     out.push_str("==== the catalog\n");
-    for module in tect::import::catalog(&here, &sources, true).unwrap() {
-        out.push_str(&format!("{}  {}\n", module.qualified(), module.about()));
+    for component in tect::import::catalog(&here, &sources, true).unwrap() {
+        out.push_str(&format!(
+            "{}  {}\n",
+            component.qualified(),
+            component.about()
+        ));
     }
 
     for wanted in [
@@ -261,7 +228,7 @@ fn copied(name: &str, root: &Path) {
         "flatpak",
     ] {
         out.push_str(&format!("==== import {wanted}\n"));
-        let imported = tect::import::Module::collect(
+        let imported = tect::import::Component::collect(
             tect::import::Request {
                 name: Some(wanted.to_string()),
                 image: None,
@@ -274,7 +241,7 @@ fn copied(name: &str, root: &Path) {
             &common::prompt::Prompt::silent(),
         )
         .map_err(|err| err.message().to_string())
-        .and_then(|module| module.apply(&here, &sources));
+        .and_then(|component| component.apply(&here, &sources));
         match imported {
             Ok(()) => out.push_str("copied\n"),
             Err(message) => out.push_str(&format!("{message}\n")),
@@ -282,7 +249,7 @@ fn copied(name: &str, root: &Path) {
     }
 
     out.push_str("==== the tree\n");
-    let mut written: Vec<String> = walk(&root.join("modules"))
+    let mut written: Vec<String> = walk(&root.join("components"))
         .iter()
         .map(|p| format!("{}\n", p.strip_prefix(root).unwrap().display()))
         .collect();
@@ -291,7 +258,7 @@ fn copied(name: &str, root: &Path) {
 
     out.push_str(&format!(
         "==== the lock\n{}",
-        std::fs::read_to_string(root.join("modules/modules.lock.kdl")).unwrap()
+        std::fs::read_to_string(root.join("components/components.lock.kdl")).unwrap()
     ));
     out.push_str(&format!(
         "==== check\n{}",
@@ -300,7 +267,11 @@ fn copied(name: &str, root: &Path) {
 
     // The silent import tracks its library.
     // A tracked copy is immutable, so an edit to it fails `check`.
-    std::fs::write(root.join("modules/flatpak/module.sh"), "echo forked\n").unwrap();
+    std::fs::write(
+        root.join("components/flatpak/component.sh"),
+        "echo forked\n",
+    )
+    .unwrap();
     out.push_str(&format!(
         "==== check after an edit\n{}",
         tect::run(Command::Check, None, &here).issues.plain()
@@ -308,9 +279,9 @@ fn copied(name: &str, root: &Path) {
     assert_golden(name, "import.txt", &out);
 }
 
-/// A module edited without regenerating is a `verify` failure, the per-module
+/// A component edited without regenerating is a `verify` failure, the per-component
 /// content hash being one of the facts `generated/plan.json` carries.
-fn edited_module(root: &Path) {
+fn edited_component(root: &Path) {
     let here = given(root);
     for (path, body) in &tect::run(Command::Generate, None, &here).files {
         let path = root.join(path);
@@ -324,25 +295,29 @@ fn edited_module(root: &Path) {
         "verify was not green to begin with: {clean}"
     );
 
-    std::fs::write(root.join("modules/my-editor/module.sh"), "echo edited\n").unwrap();
+    std::fs::write(
+        root.join("components/my-editor/component.sh"),
+        "echo edited\n",
+    )
+    .unwrap();
     let dirty = issues();
     assert!(
         dirty.contains("generated/plan.json"),
-        "an edited module left plan.json current: {dirty}"
+        "an edited component left plan.json current: {dirty}"
     );
 }
 
 /// `why`, both renderings and both readings. The repository answer comes off
 /// the resolved plan; the host answer comes off the two documents a built image
-/// carries, with no repo.kdl anywhere. One renderer, so the same module has to
+/// carries, with no repo.kdl anywhere. One renderer, so the same component has to
 /// come out the same way.
-fn why(name: &str, root: &Path, module: &str) {
+fn why(name: &str, root: &Path, component: &str) {
     let here = given(root);
     let mut out = String::new();
 
     for (command, heading) in [(Command::Why, "markdown"), (Command::WhyJson, "json")] {
         out.push_str(&format!("==== {heading}\n"));
-        out.push_str(&tect::run(command, module.rsplit('/').next(), &here).stdout);
+        out.push_str(&tect::run(command, component.rsplit('/').next(), &here).stdout);
     }
 
     out.push_str("==== unknown\n");
@@ -355,7 +330,7 @@ fn why(name: &str, root: &Path, module: &str) {
     // The same answer with no repository at all, off what a build bakes.
     let manifest = common::json::Json::parse(&tect::run(Command::Plan, None, &here).stdout)
         .expect("the plan is a document");
-    let host = tect::emit::why::on_host(&manifest, None, module).expect("the manifest names it");
+    let host = tect::emit::why::on_host(&manifest, None, component).expect("the manifest names it");
     out.push_str("==== from the baked manifest, with no repository\n");
     out.push_str(&host.markdown());
     out.push_str(&format!(
@@ -366,11 +341,11 @@ fn why(name: &str, root: &Path, module: &str) {
     // The build record is what was observed. Two documents out of one build
     // cannot disagree, so a disagreement is worth saying out loud.
     let record = common::json::Json::parse(&format!(
-        "{{\"modules\": [{{\"path\": {module:?}, \"content\": \"not what was declared\"}}]}}"
+        "{{\"components\": [{{\"path\": {component:?}, \"content\": \"not what was declared\"}}]}}"
     ))
     .expect("the record is a document");
-    let observed =
-        tect::emit::why::on_host(&manifest, Some(&record), module).expect("the manifest names it");
+    let observed = tect::emit::why::on_host(&manifest, Some(&record), component)
+        .expect("the manifest names it");
     out.push_str("==== against a build record that disagrees\n");
     out.push_str(
         observed
@@ -420,7 +395,7 @@ fn summary_on_host(root: &Path) {
     }
 }
 
-/// The two names `why` resolves but cannot read out of the plan: a module the
+/// The two names `why` resolves but cannot read out of the plan: a component the
 /// base suppresses, which is listed and never built, and one whose manifest
 /// never loaded.
 fn why_unbuilt(root: &Path) {
@@ -432,7 +407,7 @@ fn why_unbuilt(root: &Path) {
 
     // Suppressed: everything it provides, the base ships, so no layer builds
     // it. `why` still answers, and says which of the two it is.
-    out.push_str("==== a module the base suppresses\n");
+    out.push_str("==== a component the base suppresses\n");
     let bare = tect::run(Command::Why, Some("flatpak"), &here).stdout;
     out.push_str(&bare);
 
@@ -446,11 +421,10 @@ fn why_unbuilt(root: &Path) {
     // say both things. Stopping at the first it finds loses the other.
     std::fs::write(
         temp.join("also.image.kdl"),
-        "schema-version 1\n\nimage {\n    name \"Also\"\n\n    base \"ghcr.io/ublue-os/bazzite:stable\" {\n        \
-         family \"fedora\"\n    }\n\n    modules {\n        module \"apps/flatpak\"\n    }\n}\n",
+        "schema-version 1\n\nimage {\n    name \"Also\"\n\n    base-image {\n        base \"ghcr.io/ublue-os/bazzite:stable\" { family \"fedora\"; }\n    }\n\n    apps {\n        flatpak\n    }\n}\n",
     )
     .unwrap();
-    out.push_str("==== and the same module in an image that does build it\n");
+    out.push_str("==== and the same component in an image that does build it\n");
     out.push_str(
         tect::run(Command::Why, Some("flatpak"), &here)
             .stdout
@@ -462,7 +436,7 @@ fn why_unbuilt(root: &Path) {
 
     // Listed, but its manifest was deleted out from under the image: there is
     // nothing to read out, and that is a diagnostic. A crash names nothing.
-    std::fs::remove_dir_all(temp.join("modules/apps/flatpak")).unwrap();
+    std::fs::remove_dir_all(temp.join("components/apps/flatpak")).unwrap();
     out.push_str("==== and one whose manifest never loaded\n");
     let run = tect::run(Command::Why, Some("flatpak"), &here);
     out.push_str(
@@ -471,7 +445,7 @@ fn why_unbuilt(root: &Path) {
             .split("`apps/flatpak` is listed")
             .nth(1)
             .map(|rest| format!("`apps/flatpak` is listed{rest}"))
-            .expect("the unread module is reported")
+            .expect("the unread component is reported")
             .as_str(),
     );
 
@@ -569,18 +543,9 @@ fn repo_case(name: &str) {
             why(name, &root, "core/hello");
             summary_on_host(&root);
         }
-        // `check` reads no library, so a base file's defects show where
-        // `create image` reads the catalog.
-        "broken-bases" => {
-            let here = given(&root);
-            let (list, _, _) = tect::declarations(&here);
-            let mut issues = tect::diag::Issues::default();
-            tect::base::catalog(&here, &list.sources, &mut issues);
-            assert_golden(name, "catalog.txt", &issues.plain());
-        }
         "broken-lock" => refused_everywhere(&root),
         "no-default" => assert_no_default(&root),
-        // The module came from the collection the seed publishes, so its lock
+        // The component came from the collection the seed publishes, so its lock
         // entry names that library.
         "seeding" => why(name, &root, "flatpak"),
         "suppressed" => {
@@ -606,9 +571,8 @@ macro_rules! repo_cases {
 }
 
 repo_cases! {
-    bare_module => "bare-module",
+    bare_component => "bare-component",
     broken_asset => "broken-asset",
-    broken_bases => "broken-bases",
     broken_collect => "broken-collect",
     broken_cycle => "broken-cycle",
     broken_fetch => "broken-fetch",
@@ -619,7 +583,7 @@ repo_cases! {
     broken_key => "broken-key",
     broken_layout => "broken-layout",
     broken_lock => "broken-lock",
-    broken_module => "broken-module",
+    broken_component => "broken-component",
     broken_network => "broken-network",
     broken_options => "broken-options",
     broken_overlay => "broken-overlay",
@@ -709,16 +673,16 @@ fn init() {
 fn create() {
     let created = init_repo("create");
     create_into("create", &created);
-    edited_module(&created);
+    edited_component(&created);
 }
 
 #[test]
-fn copy_module() {
+fn copy_component() {
     copied("copy", &init_repo("copy"));
 }
 
 /// A fragment's own `RUN` lines are outside the script rule, so `check` names
-/// each module that ships one rather than letting `strict` read wider than it
+/// each component that ships one rather than letting `strict` read wider than it
 /// is. `core/spliced` has a standard layer *and* a fragment, which is the case
 /// the rule closes one half of.
 #[test]

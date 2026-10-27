@@ -1,9 +1,9 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
-3 modules, the ungated set.
+3 components, the ungated set.
 
-| Module | Description | Options | Satisfies | Refuses |
+| Component | Description | Options | Satisfies | Refuses |
 | --- | --- | --- | --- | --- |
 | `core/menu` | Assembles every contributed justfile fragment into one file |  |  |  |
 | `core/power` | Power recipes, contributed to the menu after the defaults |  |  |  |

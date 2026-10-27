@@ -1,0 +1,25 @@
+schema-version 1
+
+description "Fedora, as this collection describes it"
+provides {
+    "rechunking"
+    "luks-initramfs"
+    "initramfs-generation" witness="/usr/bin/dracut"
+    "selinux-policy" witness="/usr/sbin/semodule"
+    "ssh" witness="/usr/sbin/sshd"
+    "bootc" witness="/usr/bin/bootc"
+    "bootupctl" witness="/usr/bin/bootupctl"
+    "podman" witness="/usr/bin/podman"
+    "crun" witness="/usr/bin/crun"
+}
+base "quay.io/fedora/fedora-bootc:$version" {
+    family "fedora"
+    scap-content "ssg-fedora-ds.xml"
+    bootloader "grub2"
+}
+imports "fedora-family"
+
+option "version" type="string" {
+    default "44"
+    renovate datasource="docker" depName="quay.io/fedora/fedora-bootc"
+}

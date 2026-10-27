@@ -1,7 +1,7 @@
 //! The image files: one `.kdl` at the repository root per image.
 
 use crate::diag::{Issue, Source, Span};
-use crate::model::module::{Access, Coverage, Module, Refusal};
+use crate::model::component::{Access, Component, Coverage, Refusal};
 use crate::model::options::Value;
 use crate::model::remote::Collection;
 
@@ -26,11 +26,14 @@ pub fn is_name(name: &str) -> bool {
     chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
-/// Answers whether `path` names a module directory the repository may hold.
+/// Answers whether `path` names a component directory the repository may hold.
 /// The last part may end in one `@<tag>`, which marks a local copy of a library
-/// module imported under a second name.
+/// component imported under a second name.
 pub fn is_local_path(path: &str) -> bool {
-    let (parents, last) = path.rsplit_once('/').unwrap_or(("", path));
+    let (parents, last) = match path.rsplit_once('/') {
+        Some((parents, last)) => (Some(parents), last),
+        None => (None, path),
+    };
     let last = match last.split_once('@') {
         Some((name, tag)) => {
             let tagged = !tag.is_empty()
@@ -44,7 +47,7 @@ pub fn is_local_path(path: &str) -> bool {
         }
         None => last,
     };
-    is_name(last) && (parents.is_empty() || parents.split('/').all(is_name))
+    is_name(last) && parents.is_none_or(|parents| parents.split('/').all(is_name))
 }
 
 /// A build target: which image, and which flavour of it.
@@ -92,44 +95,102 @@ pub struct Image {
     pub keywords: Vec<String>,
     pub logo_url: String,
     pub conforms: String,
-    /// `uki-shim` or `uki-db`, empty when the image uses today's chain.
+    /// `uki-shim` or `uki-db` from `boot-chain`, empty when the image uses
+    /// today's chain.
     pub boot: String,
-    /// None only when the `base` node is missing or malformed, which is
+    /// None only when the image lists no base or a malformed one, which is
     /// already an issue: nothing downstream invents a default for it.
     pub base: Option<Base>,
+    /// Holds the entry of the listed component that declares `base`.
+    /// Resolution loads that component into `base`.
+    pub base_entry: Option<BaseEntry>,
+    /// Holds the path of every component that the image file defines inline.
+    pub defined: Vec<String>,
     /// What the image says about the disk it is installed onto. None where it
     /// says nothing, which leaves the family's answers standing.
     pub layout: Option<Layout>,
-    /// Rules an installed module refuses that this image lets remediation set
-    /// anyway. A module's refusal is a judgement about a deployment, and the
+    /// Rules an installed component refuses that this image lets remediation set
+    /// anyway. A component's refusal is a judgement about a deployment, and the
     /// deployment is the image's: `grub2_nousb_argument` removes a keyboard a
     /// kiosk has not got. The scan measures the result either way, which is
     /// what keeps a lift honest.
     pub allows: Vec<Refusal>,
     pub flavours: Vec<Flavour>,
     pub entries: Vec<Entry>,
-    /// Entries the base makes redundant: everything the module provides, the
+    /// Entries the base makes redundant: everything the component provides, the
     /// base already ships, so nothing builds it.
     pub suppressed: Vec<Entry>,
     pub span: Span,
 }
 
+impl Base {
+    /// Lists what the base ships. `base-image` is what makes the component a
+    /// base, and no file in the image witnesses it.
+    pub fn shipped(&self) -> impl Iterator<Item = &Decl> {
+        self.provides
+            .iter()
+            .filter(|decl| decl.name != crate::parse::component::BASE_IMAGE)
+    }
+
+    /// Answers whether the base meets a requirement.
+    pub fn answers(&self, required: &str) -> bool {
+        self.provides
+            .iter()
+            .any(|decl| crate::resolve::meets(&decl.name, required))
+    }
+
+    /// Answers whether the base declares every name a component provides. A
+    /// component that provides nothing is never covered.
+    pub fn covers<'a>(&self, provides: impl IntoIterator<Item = &'a str>) -> bool {
+        let mut provides = provides.into_iter().peekable();
+        provides.peek().is_some()
+            && provides.all(|name| self.provides.iter().any(|decl| decl.name == name))
+    }
+}
+
+/// The image's base entry. It names the base component, sets its options and
+/// records what the probes keep current.
+pub struct BaseEntry {
+    pub entry: Entry,
+    /// Holds the digest that pins the reference.
+    pub digest: Option<String>,
+    pub signed: bool,
+}
+
 /// The base image, and what building on it may assume.
 pub struct Base {
+    /// Holds the path of the base component.
+    pub path: String,
     /// The full image reference, emitted verbatim as the generated `FROM`.
     pub image: String,
     pub family: String,
     /// Capabilities the base image already ships, by name.
     pub provides: Vec<Decl>,
-    /// Capabilities the base is unusable without: a container base a module
-    /// set turns into a bootc image declares what that module set has to
+    /// Capabilities the base is unusable without: a container base a component
+    /// set turns into a bootc image declares what that component set has to
     /// provide, and `check` refuses the image until something does.
     pub requires: Vec<Decl>,
+    /// Holds the components that the base component imports.
+    pub imports: Vec<crate::model::component::Import>,
+    /// Holds the base component's manifest. An issue about a base import points
+    /// into it.
+    pub src: Source,
     /// Benchmark rules the base image is published as satisfying, which count
-    /// towards `conforms` the way a listed module's claims do.
+    /// towards `conforms` the way a listed component's claims do.
     pub satisfies: Vec<Coverage>,
     /// Whether the base image publishes a cosign signature.
     pub signed: bool,
+    /// Lists the bootloaders an image on this base can install, the default
+    /// first.
+    pub bootloaders: Vec<String>,
+    /// Holds the witness path of each provided name that the base component
+    /// locates with `witness=`.
+    pub files: Vec<crate::model::component::Located>,
+    /// Holds what keeps the base entry's `version` current, where the base
+    /// component declares it.
+    pub tracker: Option<crate::model::options::VersionTracker>,
+    /// Holds the lock entry of a base component that an import copied in.
+    pub imported: Option<crate::provenance::lock::Record>,
     /// The SSG datastream file a scan of an image on this base reads, as a
     /// bare filename under the content directory. Empty where the family's
     /// default stands.
@@ -158,8 +219,8 @@ pub struct Layout {
     pub span: Span,
 }
 
-/// A base declares capabilities and paths the way a module does.
-pub use crate::model::module::Decl;
+/// A base declares capabilities and paths the way a component does.
+pub use crate::model::component::Decl;
 
 pub struct Flavour {
     pub name: String,
@@ -181,10 +242,10 @@ pub struct Workflow {
     pub schedule: Option<String>,
 }
 
-/// One entry in the list: a module, and the decisions the image author makes
+/// One entry in the list: a component, and the decisions the image author makes
 /// about it.
 pub struct Entry {
-    /// The module's directory, relative to `modules/`.
+    /// The component's directory, relative to `components/`.
     pub path: String,
     pub flavour: Option<String>,
     pub variant: Option<String>,
@@ -193,18 +254,27 @@ pub struct Entry {
     pub span: Span,
     /// The manifest this entry names, loaded during resolution. None when it
     /// could not be read, which is already an issue.
-    pub module: Option<Module>,
+    pub component: Option<Component>,
+    /// Names the component whose `imports` added this entry to the image. It
+    /// is None for an entry that the image file lists.
+    pub imported_by: Option<String>,
+    /// Holds the span of each manifest node of a component that the image
+    /// file defines inline. It is None for a component under `components/`.
+    pub inline: Option<Vec<Span>>,
+    /// Marks a path segment that only holds other segments. If no component
+    /// is at its path, then the segment organises and lists nothing.
+    pub organises: bool,
 }
 
 impl Entry {
-    /// Names this module as a seed calls it. An imported module keeps its
-    /// library and its path there. A module this repository owns takes the
+    /// Names this component as a seed calls it. An imported component keeps its
+    /// library and its path there. A component this repository owns takes the
     /// collection it publishes as.
     pub fn qualified(&self, publishes_as: &str) -> String {
         match self
-            .module
+            .component
             .as_ref()
-            .and_then(|module| module.imported.as_ref())
+            .and_then(|component| component.imported.as_ref())
         {
             Some(record) => format!("{}/{}", record.library, record.upstream),
             None => format!("{publishes_as}/{}", self.path),
@@ -213,7 +283,7 @@ impl Entry {
 }
 
 /// The image a repository publishes a seed of, and the collection it publishes
-/// its own modules as, which is what every module in the seed is named by.
+/// its own components as, which is what every component in the seed is named by.
 pub struct Seed {
     pub image: String,
     pub collection: String,
@@ -255,7 +325,7 @@ pub struct List {
     /// Whether a provenance fact that is missing or does not match is an error.
     /// Every fact is recorded either way.
     pub audit_enforce: bool,
-    /// What repo.kdl lets each step of a module layer reach.
+    /// What repo.kdl lets each step of a component layer reach.
     pub network: Network,
     /// What repo.kdl declares, which is `SCHEMA_VERSION` or the load failed.
     pub schema_version: Option<u32>,
@@ -270,7 +340,7 @@ pub struct List {
 pub enum NetRule {
     #[default]
     Allow,
-    /// A step is open only where its module declares the access.
+    /// A step is open only where its component declares the access.
     Strict,
     Deny,
 }
@@ -294,14 +364,14 @@ pub struct Network {
 }
 
 impl Network {
-    /// A package step exists only where the module declares packages, a COPR
+    /// A package step exists only where the component declares packages, a COPR
     /// or a repo file, so `strict` opens it wherever it runs.
-    pub fn access(&self, module: &Module) -> Access {
+    pub fn access(&self, component: &Component) -> Access {
         Access {
             packages: self.packages != NetRule::Deny,
             scripts: match self.scripts {
                 NetRule::Allow => true,
-                NetRule::Strict => module.network.is_some(),
+                NetRule::Strict => component.network.is_some(),
                 NetRule::Deny => false,
             },
         }
@@ -310,8 +380,80 @@ impl Network {
 
 impl Image {
     /// The manifests this image's entries resolved to, in build order.
-    pub fn modules(&self) -> impl Iterator<Item = &Module> {
-        self.entries.iter().filter_map(|e| e.module.as_ref())
+    pub fn components(&self) -> impl Iterator<Item = &Component> {
+        self.entries.iter().filter_map(|e| e.component.as_ref())
+    }
+
+    /// Answers whether the image's base meets a requirement.
+    pub fn base_answers(&self, required: &str) -> bool {
+        self.base
+            .as_ref()
+            .is_some_and(|base| base.answers(required))
+    }
+
+    /// Answers whether the base or an enabled component meets a requirement on
+    /// every target. A name that an ungated component removes meets nothing.
+    pub fn answers(&self, required: &str) -> bool {
+        let kept = |name: &str| self.removing(name, |at| at.is_none()).is_none();
+        self.base.as_ref().is_some_and(|base| {
+            base.provides
+                .iter()
+                .any(|decl| crate::resolve::meets(&decl.name, required) && kept(&decl.name))
+        }) || self.components().any(|component| {
+            crate::resolve::answers(
+                &component.path,
+                component
+                    .provides
+                    .iter()
+                    .map(|decl| decl.name.as_str())
+                    .filter(|name| kept(name)),
+                required,
+            )
+        })
+    }
+
+    /// Finds the enabled component that removes a name on a target that an entry
+    /// gated to `flavour` builds into. A component that removes a name also
+    /// removes every name below it.
+    pub fn remover(&self, name: &str, flavour: Option<&str>) -> Option<&Component> {
+        self.removing(name, |at| crate::resolve::meet(at, flavour))
+    }
+
+    /// Finds the component that removes a name, among those whose flavour
+    /// `reaches` accepts.
+    fn removing(&self, name: &str, reaches: impl Fn(Option<&str>) -> bool) -> Option<&Component> {
+        self.components()
+            .find(|component| component.withdraws(name) && reaches(component.flavour.as_deref()))
+    }
+
+    /// Answers whether the base meets a requirement on the targets of
+    /// `flavour`, once the removals on those targets apply.
+    pub fn base_meets(&self, required: &str, flavour: Option<&str>) -> bool {
+        self.base.as_ref().is_some_and(|base| {
+            base.provides.iter().any(|decl| {
+                crate::resolve::meets(&decl.name, required)
+                    && self.remover(&decl.name, flavour).is_none()
+            })
+        })
+    }
+
+    /// Answers whether a component meets a requirement on the targets of
+    /// `flavour`, once the removals on those targets apply.
+    pub fn component_meets(
+        &self,
+        component: &Component,
+        required: &str,
+        flavour: Option<&str>,
+    ) -> bool {
+        crate::resolve::answers(
+            &component.path,
+            component
+                .provides
+                .iter()
+                .map(|decl| decl.name.as_str())
+                .filter(|name| self.remover(name, flavour).is_none()),
+            required,
+        )
     }
 
     /// What a scan measures one of this image's targets against: the image's
@@ -474,5 +616,6 @@ mod tests {
         assert!(!is_local_path("browser@1@2"));
         assert!(!is_local_path("desktop@1/kde"));
         assert!(!is_local_path("Browser"));
+        assert!(!is_local_path("/browser"));
     }
 }

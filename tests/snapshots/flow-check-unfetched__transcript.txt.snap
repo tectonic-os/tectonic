@@ -3,18 +3,17 @@ source: tests/golden/harness.rs
 ---
 Tectonic v{version}
 
-  × `core/one` requires `build-environment`, which nothing enabled provides
-   ╭─[./modules/core/one/module.kdl:7:1]
+  × `core/one` requires `flatpak`, which nothing enabled provides
+   ╭─[./components/core/one/manifest.kdl:7:10]
  6 │ 
- 7 │ requires "build-environment"
-   · ────┬───
-   ·     ╰── unsatisfied
+ 7 │ requires "flatpak"
+   ·          ────┬────
+   ·              ╰── unsatisfied
    ╰────
-  help: no module in the repository declares `provides "build-environment"`,
-        and neither does the `base` node in ./example.image.kdl. `tect import
-        module` lists what the declared libraries provide
+  help: no component in the repository declares `provides "flatpak"`, and
+        neither does the base `base-image/fedora`. `tect import component`
+        lists what the declared libraries provide
 
-tect: 1 problem in ./modules/core/one/module.kdl; none in ./example.image.kdl, ./repo.kdl
-tect: `tectonic-modules` is unpinned, so a fetch from it takes whatever its ref holds then, unverified
-tect: `core` is unpinned, so a fetch from it takes whatever its ref holds then, unverified
+tect: 1 problem in ./components/core/one/manifest.kdl; none in ./example.image.kdl, ./repo.kdl
+tect: `tectonic-components` is unpinned, so a fetch from it takes whatever its ref holds then, unverified
 ==== exit 2

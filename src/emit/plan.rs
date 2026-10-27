@@ -1,8 +1,8 @@
 //! One resolved JSON plan holds every fact that downstream commands derive.
 
 use crate::model::asset::Asset;
+use crate::model::component::Component;
 use crate::model::image::{Entry, Image, List, Target, NO_FLAVOUR};
-use crate::model::module::Module;
 use crate::resolve::overlay;
 use crate::resolve::workflow::Declared;
 use crate::resolve::Resolved;
@@ -141,13 +141,25 @@ fn image(list: &List, image: &Image, resolved: &Resolved) -> Json {
             match &image.base {
                 None => Json::Null,
                 Some(base) => Json::object([
+                    ("path", Json::string(&base.path)),
+                    (
+                        "defined",
+                        match image
+                            .base_entry
+                            .as_ref()
+                            .and_then(|held| held.entry.inline.as_ref())
+                        {
+                            Some(_) => Json::string(declared_in(image.src.name())),
+                            None => Json::Null,
+                        },
+                    ),
                     ("image", Json::string(&base.image)),
                     ("family", Json::string(&base.family)),
                     ("scap_content", Json::string(&base.scap_content)),
                     ("signed", Json::Bool(base.signed)),
                     (
                         "provides",
-                        Json::strings(base.provides.iter().map(|d| d.name.clone())),
+                        Json::strings(base.shipped().map(|decl| decl.name.clone())),
                     ),
                     ("witnesses", witnesses(image)),
                     (
@@ -200,7 +212,10 @@ fn target(list: &List, image: &Image, resolved: &Resolved, target: &Target) -> J
         .iter()
         .filter(|entry| in_target(entry, flavour))
         .collect();
-    let modules: Vec<&Module> = entries.iter().filter_map(|e| e.module.as_ref()).collect();
+    let components: Vec<&Component> = entries
+        .iter()
+        .filter_map(|e| e.component.as_ref())
+        .collect();
 
     Json::object([
         ("name", Json::string(target.to_string())),
@@ -245,8 +260,12 @@ fn target(list: &List, image: &Image, resolved: &Resolved, target: &Target) -> J
             ),
         ),
         (
-            "modules",
-            Json::array(entries.iter().map(|entry| self::module(entry, family))),
+            "components",
+            Json::array(
+                entries
+                    .iter()
+                    .map(|entry| self::component(entry, family, image, &entries)),
+            ),
         ),
         (
             "suppressed",
@@ -255,23 +274,23 @@ fn target(list: &List, image: &Image, resolved: &Resolved, target: &Target) -> J
                     .suppressed
                     .iter()
                     .filter(|entry| in_target(entry, flavour))
-                    .map(|entry| self::module(entry, family)),
+                    .map(|entry| self::component(entry, family, image, &entries)),
             ),
         ),
         (
             "secrets",
-            unique(&modules, |m| {
+            unique(&components, |m| {
                 m.secrets.iter().map(|d| d.name.clone()).collect()
             }),
         ),
         (
             "contract_files",
-            Json::strings(contract_files(image, &modules)),
+            Json::strings(contract_files(image, &components)),
         ),
         (
             "verify_exceptions",
             Json::array(
-                unique_pairs(&modules, |m| {
+                unique_pairs(&components, |m| {
                     m.verify_exceptions
                         .iter()
                         .map(|e| (e.class.clone(), e.unit.clone()))
@@ -283,7 +302,7 @@ fn target(list: &List, image: &Image, resolved: &Resolved, target: &Target) -> J
                 }),
             ),
         ),
-        ("assets", assets(&modules)),
+        ("assets", assets(&components)),
         (
             "overlay_files",
             overlay_files(image, &resolved.shipped, flavour),
@@ -295,17 +314,21 @@ fn target(list: &List, image: &Image, resolved: &Resolved, target: &Target) -> J
         (
             "collected_files",
             Json::map(entries.iter().filter_map(|entry| {
-                resolved.collected.by_module.get(&entry.path).map(|staged| {
-                    (
-                        entry.path.clone(),
-                        Json::array(staged.iter().map(|c| {
-                            Json::object([
-                                ("file", Json::string(&c.file)),
-                                ("staged", Json::string(&c.staged)),
-                            ])
-                        })),
-                    )
-                })
+                resolved
+                    .collected
+                    .by_component
+                    .get(&entry.path)
+                    .map(|staged| {
+                        (
+                            entry.path.clone(),
+                            Json::array(staged.iter().map(|c| {
+                                Json::object([
+                                    ("file", Json::string(&c.file)),
+                                    ("staged", Json::string(&c.staged)),
+                                ])
+                            })),
+                        )
+                    })
             })),
         ),
         (
@@ -315,32 +338,74 @@ fn target(list: &List, image: &Image, resolved: &Resolved, target: &Target) -> J
     ])
 }
 
-fn module(entry: &Entry, family: &str) -> Json {
-    let module = entry.module.as_ref();
+/// Says how each requirement of one entry was met on this target. It names
+/// the component that met it.
+fn met_by(entry: &Entry, image: &Image, entries: &[&Entry]) -> Json {
+    let Some(component) = &entry.component else {
+        return Json::map(std::iter::empty::<(String, Json)>());
+    };
+    Json::map(component.requires.iter().filter_map(|decl| {
+        if image.base_answers(&decl.name) {
+            return Some((
+                decl.name.clone(),
+                Json::object([("how", Json::string("base"))]),
+            ));
+        }
+        let provider = entries.iter().find(|other| {
+            other
+                .component
+                .as_ref()
+                .is_some_and(|component| component.answers(&decl.name))
+        })?;
+        Some((
+            decl.name.clone(),
+            match &provider.imported_by {
+                None => Json::object([
+                    ("how", Json::string("listed")),
+                    ("provider", Json::string(&provider.path)),
+                ]),
+                Some(by) => Json::object([
+                    ("how", Json::string("imported")),
+                    ("provider", Json::string(&provider.path)),
+                    ("by", Json::string(by)),
+                ]),
+            },
+        ))
+    }))
+}
+
+fn component(entry: &Entry, family: &str, image: &Image, entries: &[&Entry]) -> Json {
+    let component = entry.component.as_ref();
     Json::object([
         ("path", Json::string(&entry.path)),
         ("flavour", Json::optional(entry.flavour.clone())),
         ("variant", Json::optional(entry.variant.clone())),
         (
             "description",
-            Json::string(module.map(|m| m.description.as_str()).unwrap_or_default()),
+            Json::string(
+                component
+                    .map(|m| m.description.as_str())
+                    .unwrap_or_default(),
+            ),
         ),
         (
             "options",
             Json::map(
-                module
+                component
                     .map(|m| m.resolved.as_slice())
                     .unwrap_or_default()
                     .iter()
                     .map(|(name, value)| (name.clone(), Json::string(value))),
             ),
         ),
-        ("provides", Json::strings(decls(module, |m| &m.provides))),
-        ("requires", Json::strings(decls(module, |m| &m.requires))),
+        ("provides", Json::strings(decls(component, |m| &m.provides))),
+        ("requires", Json::strings(decls(component, |m| &m.requires))),
+        ("met_by", met_by(entry, image, entries)),
+        ("removes", Json::strings(decls(component, |m| &m.removes))),
         (
             "files",
             Json::map(
-                module
+                component
                     .map(|m| m.files.as_slice())
                     .unwrap_or_default()
                     .iter()
@@ -349,18 +414,27 @@ fn module(entry: &Entry, family: &str) -> Json {
         ),
         (
             "packages",
-            batches(module.map(|m| m.packages.as_slice()), family),
+            batches(component.map(|m| m.packages.as_slice()), family),
         ),
         (
             "groups",
-            batches(module.map(|m| m.groups.as_slice()), family),
+            batches(component.map(|m| m.groups.as_slice()), family),
         ),
-        ("coprs", coprs(module, family)),
+        ("coprs", coprs(component, family)),
         ("provenance", provenance(entry)),
+        (
+            "origin",
+            match &entry.imported_by {
+                None => Json::object([("how", Json::string("listed"))]),
+                Some(by) => {
+                    Json::object([("how", Json::string("imported")), ("by", Json::string(by))])
+                }
+            },
+        ),
         (
             "satisfies",
             Json::array(
-                module
+                component
                     .map(|m| m.satisfies.as_slice())
                     .unwrap_or_default()
                     .iter()
@@ -374,14 +448,14 @@ fn module(entry: &Entry, family: &str) -> Json {
         ),
         (
             "refuses",
-            refusals(module.map(|m| m.refuses.as_slice()).unwrap_or_default()),
+            refusals(component.map(|m| m.refuses.as_slice()).unwrap_or_default()),
         ),
     ])
 }
 
 /// Refusals and allowances share this shape because renderers read them
 /// together.
-fn refusals(declared: &[crate::model::module::Refusal]) -> Json {
+fn refusals(declared: &[crate::model::component::Refusal]) -> Json {
     Json::array(declared.iter().map(|refusal| {
         Json::object([
             ("rule", Json::string(&refusal.rule)),
@@ -391,7 +465,7 @@ fn refusals(declared: &[crate::model::module::Refusal]) -> Json {
 }
 
 /// Only the target family's package groups can reach its build layer.
-fn batches(declared: Option<&[crate::model::module::PackageGroup]>, family: &str) -> Json {
+fn batches(declared: Option<&[crate::model::component::PackageGroup]>, family: &str) -> Json {
     Json::array(
         declared
             .unwrap_or_default()
@@ -407,14 +481,14 @@ fn batches(declared: Option<&[crate::model::module::PackageGroup]>, family: &str
     )
 }
 
-/// The COPR repositories one module enables, which only a Fedora base can
+/// The COPR repositories one component enables, which only a Fedora base can
 /// reach. Every name is derived from the two declared segments.
-fn coprs(module: Option<&Module>, family: &str) -> Json {
+fn coprs(component: Option<&Component>, family: &str) -> Json {
     if family != "fedora" {
         return Json::array(std::iter::empty());
     }
     Json::array(
-        module
+        component
             .map(|m| m.coprs.as_slice())
             .unwrap_or_default()
             .iter()
@@ -429,27 +503,35 @@ fn coprs(module: Option<&Module>, family: &str) -> Json {
 
 /// An unresolved manifest contributes no capability declarations.
 fn decls(
-    module: Option<&Module>,
-    of: impl Fn(&Module) -> &Vec<crate::model::module::Decl>,
+    component: Option<&Component>,
+    of: impl Fn(&Component) -> &Vec<crate::model::component::Decl>,
 ) -> Vec<String> {
-    module
+    component
         .map(|m| of(m).iter().map(|d| d.name.clone()).collect())
         .unwrap_or_default()
 }
 
 /// Keeping content and import evidence together lets a consumer tell an
-/// imported copy from a module the repository owns.
+/// imported copy from a component the repository owns. An inline definition
+/// has no directory to hash, so `defined` names the image file that holds it.
 fn provenance(entry: &Entry) -> Json {
-    let module = entry.module.as_ref();
+    let component = entry.component.as_ref();
     Json::object([
         (
-            "content",
-            Json::optional(module.and_then(|m| m.content.clone())),
+            "defined",
+            match (&entry.inline, component) {
+                (Some(_), Some(m)) => Json::string(declared_in(m.src.name())),
+                _ => Json::Null,
+            },
         ),
-        ("repo", Json::Bool(module.is_some_and(|m| m.repo))),
+        (
+            "content",
+            Json::optional(component.and_then(|m| m.content.clone())),
+        ),
+        ("repo", Json::Bool(component.is_some_and(|m| m.repo))),
         (
             "imported",
-            match module.and_then(|m| m.imported.as_ref()) {
+            match component.and_then(|m| m.imported.as_ref()) {
                 None => Json::Null,
                 Some(record) => Json::object([
                     ("library", Json::string(&record.library)),
@@ -463,81 +545,78 @@ fn provenance(entry: &Entry) -> Json {
     ])
 }
 
-/// Each capability stays one layer probe even when base, module and table
-/// paths offer alternatives.
-pub(crate) fn contract_files(image: &Image, modules: &[&Module]) -> Vec<String> {
+/// A name is witnessed only by a provider's `witness=`. Each witness is one layer
+/// probe even when the base and a component each declare one. A removed name's
+/// probe carries a leading `!`, and `validate-image` requires each of its
+/// paths to be absent.
+pub(crate) fn contract_files(image: &Image, components: &[&Component]) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
-    let mut add = |paths: Vec<String>| {
-        let token = paths.join("|");
+    let mut add = |paths: Vec<String>, removed: bool| {
+        let token = match removed {
+            true => format!("!{}", paths.join("|")),
+            false => paths.join("|"),
+        };
         if !out.contains(&token) {
             out.push(token);
         }
     };
-    for decl in image.base.iter().flat_map(|b| b.provides.iter()) {
-        if !image.boot.is_empty() && decl.name == "bootupctl" {
-            continue;
-        }
-        if let Some(paths) = crate::base::witness(&decl.name, None) {
-            add(paths);
-        }
-    }
-    for module in modules {
-        for decl in &module.provides {
-            let own = module.files.iter().find(|f| f.name == decl.name);
-            if own.is_some_and(|file| file.build_only) {
-                continue;
-            }
-            let own = own.map(|file| file.file.as_str());
-            if let Some(paths) = crate::base::witness(&decl.name, own) {
-                add(paths);
-            }
+    let removed = |name: &str| components.iter().any(|component| component.withdraws(name));
+    let base = image.base.iter().flat_map(|base| &base.files);
+    for file in base.chain(components.iter().flat_map(|component| &component.files)) {
+        if !file.build_only {
+            add(vec![file.file.clone()], removed(&file.name));
         }
     }
     out
 }
 
 pub(crate) fn provides(image: &Image, entries: &[&Entry], name: &str) -> bool {
-    image
-        .base
-        .iter()
-        .flat_map(|base| &base.provides)
-        .chain(
-            entries
-                .iter()
-                .filter_map(|entry| entry.module.as_ref())
-                .flat_map(|module| &module.provides),
-        )
-        .any(|decl| decl.name == name)
+    let mut components = entries.iter().filter_map(|entry| entry.component.as_ref());
+    !components
+        .clone()
+        .any(|component| component.withdraws(name))
+        && (image.base_answers(name) || components.any(|component| component.answers(name)))
 }
 
-/// Only located capabilities can produce filesystem probes. Abstract rows must
-/// leave the probe result unchanged.
+/// The base probe measures each name that a provider in the image witnesses.
+/// A name with no `witness=` has nothing to probe.
+/// A component that meets a base requirement stands in for the base on purpose.
+/// The probe must never ask the base to claim what that component provides.
 fn witnesses(image: &Image) -> Json {
-    let mut names: Vec<&str> = crate::base::CAPABILITIES
+    let stands_in = |component: &&crate::model::component::Component| {
+        image.base.iter().any(|base| {
+            base.requires.iter().any(|decl| {
+                crate::resolve::answers(
+                    &component.path,
+                    component.provides.iter().map(|has| has.name.as_str()),
+                    &decl.name,
+                )
+            })
+        })
+    };
+    let components = image
+        .entries
         .iter()
-        .filter(|row| row.path.is_some())
-        .map(|row| row.name)
-        .chain(
-            image
-                .base
-                .iter()
-                .flat_map(|b| b.provides.iter().map(|d| d.name.as_str())),
-        )
-        .chain(
-            image
-                .entries
-                .iter()
-                .chain(&image.suppressed)
-                .filter_map(|entry| entry.module.as_ref())
-                .flat_map(|m| m.requires.iter().map(|d| d.name.as_str())),
-        )
-        .collect();
-    names.sort_unstable();
-    names.dedup();
-    Json::map(names.into_iter().filter_map(|name| {
-        let paths = crate::base::probe(name)?;
-        Some((name.to_string(), Json::strings(paths)))
-    }))
+        .chain(&image.suppressed)
+        .filter_map(|entry| entry.component.as_ref())
+        .filter(|component| !stands_in(component));
+    let files = image
+        .base
+        .iter()
+        .flat_map(|base| &base.files)
+        .chain(components.flat_map(|component| &component.files));
+    let mut paths: std::collections::BTreeMap<&str, Vec<String>> = Default::default();
+    for file in files {
+        let held = paths.entry(&file.name).or_default();
+        if !held.contains(&file.file) {
+            held.push(file.file.clone());
+        }
+    }
+    Json::map(
+        paths
+            .into_iter()
+            .map(|(name, paths)| (name.to_string(), Json::strings(paths))),
+    )
 }
 
 fn overlay_files(image: &Image, shipped: &overlay::Index, flavour: &str) -> Json {
@@ -551,18 +630,18 @@ fn overlay_files(image: &Image, shipped: &overlay::Index, flavour: &str) -> Json
     }))
 }
 
-/// Every path a module ships that another module's overlay replaced, to the
-/// module whose copy the image actually carries. A claim about a file its
+/// Every path a component ships that another component's overlay replaced, to the
+/// component whose copy the image actually carries. A claim about a file its
 /// claimant no longer owns is a composition failure, and this is what tells it
 /// from a false claim.
 fn overridden(image: &Image, shipped: &overlay::Index, flavour: &str) -> Json {
     Json::array(
         overrides(image, shipped, flavour)
             .into_iter()
-            .map(|(path, module, by)| {
+            .map(|(path, component, by)| {
                 Json::object([
                     ("path", Json::string(path)),
-                    ("module", Json::string(module)),
+                    ("component", Json::string(component)),
                     ("by", Json::string(by)),
                 ])
             }),
@@ -616,33 +695,33 @@ fn is_preset(path: &str) -> bool {
     else {
         return false;
     };
-    name.starts_with(crate::runtime::MODULE_PRESET) && name.ends_with(".preset")
+    name.starts_with(crate::runtime::COMPONENT_PRESET) && name.ends_with(".preset")
 }
 
-/// A module-level key prevents the same asset from reaching the build twice.
-pub(crate) fn pinned<'a>(modules: &[&'a Module]) -> Vec<(&'a Module, &'a Asset)> {
+/// A component-level key prevents the same asset from reaching the build twice.
+pub(crate) fn pinned<'a>(components: &[&'a Component]) -> Vec<(&'a Component, &'a Asset)> {
     let mut seen: Vec<(&str, &str)> = Vec::new();
     let mut out = Vec::new();
-    for module in modules {
-        for asset in &module.assets {
-            if seen.contains(&(module.path.as_str(), asset.name.as_str())) {
+    for component in components {
+        for asset in &component.assets {
+            if seen.contains(&(component.path.as_str(), asset.name.as_str())) {
                 continue;
             }
-            seen.push((module.path.as_str(), asset.name.as_str()));
-            out.push((*module, asset));
+            seen.push((component.path.as_str(), asset.name.as_str()));
+            out.push((*component, asset));
         }
     }
     out
 }
 
-fn assets(modules: &[&Module]) -> Json {
-    Json::array(pinned(modules).into_iter().map(|(module, asset)| {
+fn assets(components: &[&Component]) -> Json {
+    Json::array(pinned(components).into_iter().map(|(component, asset)| {
         Json::object([
-            ("module", Json::string(&module.path)),
+            ("component", Json::string(&component.path)),
             ("name", Json::string(&asset.name)),
             (
                 "manifest",
-                Json::string(format!("modules/{}/module.kdl", module.dir)),
+                Json::string(format!("components/{}/manifest.kdl", component.dir)),
             ),
             ("pin", asset.pin.json()),
         ])
@@ -650,8 +729,8 @@ fn assets(modules: &[&Module]) -> Json {
 }
 
 fn every_asset(list: &List) -> Json {
-    let modules: Vec<&Module> = list.images.iter().flat_map(Image::modules).collect();
-    assets(&modules)
+    let components: Vec<&Component> = list.images.iter().flat_map(Image::components).collect();
+    assets(&components)
 }
 
 /// `NO_FLAVOUR` must identify the ungated target because an absent gate would
@@ -663,18 +742,20 @@ pub(crate) fn in_target(entry: &Entry, target: &str) -> bool {
     }
 }
 
-fn unique(modules: &[&Module], of: impl Fn(&Module) -> Vec<String>) -> Json {
-    Json::strings(distinct(modules.iter().flat_map(|module| of(module))))
+fn unique(components: &[&Component], of: impl Fn(&Component) -> Vec<String>) -> Json {
+    Json::strings(distinct(
+        components.iter().flat_map(|component| of(component)),
+    ))
 }
 
 pub(crate) fn unique_pairs(
-    modules: &[&Module],
-    of: impl Fn(&Module) -> Vec<(String, String)>,
+    components: &[&Component],
+    of: impl Fn(&Component) -> Vec<(String, String)>,
 ) -> Vec<(String, String)> {
-    distinct(modules.iter().flat_map(|module| of(module)))
+    distinct(components.iter().flat_map(|component| of(component)))
 }
 
-/// Preserving resolved build order keeps derived lists aligned with modules.
+/// Preserving resolved build order keeps derived lists aligned with components.
 pub(crate) fn distinct<T: PartialEq>(values: impl IntoIterator<Item = T>) -> Vec<T> {
     let mut out: Vec<T> = Vec::new();
     for value in values {
@@ -692,12 +773,15 @@ mod tests {
 
     fn entry(flavour: Option<&str>) -> Entry {
         Entry {
-            path: "owner/module".into(),
+            path: "owner/component".into(),
             flavour: flavour.map(str::to_string),
             variant: None,
             options: Vec::new(),
             span: Span::default(),
-            module: None,
+            component: None,
+            imported_by: None,
+            inline: None,
+            organises: false,
         }
     }
 

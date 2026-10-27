@@ -3,13 +3,13 @@ source: tests/golden/harness.rs
 ---
 Tectonic v{version}
 
-The selected modules have dependencies not currently provided by the images:
+The selected components have dependencies not currently provided by the images:
 
-  browser > collected:1
+  browser > fedora-bootc:44
     requires: flatpak
-    provider module: flatpak
+    provider component: flatpak
 
-Add these provider modules now? (Yes/No)
+Add these provider components now? (Yes/No)
 Yes
 
 Track upstream for `browser`? (Yes/No)
@@ -17,9 +17,9 @@ Yes
 
 
 example/
-├── modules/
+├── components/
 │   ├── browser/
-│   │   └── + module.kdl
-│   └── ~ modules.lock.kdl  browser recorded
-└── ~ server.image.kdl  flatpak and browser added to modules
+│   │   └── + manifest.kdl
+│   └── ~ components.lock.kdl  browser recorded
+└── ~ server.image.kdl  flatpak and browser added to components
 ==== exit 0

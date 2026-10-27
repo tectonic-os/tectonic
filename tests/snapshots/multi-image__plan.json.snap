@@ -34,6 +34,8 @@ source: tests/golden/harness.rs
       "allows": [],
       "layout": null,
       "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
         "scap_content": "",
@@ -41,32 +43,7 @@ source: tests/golden/harness.rs
         "provides": [
           "rechunking"
         ],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -83,26 +60,32 @@ source: tests/golden/harness.rs
           "default": false,
           "pr": false,
           "siblings": [],
-          "modules": [
+          "components": [
             {
               "path": "core/shared",
               "flavour": null,
               "variant": null,
-              "description": "A module both images in this repository enable",
+              "description": "A component both images in this repository enable",
               "options": {},
               "provides": [
                 "shell-tools",
                 "eza"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "644e04194a52bd7fa6a63998dd8ac8661fbae8cdc88a1acc0e8814a7bff2f4d6",
+                "defined": null,
+                "content": "e702d0918ff8974be2f05205d7657b891658ac98c55ba1d2534c7ce7a9fd0fa3",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -135,6 +118,8 @@ source: tests/golden/harness.rs
       "allows": [],
       "layout": null,
       "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
         "scap_content": "",
@@ -142,36 +127,7 @@ source: tests/golden/harness.rs
         "provides": [
           "rechunking"
         ],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "shell-tools": [
-            "/usr/bin/shell-tools",
-            "/usr/sbin/shell-tools"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -208,26 +164,32 @@ source: tests/golden/harness.rs
               "published": "workstation-dev"
             }
           ],
-          "modules": [
+          "components": [
             {
               "path": "core/shared",
               "flavour": null,
               "variant": null,
-              "description": "A module both images in this repository enable",
+              "description": "A component both images in this repository enable",
               "options": {},
               "provides": [
                 "shell-tools",
                 "eza"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "644e04194a52bd7fa6a63998dd8ac8661fbae8cdc88a1acc0e8814a7bff2f4d6",
+                "defined": null,
+                "content": "e702d0918ff8974be2f05205d7657b891658ac98c55ba1d2534c7ce7a9fd0fa3",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -262,26 +224,32 @@ source: tests/golden/harness.rs
               "published": "workstation-dev"
             }
           ],
-          "modules": [
+          "components": [
             {
               "path": "core/shared",
               "flavour": null,
               "variant": null,
-              "description": "A module both images in this repository enable",
+              "description": "A component both images in this repository enable",
               "options": {},
               "provides": [
                 "shell-tools",
                 "eza"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "644e04194a52bd7fa6a63998dd8ac8661fbae8cdc88a1acc0e8814a7bff2f4d6",
+                "defined": null,
+                "content": "e702d0918ff8974be2f05205d7657b891658ac98c55ba1d2534c7ce7a9fd0fa3",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -316,26 +284,32 @@ source: tests/golden/harness.rs
               "published": "workstation-base"
             }
           ],
-          "modules": [
+          "components": [
             {
               "path": "core/shared",
               "flavour": null,
               "variant": null,
-              "description": "A module both images in this repository enable",
+              "description": "A component both images in this repository enable",
               "options": {},
               "provides": [
                 "shell-tools",
                 "eza"
               ],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "644e04194a52bd7fa6a63998dd8ac8661fbae8cdc88a1acc0e8814a7bff2f4d6",
+                "defined": null,
+                "content": "e702d0918ff8974be2f05205d7657b891658ac98c55ba1d2534c7ce7a9fd0fa3",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -350,14 +324,25 @@ source: tests/golden/harness.rs
               "requires": [
                 "shell-tools"
               ],
+              "met_by": {
+                "shell-tools": {
+                  "how": "listed",
+                  "provider": "core/shared"
+                }
+              },
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "b389afa2df549786eb6284f8de9df649ad3ab660902f2fa34e9b88ca4dff9d84",
+                "defined": null,
+                "content": "7f8dbc58df70dd22684d74c8244b51d18d471b33a8cd266ae93c5eff90d97e23",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []

@@ -34,6 +34,8 @@ source: tests/golden/harness.rs
       "allows": [],
       "layout": null,
       "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
         "scap_content": "",
@@ -41,32 +43,7 @@ source: tests/golden/harness.rs
         "provides": [
           "rechunking"
         ],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -83,23 +60,29 @@ source: tests/golden/harness.rs
           "default": true,
           "pr": true,
           "siblings": [],
-          "modules": [
+          "components": [
             {
               "path": "core/first",
               "flavour": null,
               "variant": null,
-              "description": "Ships a file a later module ships too",
+              "description": "Ships a file a later component ships too",
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "792e32d6ed7c2f37acf0813074203b39723a300a51bee6cebd46ea50b4eea18a",
+                "defined": null,
+                "content": "938c4d46c89896ad3027e0f4f2753362c051bf40c3e0c5edc5e53aa04b15b141",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -112,14 +95,20 @@ source: tests/golden/harness.rs
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "7a7c514a39496473191da4d8766941cced5a9f9bd9c94da10f7f2cb067ecc2ee",
+                "defined": null,
+                "content": "c0f70fb7eb59c3d40f7b4de6bf352e2d6614bc4e3c237603c4101df8edc60c98",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -128,18 +117,24 @@ source: tests/golden/harness.rs
               "path": "core/third",
               "flavour": null,
               "variant": null,
-              "description": "Overrides a path no earlier module ships",
+              "description": "Overrides a path no earlier component ships",
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "121aa42bc11ae78ada7a03faa13865b068e6ad2cd0c571cd27e27d0e78e2e51c",
+                "defined": null,
+                "content": "970705063cea90cc19aeb993c0e460d17792fa9962a70a984941d07c662387eb",
                 "repo": true,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -156,7 +151,7 @@ source: tests/golden/harness.rs
           "overlay_overridden": [
             {
               "path": "/etc/sudoers.d/99-hardening",
-              "module": "core/first",
+              "component": "core/first",
               "by": "core/second"
             }
           ],

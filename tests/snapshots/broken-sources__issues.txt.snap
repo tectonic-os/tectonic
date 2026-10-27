@@ -1,37 +1,37 @@
 ---
 source: tests/golden/harness.rs
 ---
-  x modules source `tectonic-os` is declared twice
-    ,-[tests/repos/broken-sources/repo.kdl:5:13]
+  x components source `tectonic-os` is declared twice
+    ,-[tests/repos/broken-sources/repo.kdl:5:16]
   4 | sources {
-  5 |     modules "tectonic-os" {
-    :             ^^^^^^|^^^^^^
-    :                   `-- first here
+  5 |     components "tectonic-os" {
+    :                ^^^^^^|^^^^^^
+    :                      `-- first here
   6 |         url "https://github.com/tectonic-os/modules"
   7 |         version "v1.0.0"
   8 |         sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
   9 |     }
- 10 |     modules "tectonic-os" {
-    :             ^^^^^^|^^^^^^
-    :                   `-- and again here
- 11 |         dir "../modules"
+ 10 |     components "tectonic-os" {
+    :                ^^^^^^|^^^^^^
+    :                      `-- and again here
+ 11 |         dir "../components"
     `----
   help: one kind and alias identify one source; merge the fields or rename one
         declaration
 
-  x invalid modules source name `Scratch`
-    ,-[tests/repos/broken-sources/repo.kdl:13:13]
+  x invalid components source name `Scratch`
+    ,-[tests/repos/broken-sources/repo.kdl:13:16]
  12 |     }
- 13 |     modules "Scratch" {
-    :             ^^^^|^^^^
-    :                 `-- lowercase, digits and dashes, starting with a letter
- 14 |         dir "../modules"
+ 13 |     components "Scratch" {
+    :                ^^^^|^^^^
+    :                    `-- lowercase, digits and dashes, starting with a letter
+ 14 |         dir "../components"
     `----
   help: the alias qualifies references and names its local cache
 
   x `local` is a local directory
     ,-[tests/repos/broken-sources/repo.kdl:18:9]
- 17 |         dir "../modules"
+ 17 |         dir "../components"
  18 |         version "v1.0.0"
     :         ^^^|^^^
     :            `-- only a Git source accepts this field
@@ -41,19 +41,19 @@ source: tests/golden/harness.rs
         repository
 
   x `bare` needs one source location
-    ,-[tests/repos/broken-sources/repo.kdl:20:13]
+    ,-[tests/repos/broken-sources/repo.kdl:20:16]
  19 |     }
- 20 |     modules "bare" {}
-    :             ^^^|^^
-    :                `-- pick `dir` or `url`
- 21 |     modules "insecure" {
+ 20 |     components "bare" {}
+    :                ^^^|^^
+    :                   `-- pick `dir` or `url`
+ 21 |     components "insecure" {
     `----
   help: a local source declares `dir`; a fetched source declares `url`, not
         both
 
   x `insecure` does not use an HTTPS Git URL
     ,-[tests/repos/broken-sources/repo.kdl:22:9]
- 21 |     modules "insecure" {
+ 21 |     components "insecure" {
  22 |         url "http://github.com/tectonic-os/modules"
     :         ^|^
     :          `-- not HTTPS

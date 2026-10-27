@@ -1,0 +1,8 @@
+schema-version 1
+
+description "The other half of the cycle"
+
+targets "fedora"
+
+provides "b"
+requires "a"

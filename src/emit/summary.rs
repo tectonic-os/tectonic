@@ -27,25 +27,25 @@ pub fn render(list: &List, target: &str) -> Option<String> {
     let rows: Vec<Row> = entries
         .iter()
         .map(|entry| {
-            let module = entry.module.as_ref();
+            let component = entry.component.as_ref();
             Row {
                 path: entry.path.clone(),
                 flavour: entry.flavour.clone(),
                 variant: entry.variant.clone(),
-                description: module.map(|m| m.description.clone()).unwrap_or_default(),
-                options: module
+                description: component.map(|m| m.description.clone()).unwrap_or_default(),
+                options: component
                     .map(|m| m.resolved.as_slice())
                     .unwrap_or_default()
                     .iter()
                     .map(|(name, value)| (name.clone(), format!("\"{}\"", cell(value))))
                     .collect(),
-                satisfies: module
+                satisfies: component
                     .map(|m| m.satisfies.as_slice())
                     .unwrap_or_default()
                     .iter()
                     .map(|coverage| (coverage.benchmark.clone(), coverage.rules.clone()))
                     .collect(),
-                refuses: module
+                refuses: component
                     .map(|m| m.refuses.as_slice())
                     .unwrap_or_default()
                     .iter()
@@ -73,14 +73,14 @@ pub fn on_host(target: &Json) -> String {
         .iter()
         .filter_map(|allow| text(allow, "rule"))
         .collect();
-    let rows: Vec<Row> = items(target, "modules")
+    let rows: Vec<Row> = items(target, "components")
         .iter()
-        .map(|module| Row {
-            path: text(module, "path").unwrap_or_default(),
-            flavour: text(module, "flavour"),
-            variant: text(module, "variant"),
-            description: text(module, "description").unwrap_or_default(),
-            options: match field(module, "options") {
+        .map(|component| Row {
+            path: text(component, "path").unwrap_or_default(),
+            flavour: text(component, "flavour"),
+            variant: text(component, "variant"),
+            description: text(component, "description").unwrap_or_default(),
+            options: match field(component, "options") {
                 Some(Json::Object(fields)) => fields
                     .iter()
                     .map(|(name, value)| {
@@ -107,7 +107,7 @@ pub fn on_host(target: &Json) -> String {
                     .collect(),
                 _ => Vec::new(),
             },
-            satisfies: items(module, "satisfies")
+            satisfies: items(component, "satisfies")
                 .iter()
                 .map(|claim| {
                     (
@@ -116,7 +116,7 @@ pub fn on_host(target: &Json) -> String {
                     )
                 })
                 .collect(),
-            refuses: items(module, "refuses")
+            refuses: items(component, "refuses")
                 .iter()
                 .filter_map(|refusal| text(refusal, "rule"))
                 .map(|rule| {
@@ -135,8 +135,8 @@ pub fn on_host(target: &Json) -> String {
 
 fn table(flavour: Option<&str>, conforms: &str, rows: &[Row]) -> String {
     let noun = match rows.len() {
-        1 => "module",
-        _ => "modules",
+        1 => "component",
+        _ => "components",
     };
     let mut out = match flavour {
         None => format!("{} {noun}, the ungated set.\n", rows.len()),
@@ -152,7 +152,7 @@ fn table(flavour: Option<&str>, conforms: &str, rows: &[Row]) -> String {
         let _ = write!(out, "\nIt declares `conforms \"{}\"`.\n", cell(conforms));
     }
     out.push_str(
-        "\n| Module | Description | Options | Satisfies | Refuses |\n| --- | --- | --- | --- | \
+        "\n| Component | Description | Options | Satisfies | Refuses |\n| --- | --- | --- | --- | \
          --- |\n",
     );
     for row in rows {
@@ -183,7 +183,7 @@ fn table(flavour: Option<&str>, conforms: &str, rows: &[Row]) -> String {
                 )
             })
             .collect();
-        // A lifted refusal stays beside its module because the declaration
+        // A lifted refusal stays beside its component because the declaration
         // remains even when the image overrides it.
         let refuses: Vec<String> = row
             .refuses
@@ -218,7 +218,7 @@ mod tests {
     /// not split its Markdown row.
     #[test]
     fn an_option_that_is_not_a_string_stays_on_its_row() {
-        let module = Json::object([
+        let component = Json::object([
             ("path", Json::string("one/hello")),
             (
                 "options",
@@ -232,7 +232,7 @@ mod tests {
         ]);
         let out = on_host(&Json::object([
             ("flavour", Json::Null),
-            ("modules", Json::array([module])),
+            ("components", Json::array([component])),
         ]));
         assert_eq!(
             out.lines().last(),

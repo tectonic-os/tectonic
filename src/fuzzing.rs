@@ -27,6 +27,12 @@ fn write(path: &Path, text: &str) {
         .unwrap_or_else(|error| panic!("cannot write fuzz input {}: {error}", path.display()));
 }
 
+/// The image every repository here builds, on the base component at `BASE`.
+const IMAGE: &str = "schema-version 1\nimage {\n    name \"Fuzz\"\n    base-image {\n        fuzz\n    }\n    fuzz\n}\n";
+const BASE: &str = "components/base-image/fuzz/manifest.kdl";
+const BASE_MANIFEST: &str =
+    "schema-version 1\nbase \"example.invalid/fuzz:1\" { family \"fedora\"; }\n";
+
 pub fn repository_kdl(kind: u8, text: &str) {
     let root = root(&kind.to_string());
     match kind % 4 {
@@ -43,19 +49,24 @@ pub fn repository_kdl(kind: u8, text: &str) {
             let _ = List::load(root.path());
         }
         2 => {
-            let image = "schema-version 1\nimage {\n    name \"Fuzz\"\n    base \"example.invalid/fuzz:1\" { family \"fedora\" }\n    modules { module \"fuzz\" }\n}\n";
             write(
                 &root.path().join("repo.kdl"),
                 "schema-version 1\nname \"Fuzz\"\n",
             );
-            write(&root.path().join("image.kdl"), image);
-            write(&root.path().join("modules/fuzz/module.kdl"), text);
+            write(&root.path().join("image.kdl"), IMAGE);
+            write(&root.path().join(BASE), BASE_MANIFEST);
+            write(&root.path().join("components/fuzz/manifest.kdl"), text);
             let _ = crate::load(root.path());
         }
         _ => {
-            let path = root.path().join("fuzz.base.kdl");
-            write(&path, text);
-            let _ = crate::parse::bases::read_base(&path, &mut Issues::default());
+            write(
+                &root.path().join("repo.kdl"),
+                "schema-version 1\nname \"Fuzz\"\n",
+            );
+            write(&root.path().join("image.kdl"), IMAGE);
+            write(&root.path().join(BASE), text);
+            let _ = crate::base::catalog(root.path(), &[]);
+            let _ = crate::load(root.path());
         }
     }
 }
@@ -75,14 +86,14 @@ pub fn provenance_record(text: &str) {
     crate::provenance::lock::check(root.path(), &mut Issues::default());
 }
 
-pub fn module_scripts(text: &str) {
+pub fn component_scripts(text: &str) {
     let root = root("scripts");
-    let image = "schema-version 1\nimage {\n    name \"Fuzz\"\n    base \"example.invalid/fuzz:1\" { family \"fedora\" }\n    modules { module \"fuzz\" }\n}\n";
-    let module = "schema-version 1\ndescription \"Fuzz\"\nsupports \"fedora\"\n";
+    let component = "schema-version 1\ndescription \"Fuzz\"\ntargets \"fedora\"\n";
     let repo = "schema-version 1\nname \"Fuzz\"\nsecurity-policy {\n    network {\n        scripts \"deny\"\n    }\n}\n";
     write(&root.path().join("repo.kdl"), repo);
-    write(&root.path().join("image.kdl"), image);
-    write(&root.path().join("modules/fuzz/module.kdl"), module);
-    write(&root.path().join("modules/fuzz/module.sh"), text);
+    write(&root.path().join("image.kdl"), IMAGE);
+    write(&root.path().join(BASE), BASE_MANIFEST);
+    write(&root.path().join("components/fuzz/manifest.kdl"), component);
+    write(&root.path().join("components/fuzz/component.sh"), text);
     let _ = crate::load(root.path());
 }

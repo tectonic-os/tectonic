@@ -1,14 +1,14 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
   x `core/tools` installs packages, and repo.kdl denies the package step the
   | network
   help: set `packages "allow"` in repo.kdl's `security-policy { network }`, or
-        leave this module out of the image
+        leave this component out of the image
 
   x `core/fetcher` declares that its scripts reach the network, and repo.kdl
   | denies it
-   ,-[tests/repos/broken-network/modules/core/fetcher/module.kdl:7:1]
+   ,-[tests/repos/broken-network/components/core/fetcher/manifest.kdl:7:1]
  6 | 
  7 | network "scripts"
    : ^^^|^^^
@@ -16,10 +16,10 @@ source: tests/golden.rs
  8 | 
    `----
   help: set `scripts "strict"` in repo.kdl's `security-policy { network }` to
-        honour this declaration, or leave this module out of the image
+        honour this declaration, or leave this component out of the image
 
   x `core/asset-only` declares an asset its script step cannot fetch
-   ,-[tests/repos/broken-network/modules/core/asset-only/module.kdl:7:1]
+   ,-[tests/repos/broken-network/components/core/asset-only/manifest.kdl:7:1]
  6 | 
  7 | asset "tool" {
    : ^^|^^
@@ -27,26 +27,26 @@ source: tests/golden.rs
  8 |     pin {
    `----
   help: set `scripts "strict"` in repo.kdl's `security-policy { network }` and
-        declare `network "scripts"`, or leave this module out of the image
+        declare `network "scripts"`, or leave this component out of the image
 
   x `core/fragment-only` declares a script step it has not got
-   ,-[tests/repos/broken-network/modules/core/fragment-only/module.kdl:7:1]
+   ,-[tests/repos/broken-network/components/core/fragment-only/manifest.kdl:7:1]
  6 | 
  7 | network "scripts"
    : ^^^|^^^
    :    `-- no standard layer
  8 | 
    `----
-  help: `standard-layer #false` leaves the fragment the only thing this module
-        emits, and a fragment's own RUN lines are emitted as written
+  help: `standard-layer #false` leaves the fragment the only thing this
+        component emits, and a fragment's own RUN lines are emitted as written
 
-  x `core/installer` installs packages in module.sh, and its script step has
-  | no network
-   ,-[tests/repos/broken-network/modules/core/installer/module.kdl:1:1]
+  x `core/installer` installs packages in component.sh, and its script step
+  | has no network
+   ,-[tests/repos/broken-network/components/core/installer/manifest.kdl:1:1]
  1 | schema-version 1
    : ^
    : `-- `dnf5` needs the network
  2 | 
    `----
   help: set `scripts "strict"` in repo.kdl's `security-policy { network }` and
-        declare `network "scripts"`, or leave this module out of the image
+        declare `network "scripts"`, or leave this component out of the image

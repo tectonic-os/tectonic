@@ -5,58 +5,79 @@ source: tests/golden/harness.rs
 upstream
 community
 ==== the catalog
+upstream/base-image/collected  A base only the collection knows about
+upstream/base-image/fedora  Fedora, as this collection describes it
 community/browser  A browser, from the second collection (requires flatpak)
 upstream/browser  A browser, from the first collection
 upstream/custom-kernel  A kernel the image pins, swapped in over the base's own
 upstream/debian-family  apt and its state directories, which every deb build layer reaches for
 upstream/fedora-family  dnf5 and its plugins, which every fedora build layer reaches for
 upstream/flatpak  Flatpak client and a daily update timer
-upstream/needs-family  A module that needs the family adapter under it (requires build-environment)
+upstream/needs-family  A component that needs the family adapter under it (requires build-environment)
 upstream/signature-policy  Sigstore signature verification for the image's own updates
 ==== import flatpak
 copied
 ==== import browser
-`browser` names more than one module; name which one, as `community/browser`
+`browser` names more than one component; name which one, as `community/browser`
 ==== import upstream/browser
 copied
 ==== import community/browser
-`browser` is already in this repository and differs from the library's; run `tect import module` in a terminal to list the local `browser` or import the library's under another name
+`browser` is already in this repository and differs from the library's; run `tect import component` in a terminal to list the local `browser` or import the library's under another name
 ==== import nosuch
-no module called `nosuch` in upstream, community
+no component called `nosuch` in upstream, community
 ==== import upstream/nosuch
-no module called `nosuch` in upstream
+no component called `nosuch` in upstream
 ==== import flatpak
-`flatpak` is already in this repository; run `tect import module` in a terminal to list the local `flatpak` or import the library's under another name
+`flatpak` is already in this repository; run `tect import component` in a terminal to list the local `flatpak` or import the library's under another name
 ==== the tree
-modules/.gitkeep
-modules/browser/module.kdl
-modules/flatpak/files/usr/share/example/remotes.list
-modules/flatpak/module.kdl
-modules/modules.lock.kdl
+components/.gitkeep
+components/base-image/fedora/manifest.kdl
+components/browser/manifest.kdl
+components/components.lock.kdl
+components/fedora-family/lib/family.sh
+components/fedora-family/manifest.kdl
+components/flatpak/files/usr/share/example/remotes.list
+components/flatpak/manifest.kdl
 ==== the lock
-module "browser" {
-    library "upstream"
-    path "browser"
-    content "a34ddf304dea07b9b7483d3fdad6b23af36f7709b2a8400e360624888b91d44f"
+component "base-image/fedora" {
+    library "tectonic-components"
+    path "base-image/fedora"
+    url "https://github.com/tectonic-os/library"
+    content "3ee9edf2a6836db544042428def080ba23d69a5f59206f3407537a3a6aa81f24"
     track
 }
 
-module "flatpak" {
+component "browser" {
+    library "upstream"
+    path "browser"
+    content "9cd0b8e41aae776f69cb633ba00970d49cf4b37f3e1dd94af1dc210649515a41"
+    track
+}
+
+component "fedora-family" {
+    library "tectonic-components"
+    path "fedora-family"
+    url "https://github.com/tectonic-os/library"
+    content "1657e7d2d58210a215309d2e0803b7fa58b82613c1b96bef63ec97ae7df436de"
+    track
+}
+
+component "flatpak" {
     library "upstream"
     path "flatpak"
-    content "458f87fc5f85d09877f75b41f4be3613cf7e38c9a78d7e3e4ec365a2e6aab6ce"
+    content "3661e826e22fa5fc15a5bea24a0f191ad712f7b003c830670b7d94ee83b1c796"
     track
 }
 ==== check
 ==== check after an edit
-  x `modules/flatpak` tracks its library, and its content no longer matches
+  x `components/flatpak` tracks its library, and its content no longer matches
   | its lock entry
-   ,-[target/tmp/copy/modules/modules.lock.kdl:8:1]
- 7 | 
- 8 | module "flatpak" {
-   : ^^^|^^
-   :    `-- this entry
- 9 |     library "upstream"
-   `----
-  help: undo the edit to `modules/flatpak`, or run `tect set module flatpak
-        --untracked` to make the copy the repository's own
+    ,-[target/tmp/copy/components/components.lock.kdl:24:1]
+ 23 | 
+ 24 | component "flatpak" {
+    : ^^^^|^^^^
+    :     `-- this entry
+ 25 |     library "upstream"
+    `----
+  help: undo the edit to `components/flatpak`, or run `tect set component
+        flatpak --untracked` to make the copy the repository's own

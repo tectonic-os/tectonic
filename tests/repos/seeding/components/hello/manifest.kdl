@@ -1,0 +1,7 @@
+schema-version 1
+
+description "A component this repository writes and publishes"
+
+targets "fedora"
+
+packages "fastfetch"

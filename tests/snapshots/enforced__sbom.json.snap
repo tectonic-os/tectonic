@@ -18,7 +18,7 @@ source: tests/golden.rs
       "licenseDeclared": "NOASSERTION",
       "copyrightText": "NOASSERTION",
       "supplier": "NOASSERTION",
-      "comment": "Pinned build input, declared by the one/hello module",
+      "comment": "Pinned build input, declared by the one/hello component",
       "versionInfo": "1.4.0"
     }
   ],

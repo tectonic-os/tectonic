@@ -2,17 +2,17 @@
 source: tests/golden/harness.rs
 ---
   x `tectonic-os` is not a collection this repository declares
-  help: a repository is seedable only if it publishes its own modules/ as a
+  help: a repository is seedable only if it publishes its own components/ as a
         collection, and declares it in `sources` under the owner they are
         imported as: that is what a seeded repository fetches them through
 
   x `core/hello` is in no collection the seed can name
     ,-[tests/repos/broken-seed/example.image.kdl:11:9]
- 10 |     modules {
- 11 |         module "core/hello"
-    :         ^^^|^^
-    :            `-- `tectonic-os` is not declared in `sources`
+ 10 |     core {
+ 11 |         hello
+    :         ^^|^^
+    :           `-- `tectonic-os` is not declared in `sources`
  12 |     }
     `----
-  help: a seed lists a module by name and nothing else, so one nothing can
+  help: a seed lists a component by name and nothing else, so one nothing can
         import leaves a seeded repository unbuildable

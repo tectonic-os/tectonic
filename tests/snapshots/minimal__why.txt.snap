@@ -1,10 +1,10 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 ==== markdown
 # core/hello
 
-The smallest module a repository can hold
+The smallest component a repository can hold
 
 ## Where it is built
 
@@ -33,7 +33,7 @@ Nothing. It declares no `satisfies`.
 
 | Content | Hash |
 | --- | --- |
-| declared | `33877acc20d198115512d34f23bc7481d0cd20ff656dc49e6931a2aa7986e318` |
+| declared | `5397e8faff956d7988d4c15ce672506ecc23d667ed77f91fd83601df5b64db9a` |
 
 It was written in this repository rather than imported, so nothing upstream to compare it against.
 
@@ -49,7 +49,7 @@ It enables these COPR repositories, each disabled again so it is on for the inst
 | --- | --- |
 | example/tools | https://copr.fedorainfracloud.org/coprs/example/tools/ |
 
-It enables one, in `modules/core/hello/repo`. There is no grammar for that file, so read it: it is shell calling the family's config manager.
+It enables one, in `components/core/hello/repo.sh`. There is no grammar for that file, so read it: it is shell calling the family's config manager.
 
 | URL it names |
 | --- |
@@ -57,12 +57,13 @@ It enables one, in `modules/core/hello/repo`. There is no grammar for that file,
 
 ==== json
 {
-  "module": "core/hello",
-  "description": "The smallest module a repository can hold",
+  "component": "core/hello",
+  "description": "The smallest component a repository can hold",
   "images": [
     "minimal"
   ],
   "suppressed": [],
+  "imported_by": [],
   "provides": [],
   "requires": [],
   "packages": [
@@ -97,7 +98,7 @@ It enables one, in `modules/core/hello/repo`. There is no grammar for that file,
     }
   ],
   "satisfies": [],
-  "content": "33877acc20d198115512d34f23bc7481d0cd20ff656dc49e6931a2aa7986e318",
+  "content": "5397e8faff956d7988d4c15ce672506ecc23d667ed77f91fd83601df5b64db9a",
   "built": null,
   "imported": null,
   "modified": false,
@@ -107,13 +108,13 @@ It enables one, in `modules/core/hello/repo`. There is no grammar for that file,
   ]
 }
 ==== unknown
-  x `nosuch` is not a module this repository lists
-  help: modules: hello, fedora-family
+  x `nosuch` is not a component this repository lists
+  help: components: hello, fedora-family
 
 ==== from the baked manifest, with no repository
 # core/hello
 
-The smallest module a repository can hold
+The smallest component a repository can hold
 
 ## Where it is built
 
@@ -142,7 +143,7 @@ Nothing. It declares no `satisfies`.
 
 | Content | Hash |
 | --- | --- |
-| declared | `33877acc20d198115512d34f23bc7481d0cd20ff656dc49e6931a2aa7986e318` |
+| declared | `5397e8faff956d7988d4c15ce672506ecc23d667ed77f91fd83601df5b64db9a` |
 
 It was written in this repository rather than imported, so nothing upstream to compare it against.
 
@@ -158,9 +159,9 @@ It enables these COPR repositories, each disabled again so it is on for the inst
 | --- | --- |
 | example/tools | https://copr.fedorainfracloud.org/coprs/example/tools/ |
 
-It enables one, in `modules/core/hello/repo`. There is no grammar for that file, so read it: it is shell calling the family's config manager.
+It enables one, in `components/core/hello/repo.sh`. There is no grammar for that file, so read it: it is shell calling the family's config manager.
 
-Not readable from here: a finished image carries the manifest, not the module tree.
+Not readable from here: a finished image carries the manifest, not the component tree.
 
 ==== the names it knows
 hello, fedora-family
@@ -169,7 +170,7 @@ hello, fedora-family
 
 | Content | Hash |
 | --- | --- |
-| declared | `33877acc20d198115512d34f23bc7481d0cd20ff656dc49e6931a2aa7986e318` |
+| declared | `5397e8faff956d7988d4c15ce672506ecc23d667ed77f91fd83601df5b64db9a` |
 | observed by the build | `not what was declared` |
 
 **The two documents disagree**, which they cannot if both came from this build.

@@ -1,7 +1,0 @@
-schema-version 1
-
-description "A flatpak application, which the base satisfies the runtime for"
-
-supports "fedora"
-
-requires "flatpak"

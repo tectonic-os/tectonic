@@ -1,9 +1,0 @@
-schema-version 1
-
-description "A browser, from the second collection"
-
-supports "fedora"
-
-packages "chromium"
-
-requires "flatpak"

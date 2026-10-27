@@ -1,16 +1,16 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
   x nothing reads `notes.kdl`
   help: an image file is `image.kdl` or `<name>.image.kdl`; rename it to
         `notes.image.kdl`, or move it out of the repository root
 
   x `same` is declared twice
-    ,-[tests/repos/broken-root/image.kdl:17:1]
- 16 | 
- 17 | image {
+    ,-[tests/repos/broken-root/image.kdl:16:1]
+ 15 | 
+ 16 | image {
     : ^^|^^
     :   `-- also declared above
- 18 |     name "Same"
+ 17 |     name "Same"
     `----
   help: two images cannot publish under one name; declare `id` on one of them

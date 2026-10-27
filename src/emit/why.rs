@@ -3,8 +3,8 @@
 
 use crate::emit::{Part, Table};
 use crate::layout;
+use crate::model::component::Component;
 use crate::model::image::{Image, List};
-use crate::model::module::Module;
 use crate::provenance::Evidence;
 use common::json::{field, items, strings, text, Json};
 use std::fmt::Write as _;
@@ -58,6 +58,9 @@ pub struct Why {
     pub path: String,
     pub description: String,
     pub images: Vec<String>,
+    /// Holds each image that an import added the component to. Each row names
+    /// the importing component.
+    pub imported_by: Vec<Imported>,
     pub provides: Vec<(String, Vec<String>)>,
     pub requires: Vec<(String, Option<String>)>,
     pub packages: Vec<(String, Vec<String>, Option<String>)>,
@@ -72,15 +75,15 @@ pub struct Why {
     /// `content` hash.
     pub built: Option<String>,
     pub fetches: Vec<Fetch>,
-    /// A module that enables a third-party package repository exposes the URLs
-    /// named by its `repo` file.
+    /// A component that enables a third-party package repository exposes the URLs
+    /// named by its `repo.sh` file.
     pub repo: Option<Vec<String>>,
-    /// A finished image does not carry the module tree, so a host knows only
-    /// that a `repo` file exists.
+    /// A finished image does not carry the component tree, so a host knows only
+    /// that a `repo.sh` file exists.
     pub repo_read: bool,
     /// Suppressed images remain beside built images because their base already
     /// ships every provided capability. A host leaves this empty because its
-    /// manifest holds only built modules.
+    /// manifest holds only built components.
     pub suppressed: Vec<String>,
     /// Host answers record their target scope. Repository answers already
     /// cover every image and leave it empty.
@@ -90,8 +93,21 @@ pub struct Why {
     pub source: Option<(String, String)>,
 }
 
+/// Records one image that an import added the component to.
+#[derive(Debug, PartialEq)]
+pub struct Imported {
+    pub image: String,
+    pub by: String,
+}
+
+impl Imported {
+    fn sentence(&self) -> String {
+        format!("`{}` imports it into `{}`.", self.by, self.image)
+    }
+}
+
 /// A baked manifest holds every declared target, so an unscoped answer can
-/// describe modules the running image does not carry.
+/// describe components the running image does not carry.
 #[derive(Default, PartialEq)]
 pub enum Scope {
     #[default]
@@ -128,28 +144,28 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
         .images
         .iter()
         .flat_map(|image| image.entries.iter().chain(&image.suppressed))
-        .find(|entry| entry.module.as_ref().is_some_and(|m| m.path == path))?;
-    let module = entry.module.as_ref()?;
+        .find(|entry| entry.component.as_ref().is_some_and(|m| m.path == path))?;
+    let component = entry.component.as_ref()?;
 
     let mut why = Why {
-        path: module.path.clone(),
-        description: module.description.clone(),
-        content: module.content.clone(),
-        modified: matches!((&module.imported, &module.content),
+        path: component.path.clone(),
+        description: component.description.clone(),
+        content: component.content.clone(),
+        modified: matches!((&component.imported, &component.content),
             (Some(record), Some(content)) if record.content != *content),
-        repo: module.repo.then(|| repo_urls(root, &module.dir)),
+        repo: component.repo.then(|| repo_urls(root, &component.dir)),
         repo_read: true,
         ..Why::default()
     };
 
-    if let Some(record) = &module.imported {
+    if let Some(record) = &component.imported {
         why.imported = Some((record.library.clone(), Fetch::of("collection", &record.pin)));
         why.tracked = record.tracked;
     }
-    for asset in &module.assets {
+    for asset in &component.assets {
         why.fetches.push(Fetch::of(&asset.name, &asset.pin));
     }
-    for coverage in &module.satisfies {
+    for coverage in &component.satisfies {
         why.satisfies
             .push((coverage.benchmark.clone(), coverage.rules.clone()));
     }
@@ -162,10 +178,17 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
                 continue;
             }
             listed = true;
-            why.images.push(match &entry.flavour {
+            let built = match &entry.flavour {
                 None => image.id.clone(),
                 Some(flavour) => format!("{}-{flavour}", image.id),
-            });
+            };
+            if let Some(by) = &entry.imported_by {
+                why.imported_by.push(Imported {
+                    image: built.clone(),
+                    by: by.clone(),
+                });
+            }
+            why.images.push(built);
         }
         let suppressed = image.suppressed.iter().any(|entry| entry.path == path);
         if suppressed {
@@ -173,8 +196,8 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
         }
         if listed || suppressed {
             for (into, batches) in [
-                (&mut why.packages, &module.packages),
-                (&mut why.groups, &module.groups),
+                (&mut why.packages, &component.packages),
+                (&mut why.groups, &component.groups),
             ] {
                 for batch in batches.iter().filter(|batch| batch.family == family) {
                     let declared = (
@@ -188,7 +211,7 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
                 }
             }
             if family == "fedora" {
-                for copr in &module.coprs {
+                for copr in &component.coprs {
                     let declared = (copr.name(), copr.url());
                     if !why.coprs.contains(&declared) {
                         why.coprs.push(declared);
@@ -198,26 +221,31 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
         }
     }
 
-    let peers: Vec<&Module> = list.images.iter().flat_map(Image::modules).collect();
-    for decl in &module.provides {
+    let peers: Vec<&Component> = list.images.iter().flat_map(Image::components).collect();
+    for decl in &component.provides {
         let wanted: Vec<String> = peers
             .iter()
             .filter(|other| other.path != path)
-            .filter(|other| other.requires.iter().any(|r| r.name == decl.name))
+            .filter(|other| {
+                other
+                    .requires
+                    .iter()
+                    .any(|r| crate::resolve::meets(&decl.name, &r.name))
+            })
             .map(|other| other.path.clone())
             .collect();
         why.provides.push((decl.name.clone(), wanted));
     }
-    for decl in &module.requires {
+    for decl in &component.requires {
         let from = peers
             .iter()
-            .find(|other| other.provides.iter().any(|p| p.name == decl.name))
+            .find(|other| other.answers(&decl.name))
             .map(|other| other.path.clone())
             .or_else(|| {
                 list.images
                     .iter()
                     .filter_map(|i| i.base.as_ref())
-                    .any(|base| base.provides.iter().any(|p| p.name == decl.name))
+                    .any(|base| base.answers(&decl.name))
                     .then(|| "base".to_string())
             });
         why.requires.push((decl.name.clone(), from));
@@ -226,17 +254,17 @@ pub fn of(list: &List, path: &str, root: &std::path::Path) -> Option<Why> {
     Some(why)
 }
 
-/// A `repo` file is shell for the family's config manager, so URL discovery
+/// A `repo.sh` file is shell for the family's config manager, so URL discovery
 /// follows the same visible tokens a user would inspect.
 fn repo_urls(root: &std::path::Path, dir: &str) -> Vec<String> {
     // Every family copy is read because `why` answers about
-    // the published module. A user looking for an archive needs the URL for
+    // the published component. A user looking for an archive needs the URL for
     // the user's own family.
-    let at = layout::module(root, dir);
+    let at = layout::component(root, dir);
     let text: String = layout::FAMILY_DIRS
         .iter()
-        .map(|(gated, _)| at.join(gated).join("repo"))
-        .chain(std::iter::once(at.join("repo")))
+        .map(|(gated, _)| at.join(gated).join(crate::layout::REPO_SCRIPT))
+        .chain(std::iter::once(at.join(crate::layout::REPO_SCRIPT)))
         .filter_map(|file| std::fs::read_to_string(file).ok())
         .collect::<Vec<_>>()
         .join("\n");
@@ -285,7 +313,7 @@ impl Why {
         }
 
         out.push(Part::Heading("Where it is built".into()));
-        // Suppression in one image does not suppress the module everywhere, so
+        // Suppression in one image does not suppress the component everywhere, so
         // built images remain separate from suppressed images.
         out.push(Part::Text(match self.suppressed.is_empty() {
             true => listed(&self.images),
@@ -299,10 +327,15 @@ impl Why {
                 listed(&self.suppressed),
             ),
         }));
+        out.extend(
+            self.imported_by
+                .iter()
+                .map(|imported| Part::Text(imported.sentence())),
+        );
         if let Some((url, commit)) = &self.source {
             let short: String = commit.chars().take(7).collect();
             out.push(Part::Text(format!("Built from {url} at `{short}`.")));
-            // The module tree is deliberately not in the finished image, so
+            // The component tree is deliberately not in the finished image, so
             // comparing this machine against its declarations means fetching
             // them.
             out.push(Part::Text(format!(
@@ -487,18 +520,18 @@ impl Why {
         }
         match &self.repo {
             None if self.coprs.is_empty() => out.push(Part::Text(
-                "None. It declares no `copr` and ships no `repo` file.".into(),
+                "None. It declares no `copr` and ships no `repo.sh` file.".into(),
             )),
             None => {}
             Some(urls) => {
                 out.push(Part::Text(format!(
-                    "It enables one, in `modules/{}/repo`. There is no grammar for that file, so read it: it is shell calling the family's config manager.",
+                    "It enables one, in `components/{}/repo.sh`. There is no grammar for that file, so read it: it is shell calling the family's config manager.",
                     self.path
                 )));
                 match urls.is_empty() {
                     true => out.push(Part::Text(match self.repo_read {
                         true => "No URL in it.".into(),
-                        false => "Not readable from here: a finished image carries the manifest, not the module tree.".into(),
+                        false => "Not readable from here: a finished image carries the manifest, not the component tree.".into(),
                     })),
                     false => out.push(Part::Table(Table {
                         title: String::new(),
@@ -536,10 +569,19 @@ impl Why {
 
     pub fn json(&self) -> Json {
         Json::object([
-            ("module", Json::string(&self.path)),
+            ("component", Json::string(&self.path)),
             ("description", Json::string(&self.description)),
             ("images", Json::strings(self.images.clone())),
             ("suppressed", Json::strings(self.suppressed.clone())),
+            (
+                "imported_by",
+                Json::array(self.imported_by.iter().map(|imported| {
+                    Json::object([
+                        ("image", Json::string(&imported.image)),
+                        ("by", Json::string(&imported.by)),
+                    ])
+                })),
+            ),
             (
                 "provides",
                 Json::array(self.provides.iter().map(|(name, wanted)| {
@@ -718,49 +760,71 @@ pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why
     let mut found = false;
 
     for target in &targets {
-        // The whole path agrees with `of`. `matching` already chose which module
+        // The whole path agrees with `of`. `matching` already chose which component
         // was meant, and a suffix match here could pick a different one.
-        let Some(module) = items(target, "modules")
+        let Some(component) = items(target, "components")
             .iter()
-            .find(|module| text(module, "path").as_deref() == Some(path))
+            .find(|component| text(component, "path").as_deref() == Some(path))
         else {
             continue;
         };
         found = true;
         if let Some(name) = text(target, "published").or_else(|| text(target, "name")) {
+            let origin = field(component, "origin");
+            if let Some(by) = origin.and_then(|origin| text(origin, "by")) {
+                let imported = Imported {
+                    image: name.clone(),
+                    by,
+                };
+                if !why.imported_by.contains(&imported) {
+                    why.imported_by.push(imported);
+                }
+            }
             if !why.images.contains(&name) {
                 why.images.push(name);
             }
         }
-        why.description = text(module, "description").unwrap_or_default();
+        why.description = text(component, "description").unwrap_or_default();
         for (offers, asks, into) in [("provides", "requires", &mut why.provides)] {
-            for name in strings(module, offers) {
+            for name in strings(component, offers) {
                 if into.iter().any(|(have, _)| *have == name) {
                     continue;
                 }
-                let wanted = items(target, "modules")
+                let wanted = items(target, "components")
                     .iter()
                     .filter(|other| text(other, "path").as_deref() != Some(path))
-                    .filter(|other| strings(other, asks).contains(&name))
+                    .filter(|other| {
+                        strings(other, asks)
+                            .iter()
+                            .any(|asked| crate::resolve::meets(&name, asked))
+                    })
                     .filter_map(|other| text(other, "path"))
                     .collect();
                 into.push((name, wanted));
             }
         }
         for (asks, offers, into) in [("requires", "provides", &mut why.requires)] {
-            for name in strings(module, asks) {
+            for name in strings(component, asks) {
                 if into.iter().any(|(have, _)| *have == name) {
                     continue;
                 }
-                let from = items(target, "modules")
+                let from = items(target, "components")
                     .iter()
-                    .find(|other| strings(other, offers).contains(&name))
+                    .find(|other| {
+                        text(other, "path").is_some_and(|path| {
+                            crate::resolve::answers(
+                                &path,
+                                strings(other, offers).iter().map(String::as_str),
+                                &name,
+                            )
+                        })
+                    })
                     .and_then(|other| text(other, "path"));
                 into.push((name, from));
             }
         }
         for (into, field) in [(&mut why.packages, "packages"), (&mut why.groups, "groups")] {
-            for batch in items(module, field) {
+            for batch in items(component, field) {
                 let Some(family) = text(batch, "family") else {
                     continue;
                 };
@@ -770,7 +834,7 @@ pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why
                 }
             }
         }
-        for copr in items(module, "coprs") {
+        for copr in items(component, "coprs") {
             let (Some(id), Some(url)) = (text(copr, "id"), text(copr, "url")) else {
                 continue;
             };
@@ -778,7 +842,7 @@ pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why
                 why.coprs.push((id, url));
             }
         }
-        for claim in items(module, "satisfies") {
+        for claim in items(component, "satisfies") {
             let Some(benchmark) = text(claim, "benchmark") else {
                 continue;
             };
@@ -787,7 +851,7 @@ pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why
             }
         }
 
-        if let Some(provenance) = field(module, "provenance") {
+        if let Some(provenance) = field(component, "provenance") {
             why.content = text(provenance, "content");
             if let Some(imported) = field(provenance, "imported") {
                 if let (Some(collection), Some(pin)) =
@@ -799,14 +863,14 @@ pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why
                 }
             }
             if matches!(field(provenance, "repo"), Some(Json::Bool(true))) {
-                // The module tree is not in the finished image, so the file
+                // The component tree is not in the finished image, so the file
                 // itself cannot be read here. Only its existence is available.
                 why.repo = Some(Vec::new());
             }
         }
 
         for asset in items(target, "assets") {
-            if text(asset, "module").as_deref() != Some(path) {
+            if text(asset, "component").as_deref() != Some(path) {
                 continue;
             }
             let Some(name) = text(asset, "name") else {
@@ -834,10 +898,10 @@ pub fn on_host(manifest: &Json, record: Option<&Json>, path: &str) -> Option<Why
     }
 
     if let Some(record) = record {
-        why.built = items(record, "modules")
+        why.built = items(record, "components")
             .iter()
-            .find(|module| text(module, "path").as_deref() == Some(path))
-            .and_then(|module| text(module, "content"));
+            .find(|component| text(component, "path").as_deref() == Some(path))
+            .and_then(|component| text(component, "content"));
     }
     Some(why)
 }
@@ -848,8 +912,8 @@ pub fn known_on_host(manifest: &Json, record: Option<&Json>) -> Vec<String> {
     let mut out: Vec<String> = built_as(manifest, record)
         .0
         .iter()
-        .flat_map(|target| items(target, "modules"))
-        .filter_map(|module| text(module, "path"))
+        .flat_map(|target| items(target, "components"))
+        .filter_map(|component| text(component, "path"))
         .collect();
     out.sort();
     out.dedup();
@@ -915,7 +979,7 @@ pub fn baked(
 
 #[cfg(test)]
 mod tests {
-    use super::{display, known, known_on_host, on_host, Fetch, Scope, Why};
+    use super::{display, known, known_on_host, on_host, Fetch, Imported, Scope, Why};
     use crate::emit::Part;
     use crate::resolve::name::matching;
 
@@ -926,10 +990,10 @@ mod tests {
         let manifest = common::json::Json::parse(
             r#"{"images": [{"id": "desktop", "url": "https://example.com/os/desktop",
               "targets": [
-                {"name": "desktop", "image": "desktop", "published": "desktop", "modules": [
+                {"name": "desktop", "image": "desktop", "published": "desktop", "components": [
                     {"path": "apps/kde", "provides": ["desktop"]}
                 ]},
-                {"name": "desktop/dx", "image": "desktop", "published": "desktop-dx", "modules": [
+                {"name": "desktop/dx", "image": "desktop", "published": "desktop-dx", "components": [
                     {"path": "apps/kde", "provides": ["desktop"]},
                     {"path": "apps/vscodium", "requires": ["desktop"]}
                 ]}
@@ -985,6 +1049,56 @@ mod tests {
         }
     }
 
+    /// The asking component comes first, so a lookup that matches the wrong
+    /// component names the asking component itself.
+    #[test]
+    fn a_host_answer_names_the_component_that_meets_each_requirement() {
+        let manifest = common::json::Json::parse(
+            r#"{"images": [{"id": "desktop", "url": "https://example.com/os/desktop",
+              "targets": [
+                {"name": "desktop", "image": "desktop", "published": "desktop", "components": [
+                    {"path": "apps/vscodium", "requires": ["desktop", "helper"]},
+                    {"path": "apps/kde", "provides": ["desktop/plasma"]},
+                    {"path": "helper"}
+                ]}
+            ]}]}"#,
+        )
+        .expect("the manifest is a document");
+
+        let why = on_host(&manifest, None, "apps/vscodium").expect("the manifest names it");
+        assert_eq!(
+            why.requires,
+            [
+                ("desktop".to_string(), Some("apps/kde".to_string())),
+                ("helper".to_string(), Some("helper".to_string())),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_host_answer_names_the_component_that_imported_this_one() {
+        let manifest = common::json::Json::parse(
+            r#"{"images": [{"id": "desktop", "targets": [
+                {"name": "desktop", "image": "desktop", "published": "desktop", "components": [
+                    {"path": "runtime", "origin": {"how": "imported", "by": "apps/kde"}},
+                    {"path": "apps/kde", "origin": {"how": "listed"}}
+                ]}
+            ]}]}"#,
+        )
+        .expect("the manifest is a document");
+
+        let imported = on_host(&manifest, None, "runtime").expect("the manifest names it");
+        let listed = on_host(&manifest, None, "apps/kde").expect("the manifest names it");
+        assert_eq!(
+            imported.imported_by,
+            [Imported {
+                image: "desktop".to_string(),
+                by: "apps/kde".to_string(),
+            }]
+        );
+        assert!(listed.imported_by.is_empty());
+    }
+
     #[test]
     fn display_shortens_an_unambiguous_name() {
         let paths = vec![
@@ -999,17 +1113,17 @@ mod tests {
     }
 
     #[test]
-    fn picker_snapshots_repository_modules() {
+    fn picker_snapshots_repository_components() {
         use crate::screen_tests::{assert_screen, screen};
 
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/repos/enforced");
         let (list, _) = crate::model::image::List::load(&root);
-        let modules = known(&list);
-        let options = crate::dispatch::picker_options(&display(&modules));
+        let components = known(&list);
+        let options = crate::dispatch::picker_options(&display(&components));
         assert_screen(
-            "why-module-picker",
+            "why-component-picker",
             screen().picker(
-                crate::copy::WHICH_MODULE,
+                crate::copy::WHICH_COMPONENT,
                 &options,
                 None,
                 "enter confirms",
@@ -1024,7 +1138,7 @@ mod tests {
     #[test]
     fn the_read_out_loads_the_path_that_was_resolved() {
         let manifest = common::json::Json::parse(
-            r#"{"images": [{"targets": [{"name": "t", "modules": [
+            r#"{"images": [{"targets": [{"name": "t", "components": [
                 {"path": "b/a/x", "description": "the long one"},
                 {"path": "a/x", "description": "the short one"}
             ]}]}]}"#,
@@ -1035,7 +1149,7 @@ mod tests {
         for given in ["a/x", "b/a/x"] {
             let resolved = matching(&known, given);
             let [resolved] = resolved.as_slice() else {
-                panic!("`{given}` names exactly one module");
+                panic!("`{given}` names exactly one component");
             };
             let why = on_host(&manifest, None, resolved).expect("the manifest names it");
             assert_eq!(why.path, given);

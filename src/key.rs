@@ -1,5 +1,5 @@
 //! `create key <kind>` and `set key <kind>`. Which key exists, where each half
-//! of it goes and what generates it come out of the module declaring it; the
+//! of it goes and what generates it come out of the component declaring it; the
 //! generators, and the text that follows one, are the tool's.
 //!
 //! `create` invents a key and writes both halves; `set` records a public half
@@ -7,7 +7,7 @@
 
 use crate::copy;
 use crate::layout;
-use crate::model::module::Key as Declared;
+use crate::model::component::Key as Declared;
 use crate::parse::disk::Disk;
 use common::prompt::Prompt;
 use common::ui::Choice;
@@ -15,7 +15,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// One key, as the module declaring it describes it and as this repository
+/// One key, as the component declaring it describes it and as this repository
 /// puts it on disk.
 pub struct Key {
     declared: Declared,
@@ -25,13 +25,13 @@ pub struct Key {
     cn: Option<String>,
 }
 
-/// The declaration both verbs work off: which kind, and which module's, asked
+/// The declaration both verbs work off: which kind, and which component's, asked
 /// where the command named neither.
 fn declared(
     command: &str,
     root: &Path,
     kind: Option<String>,
-    module: Option<String>,
+    component: Option<String>,
     prompt: &Prompt,
 ) -> Result<Declared, String> {
     let mut disk = Disk::scan(root);
@@ -47,7 +47,7 @@ fn declared(
     if declaring.is_empty() {
         return Err(absent(root, &kind, &disk));
     }
-    let at = provider(&declaring, &kind, module, prompt)?;
+    let at = provider(&declaring, &kind, component, prompt)?;
     Ok(declaring.swap_remove(at).1)
 }
 
@@ -55,11 +55,11 @@ impl Key {
     pub fn collect(
         root: &Path,
         kind: Option<String>,
-        module: Option<String>,
+        component: Option<String>,
         cn: Option<String>,
         prompt: &Prompt,
     ) -> Result<Self, String> {
-        let declared = declared("create key", root, kind, module, prompt)?;
+        let declared = declared("create key", root, kind, component, prompt)?;
         let kind = declared.kind.clone();
 
         let public = layout::public_key(root, &declared.public);
@@ -186,7 +186,7 @@ impl Key {
                  \x20 MOK_KEY_PATH={private} is what a local build reads it from\n\
                  \n\
                  every machine that boots this image enrols the certificate once, and\n\
-                 until it does the modules signed with it will not load:\n\
+                 until it does the components signed with it will not load:\n\
                  \x20 sudo mokutil --import {public}\n\
                  \x20 it asks for a one-time password; reboot, choose Enroll MOK, and\n\
                  \x20 give the same password\n"
@@ -195,7 +195,7 @@ impl Key {
     }
 }
 
-/// A public half the person already holds, recorded where the module says it
+/// A public half the person already holds, recorded where the component says it
 /// goes. Only that half: no private half is ever copied into a repository.
 pub struct Recorded {
     from: PathBuf,
@@ -206,11 +206,11 @@ impl Recorded {
     pub fn collect(
         root: &Path,
         kind: Option<String>,
-        module: Option<String>,
+        component: Option<String>,
         from: Option<String>,
         prompt: &Prompt,
     ) -> Result<Self, String> {
-        let declared = declared("set key", root, kind, module, prompt)?;
+        let declared = declared("set key", root, kind, component, prompt)?;
         // Before the path is asked for, so a key that is already there is said
         // so before a person types one out.
         let public = layout::public_key(root, &declared.public);
@@ -295,7 +295,7 @@ fn which(command: &str, disk: &Disk, prompt: &Prompt) -> Result<String, String> 
         })
 }
 
-/// Which module declares the key, where more than one declares the kind.
+/// Which component declares the key, where more than one declares the kind.
 fn provider(
     declaring: &[(String, Declared)],
     kind: &str,
@@ -307,7 +307,7 @@ fn provider(
         return dirs
             .iter()
             .position(|dir| *dir == given)
-            .ok_or_else(|| format!("`modules/{given}` does not declare `key \"{kind}\"`"));
+            .ok_or_else(|| format!("`components/{given}` does not declare `key \"{kind}\"`"));
     }
     match dirs.as_slice() {
         [_] => Ok(0),
@@ -317,21 +317,21 @@ fn provider(
             prompt
                 .choose(&copy::key_provider(kind), &options)?
                 .ok_or_else(|| {
-                    format!("the {kind} key is declared by {listed}; name one with `--module`")
+                    format!("the {kind} key is declared by {listed}; name one with `--component`")
                 })
         }
     }
 }
 
-/// The module already declares the key, so importing one fixes nothing.
-fn refused(kind: &str, (module, refusals): &(String, String)) -> String {
+/// The component already declares the key, so importing one fixes nothing.
+fn refused(kind: &str, (component, refusals): &(String, String)) -> String {
     format!(
-        "The {module} module declares the {kind} key, and its manifest refuses it.\n\n{}",
+        "The {component} component declares the {kind} key, and its manifest refuses it.\n\n{}",
         refusals.trim_end()
     )
 }
 
-/// Nothing here declares the kind: which module in the declared collections
+/// Nothing here declares the kind: which component in the declared collections
 /// does, and the line that fetches it.
 fn absent(root: &Path, kind: &str, disk: &Disk) -> String {
     let (list, ..) = crate::declarations(root);
@@ -339,12 +339,12 @@ fn absent(root: &Path, kind: &str, disk: &Disk) -> String {
     let found: Vec<String> = index
         .declaring_key(kind)
         .iter()
-        .map(|module| module.qualified())
+        .map(|component| component.qualified())
         .collect();
     match found.first() {
         Some(first) => format!(
-            "The {} module must be imported before creating {kind} keys.\n\
-             You can add it with `tect import module {first}`",
+            "The {} component must be imported before creating {kind} keys.\n\
+             You can add it with `tect import component {first}`",
             found.join(" or ")
         ),
         None => match index.unsearched() {
@@ -362,14 +362,14 @@ fn undeclared(kind: &str, disk: &Disk) -> String {
     };
     match disk.keys.is_empty() {
         true => format!(
-            "no module in this repository declares {noun}.\n\n\
-             Keys come from modules: image signing from a module carrying the cosign public \
+            "no component in this repository declares {noun}.\n\n\
+             Keys come from components: image signing from a component carrying the cosign public \
              key, Secure Boot from a kernel module carrying a MOK certificate. Import one and \
              run this again."
         ),
         false => format!(
-            "no module in this repository declares {noun}.\n\n\
-             The keys declared here are {}. Import a module carrying one and run this again.",
+            "no component in this repository declares {noun}.\n\n\
+             The keys declared here are {}. Import a component carrying one and run this again.",
             listed(disk)
         ),
     }
@@ -408,8 +408,8 @@ fn common_name(
     Ok(cn)
 }
 
-/// The keypair a published image is signed with, and the policy module verifies
-/// updates against.
+/// The keypair a published image is signed with, and the signature-policy
+/// component verifies updates against.
 fn cosign(work: &Path) -> Result<(PathBuf, PathBuf), String> {
     let mut generate = Command::new("cosign");
     generate
@@ -514,7 +514,7 @@ fn pcr_pair(work: &Path, declared: &Declared) -> Result<(PathBuf, PathBuf), Stri
 }
 
 /// A key already on disk is never replaced: the private half cannot be
-/// recovered. The zero-byte file a module ships as a placeholder is not one.
+/// recovered. The zero-byte file a component ships as a placeholder is not one.
 fn unwritten(path: &Path) -> Result<(), String> {
     match std::fs::metadata(path) {
         Ok(meta) if meta.len() > 0 => Err(format!(
@@ -647,7 +647,7 @@ mod tests {
 
 description "x"
 
-supports "fedora"
+targets "fedora"
 
 key "secureboot" {
     generator "openssl" profile="module-signing" bits=4096
@@ -660,7 +660,7 @@ key "secureboot" {
 
 description "x"
 
-supports "debian"
+targets "debian"
 
 key "ssh" {
     generator "ssh-keygen"
@@ -673,7 +673,7 @@ key "ssh" {
 
 description "x"
 
-supports "fedora"
+targets "fedora"
 
 key "pcr" {
     generator "openssl" profile="pcr-signing" bits=4096
@@ -686,7 +686,7 @@ key "pcr" {
 
 description "x"
 
-supports "fedora"
+targets "fedora"
 
 key "keylime-ca" {
     generator "openssl" profile="tls-ca" bits=2048
@@ -710,7 +710,7 @@ key "keylime-ca" {
     fn repo(name: &str, manifest: &str) -> PathBuf {
         let root = std::env::temp_dir().join(format!("{name}.{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
-        crate::init::put(&root.join("modules/keyholder/module.kdl"), manifest).unwrap();
+        crate::init::put(&root.join("components/keyholder/manifest.kdl"), manifest).unwrap();
         root
     }
 
@@ -855,30 +855,30 @@ key "keylime-ca" {
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// A kind no module here declares, and none of the collections either.
+    /// A kind no component here declares, and none of the collections either.
     #[test]
-    fn a_module_has_to_declare_the_key() {
+    fn a_component_has_to_declare_the_key() {
         let root = repo("tect-no-key-test", SECUREBOOT);
         let message = Key::collect(&root, Some("cosign".into()), None, None, &Prompt::silent())
             .map(|_| ())
             .unwrap_err();
         assert_eq!(
             message,
-            "no module in this repository declares a cosign key.\n\n\
-             The keys declared here are secureboot. Import a module carrying one and run this again."
+            "no component in this repository declares a cosign key.\n\n\
+             The keys declared here are secureboot. Import a component carrying one and run this again."
         );
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// Two modules declare the kind, so the named one decides where the
+    /// Two components declare the kind, so the named one decides where the
     /// public half lands.
     #[test]
-    fn the_named_module_of_two_declares_the_key() {
+    fn the_named_component_of_two_declares_the_key() {
         let root = std::env::temp_dir().join(format!("tect-key-named-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
-        crate::init::put(&root.join("modules/one/module.kdl"), SECUREBOOT).unwrap();
+        crate::init::put(&root.join("components/one/manifest.kdl"), SECUREBOOT).unwrap();
         crate::init::put(
-            &root.join("modules/two/module.kdl"),
+            &root.join("components/two/manifest.kdl"),
             &SECUREBOOT.replace("sb_cert.der", "other.der"),
         )
         .unwrap();
@@ -942,11 +942,11 @@ key "keylime-ca" {
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// `set key`: the destination comes out of the module's `public`
+    /// `set key`: the destination comes out of the component's `public`
     /// declaration, and a file in the wrong form is refused. Committed, it is
     /// discovered by a build a long way from here.
     #[test]
-    fn a_recorded_key_lands_where_the_module_says_and_is_read_before_it_does() {
+    fn a_recorded_key_lands_where_the_component_says_and_is_read_before_it_does() {
         let root = repo("tect-set-key-test", SSH);
         let held = root.join("held.pub");
         let record = |from: &Path| {

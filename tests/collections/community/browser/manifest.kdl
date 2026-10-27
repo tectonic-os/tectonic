@@ -1,0 +1,9 @@
+schema-version 1
+
+description "A browser, from the second collection"
+
+targets "fedora"
+
+packages "chromium"
+
+requires "flatpak"

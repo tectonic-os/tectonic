@@ -35,7 +35,7 @@ source: tests/golden/harness.rs
       "schedule": "30 3 * * 1"
     },
     {
-      "file": "update-modules.yml",
+      "file": "update-components.yml",
       "schedule": "30 5 * * 1"
     }
   ],
@@ -62,14 +62,16 @@ source: tests/golden/harness.rs
         "bootloader": "grub2"
       },
       "base": {
+        "path": "base-image/fedora",
+        "defined": null,
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
         "scap_content": "ssg-fedora-ds.xml",
         "signed": false,
         "provides": [
           "rechunking",
-          "initramfs-generation",
           "luks-initramfs",
+          "initramfs-generation",
           "selinux-policy",
           "ssh",
           "bootc",
@@ -86,9 +88,6 @@ source: tests/golden/harness.rs
           ],
           "crun": [
             "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
           ],
           "initramfs-generation": [
             "/usr/bin/dracut"
@@ -119,7 +118,52 @@ source: tests/golden/harness.rs
           "default": true,
           "pr": true,
           "siblings": [],
-          "modules": [],
+          "components": [
+            {
+              "path": "fedora-family",
+              "flavour": null,
+              "variant": null,
+              "description": "dnf5 and its plugins, which every fedora build layer reaches for",
+              "options": {},
+              "provides": [
+                "build-environment"
+              ],
+              "requires": [],
+              "met_by": {},
+              "removes": [],
+              "files": {},
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "defined": null,
+                "content": "1657e7d2d58210a215309d2e0803b7fa58b82613c1b96bef63ec97ae7df436de",
+                "repo": false,
+                "imported": {
+                  "library": "tectonic-components",
+                  "path": "fedora-family",
+                  "content": "1657e7d2d58210a215309d2e0803b7fa58b82613c1b96bef63ec97ae7df436de",
+                  "pin": {
+                    "locator": "https://github.com/tectonic-os/library",
+                    "selector": null,
+                    "verifier": null,
+                    "tracker": "none",
+                    "reason": null,
+                    "from": "asset",
+                    "path": null,
+                    "resolved": "https://github.com/tectonic-os/library"
+                  },
+                  "tracked": true
+                }
+              },
+              "origin": {
+                "how": "imported",
+                "by": "base-image/fedora"
+              },
+              "satisfies": [],
+              "refuses": []
+            }
+          ],
           "suppressed": [],
           "secrets": [],
           "contract_files": [

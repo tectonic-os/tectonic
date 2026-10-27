@@ -1,0 +1,9 @@
+schema-version 1
+
+description "Emits its fragment alone"
+
+targets "fedora"
+
+network "scripts"
+
+fragment standard-layer=#false

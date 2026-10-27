@@ -1,0 +1,7 @@
+schema-version 1
+
+description "The provider for both namesake clients"
+
+targets "fedora"
+
+provides "flatpak" witness="/usr/bin/flatpak"

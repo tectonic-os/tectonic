@@ -2,8 +2,8 @@
 
 use crate::diag::{Issue, Issues};
 use crate::layout;
+use crate::model::component::Component;
 use crate::model::image::Image;
-use crate::model::module::Module;
 use crate::parse::disk::Disk;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -19,8 +19,8 @@ pub struct Collected {
 /// Every contribution, and every destination assembled from them.
 #[derive(Default)]
 pub struct Collection {
-    /// Contributor module path to what its layer stages.
-    pub by_module: BTreeMap<String, Vec<Collected>>,
+    /// Contributor component path to what its layer stages.
+    pub by_component: BTreeMap<String, Vec<Collected>>,
     /// Every declared destination, sorted so two runs on the same tree emit
     /// the same plan.
     pub destinations: Vec<String>,
@@ -35,20 +35,20 @@ pub fn resolve_collects(
     disk: &Disk,
     issues: &mut Issues,
 ) -> Collection {
-    let mut by_file: BTreeMap<&str, &Module> = BTreeMap::new();
-    for module in image.modules() {
-        for collect in &module.collects {
+    let mut by_file: BTreeMap<&str, &Component> = BTreeMap::new();
+    for component in image.components() {
+        for collect in &component.collects {
             if let Some(first) = by_file.get(collect.file.as_str()) {
                 issues.push(
                     Issue::new(
-                        format!("two enabled modules collect `{}`", collect.file),
-                        &module.src,
+                        format!("two enabled components collect `{}`", collect.file),
+                        &component.src,
                     )
                     .at(collect.span, "collected again here")
                     .help(format!("already collected by `{}`", first.path)),
                 );
             } else {
-                by_file.insert(collect.file.as_str(), module);
+                by_file.insert(collect.file.as_str(), component);
             }
         }
     }
@@ -63,12 +63,12 @@ pub fn resolve_collects(
     out.destinations.sort();
     out.destinations.dedup();
 
-    // A contribution is a file the module ships, so it gates the way the rest
-    // of them do. One file lands per module and the collector claims one name,
+    // A contribution is a file the component ships, so it gates the way the rest
+    // of them do. One file lands per component and the collector claims one name,
     // so this picks the most specific copy.
     let family = image.base.as_ref().map_or("", |base| base.family.as_str());
-    for module in image.modules() {
-        let dir = layout::module(root, &module.dir);
+    for component in image.components() {
+        let dir = layout::component(root, &component.dir);
         for (file, collector) in &disk.collectors {
             let Some(shipped) = layout::shipped(&dir, family, file) else {
                 continue;
@@ -77,21 +77,21 @@ pub fn resolve_collects(
                 Some(enabled) => {
                     let declared = enabled.collects.iter().find(|c| &c.file == file);
                     let into = declared.map(|c| c.into.clone()).unwrap_or_default();
-                    let priority = module
+                    let priority = component
                         .contributes
                         .iter()
                         .find(|c| &c.file == file)
                         .map(|c| c.priority)
                         .or_else(|| declared.map(|c| c.priority))
                         .unwrap_or_default();
-                    if !module.standard_layer {
+                    if !component.standard_layer {
                         issues.push(
                             Issue::new(
                                 format!(
                                     "`{}` ships a {file} with no standard layer to collect it from",
-                                    module.path
+                                    component.path
                                 ),
-                                &module.src,
+                                &component.src,
                             )
                             .help(format!(
                                 "`standard-layer #false` makes the fragment the whole layer, so it has to append the file to {into} itself"
@@ -99,26 +99,26 @@ pub fn resolve_collects(
                         );
                         continue;
                     }
-                    out.by_module
-                        .entry(module.path.clone())
+                    out.by_component
+                        .entry(component.path.clone())
                         .or_default()
                         .push(Collected {
                             file: shipped,
-                            staged: staged(&into, priority, &module.path),
+                            staged: staged(&into, priority, &component.path),
                             into,
                         });
                 }
                 // An enabled collector whose `collects` was refused has
                 // already reported it, and adding it to the image fixes
                 // nothing.
-                None if image.modules().any(|enabled| enabled.dir == *collector) => {}
+                None if image.components().any(|enabled| enabled.dir == *collector) => {}
                 None => issues.push(
                     Issue::new(
                         format!(
                             "`{}` ships a {file} but nothing enabled collects it",
-                            module.path
+                            component.path
                         ),
-                        &module.src,
+                        &component.src,
                     )
                     .help(format!(
                         "`{collector}` collects it; add it to this image, or drop the {file}"
@@ -129,7 +129,7 @@ pub fn resolve_collects(
     }
 
     let mut assembled: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    for collected in out.by_module.values().flatten() {
+    for collected in out.by_component.values().flatten() {
         assembled
             .entry(collected.into.clone())
             .or_default()
@@ -144,7 +144,10 @@ pub fn resolve_collects(
     out
 }
 
-/// Where one contribution is staged: `<into>.d/NNNN-<module>.part`.
-fn staged(into: &str, priority: u32, module: &str) -> String {
-    format!("{into}.d/{priority:04}-{}.part", module.replace('/', "-"))
+/// Where one contribution is staged: `<into>.d/NNNN-<component>.part`.
+fn staged(into: &str, priority: u32, component: &str) -> String {
+    format!(
+        "{into}.d/{priority:04}-{}.part",
+        component.replace('/', "-")
+    )
 }

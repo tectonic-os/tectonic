@@ -1,0 +1,7 @@
+schema-version 1
+
+description "A component both images in this repository enable"
+
+targets "fedora"
+
+provides "shell-tools" "eza"

@@ -1,4 +1,13 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
-
+  x `components/flatpak` tracks its library, and its content no longer matches
+  | its lock entry
+   ,-[tests/repos/seeding/components/components.lock.kdl:1:1]
+ 1 | component "flatpak" {
+   : ^^^^|^^^^
+   :     `-- this entry
+ 2 |     library "tectonic-os"
+   `----
+  help: undo the edit to `components/flatpak`, or run `tect set component
+        flatpak --untracked` to make the copy the repository's own

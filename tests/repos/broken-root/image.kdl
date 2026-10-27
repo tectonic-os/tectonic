@@ -3,27 +3,25 @@ schema-version 1
 image {
     name "Same"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking"
+    base-image {
+        fedora-bootc-44
     }
 
-    modules {
-        module "fedora-family"
-        module "core/hello"
+    fedora-family
+    core {
+        hello
     }
 }
 
 image {
     name "Same"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking"
+    base-image {
+        fedora-bootc-44
     }
 
-    modules {
-        module "fedora-family"
-        module "core/hello"
+    fedora-family
+    core {
+        hello
     }
 }

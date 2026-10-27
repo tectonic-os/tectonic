@@ -4,7 +4,7 @@ source: tests/golden/harness.rs
 ==== markdown
 # one/hello
 
-An imported module edited since it was imported
+An imported component edited since it was imported
 
 ## Where it is built
 
@@ -29,11 +29,11 @@ A claim the tool records rather than certifies. The scan is what confirms it.
 
 | Content | Hash |
 | --- | --- |
-| declared | `d477d22a5a9ba3d0aaca5011b7ec83b4ed58c73e068a592c838d096f797f7df7` |
+| declared | `ef8159ad4e8ea55c4252eb435ee5c40b6963e7ad9800bac563a63bfac2a89eca` |
 
 | Collection | Locator | Selector | Verifier | Tracker |
 | --- | --- | --- | --- | --- |
-| `one` | https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | not declared | none |
+| `one` | https://github.com/owner/components/archive/refs/tags/{version}.tar.gz | v1.0.0 | not declared | none |
 
 **It has been edited since it was imported.** It is the repository's own copy, and the lock entry records where it came from.
 
@@ -45,7 +45,7 @@ A claim the tool records rather than certifies. The scan is what confirms it.
 
 ## Third-party repositories
 
-It enables one, in `modules/one/hello/repo`. There is no grammar for that file, so read it: it is shell calling the family's config manager.
+It enables one, in `components/one/hello/repo.sh`. There is no grammar for that file, so read it: it is shell calling the family's config manager.
 
 | URL it names |
 | --- |
@@ -53,12 +53,13 @@ It enables one, in `modules/one/hello/repo`. There is no grammar for that file, 
 
 ==== json
 {
-  "module": "one/hello",
-  "description": "An imported module edited since it was imported",
+  "component": "one/hello",
+  "description": "An imported component edited since it was imported",
   "images": [
     "enforced"
   ],
   "suppressed": [],
+  "imported_by": [],
   "provides": [
     {
       "capability": "hello",
@@ -87,13 +88,13 @@ It enables one, in `modules/one/hello/repo`. There is no grammar for that file, 
       ]
     }
   ],
-  "content": "d477d22a5a9ba3d0aaca5011b7ec83b4ed58c73e068a592c838d096f797f7df7",
+  "content": "ef8159ad4e8ea55c4252eb435ee5c40b6963e7ad9800bac563a63bfac2a89eca",
   "built": null,
   "imported": {
     "collection": "one",
     "pin": {
       "name": "collection",
-      "locator": "https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz",
+      "locator": "https://github.com/owner/components/archive/refs/tags/{version}.tar.gz",
       "selector": "v1.0.0",
       "verifier": null,
       "tracker": "none"
@@ -115,13 +116,13 @@ It enables one, in `modules/one/hello/repo`. There is no grammar for that file, 
   ]
 }
 ==== unknown
-  x `nosuch` is not a module this repository lists
-  help: modules: consumer, hello
+  x `nosuch` is not a component this repository lists
+  help: components: consumer, hello
 
 ==== from the baked manifest, with no repository
 # one/hello
 
-An imported module edited since it was imported
+An imported component edited since it was imported
 
 ## Where it is built
 
@@ -146,11 +147,11 @@ A claim the tool records rather than certifies. The scan is what confirms it.
 
 | Content | Hash |
 | --- | --- |
-| declared | `d477d22a5a9ba3d0aaca5011b7ec83b4ed58c73e068a592c838d096f797f7df7` |
+| declared | `ef8159ad4e8ea55c4252eb435ee5c40b6963e7ad9800bac563a63bfac2a89eca` |
 
 | Collection | Locator | Selector | Verifier | Tracker |
 | --- | --- | --- | --- | --- |
-| `one` | https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | not declared | none |
+| `one` | https://github.com/owner/components/archive/refs/tags/{version}.tar.gz | v1.0.0 | not declared | none |
 
 **It has been edited since it was imported.** It is the repository's own copy, and the lock entry records where it came from.
 
@@ -162,9 +163,9 @@ A claim the tool records rather than certifies. The scan is what confirms it.
 
 ## Third-party repositories
 
-It enables one, in `modules/one/hello/repo`. There is no grammar for that file, so read it: it is shell calling the family's config manager.
+It enables one, in `components/one/hello/repo.sh`. There is no grammar for that file, so read it: it is shell calling the family's config manager.
 
-Not readable from here: a finished image carries the manifest, not the module tree.
+Not readable from here: a finished image carries the manifest, not the component tree.
 
 ==== the names it knows
 consumer, hello
@@ -173,13 +174,13 @@ consumer, hello
 
 | Content | Hash |
 | --- | --- |
-| declared | `d477d22a5a9ba3d0aaca5011b7ec83b4ed58c73e068a592c838d096f797f7df7` |
+| declared | `ef8159ad4e8ea55c4252eb435ee5c40b6963e7ad9800bac563a63bfac2a89eca` |
 | observed by the build | `not what was declared` |
 
 **The two documents disagree**, which they cannot if both came from this build.
 
 | Collection | Locator | Selector | Verifier | Tracker |
 | --- | --- | --- | --- | --- |
-| `one` | https://github.com/owner/modules/archive/refs/tags/{version}.tar.gz | v1.0.0 | not declared | none |
+| `one` | https://github.com/owner/components/archive/refs/tags/{version}.tar.gz | v1.0.0 | not declared | none |
 
 **It has been edited since it was imported.** It is the repository's own copy, and the lock entry records where it came from.

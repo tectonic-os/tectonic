@@ -3,8 +3,7 @@ source: tests/golden/harness.rs
 ---
 Tectonic v{version}
 
-tect: `tectonic-modules` is unpinned, so a fetch from it takes whatever its ref holds then, unverified
-tect: `core` is unpinned, so a fetch from it takes whatever its ref holds then, unverified
+tect: `tectonic-components` is unpinned, so a fetch from it takes whatever its ref holds then, unverified
 tect: `example` conforms to `standard` and nothing it installs or builds on declares `satisfies`, so nothing here claims a rule of it. Nothing read a datastream, so that is a count of declarations: `tect check --datastream <file>` says which of the profile's rules are unclaimed
-tect: 1 images, 0 modules, 0 flavours
+tect: 1 images, 1 components, 0 flavours
 ==== exit 0

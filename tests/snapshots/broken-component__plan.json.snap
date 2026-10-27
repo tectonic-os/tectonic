@@ -1,0 +1,175 @@
+---
+source: tests/golden/harness.rs
+---
+{
+  "schema_version": 1,
+  "default_image": "broken-component",
+  "default_image_name": "Broken Component",
+  "pr_image": "broken-component",
+  "default_target": "broken-component",
+  "default_published": "broken-component",
+  "pr_target": "broken-component",
+  "pr_published": "broken-component",
+  "ungated_target": "broken-component",
+  "ungated_published": "broken-component",
+  "cache_image": "broken-component-cache",
+  "workflows": [],
+  "audit": {
+    "enforce": false
+  },
+  "assets": [],
+  "images": [
+    {
+      "id": "broken-component",
+      "name": "Broken Component",
+      "pretty_name": "",
+      "file": "./image.kdl",
+      "url": "",
+      "issues_url": "",
+      "description": "",
+      "keywords": [],
+      "logo_url": "",
+      "conforms": "",
+      "boot": "",
+      "allows": [],
+      "layout": null,
+      "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
+        "image": "quay.io/fedora/fedora-bootc:44",
+        "family": "fedora",
+        "scap_content": "",
+        "signed": false,
+        "provides": [
+          "rechunking"
+        ],
+        "witnesses": {},
+        "requires": [],
+        "satisfies": []
+      },
+      "flavours": [],
+      "default_flavour": null,
+      "targets": [
+        {
+          "name": "broken-component",
+          "image": "broken-component",
+          "flavour": null,
+          "published": "broken-component",
+          "conforms": "",
+          "allows": [],
+          "default": true,
+          "pr": true,
+          "siblings": [],
+          "components": [
+            {
+              "path": "core/nameless",
+              "flavour": null,
+              "variant": null,
+              "description": "",
+              "options": {},
+              "provides": [
+                "shell-tools"
+              ],
+              "requires": [],
+              "met_by": {},
+              "removes": [],
+              "files": {},
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "defined": null,
+                "content": "157c6f4c6dec62ae03abecfa1c7802cfafa3b08651d214dec028d3daac444206",
+                "repo": false,
+                "imported": null
+              },
+              "origin": {
+                "how": "listed"
+              },
+              "satisfies": [
+                {
+                  "benchmark": "cis-fedora",
+                  "rules": []
+                },
+                {
+                  "benchmark": "stig",
+                  "rules": [
+                    "R1"
+                  ]
+                },
+                {
+                  "benchmark": "stig",
+                  "rules": [
+                    "R2"
+                  ]
+                }
+              ],
+              "refuses": []
+            },
+            {
+              "path": "core/missing",
+              "flavour": null,
+              "variant": null,
+              "description": "",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "met_by": {},
+              "removes": [],
+              "files": {},
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "defined": null,
+                "content": null,
+                "repo": false,
+                "imported": null
+              },
+              "origin": {
+                "how": "listed"
+              },
+              "satisfies": [],
+              "refuses": []
+            },
+            {
+              "path": "core/latin",
+              "flavour": null,
+              "variant": null,
+              "description": "",
+              "options": {},
+              "provides": [],
+              "requires": [],
+              "met_by": {},
+              "removes": [],
+              "files": {},
+              "packages": [],
+              "groups": [],
+              "coprs": [],
+              "provenance": {
+                "defined": null,
+                "content": null,
+                "repo": false,
+                "imported": null
+              },
+              "origin": {
+                "how": "listed"
+              },
+              "satisfies": [],
+              "refuses": []
+            }
+          ],
+          "suppressed": [],
+          "secrets": [],
+          "contract_files": [],
+          "verify_exceptions": [],
+          "assets": [],
+          "overlay_files": {},
+          "overlay_overridden": [],
+          "collected_files": {},
+          "collect_destinations": []
+        }
+      ]
+    }
+  ]
+}

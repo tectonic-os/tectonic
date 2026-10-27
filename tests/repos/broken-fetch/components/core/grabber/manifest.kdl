@@ -1,0 +1,5 @@
+schema-version 1
+
+description "Reaches the network with nothing declaring what it pulls"
+
+targets "fedora"

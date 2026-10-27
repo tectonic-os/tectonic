@@ -3,9 +3,8 @@ schema-version 1
 image {
     name "Workstation"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking"
+    base-image {
+        fedora-bootc-44
     }
 
     flavours {
@@ -13,11 +12,13 @@ image {
         dev
     }
 
-    modules {
-        module "core/shared"
+    core {
+        shared
+    }
 
-        flavour "dev" {
-            module "core/dev-tools"
+    flavour "dev" {
+        core {
+            dev-tools
         }
     }
 }

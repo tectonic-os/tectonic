@@ -1,7 +1,0 @@
-schema-version 1
-
-description "A module only one flavour builds"
-
-supports "fedora"
-
-packages "akmod-nvidia"

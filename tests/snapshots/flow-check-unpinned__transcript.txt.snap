@@ -3,7 +3,6 @@ source: tests/golden/harness.rs
 ---
 Tectonic v{version}
 
-tect: `tectonic-modules` is unpinned, so a fetch from it takes whatever its ref holds then, unverified
-tect: `core` is unpinned, so a fetch from it takes whatever its ref holds then, unverified
-tect: 1 images, 0 modules, 0 flavours
+tect: `tectonic-components` is unpinned, so a fetch from it takes whatever its ref holds then, unverified
+tect: 1 images, 1 components, 0 flavours
 ==== exit 0

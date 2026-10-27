@@ -4,7 +4,7 @@
 
 Location: The root of the repository.
 
-`repo.kdl` sits at the root of the repository and holds what applies to every image in it: which `tect` release builds it, where its modules come from, which CI workflows run and which security rules every image follows. The images themselves live in image files beside it.
+`repo.kdl` sits at the root of the repository and holds what applies to every image in it: which `tect` release builds it, where its components come from, which CI workflows run and which security rules every image follows. The images themselves live in image files beside it.
 
 ```kdl
 schema-version 1
@@ -16,13 +16,9 @@ renovate rebaseWhen="never" {
     schedule "* 0-5 * * *"
 }
 sources {
-    modules "tectonic-modules" {
+    components "tectonic-components" {
         url "https://github.com/tectonic-os/library"
-        path "modules"
-    }
-    base-images "core" {
-        url "https://github.com/tectonic-os/library"
-        path "base-images/core"
+        path "components"
     }
 }
 ```
@@ -37,7 +33,7 @@ sources {
 | [`seed`](#seed) (optional) | *string* | The image that this repository publishes as a starting point for a new repository. |
 | [`workflows`](#workflows) (optional) | {&nbsp;[fields](#workflows-fields)&nbsp;} | The CI workflows that `tect generate` writes into `.github/workflows/`. |
 | [`renovate`](#renovate) (optional) | optionally {&nbsp;[fields](#renovate-fields)&nbsp;} | The Renovate policy that `tect generate` writes into `.github/renovate.json5`. |
-| [`sources`](#sources) (optional) | {&nbsp;[fields](#sources-fields)&nbsp;} | The module and base-image libraries this repository reads. |
+| [`sources`](#sources) (optional) | {&nbsp;[fields](#sources-fields)&nbsp;} | The component libraries this repository reads. |
 | [`manifest`](#manifest) (optional) | {&nbsp;[fields](#manifest-fields)&nbsp;} | Whether a build stamps the generated manifest onto the image as an OCI label. |
 | [`audit`](#audit) (optional) | {&nbsp;[fields](#audit-fields)&nbsp;} | How the repository treats a provenance check that fails. |
 | [`security-policy`](#security-policy) (optional) | optionally {&nbsp;[fields](#security-policy-fields)&nbsp;} | The security rules that the repository sets for every image it defines. |
@@ -131,7 +127,7 @@ Accepts: *string*
 
 ## `seed` (optional)
 
-A seed lets another user start a new repository from this one. `tect generate` writes the base, the module list and the collections of the named image into the seed, so a new repository starts from the same image.
+A seed lets another user start a new repository from this one. `tect generate` writes the base, the component list and the collections of the named image into the seed, so a new repository starts from the same image.
 
 ```kdl
 seed "workstation" collection="owner"
@@ -142,19 +138,19 @@ Accepts: *string*
 `tect generate` writes the seed to `generated/seed.kdl`. The seed carries:
 
 - the base of the image;
-- the module list of the image;
-- the collections that those modules come from.
+- the component list of the image;
+- the collections that those components come from.
 
 | Property | Accepts | Description |
 | --- | --- | --- |
-| `collection=` (required) | *string* | The collection that this repository publishes its own modules as. |
+| `collection=` (required) | *string* | The collection that this repository publishes its own components as. |
 
 > [!NOTE]
 > The seed carries no name, URL or owner of this repository.
 >
-> The seed names each module through the collection it is fetched from, so `collection=` names a collection in `sources`. A repository is seedable only if it publishes its own `modules/` as a collection.
+> The seed names each component through the collection it is fetched from, so `collection=` names a collection in `sources`. A repository is seedable only if it publishes its own `components/` as a collection.
 >
-> If the seed image lists a module that no collection can import, then `tect` reports it, because a new repository could not build that seed.
+> If the seed image lists a component that no collection can import, then `tect` reports it, because a new repository could not build that seed.
 
 <a id="workflows"></a>
 
@@ -248,11 +244,11 @@ renovate rebaseWhen="never" {
 
 ## `sources` (optional)
 
-Lists typed libraries that this repository reads from a local directory or fetches from an HTTPS Git repository. A `modules` source feeds imports. A `base-images` source is the base catalog. Every source declares exactly one of `dir` and `url`: `dir` names a directory on this machine, and `url` names an HTTPS Git repository.
+Lists the libraries that this repository reads from a local directory or fetches from an HTTPS Git repository. A `components` source holds components and base components alike: `tect import component` copies a component from it, and `tect create image` offers its bases. Every source declares exactly one of `dir` and `url`: `dir` names a directory on this machine, and `url` names an HTTPS Git repository.
 
 ```kdl
 sources {
-    modules "tectonic-modules"
+    components "tectonic-components"
 }
 ```
 
@@ -262,38 +258,37 @@ Accepts: {&nbsp;[fields](#sources-fields)&nbsp;}
 
 | Field | Accepts | Description |
 | --- | --- | --- |
-| [`modules`](#sources-modules) (optional,&nbsp;repeatable) | *string*, then optionally {&nbsp;[fields](#sources-modules-fields)&nbsp;} | A module library that imports and copies resolve against. |
-| [`base-images`](#sources-base-images) (optional,&nbsp;repeatable) | *string*, then optionally {&nbsp;[fields](#sources-base-images-fields)&nbsp;} | A base-image library that the base catalog is read out of. |
+| [`components`](#sources-components) (optional,&nbsp;repeatable) | *string*, then optionally {&nbsp;[fields](#sources-components-fields)&nbsp;} | A component library that imports and `tect create image` read components and bases from. |
 
 > [!NOTE]
-> `tect import module` copies a module from a `modules` source to `modules/<name>`, and `modules/modules.lock.kdl` records the source.
+> `tect import component` copies a component from a `components` source to `components/<name>`, and `components/components.lock.kdl` records the source.
 
-<a id="sources-modules"></a>
+<a id="sources-components"></a>
 
-### `modules` (optional, repeatable)
+### `components` (optional, repeatable)
 
-A module library that imports and copies resolve against.
+A component library that imports and `tect create image` read components and bases from.
 
 ```kdl
 sources {
-    modules "tectonic-modules"
+    components "tectonic-components"
 }
 ```
 
-Accepts: *string*, then optionally {&nbsp;[fields](#sources-modules-fields)&nbsp;}
+Accepts: *string*, then optionally {&nbsp;[fields](#sources-components-fields)&nbsp;}
 
-<a id="sources-modules-fields"></a>
+<a id="sources-components-fields"></a>
 
 | Field | Accepts | Description |
 | --- | --- | --- |
-| [`dir`](#sources-modules-dir) (optional) | *string* | The local directory that holds this source. |
-| [`url`](#sources-modules-url) (optional) | *string* | The HTTPS Git repository that holds this source. |
-| [`path`](#sources-modules-path) (optional) | *string* | The directory inside the Git repository that holds this module library. |
-| [`version`](#sources-modules-version) (optional) | *string* | The branch, tag or commit that selects the repository tree. |
-| [`sha256`](#sources-modules-sha256) (optional) | *string* | The hash of the canonical tar archive for the selected commit. |
-| [`unpinned`](#sources-modules-unpinned) (optional) | *string* | Why this source follows a ref without a verified archive hash. |
+| [`dir`](#sources-components-dir) (optional) | *string* | The local directory that holds this source. |
+| [`url`](#sources-components-url) (optional) | *string* | The HTTPS Git repository that holds this source. |
+| [`path`](#sources-components-path) (optional) | *string* | The directory inside the Git repository that holds this component library. |
+| [`version`](#sources-components-version) (optional) | *string* | The branch, tag or commit that selects the repository tree. |
+| [`sha256`](#sources-components-sha256) (optional) | *string* | The hash of the canonical tar archive for the selected commit. |
+| [`unpinned`](#sources-components-unpinned) (optional) | *string* | Why this source follows a ref without a verified archive hash. |
 
-<a id="sources-modules-dir"></a>
+<a id="sources-components-dir"></a>
 
 #### `dir` (optional)
 
@@ -301,15 +296,15 @@ The local directory that holds this source.
 
 ```kdl
 sources {
-    modules "tectonic-modules" {
-        dir "../library/modules"
+    components "tectonic-components" {
+        dir "../library/components"
     }
 }
 ```
 
 Accepts: *string*
 
-<a id="sources-modules-url"></a>
+<a id="sources-components-url"></a>
 
 #### `url` (optional)
 
@@ -317,7 +312,7 @@ The HTTPS Git repository that holds this source.
 
 ```kdl
 sources {
-    modules "tectonic-modules" {
+    components "tectonic-components" {
         url "https://github.com/tectonic-os/library"
     }
 }
@@ -325,23 +320,23 @@ sources {
 
 Accepts: *string*
 
-<a id="sources-modules-path"></a>
+<a id="sources-components-path"></a>
 
 #### `path` (optional)
 
-The directory inside the Git repository that holds this module library.
+The directory inside the Git repository that holds this component library.
 
 ```kdl
 sources {
-    modules "tectonic-modules" {
-        path "modules"
+    components "tectonic-components" {
+        path "components"
     }
 }
 ```
 
 Accepts: *string*
 
-<a id="sources-modules-version"></a>
+<a id="sources-components-version"></a>
 
 #### `version` (optional)
 
@@ -349,7 +344,7 @@ The branch, tag or commit that selects the repository tree.
 
 ```kdl
 sources {
-    modules "tectonic-modules" {
+    components "tectonic-components" {
         version "v1"
     }
 }
@@ -357,7 +352,7 @@ sources {
 
 Accepts: *string*
 
-<a id="sources-modules-sha256"></a>
+<a id="sources-components-sha256"></a>
 
 #### `sha256` (optional)
 
@@ -365,7 +360,7 @@ The hash of the canonical tar archive for the selected commit.
 
 ```kdl
 sources {
-    modules "tectonic-modules" {
+    components "tectonic-components" {
         sha256 "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3"
     }
 }
@@ -373,7 +368,7 @@ sources {
 
 Accepts: *string*
 
-<a id="sources-modules-unpinned"></a>
+<a id="sources-components-unpinned"></a>
 
 #### `unpinned` (optional)
 
@@ -381,49 +376,8 @@ Why this source follows a ref without a verified archive hash.
 
 ```kdl
 sources {
-    modules "tectonic-modules" {
+    components "tectonic-components" {
         unpinned "This repository follows the library's default ref"
-    }
-}
-```
-
-Accepts: *string*
-
-<a id="sources-base-images"></a>
-
-### `base-images` (optional, repeatable)
-
-A base-image library that the base catalog is read out of.
-
-```kdl
-sources {
-    base-images "core"
-}
-```
-
-Accepts: *string*, then optionally {&nbsp;[fields](#sources-base-images-fields)&nbsp;}
-
-<a id="sources-base-images-fields"></a>
-
-| Field | Accepts | Description |
-| --- | --- | --- |
-| [`dir`](#sources-modules-dir) (optional) | *string* | The local directory that holds this source. |
-| [`url`](#sources-modules-url) (optional) | *string* | The HTTPS Git repository that holds this source. |
-| [`path`](#sources-base-images-path) (optional) | *string* | The directory inside the Git repository that holds this base-image library. |
-| [`version`](#sources-modules-version) (optional) | *string* | The branch, tag or commit that selects the repository tree. |
-| [`sha256`](#sources-modules-sha256) (optional) | *string* | The hash of the canonical tar archive for the selected commit. |
-| [`unpinned`](#sources-modules-unpinned) (optional) | *string* | Why this source follows a ref without a verified archive hash. |
-
-<a id="sources-base-images-path"></a>
-
-#### `path` (optional)
-
-The directory inside the Git repository that holds this base-image library.
-
-```kdl
-sources {
-    base-images "core" {
-        path "base-images/core"
     }
 }
 ```
@@ -480,7 +434,7 @@ Accepts: {&nbsp;[fields](#audit-fields)&nbsp;}
 
 `tect` records these provenance facts whether or not this block exists:
 
-- the hash of each module;
+- the hash of each component;
 - the source of each import;
 - the digest of the base tag;
 - the commit of each cloned asset.
@@ -507,7 +461,7 @@ Accepts: *boolean*
 
 Each check runs in the command named before it:
 
-- `tect import module`, `tect create image` and `tect set conforms`: the library a module is copied from is pinned to a tag and its hash.
+- `tect import component`, `tect create image` and `tect set conforms`: the library a component is copied from is pinned to a tag and its hash.
 - `tect build`: the base tag resolves to a manifest digest.
 - `tect build`: the repository is at a commit.
 - `tect build`: each cloned asset resolves to a commit.
@@ -519,9 +473,9 @@ Each check runs in the command named before it:
 | `#false`, or no `enforce` | `tect` reports a failed check, and the command continues. |
 
 > [!NOTE]
-> `tect` also reports a `module.sh` or `finalize.sh` that reaches the network with no `asset` that declares the download. This report does not depend on `enforce`.
+> `tect` also reports a `component.sh` or `finalize.sh` that reaches the network with no `asset` that declares the download. This report does not depend on `enforce`.
 >
-> `tect` refuses a module that tracks its library and no longer matches its entry in the module lock. This refusal does not depend on `enforce`.
+> `tect` refuses a component that tracks its library and no longer matches its entry in the component lock. This refusal does not depend on `enforce`.
 
 <a id="security-policy"></a>
 
@@ -539,7 +493,7 @@ Accepts: optionally {&nbsp;[fields](#security-policy-fields)&nbsp;}
 
 | Field | Accepts | Description |
 | --- | --- | --- |
-| [`network`](#security-policy-network) (optional) | optionally `allow` or `strict`, then optionally {&nbsp;[fields](#security-policy-network-fields)&nbsp;} | The rule that decides whether each step of a module layer reaches the network. |
+| [`network`](#security-policy-network) (optional) | optionally `allow` or `strict`, then optionally {&nbsp;[fields](#security-policy-network-fields)&nbsp;} | The rule that decides whether each step of a component layer reaches the network. |
 
 > [!NOTE]
 > If the `security-policy` block is absent, then every step keeps the network.
@@ -548,7 +502,7 @@ Accepts: optionally {&nbsp;[fields](#security-policy-fields)&nbsp;}
 
 ### `network` (optional)
 
-Controls network access while the image builds. The user can open the network to every step, or with `strict` open it only for the modules that declare a need, so an undeclared download fails the build. `packages` and `scripts` set the rule for one kind of step.
+Controls network access while the image builds. The user can open the network to every step, or with `strict` open it only for the components that declare a need, so an undeclared download fails the build. `packages` and `scripts` set the rule for one kind of step.
 
 ```kdl
 security-policy {
@@ -558,10 +512,10 @@ security-policy {
 
 Accepts: optionally `allow` or `strict`, then optionally {&nbsp;[fields](#security-policy-network-fields)&nbsp;}
 
-A module layer runs two kinds of step:
+A component layer runs two kinds of step:
 
-- A package step installs the repo files, the COPRs and the packages of the module.
-- A script step runs the `module.sh` of the module and its finalize hook.
+- A package step installs the repo files, the COPRs and the packages of the component.
+- A script step runs the `component.sh` of the component and its finalize hook.
 
 | Value | Effect |
 | --- | --- |
@@ -595,7 +549,7 @@ Accepts: `allow` or `strict` or `deny`
 | Value | Effect |
 | --- | --- |
 | `allow` | Every package step reaches the network. |
-| `strict` | Every package step reaches the network, because a package step runs only where the module declares packages, a COPR or a repo file. |
+| `strict` | Every package step reaches the network, because a package step runs only where the component declares packages, a COPR or a repo file. |
 | `deny` | Every package step runs under `--network=none`. |
 
 <a id="security-policy-network-scripts"></a>
@@ -617,8 +571,8 @@ Accepts: `allow` or `strict` or `deny`
 | Value | Effect |
 | --- | --- |
 | `allow` | Every script step reaches the network. |
-| `strict` | A script step reaches the network only if its module declares `network "scripts"`. |
+| `strict` | A script step reaches the network only if its component declares `network "scripts"`. |
 | `deny` | Every script step runs under `--network=none`. |
 
 > [!NOTE]
-> If the rule is `strict` or `deny`, then `tect check` names each module that ships a Containerfile fragment. The rule does not reach the `RUN` lines of a fragment.
+> If the rule is `strict` or `deny`, then `tect check` names each component that ships a Containerfile fragment. The rule does not reach the `RUN` lines of a fragment.

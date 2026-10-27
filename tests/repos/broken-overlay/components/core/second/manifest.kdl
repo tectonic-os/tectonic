@@ -1,0 +1,7 @@
+schema-version 1
+
+description "Ships the same path without saying so"
+
+targets "fedora"
+
+mode "/etc/sudoers.d/99-hardening" "0440"

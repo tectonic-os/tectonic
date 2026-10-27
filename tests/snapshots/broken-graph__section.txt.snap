@@ -1,10 +1,10 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 ### Base Image
 FROM ${BASE} AS rootfs
 
-## Module layers
+## Component layers
 
 # ---- /opt build root ----
 RUN mv /opt /opt.bak && mkdir /opt
@@ -15,40 +15,40 @@ RUN if [ -L /usr/local ]; then mv /usr/local /usr/local.bak && \
     /usr/local/lib /usr/local/lib64 /usr/local/libexec /usr/local/share /usr/local/src; fi
 
 # ---- core/one ----
-RUN --mount=type=bind,from=ctx,source=/modules/core/one,target=/ctx/modules/core/one \
+RUN --mount=type=bind,from=ctx,source=/components/core/one,target=/ctx/components/core/one \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib,rw \
-    --mount=type=bind,from=ctx,source=/modules/core/one/lib/one/shared.sh,target=/ctx/lib/shared.sh \
-    --mount=type=bind,from=ctx,source=/modules/core/two/lib/two/shared.sh,target=/ctx/lib/shared.sh \
-    --mount=type=bind,from=ctx,source=/generated/broken-graph/modules/core/one.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/components/core/one/lib/one/shared.sh,target=/ctx/lib/shared.sh \
+    --mount=type=bind,from=ctx,source=/components/core/two/lib/two/shared.sh,target=/ctx/lib/shared.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-graph/components/core/one.sh,target=/ctx/component.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/module.sh
+    bash /ctx/component.sh
 
 # ---- core/two ----
-RUN --mount=type=bind,from=ctx,source=/modules/core/two,target=/ctx/modules/core/two \
+RUN --mount=type=bind,from=ctx,source=/components/core/two,target=/ctx/components/core/two \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib,rw \
-    --mount=type=bind,from=ctx,source=/modules/core/one/lib/one/shared.sh,target=/ctx/lib/shared.sh \
-    --mount=type=bind,from=ctx,source=/modules/core/two/lib/two/shared.sh,target=/ctx/lib/shared.sh \
-    --mount=type=bind,from=ctx,source=/generated/broken-graph/modules/core/two.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/components/core/one/lib/one/shared.sh,target=/ctx/lib/shared.sh \
+    --mount=type=bind,from=ctx,source=/components/core/two/lib/two/shared.sh,target=/ctx/lib/shared.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-graph/components/core/two.sh,target=/ctx/component.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/module.sh
+    bash /ctx/component.sh
 
 # ---- core/three ----
-RUN --mount=type=bind,from=ctx,source=/modules/core/three,target=/ctx/modules/core/three \
+RUN --mount=type=bind,from=ctx,source=/components/core/three,target=/ctx/components/core/three \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib,rw \
-    --mount=type=bind,from=ctx,source=/modules/core/one/lib/one/shared.sh,target=/ctx/lib/shared.sh \
-    --mount=type=bind,from=ctx,source=/modules/core/two/lib/two/shared.sh,target=/ctx/lib/shared.sh \
-    --mount=type=bind,from=ctx,source=/generated/broken-graph/modules/core/three.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/components/core/one/lib/one/shared.sh,target=/ctx/lib/shared.sh \
+    --mount=type=bind,from=ctx,source=/components/core/two/lib/two/shared.sh,target=/ctx/lib/shared.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-graph/components/core/three.sh,target=/ctx/component.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/module.sh
+    bash /ctx/component.sh
 
 # ---- flavour gate ----
 ARG FLAVOUR
@@ -71,10 +71,6 @@ ARG SCAP_REFUSED=
 ARG IMAGE_ID="broken-graph"
 ARG IMAGE_NAME="Broken Graph"
 ARG IMAGE_REGISTRY=""
-
-# ---- os-release ----
-RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
-    IMAGE_VERSION="${IMAGE_VERSION}" IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" /ctx/tect os-release
 
 # ---- finalize ----
 RUN --mount=type=bind,from=ctx,source=/generated/broken-graph/finalize.sh,target=/ctx/finalize.sh \

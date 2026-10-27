@@ -2,9 +2,9 @@
 source: tests/golden/harness.rs
 assertion_line: 50
 ---
-4 modules, the ungated set.
+4 components, the ungated set.
 
-| Module | Description | Options | Satisfies | Refuses |
+| Component | Description | Options | Satisfies | Refuses |
 | --- | --- | --- | --- | --- |
 | `core/menu` | Collects a file, but declares no destination for it |  |  |  |
 | `core/absent` | Contributes a file it does not ship, twice, out of range |  |  |  |

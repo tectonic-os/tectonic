@@ -1,7 +1,7 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
-## Module layers
+## Component layers
 
 # ---- /opt build root ----
 RUN mv /opt /opt.bak && mkdir /opt
@@ -31,10 +31,6 @@ ARG SCAP_REFUSED=
 # ---- image identity ----
 ARG IMAGE_ID="Not An Id"
 ARG IMAGE_REGISTRY=""
-
-# ---- os-release ----
-RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
-    IMAGE_VERSION="${IMAGE_VERSION}" IMAGE_ID="${IMAGE_ID}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" /ctx/tect os-release
 
 # ---- finalize ----
 RUN --mount=type=bind,from=ctx,source=/generated/Not An Id/finalize.sh,target=/ctx/finalize.sh \

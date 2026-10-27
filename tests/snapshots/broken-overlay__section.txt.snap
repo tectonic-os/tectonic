@@ -1,10 +1,10 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 ### Base Image
 FROM ${BASE} AS rootfs
 
-## Module layers
+## Component layers
 
 # ---- /opt build root ----
 RUN mv /opt /opt.bak && mkdir /opt
@@ -15,34 +15,34 @@ RUN if [ -L /usr/local ]; then mv /usr/local /usr/local.bak && \
     /usr/local/lib /usr/local/lib64 /usr/local/libexec /usr/local/share /usr/local/src; fi
 
 # ---- core/first ----
-RUN --mount=type=bind,from=ctx,source=/modules/core/first,target=/ctx/modules/core/first \
+RUN --mount=type=bind,from=ctx,source=/components/core/first,target=/ctx/components/core/first \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
-    --mount=type=bind,from=ctx,source=/generated/broken-overlay/modules/core/first.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-overlay/components/core/first.sh,target=/ctx/component.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/module.sh
+    bash /ctx/component.sh
 
 # ---- core/second ----
-RUN --mount=type=bind,from=ctx,source=/modules/core/second,target=/ctx/modules/core/second \
+RUN --mount=type=bind,from=ctx,source=/components/core/second,target=/ctx/components/core/second \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
-    --mount=type=bind,from=ctx,source=/generated/broken-overlay/modules/core/second.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-overlay/components/core/second.sh,target=/ctx/component.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/module.sh
+    bash /ctx/component.sh
 
 # ---- core/third ----
-RUN --mount=type=bind,from=ctx,source=/modules/core/third,target=/ctx/modules/core/third \
+RUN --mount=type=bind,from=ctx,source=/components/core/third,target=/ctx/components/core/third \
     --mount=type=bind,from=ctx,source=/generated/lib,target=/ctx/lib \
-    --mount=type=bind,from=ctx,source=/generated/broken-overlay/modules/core/third.sh,target=/ctx/module.sh \
+    --mount=type=bind,from=ctx,source=/generated/broken-overlay/components/core/third.sh,target=/ctx/component.sh \
     --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    bash /ctx/module.sh
+    bash /ctx/component.sh
 
 # ---- flavour gate ----
 ARG FLAVOUR
@@ -65,10 +65,6 @@ ARG SCAP_REFUSED=
 ARG IMAGE_ID="broken-overlay"
 ARG IMAGE_NAME="Broken Overlay"
 ARG IMAGE_REGISTRY=""
-
-# ---- os-release ----
-RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
-    IMAGE_VERSION="${IMAGE_VERSION}" IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" /ctx/tect os-release
 
 # ---- finalize ----
 RUN --mount=type=bind,from=ctx,source=/generated/broken-overlay/finalize.sh,target=/ctx/finalize.sh \

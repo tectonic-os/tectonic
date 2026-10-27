@@ -1,5 +1,0 @@
-schema-version 1
-
-description "Installs a package from its own script"
-
-supports "fedora"

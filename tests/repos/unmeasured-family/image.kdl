@@ -5,8 +5,8 @@ image {
 
     // A family nothing here has measured. The image answers for itself, so it
     // installs; an image on this base declaring no layout builds no media.
-    base "ghcr.io/someone/arch-bootc:latest" {
-        family "arch"
+    base-image {
+        arch-bootc-latest
     }
 
     layout {
@@ -17,5 +17,4 @@ image {
         bootloader "systemd"
     }
 
-    modules {}
 }

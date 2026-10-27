@@ -2,7 +2,7 @@
 source: tests/golden/harness.rs
 ---
   x `collects` needs into=, where the build puts them
-   ,-[tests/repos/broken-collect/modules/core/menu/module.kdl:7:1]
+   ,-[tests/repos/broken-collect/components/core/menu/manifest.kdl:7:1]
  6 | 
  7 | collects "justfile.inc" priority=500
    : ^^^^|^^^
@@ -12,7 +12,7 @@ source: tests/golden/harness.rs
         priority=500`
 
   x `priority` is a number from 0 to 9999
-   ,-[tests/repos/broken-collect/modules/core/absent/module.kdl:7:28]
+   ,-[tests/repos/broken-collect/components/core/absent/manifest.kdl:7:28]
  6 | 
  7 | contributes "justfile.inc" priority=90000
    :                            ^^^^^^^|^^^^^^
@@ -23,7 +23,7 @@ source: tests/golden/harness.rs
         whole range there is
 
   x `core/absent` orders a justfile.inc it does not ship
-   ,-[tests/repos/broken-collect/modules/core/absent/module.kdl:8:1]
+   ,-[tests/repos/broken-collect/components/core/absent/manifest.kdl:8:1]
  7 | contributes "justfile.inc" priority=90000
  8 | contributes "justfile.inc" priority=100
    : ^^^^^|^^^^^

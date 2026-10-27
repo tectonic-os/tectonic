@@ -1,7 +1,0 @@
-schema-version 1
-
-description "A module this repository writes and publishes"
-
-supports "fedora"
-
-packages "fastfetch"

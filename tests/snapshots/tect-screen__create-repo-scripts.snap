@@ -5,7 +5,7 @@ Buffer {
     area: Rect { x: 0, y: 0, width: 80, height: 32 },
     content: [
         "Which files to keep in scripts/?                                                ",
-        "> [x] Containerfile.skeleton  the Containerfile around the generated module laye",
+        "> [x] Containerfile.skeleton  the Containerfile around the generated component l",
         "  [ ] lint.sh  the repository's lint, as CI runs it                             ",
         "  [ ] tect.sh  fetches and runs the tect release that repo.kdl pins             ",
         "  [ ] smoke.sh  boots a built image under qemu and waits for ssh                ",

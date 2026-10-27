@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
 ==== as generated
 ==== edited by hand
@@ -33,6 +33,6 @@ source: tests/golden.rs
 ==== and generated again
 smoke-test.yml is gone
 ==== never generated
-  x 16 generated files are not there
-  help: run `tect generate` and commit what it writes; it writes all 16 of
+  x 17 generated files are not there
+  help: run `tect generate` and commit what it writes; it writes all 17 of
         them

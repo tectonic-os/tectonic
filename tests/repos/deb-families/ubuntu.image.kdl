@@ -3,17 +3,19 @@ schema-version 1
 image {
     name "Ubuntu"
 
-    base "docker.io/library/ubuntu:26.04" {
-        family "ubuntu"
+    base-image {
+        ubuntu-26-04
     }
 
     layout {
         bootloader "grub2"
     }
 
-    modules {
-        module "debian-family"
-        module "core/menu"
-        module "core/shared"
+    debian-family
+    core {
+        menu
+    }
+    core {
+        shared
     }
 }

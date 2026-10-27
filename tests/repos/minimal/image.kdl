@@ -3,17 +3,16 @@ schema-version 1
 image {
     name "Minimal"
 
-    base "quay.io/fedora/fedora-bootc:44" {
-        family "fedora"
-        provides "rechunking"
+    base-image {
+        fedora-bootc-44
     }
 
     layout {
         bootloader "grub2"
     }
 
-    modules {
-        module "fedora-family"
-        module "core/hello"
+    fedora-family
+    core {
+        hello
     }
 }

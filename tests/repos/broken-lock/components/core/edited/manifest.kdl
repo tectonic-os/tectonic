@@ -1,0 +1,7 @@
+schema-version 1
+
+description "A component the lock records as imported"
+
+targets "fedora"
+
+packages "fastfetch"

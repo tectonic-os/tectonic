@@ -1,5 +1,5 @@
 ---
-source: tests/golden.rs
+source: tests/golden/harness.rs
 ---
   x this repository is written against schema version 0
    ,-[tests/repos/past-schema/repo.kdl:1:1]

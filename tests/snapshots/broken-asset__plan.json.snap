@@ -19,9 +19,9 @@ source: tests/golden/harness.rs
   },
   "assets": [
     {
-      "module": "core/pins",
+      "component": "core/pins",
       "name": "tracked-and-manual",
-      "manifest": "modules/core/pins/module.kdl",
+      "manifest": "components/core/pins/manifest.kdl",
       "pin": {
         "locator": "https://example.com/download/v{version}/tool.tar.gz",
         "selector": "1.0.0",
@@ -34,9 +34,9 @@ source: tests/golden/harness.rs
       }
     },
     {
-      "module": "core/pins",
+      "component": "core/pins",
       "name": "no-tracking",
-      "manifest": "modules/core/pins/module.kdl",
+      "manifest": "components/core/pins/manifest.kdl",
       "pin": {
         "locator": "https://example.com/download/v{tag}/tool.tar.gz; rm -rf /",
         "selector": "1.0.0",
@@ -65,6 +65,8 @@ source: tests/golden/harness.rs
       "allows": [],
       "layout": null,
       "base": {
+        "path": "base-image/fedora-bootc-44",
+        "defined": null,
         "image": "quay.io/fedora/fedora-bootc:44",
         "family": "fedora",
         "scap_content": "",
@@ -72,32 +74,7 @@ source: tests/golden/harness.rs
         "provides": [
           "rechunking"
         ],
-        "witnesses": {
-          "bootc": [
-            "/usr/bin/bootc"
-          ],
-          "bootupctl": [
-            "/usr/bin/bootupctl"
-          ],
-          "crun": [
-            "/usr/bin/crun"
-          ],
-          "flatpak": [
-            "/usr/bin/flatpak"
-          ],
-          "initramfs-generation": [
-            "/usr/bin/dracut"
-          ],
-          "podman": [
-            "/usr/bin/podman"
-          ],
-          "selinux-policy": [
-            "/usr/sbin/semodule"
-          ],
-          "ssh": [
-            "/usr/sbin/sshd"
-          ]
-        },
+        "witnesses": {},
         "requires": [],
         "satisfies": []
       },
@@ -114,7 +91,7 @@ source: tests/golden/harness.rs
           "default": true,
           "pr": true,
           "siblings": [],
-          "modules": [
+          "components": [
             {
               "path": "core/pins",
               "flavour": null,
@@ -123,14 +100,20 @@ source: tests/golden/harness.rs
               "options": {},
               "provides": [],
               "requires": [],
+              "met_by": {},
+              "removes": [],
               "files": {},
               "packages": [],
               "groups": [],
               "coprs": [],
               "provenance": {
-                "content": "0a6e33a44495c03490914aa3c2dc1f481f5f15245895211b735299a7cafb8dac",
+                "defined": null,
+                "content": "4916772e79c7fc93661bfaadf649b484d0e138d7b38d2dd2166725e39dcb6367",
                 "repo": false,
                 "imported": null
+              },
+              "origin": {
+                "how": "listed"
               },
               "satisfies": [],
               "refuses": []
@@ -142,9 +125,9 @@ source: tests/golden/harness.rs
           "verify_exceptions": [],
           "assets": [
             {
-              "module": "core/pins",
+              "component": "core/pins",
               "name": "tracked-and-manual",
-              "manifest": "modules/core/pins/module.kdl",
+              "manifest": "components/core/pins/manifest.kdl",
               "pin": {
                 "locator": "https://example.com/download/v{version}/tool.tar.gz",
                 "selector": "1.0.0",
@@ -157,9 +140,9 @@ source: tests/golden/harness.rs
               }
             },
             {
-              "module": "core/pins",
+              "component": "core/pins",
               "name": "no-tracking",
-              "manifest": "modules/core/pins/module.kdl",
+              "manifest": "components/core/pins/manifest.kdl",
               "pin": {
                 "locator": "https://example.com/download/v{tag}/tool.tar.gz; rm -rf /",
                 "selector": "1.0.0",

@@ -18,7 +18,7 @@ source: tests/golden/harness.rs
       "licenseDeclared": "NOASSERTION",
       "copyrightText": "NOASSERTION",
       "supplier": "NOASSERTION",
-      "comment": "Pinned build input, declared by the core/pins module",
+      "comment": "Pinned build input, declared by the core/pins component",
       "versionInfo": "1.0.0"
     },
     {
@@ -30,7 +30,7 @@ source: tests/golden/harness.rs
       "licenseDeclared": "NOASSERTION",
       "copyrightText": "NOASSERTION",
       "supplier": "NOASSERTION",
-      "comment": "Pinned build input, declared by the core/pins module",
+      "comment": "Pinned build input, declared by the core/pins component",
       "versionInfo": "1.0.0"
     }
   ],

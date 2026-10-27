@@ -3,7 +3,7 @@ source: tests/golden.rs
 ---
 Tectonic v{version}
 
-module name: Other
+component name: Other
 
 Error: nothing left in TECT_ANSWERS to answer `description (optional) []` with.
 

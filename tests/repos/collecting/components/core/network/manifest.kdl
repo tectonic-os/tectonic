@@ -1,0 +1,8 @@
+schema-version 1
+
+description "Network recipes, contributed to the menu before the defaults"
+
+targets "fedora"
+
+helpers "lib/network.sh"
+contributes "justfile.inc" priority=100

@@ -2,9 +2,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-# `modules/` here is a fetched collection cache, which is linted where it is
+# `components/` here is a fetched collection cache, which is linted where it is
 # authored.
-mapfile -t scripts < <(find . \( -path ./target -o -path ./fuzz/target -o -path ./modules \) -prune -o \
+mapfile -t scripts < <(find . \( -path ./target -o -path ./fuzz/target -o -path ./components \) -prune -o \
     -name '*.sh' -type f -print)
 shfmt=(shfmt -i 4 -ci -bn -sr)
 
@@ -40,7 +40,7 @@ fi
 
 # Every member's sources, so a crate added to the workspace later is covered
 # without editing this. ratatui belongs to `common` and to nothing here.
-mapfile -t member_src < <(find . \( -path ./target -o -path ./fuzz/target -o -path ./modules \) -prune \
+mapfile -t member_src < <(find . \( -path ./target -o -path ./fuzz/target -o -path ./components \) -prune \
     -o -path '*/src/*' -name '*.rs' -type f -print)
 
 if grep -n 'ratatui' "${member_src[@]}"; then
@@ -70,8 +70,12 @@ fi
 # `install.sh` is what a stranger pipes into `sh`, so it is checked as the
 # shell it declares. Every other script here is bash.
 mapfile -t posix < <(grep -lx '#!/bin/sh' "${scripts[@]}")
-mapfile -t in_bash < <(grep -Lx '#!/bin/sh' "${scripts[@]}")
+mapfile -t in_bash < <(grep -Lx '#!/bin/sh' "${scripts[@]}" | grep -v '/repo\.sh$')
+mapfile -t repos < <(printf '%s\n' "${scripts[@]}" | grep '/repo\.sh$')
 shellcheck -s bash "${in_bash[@]}"
+# A fixture's `repo.sh` sets `REPO_ID` for the generated script.
+# The linter cannot see that reader, so SC2034 is off for these files.
+[ "${#repos[@]}" -eq 0 ] || shellcheck -s bash -e SC2034 "${repos[@]}"
 [ "${#posix[@]}" -eq 0 ] || shellcheck -s sh "${posix[@]}"
 "${shfmt[@]}" -d "${scripts[@]}" || unformatted
 cargo fmt --check || unformatted

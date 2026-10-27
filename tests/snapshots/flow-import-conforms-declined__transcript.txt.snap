@@ -19,9 +19,9 @@ Yes
 
 
 example/
-├── modules/
+├── components/
 │   ├── sshd/
-│   │   └── + module.kdl
-│   └── + modules.lock.kdl
-└── ~ example.image.kdl  sshd added to modules
+│   │   └── + manifest.kdl
+│   └── ~ components.lock.kdl  sshd recorded
+└── ~ example.image.kdl  sshd added to components
 ==== exit 0

@@ -1,7 +1,0 @@
-schema-version 1
-
-description "Requires a key whose declaration is refused"
-
-supports "fedora"
-
-requires "cosign-key"
