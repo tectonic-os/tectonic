@@ -36,10 +36,12 @@ jobs:
       - name: Probe each base and correct its signature
         id: probe
         # The plan names each capability that a provider in the image
-        # witnesses with a `file=`, with its paths.
-        # It leaves out a component that meets a base requirement.
-        # That component stands in for the base, so the base never claims it.
-        # A name without a `file=`, such as `rechunking`, is left as it was.
+        # witnesses, with its paths.
+        # It leaves out a component that meets a base requirement, because
+        # that component stands in for the base. It leaves out a component
+        # that the base imports, because that component is part of the base
+        # component. The base never claims what either one provides.
+        # A name without a `witness=`, such as `rechunking`, is left as it was.
         #
         # A name already declared is measured whether or not anything requires
         # it: an under-claim refuses a component and says so, an over-claim is

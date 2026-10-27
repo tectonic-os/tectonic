@@ -1603,6 +1603,50 @@ fn a_component_the_base_requires_leaves_no_base_witness() {
     }
 }
 
+/// `tool` is the control. Every base image ships `/usr/lib/os-release`, so a
+/// probe that measured `identity` would ask each base to claim `os-release`.
+/// `helper` proves that the walk follows an import of an import.
+#[test]
+fn a_component_the_base_imports_leaves_no_base_witness() {
+    let plan = planned(
+        "base-imports-witness",
+        "; imports \"identity\"",
+        "        tool",
+        &[
+            (
+                "identity",
+                "provides \"os-release\" witness=\"/usr/lib/os-release\"\nimports \"helper\"",
+            ),
+            ("helper", "provides \"helper\" witness=\"/usr/bin/helper\""),
+            ("tool", "provides \"tool\" witness=\"/usr/bin/tool\""),
+        ],
+    );
+    assert!(
+        squashed(&plan).contains(r#""witnesses":{"tool":["/usr/bin/tool"]}"#),
+        "{plan}"
+    );
+}
+
+/// The base covers `identity`, so `identity` is suppressed. `helper` is still
+/// part of the base component through it.
+#[test]
+fn an_import_of_a_suppressed_base_import_leaves_no_base_witness() {
+    let plan = planned(
+        "base-imports-suppressed-witness",
+        "; provides \"os-release\"; imports \"identity\"",
+        "        tool",
+        &[
+            ("identity", "provides \"os-release\"\nimports \"helper\""),
+            ("helper", "provides \"helper\" witness=\"/usr/bin/helper\""),
+            ("tool", "provides \"tool\" witness=\"/usr/bin/tool\""),
+        ],
+    );
+    assert!(
+        squashed(&plan).contains(r#""witnesses":{"tool":["/usr/bin/tool"]}"#),
+        "{plan}"
+    );
+}
+
 /// Removing the only `pm/dnf5` provider withdraws the broader `pm` with it,
 /// because nothing else in the image answers `pm`.
 #[test]
