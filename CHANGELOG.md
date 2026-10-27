@@ -2,6 +2,16 @@
 
 Each release's section is written from the typed subjects on `main`.
 
+## 0.7.0 (2026-10-27)
+
+### Features
+
+- compose components and bases in one graph (#55)
+
+### Dependencies
+
+- deps: update dependency gitpython to v3.2.1 [security] (#49)
+
 ## 0.6.56 (2026-10-22)
 
 ### Fixes
