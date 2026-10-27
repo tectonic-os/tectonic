@@ -392,7 +392,7 @@ pub const COMPONENT: Node = Node::new("component",
                 "`tect validate-image` checks the finished image for the witness of each name \
                  that the base or a component provides with a `witness`. `base-sig-probe` reads \
                  those witnesses when it measures a base, except the ones of a component that \
-                 meets a base requirement.",
+                 meets a base requirement or that the base imports.",
                 "The witness of `luks-initramfs` is inside an archive. If a target declares it, \
                  then the build validates the initramfs with `lsinitrd`. If no target declares \
                  it, then the installer does not offer root encryption.",

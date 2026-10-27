@@ -120,7 +120,7 @@ Accepts: *list of strings*, or {&nbsp;[one name per line](#provides-fields)&nbsp
 >
 > A `provides` without `witness`, such as `rechunking`, has no witness. `tect` holds no default path for a name.
 >
-> `tect validate-image` checks the finished image for the witness of each name that the base or a component provides with a `witness`. `base-sig-probe` reads those witnesses when it measures a base, except the ones of a component that meets a base requirement.
+> `tect validate-image` checks the finished image for the witness of each name that the base or a component provides with a `witness`. `base-sig-probe` reads those witnesses when it measures a base, except the ones of a component that meets a base requirement or that the base imports.
 >
 > The witness of `luks-initramfs` is inside an archive. If a target declares it, then the build validates the initramfs with `lsinitrd`. If no target declares it, then the installer does not offer root encryption.
 >

@@ -581,18 +581,21 @@ pub(crate) fn provides(image: &Image, entries: &[&Entry], name: &str) -> bool {
 /// The base probe measures each name that a provider in the image witnesses.
 /// A name with no `witness=` has nothing to probe.
 /// A component that meets a base requirement stands in for the base on purpose.
-/// The probe must never ask the base to claim what that component provides.
+/// A component that the base imports is part of the base component.
+/// The probe must never ask the base to claim what either component provides.
 fn witnesses(image: &Image) -> Json {
+    let brought = brought(image);
     let stands_in = |component: &&crate::model::component::Component| {
-        image.base.iter().any(|base| {
-            base.requires.iter().any(|decl| {
-                crate::resolve::answers(
-                    &component.path,
-                    component.provides.iter().map(|has| has.name.as_str()),
-                    &decl.name,
-                )
+        brought.contains(component.path.as_str())
+            || image.base.iter().any(|base| {
+                base.requires.iter().any(|decl| {
+                    crate::resolve::answers(
+                        &component.path,
+                        component.provides.iter().map(|has| has.name.as_str()),
+                        &decl.name,
+                    )
+                })
             })
-        })
     };
     let components = image
         .entries
@@ -617,6 +620,35 @@ fn witnesses(image: &Image) -> Json {
             .into_iter()
             .map(|(name, paths)| (name.to_string(), Json::strings(paths))),
     )
+}
+
+/// Lists the path of each component that the base imports, directly or through
+/// another import. An entry's `imported_by` names only its first importer, so
+/// the walk follows the manifests' `imports` instead. An import that the base
+/// covers is suppressed, and its own imports still belong to the base.
+fn brought(image: &Image) -> std::collections::BTreeSet<&str> {
+    let mut held = std::collections::BTreeSet::new();
+    let mut todo: Vec<&str> = image
+        .base
+        .iter()
+        .flat_map(|base| &base.imports)
+        .map(|import| import.path.as_str())
+        .collect();
+    while let Some(path) = todo.pop() {
+        if !held.insert(path) {
+            continue;
+        }
+        let component = image
+            .entries
+            .iter()
+            .chain(&image.suppressed)
+            .find(|entry| entry.path == path)
+            .and_then(|entry| entry.component.as_ref());
+        if let Some(component) = component {
+            todo.extend(component.imports.iter().map(|import| import.path.as_str()));
+        }
+    }
+    held
 }
 
 fn overlay_files(image: &Image, shipped: &overlay::Index, flavour: &str) -> Json {
