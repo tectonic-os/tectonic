@@ -86,9 +86,6 @@ const COMPONENT_DIR: &str = "@COMPONENT@";
 /// on it. A `tail` fragment binds it from a stage of its own.
 const LINEAGE: &str = "rootfs";
 
-/// The capability whose provider makes the build render os-release.
-pub const OS_RELEASE: &str = "os-release";
-
 /// The binary, so anything running in the image can call the tool.
 const TECT_MOUNT: &str = "--mount=type=bind,from=tect,source=/tect,target=/ctx/tect \\\n    ";
 
@@ -166,7 +163,6 @@ pub fn sections(image: &Image, root: &Path) -> (String, String) {
         .iter()
         .map(|(name, _)| format!("{name}=\"${{{name}}}\" "))
         .collect();
-    let mut identity_declared = false;
 
     let _ = write!(out, "## Component layers\n\n");
     let _ = write!(
@@ -240,22 +236,6 @@ pub fn sections(image: &Image, root: &Path) -> (String, String) {
         }
         let _ = writeln!(out, "# ---- {} ----", entry.path);
         let _ = write!(out, "{}\n\n", blocks.join("\n\n"));
-
-        // The stable os-release fields render where the identity component
-        // sits. Their ARGs change only with the image file, so a later layer
-        // keeps its cache. The finalize step writes the version.
-        if renders_os_release(image, component) {
-            if !identity_declared {
-                out.push_str(&identity_args);
-                identity_declared = true;
-            }
-            let render = format!("{identity_env}/ctx/tect os-release");
-            let _ = write!(
-                out,
-                "# ---- os-release ----\nRUN {TECT_MOUNT}{}\n\n",
-                flavoured(entry.flavour.as_deref(), &render)
-            );
-        }
     }
 
     if !flavour_arg_emitted {
@@ -267,9 +247,7 @@ pub fn sections(image: &Image, root: &Path) -> (String, String) {
     let _ = write!(out, "{CONFORMS_ARG}\n\n");
     let _ = write!(out, "{SCAP_ARGS}\n\n");
 
-    if !identity_declared {
-        out.push_str(&identity_args);
-    }
+    out.push_str(&identity_args);
 
     let _ = write!(out, "{}\n\n", finalize_layer(image, &identity_env, root));
 
@@ -281,23 +259,6 @@ pub fn sections(image: &Image, root: &Path) -> (String, String) {
     }
 
     (out, tail_out)
-}
-
-/// Answers whether the build renders os-release after this component's layer.
-/// The component provides `os-release`, and no component on its targets removes it.
-pub fn renders_os_release(image: &Image, component: &Component) -> bool {
-    component.answers(OS_RELEASE)
-        && image
-            .remover(OS_RELEASE, component.flavour.as_deref())
-            .is_none()
-}
-
-/// Wraps a shell line so that it runs only in the flavour it is gated to.
-pub fn flavoured(flavour: Option<&str>, line: &str) -> String {
-    match flavour {
-        None => line.to_string(),
-        Some(flavour) => format!("if [ \"${{FLAVOUR:-}}\" = \"{flavour}\" ]; then {line}; fi"),
-    }
 }
 
 pub fn section(image: &Image, root: &Path) -> String {

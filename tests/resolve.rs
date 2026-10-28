@@ -1400,41 +1400,23 @@ fn a_family_outside_a_base_block_is_unknown() {
     assert!(issues.contains("unknown node `family`"), "{issues}");
 }
 
-/// The identity component's layer renders the stable fields. The finalize
-/// step renders the version.
+/// The identity component writes os-release from a finalize hook.
+/// That hook reads the image's own values from the finalize layer's environment.
 #[test]
-fn the_identity_component_renders_os_release_after_its_layer() {
-    let root = written(
-        "os-release-component",
-        "        identity\n        later",
-        &[("identity", "provides \"os-release\""), ("later", "")],
-    );
+fn the_finalize_layer_carries_the_image_identity() {
+    let root = written("identity-env", "        later", &[("later", "")]);
     let out = generated(&root);
     let _ = std::fs::remove_dir_all(&root);
     let at = |line: &str| out.find(line).unwrap_or_else(|| panic!("{line}: {out}"));
-    let render = at("/ctx/tect os-release");
-    assert!(at("# ---- identity ----") < render, "{out}");
-    assert!(render < at("# ---- later ----"), "{out}");
-    let run = &out[render - 300..render];
-    assert!(!run.contains("IMAGE_VERSION"), "{run}");
-    assert!(
-        out.contains("# ---- os-release ----\n/ctx/tect os-release"),
-        "{out}"
-    );
-    assert_eq!(
-        out.matches("# ---- image identity ----").count(),
-        1,
-        "{out}"
-    );
-    assert!(at("# ---- image identity ----") < render, "{out}");
-}
-
-#[test]
-fn an_image_with_no_os_release_provider_renders_none() {
-    let root = written("os-release-none", "        later", &[("later", "")]);
-    let out = generated(&root);
-    let _ = std::fs::remove_dir_all(&root);
-    assert!(!out.contains("tect os-release"), "{out}");
+    let finalize = at("# ---- finalize ----");
+    assert!(at("ARG IMAGE_NAME=") < finalize, "{out}");
+    for name in ["IMAGE_ID", "IMAGE_NAME", "IMAGE_VERSION"] {
+        assert!(
+            out[finalize..].contains(&format!("{name}=\"${{{name}}}\"")),
+            "{name}: {out}"
+        );
+    }
+    assert!(!out.contains("os-release"), "{out}");
 }
 
 #[test]

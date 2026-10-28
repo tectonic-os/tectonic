@@ -751,10 +751,6 @@ pub fn dispatch(
         }
         // Build-layer commands read the surrounding image and need no
         // repository.
-        Verb::OsRelease => {
-            crate::runtime::os_release()?;
-            Ok(ExitCode::SUCCESS)
-        }
         Verb::BuildRecord => {
             crate::provenance::build::write()?;
             Ok(ExitCode::SUCCESS)

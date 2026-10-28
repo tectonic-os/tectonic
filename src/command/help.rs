@@ -623,9 +623,6 @@ pub(super) const WHY_NOTES: &str = r#"> [!NOTE]
 > `tect` does not read a `repo.sh` file, so it points at the file and prints the
 > URLs it found."#;
 
-pub(super) const OS_RELEASE: &str = r#"Writes the image identity, which the build arguments carry, into
-`/usr/lib/os-release`. The generated Containerfile runs it."#;
-
 pub(super) const BUILD_RECORD: &str = r#"Writes `/usr/share/tectonic/build.json`, the record of what the build resolved.
 The baked `manifest.json` beside it holds what the repository declared. The
 record holds the digest of the base, the commit of each cloned asset, the source

@@ -219,10 +219,11 @@ provides {
     "initramfs-generation" witness="/usr/bin/dracut"
     "selinux-policy" witness="/usr/sbin/semodule"
     "ssh" witness="/usr/sbin/sshd"
+    "package-manager/dnf5" witness="/usr/bin/dnf5"
     // and the rest of what the base image ships
 }
 
-imports "fedora/build-environment" "package-manager/dnf5" "identity"
+imports "fedora/build-environment" "identity"
 
 base "quay.io/fedora/fedora-bootc:$version" {
     family "fedora"
@@ -237,14 +238,13 @@ states the base's family, its bootloaders and its benchmark content. The
 components might require. It lists one capability on each line. A short list
 can go on one line instead, as `provides "rechunking" "luks-initramfs"`. A
 `witness` names the path that proves the capability is there, and the build
-checks the finished image for it. The `imports` node names
-the components every image on this base needs. `tect create image` copied
-`fedora/build-environment`, `package-manager/dnf5` and `identity` into
-`components/`. The image lists none of them, because the base's import builds
-each one into every image on it. `identity` provides `os-release`. The build writes
-the image's own name into `/usr/lib/os-release` right after the `identity`
-layer. `scap-content` names the benchmark content that a compliance scan of the
-image reads.
+checks the finished image for it. The `imports` node names the components
+every image on this base needs. `tect create image` copied
+`fedora/build-environment` and `identity` into `components/`. The image lists
+none of them, because the base's import builds each one into every image on
+it. `identity` provides `os-release`. Its finalize hook writes the image's own
+name into `/usr/lib/os-release`. `scap-content` names the benchmark content
+that a compliance scan of the image reads.
 
 `signed` records whether the base image publishes a signature. The base
 signature probe workflow corrects it.
