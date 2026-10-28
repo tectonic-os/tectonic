@@ -30,6 +30,7 @@ sources {
 | [`name`](#name) (optional) | *string* | An optional human-readable label for the repository. |
 | [`default-image`](#default-image) (optional) | *string* | The image that a command with no image, or a build with no target, uses. |
 | [`pr-image`](#pr-image) (optional) | *string* | The image a pull request builds. |
+| [`backend`](#backend) (optional) | `buildah` or `buildx` | The container build tool that `tect build` runs and that the generated `build.yml` sets up. |
 | [`seed`](#seed) (optional) | *string* | The image that this repository publishes as a starting point for a new repository. |
 | [`workflows`](#workflows) (optional) | {&nbsp;[fields](#workflows-fields)&nbsp;} | The CI workflows that `tect generate` writes into `.github/workflows/`. |
 | [`renovate`](#renovate) (optional) | optionally {&nbsp;[fields](#renovate-fields)&nbsp;} | The Renovate policy that `tect generate` writes into `.github/renovate.json5`. |
@@ -122,6 +123,28 @@ pr-image "workstation"
 ```
 
 Accepts: *string*
+
+<a id="backend"></a>
+
+## `backend` (optional)
+
+Names the tool that builds every image in the repository. If absent, then `tect build` runs `buildah`.
+
+```kdl
+backend "buildx"
+```
+
+Accepts: `buildah` or `buildx`
+
+| Value | Effect |
+| --- | --- |
+| `buildah` | `tect build` runs `podman build`. An image whose `boot-chain` builds a UKI needs it. |
+| `buildx` | `tect build` runs `docker buildx build`. The generated `build.yml` loads its OCI archive into the podman store that the later steps read, and it can use a registry layer cache. |
+
+> [!NOTE]
+> `--backend` or `$BUILD_BACKEND` overrides it for one build. The flag wins over the variable, and the variable wins over this node.
+>
+> `tect check` refuses `buildx` for an image whose `boot-chain` builds a UKI. A sealed UKI carries the composefs digest, and `tect build` reads that digest from the local buildah store.
 
 <a id="seed"></a>
 

@@ -449,6 +449,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # tect:only backend-buildx
+      - name: Set up buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # tect:end
       - name: Build image
         env:
           TARGET: ${{ matrix.target }}
@@ -469,6 +474,7 @@ jobs:
           if [ -n "$KERNEL" ]; then
             args+=(--kernel "$KERNEL")
           fi
+          # tect:only backend-buildah
           # Root, because every step after this is `sudo podman` against the
           # root store: a rootless build would need an export to reach it.
           sudo git config --system --add safe.directory "$PWD"
@@ -478,6 +484,24 @@ jobs:
             IMAGE_VERSION="$IMAGE_VERSION" \
             LABELS="$LABELS" \
             "$(realpath "$(./scripts/tect.sh --path)")" build "${args[@]}"
+          # tect:end
+          # tect:only backend-buildx
+          # buildx builds in its own BuildKit container, outside the root
+          # podman store that every later step reads. The OCI archive carries
+          # the image across, under the one staging tag.
+          archive="${RUNNER_TEMP}/image.oci.tar"
+          args+=(--oci-output "$archive")
+          if [ "$PUBLISH" = true ]; then
+            args+=(--cache-to)
+          fi
+          ./scripts/tect.sh build "${args[@]}"
+          # BuildKit's cache, the archive and the podman copy would otherwise
+          # share the runner's disk at once.
+          docker buildx prune --all --force > /dev/null
+          sudo skopeo copy "oci-archive:${archive}" \
+            "containers-storage:localhost/${IMAGE_NAME}:raw"
+          rm -f "$archive"
+          # tect:end
 
       - name: Summarize the resolved build
         env:

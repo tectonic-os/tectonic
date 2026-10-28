@@ -910,7 +910,7 @@ that are current.
 | `--target <target>` | the target, where the positional argument is not used |
 | `--tag <tag>` | tag the result; repeatable, and $TAGS adds to it |
 | `--kernel <name>` | the KERNEL build arg |
-| `--backend <name>` | buildx or buildah, else $BUILD_BACKEND, else buildah |
+| `--backend <name>` | buildx or buildah, else $BUILD_BACKEND, else the `backend` in repo.kdl |
 | `--oci-output <path>` | write an OCI archive instead of loading the image |
 | `--secret <id=path>` | mount <path> as the build secret <id>; repeatable |
 | `--cache-to` | export the layer cache to the registry cache repository |

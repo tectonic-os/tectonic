@@ -67,6 +67,25 @@ mod tests {
     }
 
     #[test]
+    fn the_build_job_runs_the_declared_backend() {
+        let buildah = render(BODY, None, &["no-kernel", "backend-buildah"]);
+        assert!(buildah.contains("sudo env \\"), "{buildah}");
+        assert!(!buildah.contains("setup-buildx-action"), "{buildah}");
+        assert!(!buildah.contains("--oci-output"), "{buildah}");
+        let buildx = render(BODY, None, &["no-kernel", "backend-buildx"]);
+        assert!(buildx.contains("setup-buildx-action"), "{buildx}");
+        assert!(
+            buildx.contains("args+=(--oci-output \"$archive\")"),
+            "{buildx}"
+        );
+        assert!(
+            buildx.contains("containers-storage:localhost/${IMAGE_NAME}:raw"),
+            "{buildx}"
+        );
+        assert!(!buildx.contains("sudo env \\"), "{buildx}");
+    }
+
+    #[test]
     fn the_declared_schedule_replaces_the_shipped_one() {
         let out = render(BODY, Some("0 5 * * 1"), &["no-kernel"]);
         assert!(out.contains("    - cron: '0 5 * * 1'\n"), "{out}");

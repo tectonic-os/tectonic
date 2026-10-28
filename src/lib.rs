@@ -239,7 +239,12 @@ pub(crate) fn load(root: &Path) -> Loaded {
     // After the components, since what a workflow needs is a fact about them.
     let basis = resolve::workflow::Basis::of(&list);
     let workflows = resolve::workflow::resolve(&list, &basis, &mut issues);
-    let facts = resolve::workflow::facts(&basis, list.scans_scheduled, list.publishes_scheduled);
+    let facts = resolve::workflow::facts(
+        &basis,
+        list.scans_scheduled,
+        list.publishes_scheduled,
+        list.backend,
+    );
 
     Loaded {
         list,

@@ -2,7 +2,9 @@
 
 use crate::diag::{Issue, Issues, Source, Span};
 use crate::layout;
-use crate::model::image::{List, NetRule, Network, Seed, Workflow, SCHEMA_VERSION, TECT_VERSION};
+use crate::model::image::{
+    Backend, List, NetRule, Network, Seed, Workflow, SCHEMA_VERSION, TECT_VERSION,
+};
 use crate::model::options::Value;
 use crate::model::remote::Kind as SourceKind;
 use crate::parse::image::IMAGE;
@@ -130,6 +132,24 @@ pub const REPO: Node = Node::new("repo",
             .arg(Arg::Str, Say::new("`{}` needs an image name", "no image given",
                 "`pr-image \"workstation\"`, since a pull request builds one target"))
             .once(""),
+        Node::new("backend", "The container build tool that `tect build` runs and that the generated `build.yml` sets up.").about("Names the tool that builds every image in the repository. If absent, then `tect build` runs `buildah`.").example("\"buildx\"")
+            .arg(Arg::One(&["buildah", "buildx"]), Say::new("`{}` is not a build backend",
+                "not a backend", "`backend` takes `buildah` or `buildx`"))
+            .once("a repository builds with one backend")
+            .values(&[
+                ("`buildah`", "`tect build` runs `podman build`. An image whose `boot-chain` \
+                  builds a UKI needs it."),
+                ("`buildx`", "`tect build` runs `docker buildx build`. The generated \
+                  `build.yml` loads its OCI archive into the podman store that the later \
+                  steps read, and it can use a registry layer cache."),
+            ])
+            .notes(&[
+                "`--backend` or `$BUILD_BACKEND` overrides it for one build. The flag wins \
+                 over the variable, and the variable wins over this node.",
+                "`tect check` refuses `buildx` for an image whose `boot-chain` builds a UKI. \
+                 A sealed UKI carries the composefs digest, and `tect build` reads that digest \
+                 from the local buildah store.",
+            ]),
         Node::new("seed",
             "The image that this repository publishes as a starting point for a new repository.").about("A seed lets another user start a new repository from this one. `tect generate` writes the base, the component list and the collections of the named image into the seed, so a new repository starts from the same image.").example("\"workstation\" collection=\"owner\"")
             .arg(Arg::Str, Say::new("`{}` needs an image name", "no image given",
@@ -484,6 +504,7 @@ impl List {
             pr_image_id: None,
             seed: None,
             manifest_label: false,
+            backend: Backend::default(),
             renovate: None,
             audit_enforce: false,
             network: Network::default(),
@@ -643,6 +664,11 @@ impl List {
                 (true, "pr-image") => {
                     self.pr_image_id = string_arg(node).map(str::to_string);
                 }
+                (true, "backend") => {
+                    if let Some(backend) = string_arg(node).and_then(Backend::parse) {
+                        self.backend = backend;
+                    }
+                }
                 (true, "seed") => {
                     self.seed = string_arg(node).map(|image| Seed {
                         image: image.to_string(),
@@ -760,6 +786,36 @@ impl List {
                             .collect::<Vec<_>>()
                             .join(", ")
                     )),
+                );
+            }
+        }
+
+        if self.backend == Backend::Buildx && self.cache_image().is_none() {
+            issues.push(
+                Issue::new(
+                    "`backend \"buildx\"` needs a default image to name the layer cache",
+                    &self.repo_src,
+                )
+                .help(
+                    "the registry layer cache is one repository named after the default image: \
+                     declare `default-image`",
+                ),
+            );
+        }
+        if self.backend == Backend::Buildx {
+            for image in self.images.iter().filter(|image| !image.boot.is_empty()) {
+                issues.push(
+                    Issue::new(
+                        format!(
+                            "`backend \"buildx\"` cannot build `{}`, whose boot chain is `{}`",
+                            image.id, image.boot
+                        ),
+                        &self.repo_src,
+                    )
+                    .help(
+                        "a sealed UKI carries the composefs digest, which `tect build` reads \
+                         from the local buildah store: declare `backend \"buildah\"`",
+                    ),
                 );
             }
         }
@@ -1807,6 +1863,85 @@ colour "blue"
         };
         assert!(!read("schema-version 1\n"));
         assert!(read("schema-version 1\nmanifest {\n    label #true\n}\n"));
+    }
+
+    #[test]
+    fn the_backend_is_buildah_unless_declared() {
+        let read = |text: &str| {
+            let mut list = List::empty(Path::new("."));
+            let mut issues = Issues::default();
+            list.parse_file(
+                &Source::new(layout::REPO_FILE, text),
+                text,
+                true,
+                &mut issues,
+            );
+            list.backend
+        };
+        assert_eq!(read("schema-version 1\n"), Backend::Buildah);
+        assert_eq!(
+            read("schema-version 1\nbackend \"buildx\"\n"),
+            Backend::Buildx
+        );
+    }
+
+    /// The registry layer cache is named after the default image.
+    #[test]
+    fn buildx_needs_a_default_image_among_several() {
+        let issues = |default: &str| {
+            let mut list = List::empty(Path::new("."));
+            let mut issues = Issues::default();
+            let repo = format!("schema-version 1\nbackend \"buildx\"\n{default}");
+            list.parse_file(
+                &Source::new(layout::REPO_FILE, &repo),
+                &repo,
+                true,
+                &mut issues,
+            );
+            let images =
+                "schema-version 1\nimage {\n    name \"One\"\n}\nimage {\n    name \"Two\"\n}\n";
+            list.parse_file(
+                &Source::new("image.kdl", images),
+                images,
+                false,
+                &mut issues,
+            );
+            let mut checked = Issues::default();
+            list.check_images(&mut checked);
+            checked.plain()
+        };
+        assert!(issues("").contains("needs a default image"));
+        assert!(!issues("default-image \"one\"\n").contains("needs a default image"));
+    }
+
+    /// A sealed UKI reads its composefs digest from the buildah store.
+    #[test]
+    fn buildx_is_refused_for_an_image_that_builds_a_uki() {
+        let issues = |backend: &str, boot: &str| {
+            let mut list = List::empty(Path::new("."));
+            let mut issues = Issues::default();
+            let repo = format!("schema-version 1\nbackend \"{backend}\"\n");
+            list.parse_file(
+                &Source::new(layout::REPO_FILE, &repo),
+                &repo,
+                true,
+                &mut issues,
+            );
+            let image = format!("schema-version 1\nimage {{\n    name \"Sealed\"\n{boot}}}\n");
+            list.parse_file(
+                &Source::new("image.kdl", &image),
+                &image,
+                false,
+                &mut issues,
+            );
+            let mut checked = Issues::default();
+            list.check_images(&mut checked);
+            checked.plain()
+        };
+        let uki = "    boot-chain \"uki-shim\"\n";
+        assert!(issues("buildx", uki).contains("`backend \"buildx\"` cannot build `sealed`"));
+        assert!(!issues("buildah", uki).contains("backend"));
+        assert!(!issues("buildx", "").contains("backend"));
     }
 
     /// The reader is given the `network` node out of `security-policy`, so

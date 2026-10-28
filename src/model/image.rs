@@ -289,6 +289,31 @@ pub struct Seed {
     pub collection: String,
 }
 
+/// The tool that builds every image in the repository.
+#[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
+pub enum Backend {
+    #[default]
+    Buildah,
+    Buildx,
+}
+
+impl Backend {
+    pub fn parse(name: &str) -> Option<Self> {
+        match name {
+            "buildah" => Some(Self::Buildah),
+            "buildx" => Some(Self::Buildx),
+            _ => None,
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Buildah => "buildah",
+            Self::Buildx => "buildx",
+        }
+    }
+}
+
 /// The repository's declarations: every image in it, and the handful of
 /// decisions that are about the repository.
 pub struct List {
@@ -319,6 +344,10 @@ pub struct List {
     pub seed: Option<Seed>,
     /// Whether a build stamps the generated manifest onto the image as an OCI label.
     pub manifest_label: bool,
+    /// The tool that `tect build` runs when neither its flag nor
+    /// `$BUILD_BACKEND` names one. It also selects the build job that the
+    /// generated `build.yml` runs.
+    pub backend: Backend,
     /// Holds the JSON members that the `renovate` block maps to. If the block
     /// is absent, then `generate` writes no Renovate settings.
     pub renovate: Option<Vec<(String, common::json::Json)>>,

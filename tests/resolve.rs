@@ -1253,6 +1253,27 @@ fn generated(root: &std::path::Path) -> String {
     run.files.into_iter().map(|(_, text)| text).collect()
 }
 
+/// A repository that declares `buildx` generates the buildx build job.
+#[test]
+fn the_generated_build_job_follows_the_declared_backend() {
+    let root = written("backend-buildx", "", &[]);
+    std::fs::write(
+        root.join("repo.kdl"),
+        "schema-version 1\nname \"Checked\"\nbackend \"buildx\"\nworkflows {\n    build\n}\n",
+    )
+    .expect("the test repository is writable");
+    let run = tect::run(Command::Generate, None, &root);
+    let _ = std::fs::remove_dir_all(&root);
+    assert!(run.issues.is_empty(), "{}", run.issues.plain());
+    let (_, workflow) = run
+        .files
+        .iter()
+        .find(|(path, _)| path.ends_with("build.yml"))
+        .expect("the build workflow is generated");
+    assert!(workflow.contains("setup-buildx-action"), "{workflow}");
+    assert!(!workflow.contains("sudo env \\"), "{workflow}");
+}
+
 #[test]
 fn a_component_with_one_script_and_no_manifest_builds() {
     for (file, line) in [
