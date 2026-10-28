@@ -513,7 +513,7 @@ pub enum Surface {
         /// the KERNEL build arg
         #[arg(long, value_name = "name")]
         kernel: Option<String>,
-        /// buildx or buildah, else $BUILD_BACKEND, else buildah
+        /// buildx or buildah, else $BUILD_BACKEND, else the `backend` in repo.kdl
         #[arg(long, value_name = "name")]
         backend: Option<String>,
         /// write an OCI archive instead of loading the image

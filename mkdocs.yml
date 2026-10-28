@@ -25,6 +25,7 @@ hooks:
 nav:
   - Home: index.md
   - CLI: cli.md
+  - Build backends: build-backend.md
   - Getting started:
       - How to create an image: creating-an-image.md
   - Schema:

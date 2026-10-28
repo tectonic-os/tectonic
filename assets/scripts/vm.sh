@@ -487,7 +487,8 @@ if [ "$command" = build ] || [ "$rebuild" = 1 ] || [ ! -f "$image_file" ]; then
         # `generate` writes the committed files. `build` proves them.
         # This is the one path that changes the repository.
         ./scripts/tect.sh generate
-        args=(--tag "$ref")
+        # The VM boots the image from the podman store, which only buildah fills.
+        args=(--backend buildah --tag "$ref")
         [ -z "$target" ] || args+=(--target "$target")
         ./scripts/tect.sh build "${args[@]}"
     fi

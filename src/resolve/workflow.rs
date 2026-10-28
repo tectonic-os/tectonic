@@ -4,7 +4,7 @@
 
 use crate::diag::{Issue, Issues};
 use crate::layout;
-use crate::model::image::List;
+use crate::model::image::{Backend, List};
 use crate::parse::component::rpm;
 use std::path::{Path, PathBuf};
 
@@ -184,7 +184,12 @@ pub fn unlocked(list: &List, args: &[String]) -> Vec<&'static Shipped> {
 }
 
 /// The facts a body's guarded regions are kept by.
-pub fn facts(basis: &Basis, scans_scheduled: bool, publishes_scheduled: bool) -> Vec<&'static str> {
+pub fn facts(
+    basis: &Basis,
+    scans_scheduled: bool,
+    publishes_scheduled: bool,
+    backend: Backend,
+) -> Vec<&'static str> {
     let mut facts = match basis.kernel {
         true => vec!["kernel"],
         false => vec!["no-kernel"],
@@ -196,6 +201,10 @@ pub fn facts(basis: &Basis, scans_scheduled: bool, publishes_scheduled: bool) ->
     facts.push(match scans_scheduled || publishes_scheduled {
         true => "scheduled-scan",
         false => "push-scan",
+    });
+    facts.push(match backend {
+        Backend::Buildah => "backend-buildah",
+        Backend::Buildx => "backend-buildx",
     });
     facts
 }
@@ -359,20 +368,47 @@ mod tests {
             kernel: false,
         };
         assert_eq!(
-            facts(&basis, false, false),
-            ["no-kernel", "push-publish", "push-scan"]
+            facts(&basis, false, false, Backend::Buildah),
+            ["no-kernel", "push-publish", "push-scan", "backend-buildah"]
         );
         assert_eq!(
-            facts(&basis, false, true),
-            ["no-kernel", "scheduled-publish", "scheduled-scan"]
+            facts(&basis, false, true, Backend::Buildah),
+            [
+                "no-kernel",
+                "scheduled-publish",
+                "scheduled-scan",
+                "backend-buildah"
+            ]
         );
         assert_eq!(
-            facts(&basis, true, false),
-            ["no-kernel", "push-publish", "scheduled-scan"]
+            facts(&basis, true, false, Backend::Buildah),
+            [
+                "no-kernel",
+                "push-publish",
+                "scheduled-scan",
+                "backend-buildah"
+            ]
         );
         assert_eq!(
-            facts(&basis, true, true),
-            ["no-kernel", "scheduled-publish", "scheduled-scan"]
+            facts(&basis, true, true, Backend::Buildah),
+            [
+                "no-kernel",
+                "scheduled-publish",
+                "scheduled-scan",
+                "backend-buildah"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_buildx_declaration_keeps_the_buildx_job() {
+        let basis = Basis {
+            selinux: true,
+            kernel: false,
+        };
+        assert_eq!(
+            facts(&basis, false, false, Backend::Buildx).last(),
+            Some(&"backend-buildx")
         );
     }
 }
