@@ -2,6 +2,12 @@
 
 Each release's section is written from the typed subjects on `main`.
 
+## 0.7.1 (2026-10-28)
+
+### Fixes
+
+- plan: leave a base's imports out of its witnesses (#57)
+
 ## 0.7.0 (2026-10-27)
 
 ### Features
