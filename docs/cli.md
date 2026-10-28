@@ -107,7 +107,6 @@ Every command takes these options, before or after its own words. [`tect`](#tect
 | Command | Description | Schema |
 | --- | --- | --- |
 | [`tect fetch <what> <url> <sha256> [target] [extra]...`](#tect-fetch) | download one payload, verify it, and place it | [`manifest.kdl`&nbsp;›&nbsp;`asset`](schema/component.md#asset) |
-| [`tect os-release`](#tect-os-release) | write the image identity the build ARGs carry | [`image.kdl`&nbsp;›&nbsp;`image`](schema/image.md#image) |
 | [`tect build-record`](#tect-build-record) | write the record of what the build resolved |  |
 | [`tect validate-image`](#tect-validate-image) | run every check a built image has to pass | [`manifest.kdl`&nbsp;›&nbsp;`allow-verify`](schema/component.md#allow-verify) |
 
@@ -1335,15 +1334,6 @@ user, so the recipe holds none of them.
 >
 > `hostname` is the published name. It is the one value that the user is
 > expected to replace.
-
-## `tect os-release`
-
-Writes the image identity, which the build arguments carry, into
-`/usr/lib/os-release`. The generated Containerfile runs it.
-
-**Usage:** `tect os-release`
-
-**Schema:** [`image.kdl`&nbsp;›&nbsp;`image`](schema/image.md#image)
 
 ## `tect build-record`
 

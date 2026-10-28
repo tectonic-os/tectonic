@@ -19,6 +19,10 @@ const GH_INSTALL: &str = "install gh from https://github.com/cli/cli";
 /// a build layer. Every family needs it filled by a different component.
 const BUILD_ENVIRONMENT: &str = "build-environment";
 
+/// The identity role writes the image's own name into os-release at build
+/// time. Without it, the booted system keeps the name of the upstream image.
+const OS_RELEASE: &str = "os-release";
+
 pub fn origin(host: &str, owner: &str) -> String {
     format!("https://{host}/{owner}")
 }
@@ -1855,18 +1859,19 @@ fn wanted<'a>(
 /// A provider list shorter than these roles means an unread collection may
 /// still supply an answer.
 fn roles<'a>(base: Option<&'a crate::base::Base>, index: &crate::provider::Index) -> Vec<&'a str> {
-    // A base whose imports bring no build environment leaves the image to list
-    // the family's build environment itself. A base written from an image
-    // reference imports nothing, so it is one of those.
-    let lacks = base.is_none_or(|base| {
-        !index
-            .fitting(BUILD_ENVIRONMENT, &base.family)
-            .iter()
-            .any(|provider| base.imports.contains(&provider.name))
-    });
-    lacks
-        .then_some(BUILD_ENVIRONMENT)
+    // The image lists a provider of each role that the base's imports leave
+    // unfilled. A base written from an image reference imports nothing.
+    let lacks = |role: &str| {
+        base.is_none_or(|base| {
+            !index
+                .fitting(role, &base.family)
+                .iter()
+                .any(|provider| base.imports.contains(&provider.name))
+        })
+    };
+    [BUILD_ENVIRONMENT, OS_RELEASE]
         .into_iter()
+        .filter(|role| lacks(role))
         .chain(
             base.into_iter()
                 .flat_map(|base| base.requires.iter().map(String::as_str)),
@@ -1874,8 +1879,8 @@ fn roles<'a>(base: Option<&'a crate::base::Base>, index: &crate::provider::Index
         .collect()
 }
 
-/// The question says *needs* because the family adapter is not a declared
-/// `requires` on the base row.
+/// The list fills the roles that the base's imports leave unfilled.
+/// The identity role is optional, so the list never says the base needs it.
 fn offer(
     base: &str,
     wanted: &[&crate::provider::Provider],
@@ -1883,7 +1888,7 @@ fn offer(
     current: bool,
 ) -> Result<bool, String> {
     if prompt.asks() {
-        println!("{base} needs the following components:");
+        println!("{base} brings none of these components:");
         for provider in wanted {
             println!("\x20   {}", provider.qualified());
         }
@@ -2225,11 +2230,10 @@ image {
         }
     }
 
-    /// A base the repository wrote from an image reference imports nothing. A
-    /// hand-written base may import only its identity. Neither brings a build
-    /// environment, so an image on either still needs the family's.
+    /// A base the repository wrote from an image reference imports nothing.
+    /// A hand-written base may import only its identity.
     #[test]
-    fn a_base_that_imports_no_build_environment_offers_one() {
+    fn a_base_that_imports_no_role_provider_offers_one() {
         let root = std::env::temp_dir().join(format!("tect-roles-{}", std::process::id()));
         for (path, provides) in [
             ("fedora/build-environment", "build-environment"),
@@ -2255,10 +2259,10 @@ image {
             roles(None, &index),
         ];
         let _ = std::fs::remove_dir_all(&root);
-        assert_eq!(offered[0], [BUILD_ENVIRONMENT]);
+        assert_eq!(offered[0], [BUILD_ENVIRONMENT, OS_RELEASE]);
         assert_eq!(offered[1], [BUILD_ENVIRONMENT]);
-        assert!(offered[2].is_empty());
-        assert_eq!(offered[3], [BUILD_ENVIRONMENT]);
+        assert_eq!(offered[2], [OS_RELEASE]);
+        assert_eq!(offered[3], [BUILD_ENVIRONMENT, OS_RELEASE]);
     }
 
     /// The image lists the base component by its segments and sets its

@@ -80,22 +80,6 @@ rm -rf {dest}.d
         let _ = write!(out, "\n# ---- {} ----\n{body}", entry.path);
     }
 
-    // The final layer receives IMAGE_VERSION, so it writes the version and
-    // the PRETTY_NAME fallback that contains it.
-    for entry in &image.entries {
-        if entry
-            .component
-            .as_ref()
-            .is_some_and(|component| super::containerfile::renders_os_release(image, component))
-        {
-            let _ = write!(
-                out,
-                "\n# ---- os-release ----\n{}\n",
-                super::containerfile::flavoured(entry.flavour.as_deref(), "/ctx/tect os-release")
-            );
-        }
-    }
-
     // The tail interpolates nothing, so it lives beside this file where
     // `./lint.sh` reads it. Compiled in, never read at runtime: `tect.sh`
     // unpacks the binary alone.
