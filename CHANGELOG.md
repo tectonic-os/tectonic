@@ -2,6 +2,13 @@
 
 Each release's section is written from the typed subjects on `main`.
 
+## 0.7.2 (2026-10-28)
+
+### Features
+
+- the identity component writes os-release (#59)
+- the repository declares its build backend (#60)
+
 ## 0.7.1 (2026-10-28)
 
 ### Fixes
