@@ -108,7 +108,9 @@ jobs:
           fi
 
           echo "==> selinux denials"
-          denials="$(s journalctl -b --no-pager | grep -Ei 'avc:[[:space:]]+denied')" || true
+          # A permissive denial records a policy gap that the kernel did not
+          # enforce. Only an enforcing denial is a failure.
+          denials="$(s journalctl -b --no-pager | grep -Ei 'avc:[[:space:]]+denied' | grep -v 'permissive=1')" || true
           if [ -n "$denials" ]; then
             printf '%s\n' "$denials"
           else
