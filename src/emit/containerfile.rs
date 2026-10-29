@@ -1,10 +1,11 @@
-//! The generated Containerfile: the skeleton the repository keeps, with the
-//! component layers and the finalize layer spliced between its markers.
+//! The generated Containerfile: the skeleton the repository keeps, with every
+//! generated region spliced between its markers.
 
 use crate::emit::{component_build, finalize};
 use crate::layout;
 use crate::model::component::{Component, Position};
 use crate::model::image::{Entry, Image};
+use crate::resolve::overlay;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
@@ -12,17 +13,31 @@ use std::path::{Path, PathBuf};
 pub const SKELETON: &str = "scripts/Containerfile.skeleton";
 pub const BEGIN: &str = "# ---- BEGIN GENERATED (component layers) ----";
 pub const END: &str = "# ---- END GENERATED ----";
+pub const RECORD_BEGIN: &str = "# ---- BEGIN GENERATED (build record) ----";
+pub const RECORD_END: &str = "# ---- END GENERATED (build record) ----";
 pub const TAIL_BEGIN: &str = "# ---- BEGIN GENERATED (tail fragments) ----";
 pub const TAIL_END: &str = "# ---- END GENERATED (tail fragments) ----";
+pub const VALIDATE_BEGIN: &str = "# ---- BEGIN GENERATED (validate) ----";
+pub const VALIDATE_END: &str = "# ---- END GENERATED (validate) ----";
+
+/// The text spliced into each generated region, in file order.
+pub struct Regions {
+    pub layers: String,
+    pub record: String,
+    pub tails: String,
+    pub validate: String,
+}
+
+const ENDS: [&str; 4] = [END, RECORD_END, TAIL_END, VALIDATE_END];
 
 /// Where the assembled Containerfile for one image is written.
 pub fn path(image: &Image) -> PathBuf {
     layout::generated_image(&image.id).join(layout::CONTAINERFILE)
 }
 
-/// The skeleton with `section` between its markers, the syntax directive kept
-/// first and the header under it.
-pub fn file(skeleton: &str, image: &Image, section: &str, tails: &str) -> String {
+/// The skeleton with each region's text between its markers, the syntax
+/// directive kept first and the header under it.
+pub fn file(skeleton: &str, image: &Image, regions: &Regions) -> String {
     let mut out = String::new();
     let mut lines = skeleton.lines().peekable();
     if lines.peek().is_some_and(|l| l.starts_with("# syntax=")) {
@@ -32,17 +47,21 @@ pub fn file(skeleton: &str, image: &Image, section: &str, tails: &str) -> String
 
     let mut generated = false;
     for line in lines {
-        if line == END || line == TAIL_END {
+        if ENDS.contains(&line) {
             generated = false;
         }
         if !generated {
             let _ = writeln!(out, "{line}");
         }
-        if line == BEGIN {
-            let _ = write!(out, "\n{section}");
-            generated = true;
-        } else if line == TAIL_BEGIN {
-            let _ = write!(out, "\n{tails}");
+        let body = match line {
+            BEGIN => Some(&regions.layers),
+            RECORD_BEGIN => Some(&regions.record),
+            TAIL_BEGIN => Some(&regions.tails),
+            VALIDATE_BEGIN => Some(&regions.validate),
+            _ => None,
+        };
+        if let Some(body) = body {
+            let _ = write!(out, "\n{body}");
             generated = true;
         }
     }
@@ -72,10 +91,12 @@ ARG FLAVOUR";
 
 /// The base's family, for the layers that cannot derive it from the filesystem:
 /// what a package is queried with differs per family and nothing in the image
-/// says which one built it.
-const FAMILY_ARG: &str = "\
-# ---- base family ----
-ARG FAMILY";
+/// says which one built it. The image's declared base is the one source, so the
+/// build passes no `FAMILY` argument.
+fn family_arg(image: &Image) -> String {
+    let family = image.base.as_ref().map_or("", |base| base.family.as_str());
+    format!("# ---- base family ----\nARG FAMILY={family}")
+}
 
 /// What a fragment writes where a mount writes `source=/components/<dir>`. It is
 /// inlined verbatim, so it cannot name its own directory, and `${...}` would be
@@ -96,13 +117,18 @@ const CONFORMS_ARG: &str = "\
 # ---- declared conformance ----
 ARG CONFORMS=";
 
+/// The measured content, for the remediation hook to scan. It is needed
+/// whenever a target declares a profile, even where no component claims a rule.
+const SCAP_CONTENT_ARG: &str = "\
+# ---- measured content ----
+ARG SCAP_CONTENT=";
+
 /// What the components claim and what they refuse, for the finalize layer to keep
 /// out of any remediation that runs there. Build args rather than baked into
 /// the generated script, because which components are in the build is a flavour's
 /// answer and the generated file is one per image.
-const SCAP_ARGS: &str = "\
+const SCAP_RULES_ARGS: &str = "\
 # ---- claimed and refused rules ----
-ARG SCAP_CONTENT=
 ARG SCAP_CLAIMED=
 ARG SCAP_REFUSED=";
 
@@ -130,7 +156,12 @@ fn identity(image: &Image) -> Vec<(&'static str, String)> {
     vars
 }
 
-pub fn sections(image: &Image, root: &Path) -> (String, String) {
+pub fn sections(
+    image: &Image,
+    root: &Path,
+    audit_enforce: bool,
+    shipped: &overlay::Index,
+) -> Regions {
     let mut out = String::new();
     let mut tails: Vec<String> = Vec::new();
     let mut flavour_arg_emitted = false;
@@ -238,18 +269,35 @@ pub fn sections(image: &Image, root: &Path) -> (String, String) {
         let _ = write!(out, "{}\n\n", blocks.join("\n\n"));
     }
 
-    if !flavour_arg_emitted {
+    let flavours = !image.flavours.is_empty();
+    if flavours && !flavour_arg_emitted {
         let _ = write!(out, "{FLAVOUR_ARG}\n\n");
     }
 
+    let conforms = image.declares_conforms();
+    let (claimed, refused) = crate::scap::exclusions(image);
+    let rules = !claimed.is_empty() || !refused.is_empty();
+
     let _ = write!(out, "{IMAGE_VERSION_ARG}\n\n");
-    let _ = write!(out, "{FAMILY_ARG}\n\n");
-    let _ = write!(out, "{CONFORMS_ARG}\n\n");
-    let _ = write!(out, "{SCAP_ARGS}\n\n");
+    let _ = write!(out, "{}\n\n", family_arg(image));
+    if conforms {
+        let _ = write!(out, "{CONFORMS_ARG}\n\n");
+        let _ = write!(out, "{SCAP_CONTENT_ARG}\n\n");
+    }
+    if rules {
+        let _ = write!(out, "{SCAP_RULES_ARGS}\n\n");
+    }
 
     out.push_str(&identity_args);
 
-    let _ = write!(out, "{}\n\n", finalize_layer(image, &identity_env, root));
+    let _ = write!(
+        out,
+        "{}\n\n",
+        finalize_layer(image, &identity_env, root, flavours, conforms, rules)
+    );
+
+    let record = record_layer(audit_enforce);
+    let validate = validate_layer(image, shipped);
 
     let mut tail_out = String::new();
     // A tail fragment ends the lineage stage after the skeleton has made its
@@ -258,18 +306,136 @@ pub fn sections(image: &Image, root: &Path) -> (String, String) {
         let _ = write!(tail_out, "{tail}\n\n");
     }
 
-    (out, tail_out)
+    Regions {
+        layers: out,
+        record,
+        tails: tail_out,
+        validate,
+    }
 }
 
-pub fn section(image: &Image, root: &Path) -> String {
-    let (mut out, tail) = sections(image, root);
-    out.push_str(&tail);
+pub fn section(
+    image: &Image,
+    root: &Path,
+    audit_enforce: bool,
+    shipped: &overlay::Index,
+) -> String {
+    let regions = sections(image, root, audit_enforce, shipped);
+    let parts = [
+        regions.layers,
+        regions.record,
+        regions.tails,
+        regions.validate,
+    ];
+    parts
+        .iter()
+        .filter(|part| !part.is_empty())
+        .map(|part| part.as_str())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn record_layer(audit_enforce: bool) -> String {
+    let mut out = String::from(
+        "COPY --from=ctx /generated/plan.json /usr/share/tectonic/manifest.json\n\n\
+         ARG BASE\n\
+         ARG BASE_DECLARED=\"\"\n\
+         ARG TARGET=\"\"\n\
+         ARG SOURCE_COMMIT=\"\"\n\
+         ARG BUILD_BACKEND=\"\"\n\
+         ARG COMPONENT_HASHES=\"\"\n\
+         ARG ASSET_RESOLUTIONS=\"\"\n",
+    );
+    if audit_enforce {
+        out.push_str("ARG AUDIT_ENFORCE=\"\"\n");
+    }
+    let _ = write!(
+        out,
+        "RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \\\n    \
+         BASE=\"${{BASE}}\" BASE_DECLARED=\"${{BASE_DECLARED}}\" TARGET=\"${{TARGET}}\" \\\n    \
+         SOURCE_COMMIT=\"${{SOURCE_COMMIT}}\" BUILD_BACKEND=\"${{BUILD_BACKEND}}\" \\\n    \
+         COMPONENT_HASHES=\"${{COMPONENT_HASHES}}\" \\\n    \
+         ASSET_RESOLUTIONS=\"${{ASSET_RESOLUTIONS}}\" "
+    );
+    if audit_enforce {
+        out.push_str("AUDIT_ENFORCE=\"${AUDIT_ENFORCE}\" ");
+    }
+    out.push_str(
+        "\\\n    \
+         IMAGE_ID=\"${IMAGE_ID}\" IMAGE_VERSION=\"${IMAGE_VERSION}\" /ctx/tect build-record\n\n\
+         RUN --mount=type=tmpfs,target=/run --network=none bootc container lint\n",
+    );
+    out
+}
+
+/// This layer runs the final `tect validate-image` check.
+/// It declares and passes each argument only where the image has the
+/// contract, verify exception, preset or LUKS witness that argument carries.
+fn validate_layer(image: &Image, shipped: &overlay::Index) -> String {
+    let components: Vec<&Component> = image
+        .entries
+        .iter()
+        .filter_map(|entry| entry.component.as_ref())
+        .collect();
+    let contracts = crate::emit::plan::contract_files(image, &components);
+    let exceptions = crate::emit::plan::unique_pairs(&components, |component| {
+        component
+            .verify_exceptions
+            .iter()
+            .map(|e| (e.class.clone(), e.unit.clone()))
+            .collect()
+    });
+    let presets = crate::emit::plan::declares_presets(shipped);
+    // One file serves every target, so the argument exists where the base or
+    // any component answers it. A target that withdraws it sends no value and
+    // the default stands.
+    let luks = image.answers(crate::emit::recipe::LUKS_INITRAMFS);
+
+    let family = image.base.as_ref().map_or("", |base| base.family.as_str());
+    let mut out = format!("ARG FAMILY={family}\n");
+    if !contracts.is_empty() {
+        out.push_str("ARG CONTRACT_FILES=\"\"\n");
+    }
+    if !exceptions.is_empty() {
+        out.push_str("ARG VERIFY_EXCEPTIONS=\"\"\n");
+    }
+    if presets {
+        out.push_str("ARG COMPONENT_PRESETS=\"\"\n");
+    }
+    if luks {
+        out.push_str("ARG LUKS_INITRAMFS=\"false\"\n");
+    }
+    out.push_str(
+        "RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \\\n    \
+         --mount=type=tmpfs,target=/tmp \\\n    \
+         --mount=type=tmpfs,target=/run \\\n    ",
+    );
+    if !contracts.is_empty() {
+        out.push_str("CONTRACT_FILES=\"${CONTRACT_FILES}\" \\\n    ");
+    }
+    if !exceptions.is_empty() {
+        out.push_str("VERIFY_EXCEPTIONS=\"${VERIFY_EXCEPTIONS}\" \\\n    ");
+    }
+    if presets {
+        out.push_str("COMPONENT_PRESETS=\"${COMPONENT_PRESETS}\" \\\n    ");
+    }
+    if luks {
+        out.push_str("LUKS_INITRAMFS=\"${LUKS_INITRAMFS}\" \\\n    ");
+    }
+    out.push_str("FAMILY=\"${FAMILY}\" /ctx/tect validate-image\n");
     out
 }
 
 /// The one layer below the components: the collected files assembled, then every
 /// finalize hook, with only the component directories those hooks read mounted.
-fn finalize_layer(image: &Image, identity_env: &str, root: &Path) -> String {
+fn finalize_layer(
+    image: &Image,
+    identity_env: &str,
+    root: &Path,
+    flavours: bool,
+    conforms: bool,
+    rules: bool,
+) -> String {
     let hooks = finalize::hooks(image, root);
     let script = finalize::path(image).display().to_string();
     // Every hook runs in this one layer, so the layer closes only where every
@@ -305,12 +471,24 @@ fn finalize_layer(image: &Image, identity_env: &str, root: &Path) -> String {
     out.push_str(
         "--mount=type=cache,target=/var/cache \\\n    \
          --mount=type=cache,target=/var/log \\\n    \
-         --mount=type=tmpfs,target=/tmp \\\n    \
-         FLAVOUR=${FLAVOUR} IMAGE_VERSION=\"${IMAGE_VERSION}\" \\\n    \
-         CONFORMS=\"${CONFORMS}\" FAMILY=\"${FAMILY}\" \\\n    \
-         SCAP_CONTENT=\"${SCAP_CONTENT}\" SCAP_CLAIMED=\"${SCAP_CLAIMED}\" \\\n    \
-         SCAP_REFUSED=\"${SCAP_REFUSED}\" \\\n    ",
+         --mount=type=tmpfs,target=/tmp \\\n    ",
     );
+    // The finalize script runs under `set -u`.
+    // A hook supplies a default for a variable the generated file does not
+    // declare.
+    let mut env = String::new();
+    if flavours {
+        env.push_str("FLAVOUR=${FLAVOUR} ");
+    }
+    env.push_str("IMAGE_VERSION=\"${IMAGE_VERSION}\" ");
+    if conforms {
+        env.push_str("CONFORMS=\"${CONFORMS}\" SCAP_CONTENT=\"${SCAP_CONTENT}\" ");
+    }
+    env.push_str("FAMILY=\"${FAMILY}\" ");
+    if rules {
+        env.push_str("SCAP_CLAIMED=\"${SCAP_CLAIMED}\" SCAP_REFUSED=\"${SCAP_REFUSED}\" ");
+    }
+    out.push_str(&env);
     out.push_str(identity_env);
     out.push_str("bash /ctx/finalize.sh");
     out

@@ -706,6 +706,12 @@ pub(crate) fn overrides(
     out
 }
 
+/// Whether any component in the image ships a preset. A shipped preset is what
+/// makes the generated `COMPONENT_PRESETS` argument needed.
+pub(crate) fn declares_presets(shipped: &overlay::Index) -> bool {
+    shipped.keys().any(|path| is_preset(path))
+}
+
 /// The layer verifies only presets delivered by this target's overlays.
 pub(crate) fn preset_files(image: &Image, shipped: &overlay::Index, flavour: &str) -> Vec<String> {
     shipped

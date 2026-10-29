@@ -99,13 +99,11 @@ pub struct Run {
 
 /// The Containerfile skeleton to splice into. If the repository has none, then
 /// this release's skeleton is used.
-fn skeleton(
-    root: &Path,
-    needs_tail: bool,
-    needs_luks: bool,
-    issues: &mut Issues,
-) -> Option<String> {
-    use emit::containerfile::{BEGIN, END, SKELETON, TAIL_BEGIN, TAIL_END};
+fn skeleton(root: &Path, issues: &mut Issues) -> Option<String> {
+    use emit::containerfile::{
+        BEGIN, END, RECORD_BEGIN, RECORD_END, SKELETON, TAIL_BEGIN, TAIL_END, VALIDATE_BEGIN,
+        VALIDATE_END,
+    };
 
     let text = match std::fs::read_to_string(root.join(SKELETON)) {
         Ok(text) => text,
@@ -119,47 +117,133 @@ fn skeleton(
         }
     };
     let src = Source::new(SKELETON, text.clone());
+    // A skeleton that still carries the record or validate steps would run
+    // each step twice.
+    let stale = old_spine(&text);
+    if !stale.is_empty() {
+        let ranges: Vec<String> = stale
+            .iter()
+            .map(|(first, last)| match first == last {
+                true => format!("{first}"),
+                false => format!("{first} to {last}"),
+            })
+            .collect();
+        issues.push(
+            Issue::new(
+                format!("`{SKELETON}` still carries the generated record or validate steps"),
+                &src,
+            )
+            .help(format!(
+                "the old steps are at lines {}; delete `{SKELETON}` and run `tect generate` \
+                 to use this release's skeleton",
+                ranges.join(" and ")
+            )),
+        );
+        return None;
+    }
+
+    let expected = [
+        BEGIN,
+        END,
+        RECORD_BEGIN,
+        RECORD_END,
+        TAIL_BEGIN,
+        TAIL_END,
+        VALIDATE_BEGIN,
+        VALIDATE_END,
+    ];
     let mut found = true;
-    let markers = if needs_tail {
-        &[BEGIN, END, TAIL_BEGIN, TAIL_END][..]
-    } else {
-        &[BEGIN, END][..]
-    };
-    for marker in markers {
-        if !text.lines().any(|line| line == *marker) {
+    for marker in expected {
+        if !text.lines().any(|line| line == marker) {
             issues.push(
                 Issue::new(format!("`{SKELETON}` has no `{marker}` line"), &src)
-                    .help("the generated component layers go between the two markers"),
+                    .help("the generated regions go between their marker pairs"),
             );
             found = false;
         }
     }
-    if needs_tail && !text.contains("--mount=type=tmpfs,target=/run") {
-        issues.push(
-            Issue::new(
-                format!("`{SKELETON}` does not isolate `/run` from the final image"),
-                &src,
-            )
-            .help("mount `/run` as tmpfs in the final `validate-image` RUN before adding a UKI"),
-        );
-        found = false;
-    }
-    if needs_luks
-        && (!text.contains("ARG LUKS_INITRAMFS=")
-            || !text.contains("LUKS_INITRAMFS=\"${LUKS_INITRAMFS}\""))
-    {
-        issues.push(
-            Issue::new(
-                format!("`{SKELETON}` does not pass the LUKS initramfs witness"),
-                &src,
-            )
-            .help(
-                "add `ARG LUKS_INITRAMFS=\"false\"` and pass `LUKS_INITRAMFS=\"${LUKS_INITRAMFS}\"` to the final `validate-image` RUN",
-            ),
-        );
-        found = false;
+    // A region in the wrong place runs its step in the wrong stage.
+    // The seal pass stops at the tail. A step before the tail runs again in
+    // that pass and can move the digest the UKI embedded.
+    let at: Option<Vec<usize>> = expected
+        .iter()
+        .map(|marker| text.lines().position(|line| line == *marker))
+        .collect();
+    if let Some(at) = at {
+        if !at.windows(2).all(|pair| pair[0] < pair[1]) {
+            issues.push(
+                Issue::new(
+                    format!("`{SKELETON}` puts its marker pairs out of order"),
+                    &src,
+                )
+                .help(
+                    "order the regions: component layers, build record, tail fragments, validate",
+                ),
+            );
+            found = false;
+        }
     }
     found.then_some(text)
+}
+
+/// Returns the line ranges of a skeleton that still holds the generated
+/// record or validate steps, as 1-based inclusive numbers. A range is the
+/// stretch of lines outside the marker regions. Its ARG lines go with the
+/// RUN they feed.
+fn old_spine(text: &str) -> Vec<(usize, usize)> {
+    use emit::containerfile::{
+        BEGIN, END, RECORD_BEGIN, RECORD_END, TAIL_BEGIN, TAIL_END, VALIDATE_BEGIN, VALIDATE_END,
+    };
+
+    let begins = [BEGIN, RECORD_BEGIN, TAIL_BEGIN, VALIDATE_BEGIN];
+    let ends = [END, RECORD_END, TAIL_END, VALIDATE_END];
+    let mut inside = false;
+    let mut stretches: Vec<(usize, usize)> = Vec::new();
+    let mut open: Option<usize> = None;
+    for (index, line) in text.lines().enumerate() {
+        if begins.contains(&line) || ends.contains(&line) {
+            if let Some(first) = open.take() {
+                stretches.push((first, index));
+            }
+            inside = begins.contains(&line);
+        } else if inside {
+            if let Some(first) = open.take() {
+                stretches.push((first, index));
+            }
+        } else if open.is_none() {
+            open = Some(index);
+        }
+    }
+    if let Some(first) = open {
+        stretches.push((first, text.lines().count()));
+    }
+
+    let keys = [
+        "/generated/plan.json",
+        "/ctx/tect build-record",
+        "bootc container lint",
+        "/ctx/tect validate-image",
+    ];
+    stretches
+        .into_iter()
+        .filter(|(first, last)| {
+            text.lines()
+                .skip(*first)
+                .take(last - first)
+                .any(|line| keys.iter().any(|key| line.contains(key)))
+        })
+        .filter_map(|(first, last)| {
+            let mut from = first;
+            let mut to = last.saturating_sub(1);
+            while from <= to && text.lines().nth(from).is_some_and(|l| l.trim().is_empty()) {
+                from += 1;
+            }
+            while to >= from && text.lines().nth(to).is_some_and(|l| l.trim().is_empty()) {
+                to = to.saturating_sub(1);
+            }
+            (from <= to).then_some((from + 1, to + 1))
+        })
+        .collect()
 }
 
 /// Every manifest read and every image resolved, which is what any command
@@ -356,16 +440,10 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
             .and_then(|d| list.images.iter().position(|i| i.id == d.id)),
     };
 
-    let needs_tail = list
-        .images
-        .iter()
-        .flat_map(|image| image.components())
-        .any(|component| component.fragment_position == model::component::Position::Tail);
-    let needs_luks = list.images.iter().any(|image| {
-        let entries: Vec<_> = image.entries.iter().collect();
-        emit::plan::provides(image, &entries, emit::recipe::LUKS_INITRAMFS)
-    });
-    let skeleton = skeleton(root, needs_tail, needs_luks, &mut issues);
+    let skeleton = match command {
+        Command::Check | Command::Generate | Command::Verify => skeleton(root, &mut issues),
+        _ => None,
+    };
 
     let mut files: Vec<(PathBuf, String)> = Vec::new();
     if matches!(command, Command::Generate | Command::Verify) {
@@ -392,10 +470,15 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
         );
         for (image, resolved) in list.images.iter().zip(&resolved) {
             if let Some(skeleton) = &skeleton {
-                let (section, tails) = emit::containerfile::sections(image, root);
+                let regions = emit::containerfile::sections(
+                    image,
+                    root,
+                    list.audit_enforce,
+                    &resolved.shipped,
+                );
                 files.push((
                     emit::containerfile::path(image),
-                    emit::containerfile::file(skeleton, image, &section, &tails),
+                    emit::containerfile::file(skeleton, image, &regions),
                 ));
             }
             files.extend(emit::component_build::scripts(
@@ -462,7 +545,12 @@ pub(crate) fn run_loaded(command: Command, arg: Option<&str>, root: &Path, loade
             None => String::new(),
         },
         Command::Section => match one {
-            Some(i) => emit::containerfile::section(&list.images[i], root),
+            Some(i) => emit::containerfile::section(
+                &list.images[i],
+                root,
+                list.audit_enforce,
+                &resolved[i].shipped,
+            ),
             None => String::new(),
         },
         Command::Generate => files
@@ -715,32 +803,69 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_tail_and_luks_require_their_skeleton_guards() {
+    fn a_skeleton_that_still_carries_the_old_steps_is_refused() {
         let root = std::env::temp_dir().join(format!("tect-skeleton-{}", std::process::id()));
         let path = root.join(emit::containerfile::SKELETON);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        let stale = init::SKELETON.replace(
-            "--mount=type=tmpfs,target=/run",
-            "--mount=type=cache,target=/run",
+        std::fs::write(&path, init::SKELETON).unwrap();
+
+        let mut issues = Issues::default();
+        assert!(skeleton(&root, &mut issues).is_some());
+        assert!(issues.findings().is_empty());
+
+        let stale = "\
+ARG BASE
+FROM scratch AS ctx
+
+# ---- BEGIN GENERATED (component layers) ----
+# ---- END GENERATED ----
+
+COPY --from=ctx /generated/plan.json /usr/share/tectonic/manifest.json
+
+ARG BASE
+RUN /ctx/tect build-record
+
+RUN --network=none bootc container lint
+
+# ---- BEGIN GENERATED (tail fragments) ----
+# ---- END GENERATED (tail fragments) ----
+
+ARG FAMILY
+ARG CONTRACTS
+RUN /ctx/tect validate-image
+";
+        std::fs::write(&path, stale).unwrap();
+        let mut issues = Issues::default();
+        assert!(skeleton(&root, &mut issues).is_none());
+        let plain = issues.plain();
+        assert!(
+            plain.contains("still carries the generated"),
+            "no refusal in {plain}"
         );
-        std::fs::write(&path, stale).unwrap();
+        assert!(plain.contains("at lines 7 to 12"), "{plain}");
+        assert!(plain.contains("and 17 to 19"), "{plain}");
 
-        assert!(skeleton(&root, false, false, &mut Issues::default()).is_some());
-        let mut issues = Issues::default();
-        assert!(skeleton(&root, true, false, &mut issues).is_none());
-        assert!(issues
-            .findings()
-            .iter()
-            .any(|message| message.contains("does not isolate `/run`")));
+        let unordered = "\
+# ---- BEGIN GENERATED (validate) ----
+# ---- END GENERATED (validate) ----
 
-        let stale = init::SKELETON.replace("LUKS_INITRAMFS=\"${LUKS_INITRAMFS}\"", "");
-        std::fs::write(&path, stale).unwrap();
+# ---- BEGIN GENERATED (component layers) ----
+# ---- END GENERATED ----
+
+# ---- BEGIN GENERATED (build record) ----
+# ---- END GENERATED (build record) ----
+
+# ---- BEGIN GENERATED (tail fragments) ----
+# ---- END GENERATED (tail fragments) ----
+";
+        std::fs::write(&path, unordered).unwrap();
         let mut issues = Issues::default();
-        assert!(skeleton(&root, false, true, &mut issues).is_none());
-        assert!(issues
-            .findings()
-            .iter()
-            .any(|message| message.contains("does not pass the LUKS initramfs witness")));
+        assert!(skeleton(&root, &mut issues).is_none());
+        assert!(
+            issues.plain().contains("out of order"),
+            "{}",
+            issues.plain()
+        );
 
         std::fs::remove_dir_all(root).unwrap();
     }

@@ -1,110 +1,85 @@
 # Build backends
 
-`tect build` hands one generated Containerfile to a container build tool. That
-tool is the backend. This page lists everything the backend receives and
-everything it returns, so a reader can tell what a second backend would have
-to honour.
+`tect build` uses one of two container build tools. The choice changes where
+the image lands, whether the build caches layers in a registry, and whether a
+UKI image can be built.
 
-`tect` drives two backends:
+## Which backend to use
 
-| Backend | Program | Default |
+`buildah` is the default. Use it for a UKI image, for a local VM build, or when
+you do not need a shared layer cache.
+
+`buildx` caches layers in a registry. Use it when you want that cache shared
+between runs and flavours. `buildx` cannot build a UKI image.
+
+## Choose a backend
+
+Set `backend "buildx"` in `repo.kdl` to choose `buildx` for the repository.
+`--backend <name>` overrides the choice for one command. `$BUILD_BACKEND`
+overrides it while the variable is set. The flag wins over the variable. Either
+wins over `repo.kdl`.
+
+Run `tect generate` after you change the backend. The generated `build.yml`
+follows the declared backend.
+
+## What changes
+
+| | `buildah` | `buildx` |
 | --- | --- | --- |
-| `buildah` | `podman build` | yes |
-| `buildx` | `docker buildx build` | no |
+| Image destination | The local podman store. | The Docker store, or an OCI archive with `--oci-output`. |
+| Base image | A newer base is pulled on every build. | The builder's default pull policy applies. |
+| Registry layer cache | None. `--cache-to` is refused. | The cache described below. |
+| UKI image | Built. | Refused. |
 
-The repository chooses one with [`backend`](schema/repo.md#backend) in
-`repo.kdl`. `--backend` or `$BUILD_BACKEND` overrides it for one build. The
-flag wins over the variable, and the variable wins over `repo.kdl`.
+`buildx` also turns off the provenance attestation that BuildKit would add.
 
-## Inputs
+## Registry cache
 
-Every build receives these inputs, whichever backend runs it.
+`buildx` reads and writes a layer cache in `<namespace>/<default-image>-cache`.
+The namespace is `$IMAGE_REGISTRY`, or the GitHub origin when that variable is
+unset. The default image is the only image, or the image named by
+`default-image`.
 
-| Input | Form | Source |
-| --- | --- | --- |
-| Containerfile | `--file generated/<image>/Containerfile` | `tect generate` writes it, and `tect build` refuses a stale one |
-| Context | the repository root | the directory `tect build` runs in |
-| Build arguments | `--build-arg NAME=value` | the table below |
-| Secrets | `--secret id=<id>,src=<path>` | each `--secret <id>=<path>` given to `tect build`, and `mok_privkey` from `$MOK_KEY_PATH` |
-| Tags | `--tag <reference>` | each `--tag` and each line of `$TAGS`; with neither, `$IMAGE_NAME:$DEFAULT_TAG`, whose parts default to the published name and `latest` |
-| Labels | `--label <key>=<value>` | `$LABELS`, and the manifest label if `manifest { label #true }` |
+By default, `buildx` reads the cache for the target and the other flavours of
+the same image. `--no-cache-from` skips that read. `--cache-to` writes the
+cache.
 
-The build arguments carry what the plan resolved, so the build itself resolves
-nothing:
+A repository with more than one image must declare `default-image`. Without a
+name for the cache, `buildx` skips it. `--cache-to` then fails.
 
-| Argument | What it holds |
-| --- | --- |
-| `FLAVOUR` | The flavour of the target, empty for the image itself. |
-| `IMAGE_VERSION` | `$IMAGE_VERSION`, else today's date in UTC. |
-| `IMAGE_REGISTRY` | The registry namespace the image publishes under. |
-| `BASE`, `BASE_DECLARED` | The base as resolved to a digest, and as declared. |
-| `KERNEL` | The `--kernel` value, if given. |
-| `TARGET` | The target, as `<image>` or `<image>/<flavour>`. |
-| `FAMILY` | The base family. |
-| `CONFORMS`, `SCAP_CONTENT`, `SCAP_CLAIMED`, `SCAP_REFUSED` | The declared benchmark profile, its content, and the rules the components claim or refuse. |
-| `CONTRACT_FILES`, `VERIFY_EXCEPTIONS`, `COMPONENT_PRESETS`, `LUKS_INITRAMFS` | What `tect validate-image` checks inside the finished image. |
-| `COMPONENT_HASHES`, `ASSET_RESOLUTIONS`, `SOURCE_COMMIT`, `BUILD_BACKEND`, `AUDIT_ENFORCE` | What the build record states. |
+## UKI images
 
-The image file's own values reach the Containerfile as `ARG` defaults, because
-they change only with the image file: `IMAGE_ID`, `IMAGE_NAME`,
-`IMAGE_PRETTY_NAME`, `IMAGE_URL` and `IMAGE_ISSUES_URL`. The finalize layer
-passes them to every component's finalize hook.
+An image with `boot-chain "uki-shim"` or `boot-chain "uki-db"` builds a UKI.
+Only `buildah` can build it. `tect check` refuses `backend "buildx"` for such a
+repository. `tect build --backend buildx` refuses that target.
 
-## What each backend adds
-
-| Input | `buildah` | `buildx` |
-| --- | --- | --- |
-| Pull policy | `--pull=newer` | the builder's default |
-| Registry layer cache | the import is ignored with a note, and `--cache-to` is refused | `--cache-from` for the target and its sibling flavours, and `--cache-to` with `--cache-to`. The cache repository is `<default image>-cache`, so `tect check` requires `default-image` under `buildx` |
-| OCI archive | refused | `--output type=oci,dest=<path>` with `--oci-output <path>`, else `--load` into the Docker store |
-| Provenance attestation | none | `--provenance=false` |
-
-## Outputs
-
-| Output | Where |
-| --- | --- |
-| The image | The backend's own store under each tag. With `--oci-output`, an OCI archive instead. |
-| The build record | `/usr/share/tectonic/build.json` inside the image. |
-| The declared manifest | `/usr/share/tectonic/manifest.json` inside the image, and an OCI label if declared. |
-
-A single-pass build replaces the `tect` process with the backend, so the
-backend's exit status is the build's exit status.
-
-## The composefs digest handoff
-
-An image whose `boot-chain` builds a UKI is built in two passes, and only
-`buildah` can build it. `tect check` refuses `backend "buildx"` for such an
-image, and `tect build` refuses `--backend buildx` for its target.
-
-1. The first pass builds the `split` stage under a scratch tag.
-2. `tect` runs `bootc container compute-composefs-digest-from-storage` on the
-   split image in a container that mounts the podman store. This is the digest
-   `bootc install` compares against.
-3. The second pass builds the sealed image from the generated file's tail. It
-   receives `SPLIT_BASE`, the split image's tag, and `COMPOSEFS_DIGEST`, the
-   digest. The UKI embeds the digest on its kernel command line.
-4. `tect` computes the sealed image's own digest and refuses it if the digest
-   moved. It reads the UKI command line back, and it runs `tect
-   validate-image` against the sealed image.
-5. Only then does `tect` apply the requested tags. A failed check publishes
-   nothing and removes both scratch images.
-
-The handoff needs the split image in a store that a container can mount, and a
-BuildKit builder keeps its images in its own container. That is why `buildx`
-cannot build a UKI.
+A UKI build runs in two passes. The first builds the image. The second seals it
+with a digest read from the local podman store. `buildx` does not use that
+store. `tect` tags the image only after the sealed image passes its checks. A
+failed check publishes nothing.
 
 ## In CI
 
-The generated `build.yml` follows `backend`:
+The generated `build.yml` runs the declared backend.
 
-- **`buildah`:** `tect build` runs as root, so the image lands in the root
-  podman store that the SBOM, rechunk, push and signing steps read.
-- **`buildx`:** the job sets up a BuildKit builder. `tect build` writes an OCI
-  archive, and `skopeo` copies it into the root podman store under the same
-  staging tag. On a publishing run, `tect build` also exports the layer cache.
-  The later steps run unchanged.
+- `buildah`: the image lands in the root podman store. The SBOM, rechunk, push
+  and signing steps read that store.
+- `buildx`: `tect build` writes an OCI archive. The workflow copies it into the
+  root podman store. The later steps do not change. A publishing run also
+  writes the layer cache.
 
-## On the user's machine
+## In a local VM
 
-`tect vm run --rebuild` builds with `buildah` whatever `repo.kdl` declares,
-because the VM boots the image from the podman store.
+`tect vm run --rebuild` always uses `buildah`, whatever `repo.kdl` declares.
+The VM boots the image from the podman store. A local VM build of a `buildx`
+repository is therefore a `buildah` build.
+
+## What the build produces
+
+`buildah` leaves the image in the local podman store. `buildx` loads it into
+the Docker store, or writes an OCI archive with `--oci-output`.
+
+Each image carries two files. `/usr/share/tectonic/build.json` is the resolved
+build record, and it names the backend. `/usr/share/tectonic/manifest.json` is
+the generated plan. If `repo.kdl` sets `manifest { label #true }`, the image
+also carries an `org.tectonic.manifest` label that points at the plan.
