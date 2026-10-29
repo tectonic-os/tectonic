@@ -2,6 +2,12 @@
 
 Each release's section is written from the typed subjects on `main`.
 
+## 0.7.3 (2026-10-29)
+
+### Fixes
+
+- ci: ignore permissive denials in the smoke test (#62)
+
 ## 0.7.2 (2026-10-28)
 
 ### Features

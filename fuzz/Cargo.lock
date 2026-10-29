@@ -1219,7 +1219,7 @@ dependencies = [
 
 [[package]]
 name = "tect"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "clap",
  "common",
