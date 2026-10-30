@@ -499,6 +499,11 @@ impl Image {
         }
     }
 
+    /// Whether any target of this image declares a benchmark profile.
+    pub fn declares_conforms(&self) -> bool {
+        !self.conforms.is_empty() || self.flavours.iter().any(|f| !f.conforms.is_empty())
+    }
+
     pub fn default_flavour(&self) -> Option<&str> {
         self.flavours
             .iter()

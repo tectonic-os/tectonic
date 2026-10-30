@@ -906,20 +906,19 @@ RUN --mount=type=bind,from=ctx,source=/components/core/consumer,target=/ctx/comp
     --mount=type=tmpfs,target=/tmp \
     bash /ctx/component.sh
 
-# ---- flavour gate ----
-ARG FLAVOUR
-
 # ---- image version ----
 ARG IMAGE_VERSION=dev
 
 # ---- base family ----
-ARG FAMILY
+ARG FAMILY=fedora
 
 # ---- declared conformance ----
 ARG CONFORMS=
 
-# ---- claimed and refused rules ----
+# ---- measured content ----
 ARG SCAP_CONTENT=
+
+# ---- claimed and refused rules ----
 ARG SCAP_CLAIMED=
 ARG SCAP_REFUSED=
 
@@ -935,13 +934,11 @@ RUN --mount=type=bind,from=ctx,source=/generated/enforced/finalize.sh,target=/ct
     --mount=type=cache,target=/var/cache \
     --mount=type=cache,target=/var/log \
     --mount=type=tmpfs,target=/tmp \
-    FLAVOUR=${FLAVOUR} IMAGE_VERSION="${IMAGE_VERSION}" \
-    CONFORMS="${CONFORMS}" FAMILY="${FAMILY}" \
-    SCAP_CONTENT="${SCAP_CONTENT}" SCAP_CLAIMED="${SCAP_CLAIMED}" \
-    SCAP_REFUSED="${SCAP_REFUSED}" \
-    IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" bash /ctx/finalize.sh
+    IMAGE_VERSION="${IMAGE_VERSION}" CONFORMS="${CONFORMS}" SCAP_CONTENT="${SCAP_CONTENT}" FAMILY="${FAMILY}" SCAP_CLAIMED="${SCAP_CLAIMED}" SCAP_REFUSED="${SCAP_REFUSED}" IMAGE_ID="${IMAGE_ID}" IMAGE_NAME="${IMAGE_NAME}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" bash /ctx/finalize.sh
 
 # ---- END GENERATED ----
+
+# ---- BEGIN GENERATED (build record) ----
 
 COPY --from=ctx /generated/plan.json /usr/share/tectonic/manifest.json
 
@@ -961,24 +958,20 @@ RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     IMAGE_ID="${IMAGE_ID}" IMAGE_VERSION="${IMAGE_VERSION}" /ctx/tect build-record
 
 RUN --mount=type=tmpfs,target=/run --network=none bootc container lint
+# ---- END GENERATED (build record) ----
 
 # ---- BEGIN GENERATED (tail fragments) ----
 
 # ---- END GENERATED (tail fragments) ----
 
-ARG FAMILY
-ARG CONTRACT_FILES=""
-ARG VERIFY_EXCEPTIONS=""
-ARG COMPONENT_PRESETS=""
-ARG LUKS_INITRAMFS="false"
+# ---- BEGIN GENERATED (validate) ----
+
+ARG FAMILY=fedora
 RUN --mount=type=bind,from=tect,source=/tect,target=/ctx/tect \
     --mount=type=tmpfs,target=/tmp \
     --mount=type=tmpfs,target=/run \
-    CONTRACT_FILES="${CONTRACT_FILES}" \
-    VERIFY_EXCEPTIONS="${VERIFY_EXCEPTIONS}" \
-    COMPONENT_PRESETS="${COMPONENT_PRESETS}" \
-    LUKS_INITRAMFS="${LUKS_INITRAMFS}" \
     FAMILY="${FAMILY}" /ctx/tect validate-image
+# ---- END GENERATED (validate) ----
 ==== generated/enforced/components/one/hello.sh
 #!/usr/bin/env bash
 # GENERATED FILE, do not edit.

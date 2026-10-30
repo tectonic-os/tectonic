@@ -161,47 +161,20 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
     };
     // Both lists include the base, which claims the way a component does.
     let (scap_claimed, scap_refused) = crate::scap::exclusions(image);
+    let contracts = contract_files(image, &components);
+    let exceptions: Vec<String> = unique_pairs(&components, |m| {
+        m.verify_exceptions
+            .iter()
+            .map(|e| (e.class.clone(), e.unit.clone()))
+            .collect()
+    })
+    .iter()
+    .map(|(class, unit)| format!("{class}|{unit}"))
+    .collect();
+    let luks = provides(image, &entries, crate::emit::recipe::LUKS_INITRAMFS);
     let mut build_args = vec![
-        format!("FLAVOUR={}", flavour.unwrap_or_default()),
         format!("IMAGE_VERSION={version}"),
         format!("IMAGE_REGISTRY={}", namespace.clone().unwrap_or_default()),
-        format!(
-            "CONTRACT_FILES={}",
-            contract_files(image, &components).join(" ")
-        ),
-        format!(
-            "VERIFY_EXCEPTIONS={}",
-            unique_pairs(&components, |m| m
-                .verify_exceptions
-                .iter()
-                .map(|e| (e.class.clone(), e.unit.clone()))
-                .collect())
-            .iter()
-            .map(|(class, unit)| format!("{class}|{unit}"))
-            .collect::<Vec<_>>()
-            .join(" ")
-        ),
-        format!("COMPONENT_PRESETS={}", presets.join(" ")),
-        format!(
-            "LUKS_INITRAMFS={}",
-            provides(image, &entries, crate::emit::recipe::LUKS_INITRAMFS)
-        ),
-        format!(
-            "FAMILY={}",
-            image
-                .base
-                .as_ref()
-                .map(|b| b.family.as_str())
-                .unwrap_or_default()
-        ),
-        format!("CONFORMS={conforms}"),
-        format!("SCAP_CONTENT={scap_content}"),
-        // Two vocabularies on purpose. A claim is written as a benchmark
-        // number and the hook resolves it against the content it installs; a
-        // refusal is written as a rule ID, because 710 of the 994 rules carry
-        // no number that reaches them and a rule worth refusing is often one.
-        format!("SCAP_CLAIMED={}", scap_claimed.join(" ")),
-        format!("SCAP_REFUSED={}", scap_refused.join(" ")),
         format!("TARGET={target}"),
         format!(
             "COMPONENT_HASHES={}",
@@ -214,8 +187,37 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
         format!("ASSET_RESOLUTIONS={}", resolutions.join(" ")),
         format!("SOURCE_COMMIT={source_commit}"),
         format!("BUILD_BACKEND={}", backend.name()),
-        format!("AUDIT_ENFORCE={}", list.audit_enforce),
     ];
+    // Send each argument below only where the image or the command defines it.
+    if !contracts.is_empty() {
+        build_args.push(format!("CONTRACT_FILES={}", contracts.join(" ")));
+    }
+    if !exceptions.is_empty() {
+        build_args.push(format!("VERIFY_EXCEPTIONS={}", exceptions.join(" ")));
+    }
+    if !presets.is_empty() {
+        build_args.push(format!("COMPONENT_PRESETS={}", presets.join(" ")));
+    }
+    if luks {
+        build_args.push("LUKS_INITRAMFS=true".to_string());
+    }
+    if list.audit_enforce {
+        build_args.push("AUDIT_ENFORCE=true".to_string());
+    }
+    if !image.flavours.is_empty() {
+        build_args.push(format!("FLAVOUR={}", flavour.unwrap_or_default()));
+    }
+    if image.declares_conforms() {
+        build_args.push(format!("CONFORMS={conforms}"));
+        build_args.push(format!("SCAP_CONTENT={scap_content}"));
+    }
+    if !scap_claimed.is_empty() || !scap_refused.is_empty() {
+        // A claim is a benchmark number that the remediation hook resolves
+        // against the installed content. A refusal is a rule ID, because some
+        // rules have no benchmark number.
+        build_args.push(format!("SCAP_CLAIMED={}", scap_claimed.join(" ")));
+        build_args.push(format!("SCAP_REFUSED={}", scap_refused.join(" ")));
+    }
     if let Some(base) = &image.base {
         build_args.push(format!("BASE_DECLARED={}", base.image));
         build_args.push(format!("BASE={resolved_base}"));
@@ -223,6 +225,10 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
     if let Some(kernel) = &opts.kernel {
         build_args.push(format!("KERNEL={kernel}"));
     }
+    // `tect build` validates the sealed image outside the Containerfile.
+    // No `ARG` default reaches that run. `podman run` gets `FAMILY` in its
+    // environment instead.
+    let family = image.base.as_ref().map_or("", |base| base.family.as_str());
 
     let mut tags = opts.tags.clone();
     tags.extend(lines("TAGS"));
@@ -298,6 +304,7 @@ pub fn run(root: &Path, opts: &Options) -> Result<Stopped, String> {
                 program,
                 containerfile: &containerfile,
                 build_args: &build_args,
+                family,
                 secrets: &secrets,
                 target: &target,
                 tags: &tags,
@@ -431,6 +438,7 @@ struct Invocation<'a> {
     program: &'a str,
     containerfile: &'a Path,
     build_args: &'a [String],
+    family: &'a str,
     secrets: &'a [(String, String)],
     target: &'a str,
     tags: &'a [String],
@@ -441,12 +449,13 @@ struct Invocation<'a> {
 /// install` will compare, and the image sealed with it. The generated tail's
 /// `ARG COMPOSEFS_DIGEST` is what carries the digest into the seal. Nothing
 /// reaches the user's tags until the sealed image's own digest, its embedded
-/// cmdline and the skeleton's validation have all passed.
+/// cmdline and the generated validation have all passed.
 fn build_uki(root: &Path, invocation: &Invocation) -> Result<(), String> {
     let &Invocation {
         program,
         containerfile,
         build_args,
+        family,
         secrets,
         target,
         tags,
@@ -565,11 +574,11 @@ fn build_uki(root: &Path, invocation: &Invocation) -> Result<(), String> {
                 "{sealed_tag} does not carry composefs={digest} on its UKI cmdline"
             ));
         }
-        // The skeleton's validation step cannot run in the published stage: it
+        // The generated validation step cannot run in the published stage: it
         // writes (the rpm database's shared-memory file, directory mtimes) and
         // moves the digest the UKI embedded. It runs here instead, against the
         // sealed image, and its writes land in a discarded container.
-        validate_sealed(root, &sealed_tag, build_args)
+        validate_sealed(root, &sealed_tag, build_args, family)
     })();
     if let Err(err) = checked {
         remove_image(program, &sealed_tag);
@@ -597,7 +606,7 @@ fn build_uki(root: &Path, invocation: &Invocation) -> Result<(), String> {
 }
 
 /// Everything up to and including the tail section's end: the split base, the
-/// seal and the copy into `/boot`, with the skeleton's trailing steps left
+/// seal and the copy into `/boot`, with the validate region left
 /// out. A step that runs after the seal writes to the published image and
 /// moves the digest the UKI embedded.
 fn seal_containerfile(text: &str) -> Option<String> {
@@ -606,10 +615,15 @@ fn seal_containerfile(text: &str) -> Option<String> {
     Some(text[..end].to_string())
 }
 
-/// The skeleton's checks, run against the sealed image outside the build.
+/// The generated validation, run against the sealed image outside the build.
 /// `validate_argv` is what the podman command is built from.
-fn validate_sealed(root: &Path, tag: &str, build_args: &[String]) -> Result<(), String> {
-    let argv = validate_argv(root, tag, build_args);
+fn validate_sealed(
+    root: &Path,
+    tag: &str,
+    build_args: &[String],
+    family: &str,
+) -> Result<(), String> {
+    let argv = validate_argv(root, tag, build_args, family);
     let status = Command::new("podman")
         .args(&argv)
         .status()
@@ -621,8 +635,8 @@ fn validate_sealed(root: &Path, tag: &str, build_args: &[String]) -> Result<(), 
 }
 
 /// `podman run` of the image's own validation, with the tool the build pins
-/// and the environment the skeleton's step passes it.
-fn validate_argv(root: &Path, tag: &str, build_args: &[String]) -> Vec<String> {
+/// and the environment the generated validate step passes it.
+fn validate_argv(root: &Path, tag: &str, build_args: &[String], family: &str) -> Vec<String> {
     let tool = root.join(layout::MOUNTED);
     let mut argv: Vec<String> = vec![
         "run".to_string(),
@@ -643,7 +657,6 @@ fn validate_argv(root: &Path, tag: &str, build_args: &[String]) -> Vec<String> {
         "VERIFY_EXCEPTIONS",
         "COMPONENT_PRESETS",
         "LUKS_INITRAMFS",
-        "FAMILY",
     ] {
         if let Some(value) = build_args
             .iter()
@@ -652,6 +665,7 @@ fn validate_argv(root: &Path, tag: &str, build_args: &[String]) -> Vec<String> {
             argv.extend(["-e".to_string(), format!("{name}={value}")]);
         }
     }
+    argv.extend(["-e".to_string(), format!("FAMILY={family}")]);
     argv.push(tag.to_string());
     argv.push("validate-image".to_string());
     argv
@@ -987,7 +1001,7 @@ mod tests {
         );
     }
 
-    /// The seal pass stops at the tail: the skeleton's trailing steps would
+    /// The seal pass stops at the tail: the validate region would
     /// run in the published image and move the digest the UKI embedded.
     #[test]
     fn the_seal_file_stops_at_the_tail() {
@@ -1010,7 +1024,7 @@ mod tests {
             "FAMILY=fedora".to_string(),
             "CONTRACT_FILES=a b".to_string(),
         ];
-        let argv = validate_argv(root, "example:latest", &args);
+        let argv = validate_argv(root, "example:latest", &args, "fedora");
         assert!(argv
             .windows(2)
             .any(|w| w[0] == "--entrypoint" && w[1] == "/ctx/tect"));
