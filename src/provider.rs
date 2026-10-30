@@ -81,11 +81,11 @@ impl Index {
         // One collection that cannot be reached takes the whole catalog with
         // it, so a scan that meant to fetch falls back to what is already here.
         // `unread` is what still says the search was incomplete.
-        let fetched = crate::import::catalog(root, sources, fetch);
+        let fetched = catalog(root, sources, fetch);
         let unreached = fetched.as_ref().err().cloned();
         let reached = fetched.is_ok();
         let found = fetched
-            .or_else(|_| crate::import::catalog(root, sources, false))
+            .or_else(|_| catalog(root, sources, false))
             .unwrap_or_default();
         out.extend(found);
         Self {
@@ -103,7 +103,7 @@ impl Index {
                     .iter()
                     .filter(|collection| collection.kind == SourceKind::Components)
                     .filter(|collection| {
-                        !crate::import::cached(root, collection).is_some_and(|dir| {
+                        !crate::collection::cached(root, collection).is_some_and(|dir| {
                             dir.join(collection.subtree().unwrap_or("")).is_dir()
                         })
                     })
@@ -234,6 +234,45 @@ impl Index {
             .iter()
             .find(|held| held.owner.is_none() && held.name == dir)
     }
+}
+
+/// Every component every declared collection holds, by name and then by
+/// collection.
+/// `fetch` decides whether a collection that is not on this machine is
+/// downloaded to answer or passed over. A grouped member is named by its path.
+pub fn catalog(root: &Path, sources: &[Collection], fetch: bool) -> Result<Vec<Provider>, String> {
+    let mut listed: Vec<Provider> = Vec::new();
+    for collection in sources {
+        if collection.kind != SourceKind::Components {
+            continue;
+        }
+        let tree = match fetch {
+            true => crate::collection::tree(root, collection)?,
+            false => match crate::collection::cached(root, collection) {
+                Some(dir) => dir,
+                None => continue,
+            },
+        };
+        let tree = tree.join(collection.subtree().unwrap_or(""));
+        if let Err(err) = std::fs::read_dir(&tree) {
+            if !fetch {
+                continue;
+            }
+            return Err(format!("`{}`: {}: {err}", collection.name, tree.display()));
+        }
+        for name in crate::collection::members(&tree) {
+            listed.push(Provider {
+                owner: Some(collection.name.clone()),
+                declares: crate::parse::component::summary(
+                    &tree.join(&name).join(layout::MANIFEST_FILE),
+                ),
+                name,
+                here: false,
+            });
+        }
+    }
+    listed.sort_by(|a, b| (&a.name, &a.owner).cmp(&(&b.name, &b.owner)));
+    Ok(listed)
 }
 
 /// Every component directory the repository holds.

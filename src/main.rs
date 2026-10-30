@@ -8,7 +8,8 @@ use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tect::command::{self, Cli, Context, Verb};
 use tect::copy;
-use tect::dispatch::{self, Error, USAGE_ERROR};
+use tect::dispatch::{self, USAGE_ERROR};
+use tect::error::Error;
 use tect::model::image::TECT_VERSION;
 
 /// The pointer printed after an operation error. The whole surface is too much

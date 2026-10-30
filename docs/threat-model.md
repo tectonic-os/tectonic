@@ -56,7 +56,7 @@ A collection is a Git repository of components or base-image catalogs that
   `sha256` with no `version`. A `dir` source names a local directory and is
   never fetched.
 - A `sha256` pins the canonical `git archive` of the selected version.
-  `src/import.rs` `fetch_git` refuses an archive whose hash differs.
+  `src/collection.rs` `fetch_git` refuses an archive whose hash differs.
 - Pinning is optional. A source with no `sha256` is unpinned, and every fetch
   of it takes whatever its ref holds at that time. `tect check` warns about
   each unpinned source (`src/dispatch.rs`).

@@ -2,14 +2,17 @@
 //! one in the lock, and lists them in the image the user named.
 
 use crate::copy;
-use crate::create::{report, Change, Listing};
-use crate::dispatch::Error;
+use crate::error::Error;
+use crate::flow::{report, Listing};
 use crate::layout;
-use crate::model::remote::{At, Collection, Kind as SourceKind};
+use crate::model::remote::{Collection, Kind as SourceKind};
+use crate::parse;
 use crate::provenance::lock;
 use crate::provider::Provider;
 use crate::said;
+use crate::scap::Content;
 use common::prompt::Prompt;
+use common::ui::tree::Change;
 use common::ui::Choice;
 use std::path::{Path, PathBuf};
 
@@ -81,7 +84,8 @@ pub fn find(
         }
         verified(collection, enforce)?;
         searched.push(&collection.name);
-        let tree = tree(root, collection)?.join(collection.subtree().unwrap_or(""));
+        let tree =
+            crate::collection::tree(root, collection)?.join(collection.subtree().unwrap_or(""));
         if tree.join(component).join(layout::MANIFEST_FILE).is_file() {
             found.push(Found {
                 owner: collection.name.clone(),
@@ -103,8 +107,11 @@ pub fn find(
             if owner.is_some_and(|owner| owner != collection.name) {
                 continue;
             }
-            let tree = tree(root, collection)?.join(collection.subtree().unwrap_or(""));
-            for path in crate::resolve::name::matching(&members(&tree), component) {
+            let tree =
+                crate::collection::tree(root, collection)?.join(collection.subtree().unwrap_or(""));
+            for path in
+                crate::resolve::name::matching(&crate::collection::members(&tree), component)
+            {
                 found.push(Found {
                     owner: collection.name.clone(),
                     dir: tree.join(&path),
@@ -150,62 +157,10 @@ fn no_library(sources: &[Collection]) -> Result<(), String> {
         return Ok(());
     }
     const NONE: &str = "repo.kdl declares no `sources`, so there is no collection to import from";
-    let block = crate::init::sources_block(&crate::create::Libraries::every());
+    let block = crate::init::sources_block(&crate::flow::Libraries::every());
     Err(format!(
         "{NONE}.\n\nThis is the block `tect create repo` writes:\n\n{block}"
     ))
-}
-
-/// Answers every member of a collection by its path in the tree.
-fn members(tree: &Path) -> Vec<String> {
-    layout::member_dirs(tree)
-        .iter()
-        .map(|path| {
-            path.strip_prefix(tree)
-                .unwrap_or(path)
-                .display()
-                .to_string()
-        })
-        .collect()
-}
-
-/// Every component every declared collection holds, by name and then by
-/// collection.
-/// `fetch` decides whether a collection that is not on this machine is
-/// downloaded to answer or passed over. A grouped member is named by its path.
-pub fn catalog(root: &Path, sources: &[Collection], fetch: bool) -> Result<Vec<Provider>, String> {
-    let mut listed: Vec<Provider> = Vec::new();
-    for collection in sources {
-        if collection.kind != SourceKind::Components {
-            continue;
-        }
-        let tree = match fetch {
-            true => tree(root, collection)?,
-            false => match cached(root, collection) {
-                Some(dir) => dir,
-                None => continue,
-            },
-        };
-        let tree = tree.join(collection.subtree().unwrap_or(""));
-        if let Err(err) = std::fs::read_dir(&tree) {
-            if !fetch {
-                continue;
-            }
-            return Err(format!("`{}`: {}: {err}", collection.name, tree.display()));
-        }
-        for name in members(&tree) {
-            listed.push(Provider {
-                owner: Some(collection.name.clone()),
-                declares: crate::parse::component::summary(
-                    &tree.join(&name).join(layout::MANIFEST_FILE),
-                ),
-                name,
-                here: false,
-            });
-        }
-    }
-    listed.sort_by(|a, b| (&a.name, &a.owner).cmp(&(&b.name, &b.owner)));
-    Ok(listed)
 }
 
 /// The catalog as a question, with what it holds and how it is named. A
@@ -217,7 +172,7 @@ fn offered(
     fit: Option<&Fit>,
 ) -> Result<(Vec<Provider>, Vec<Choice>), String> {
     no_library(sources)?;
-    let listed = catalog(root, sources, true)?;
+    let listed = crate::provider::catalog(root, sources, true)?;
     if listed.is_empty() {
         return Err(format!("no component in {}", names(sources)));
     }
@@ -416,28 +371,6 @@ fn choose_several(
     }
 }
 
-/// The source's tree where it is already on this machine: the directory it
-/// is, a repository fetched at the hash it is still pinned to, or whatever the
-/// last import of an unpinned one left. Nothing is fetched.
-pub fn cached(root: &Path, collection: &Collection) -> Option<PathBuf> {
-    let dir = match &collection.at {
-        At::Dir(dir) => root.join(dir),
-        At::Git(pin) => {
-            let key = source_key(pin).ok()?;
-            let dir = root.join(layout::SOURCES_CACHE).join(&key);
-            if pin.sha256.is_none() {
-                return dir.is_dir().then_some(dir);
-            }
-            let stamp = root.join(layout::SOURCES_CACHE).join(format!("{key}.pin"));
-            match std::fs::read_to_string(&stamp).ok().as_deref() == pin.sha256.as_deref() {
-                true => dir,
-                false => return None,
-            }
-        }
-    };
-    dir.is_dir().then_some(dir)
-}
-
 /// Answers the member `owner/name` from the tree that the provider index read.
 /// Nothing is fetched, so an offer vendors the same files it showed the user.
 pub(crate) fn cached_member(
@@ -454,7 +387,7 @@ pub(crate) fn cached_member(
         return Ok(None);
     };
     verified(collection, enforce)?;
-    let Some(tree) = cached(root, collection) else {
+    let Some(tree) = crate::collection::cached(root, collection) else {
         return Ok(None);
     };
     let dir = tree.join(collection.subtree().unwrap_or("")).join(name);
@@ -511,171 +444,6 @@ pub(crate) fn vendor_all(
         ));
     }
     Ok(wrote)
-}
-
-/// The source's tree on this machine: the directory it already is, or the
-/// fetched repository, verified once and kept for the next lookup. An unpinned
-/// one is fetched once per process, since the ref it follows may have moved.
-pub(crate) fn tree(root: &Path, collection: &Collection) -> Result<PathBuf, String> {
-    let remote = match &collection.at {
-        At::Dir(dir) => {
-            let dir = root.join(dir);
-            if dir.is_dir() {
-                return Ok(dir);
-            }
-            return Err(format!(
-                "`{}` is {}, which is not a directory on this machine",
-                collection.name,
-                dir.display()
-            ));
-        }
-        At::Git(remote) => remote,
-    };
-
-    let key = source_key(remote)?;
-    let cache = root.join(layout::SOURCES_CACHE);
-    let dir = cache.join(&key);
-    let pin = cache.join(format!("{key}.pin"));
-    let run = cache.join(format!("{key}.run"));
-    let this_run = std::process::id().to_string();
-    if remote.sha256.is_some() {
-        if let Some(current) = cached(root, collection) {
-            return Ok(current);
-        }
-    } else if dir.is_dir()
-        && std::fs::read_to_string(&run).is_ok_and(|found| found.trim() == this_run)
-    {
-        return Ok(dir);
-    }
-
-    std::fs::create_dir_all(&cache).map_err(|err| format!("{}: {err}", cache.display()))?;
-    let work = cache.join(format!(".{key}.fetching.{}", std::process::id()));
-    crate::init::remove(&work)?;
-    let work = crate::init::Scratch(work);
-    fetch_git(remote, &work.0).map_err(|err| format!("`{}`: {err}", collection.name))?;
-    crate::init::remove(&dir)?;
-    let fetched = work.0.join("tree");
-    std::fs::rename(&fetched, &dir).map_err(|err| format!("{}: {err}", dir.display()))?;
-    match &remote.sha256 {
-        Some(sha256) => {
-            crate::init::put(&pin, &format!("{sha256}\n"))?;
-            crate::init::remove(&run)?;
-        }
-        None => {
-            crate::init::put(&run, &format!("{this_run}\n"))?;
-            crate::init::remove(&pin)?;
-        }
-    }
-    Ok(dir)
-}
-
-fn source_key(remote: &crate::provenance::Evidence) -> Result<String, String> {
-    let url = remote.url.as_deref().ok_or("source has no Git URL")?;
-    let selector = remote.selector();
-    cache_key(url, selector)
-}
-
-/// The key a Git URL and selector share, which is what makes two sources
-/// naming one library fetch one tree.
-pub fn cache_key(url: &str, selector: &str) -> Result<String, String> {
-    crate::runtime::sha256_stdin(format!("{url}\0{selector}").as_bytes())
-}
-
-/// The directory a fetched source's tree is cached under, for a caller that
-/// seeds or inspects the cache.
-pub fn cache_path(root: &Path, url: &str, selector: &str) -> Result<PathBuf, String> {
-    Ok(root
-        .join(layout::SOURCES_CACHE)
-        .join(cache_key(url, selector)?))
-}
-
-fn git(repo: &Path, args: &[&str]) -> Result<std::process::Output, String> {
-    std::process::Command::new("git")
-        .args(args)
-        .current_dir(repo)
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .env("GIT_ASKPASS", "/bin/false")
-        .env("SSH_ASKPASS", "/bin/false")
-        .output()
-        .map_err(|err| format!("git {}: {err}", args.join(" ")))
-}
-
-fn git_ok(repo: &Path, args: &[&str]) -> Result<std::process::Output, String> {
-    let out = git(repo, args)?;
-    if out.status.success() {
-        return Ok(out);
-    }
-    Err(format!(
-        "git {}: {}\n{}",
-        args.join(" "),
-        out.status,
-        String::from_utf8_lossy(&out.stderr).trim_end()
-    ))
-}
-
-fn fetch_git(remote: &crate::provenance::Evidence, work: &Path) -> Result<(), String> {
-    let url = remote.url.as_deref().ok_or("source has no Git URL")?;
-    let selector = remote.selector();
-    // `git archive` resolves a relative `--output` under the bare repository it
-    // runs in, so every path here has to be absolute first.
-    let work = {
-        let repo = work.join("repo.git");
-        std::fs::create_dir_all(&repo).map_err(|err| format!("{}: {err}", repo.display()))?;
-        std::fs::canonicalize(work).map_err(|err| format!("{}: {err}", work.display()))?
-    };
-    let repo = work.join("repo.git");
-    let tree = work.join("tree");
-    let archive = work.join("source.tar");
-    git_ok(&repo, &["init", "--bare", "--quiet"])?;
-    git_ok(
-        &repo,
-        &[
-            "-c",
-            "protocol.version=2",
-            "fetch",
-            "--quiet",
-            "--depth=1",
-            "--no-tags",
-            // `--` ends the options, so a URL is data even when it starts
-            // with a dash.
-            "--",
-            url,
-            selector,
-        ],
-    )?;
-    let commit = git_ok(&repo, &["rev-parse", "FETCH_HEAD^{commit}"])?;
-    let commit = String::from_utf8_lossy(&commit.stdout).trim().to_string();
-    let archive_arg = archive.to_string_lossy();
-    git_ok(
-        &repo,
-        &[
-            "archive",
-            "--format=tar",
-            &format!("--output={archive_arg}"),
-            &commit,
-        ],
-    )?;
-    if let Some(expected) = &remote.sha256 {
-        crate::runtime::match_sha256(&archive, expected, &format!("{url} at {selector}"))?;
-    }
-    std::fs::create_dir_all(&tree).map_err(|err| format!("{}: {err}", tree.display()))?;
-    let out = std::process::Command::new("tar")
-        .args([
-            "-xf",
-            &archive.to_string_lossy(),
-            "-C",
-            &tree.to_string_lossy(),
-        ])
-        .output()
-        .map_err(|err| format!("tar: {err}"))?;
-    if !out.status.success() {
-        return Err(format!(
-            "tar: {}{}",
-            out.status,
-            String::from_utf8_lossy(&out.stderr)
-        ));
-    }
-    Ok(())
 }
 
 /// Copies the component in under its local name and records it in the lock. The
@@ -806,10 +574,10 @@ pub struct Component {
     /// Lists the entries that a replacing answer removes from the target.
     unlisted: Vec<Unlisted>,
     /// The CI it makes runnable, where that offer was taken.
-    workflows: Option<crate::set::Workflows>,
+    workflows: Option<crate::flow::Workflows>,
     /// The profile the images it is listed in are measured against, where the
     /// set claims rules one selects and that offer was taken.
-    conforms: Vec<crate::set::Conforms>,
+    conforms: Vec<crate::import::Conforms>,
     /// Holds the components that the set imports. Each is copied in where the
     /// repository lacks it. None is listed.
     imported: Vec<Member>,
@@ -954,7 +722,7 @@ impl Component {
                 println!("{}\n", rows.join("\n"));
                 prompt
                     .confirm(copy::GENERATE_WORKFLOWS, copy::YES, copy::NO)?
-                    .then(|| crate::set::Workflows::adding(&list, &named))
+                    .then(|| crate::flow::Workflows::adding(&list, &named))
             }
         };
 
@@ -1027,7 +795,7 @@ impl Component {
                     edits.len() - 1
                 }
             };
-            edits[at].1 = crate::create::unlisting(
+            edits[at].1 = crate::flow::unlisting(
                 &file,
                 &edits[at].1,
                 &gone.image,
@@ -1561,7 +1329,7 @@ fn measured(
     datastream: Option<&Path>,
     brought: &[String],
     prompt: &Prompt,
-) -> Result<Vec<crate::set::Conforms>, String> {
+) -> Result<Vec<crate::import::Conforms>, String> {
     let claims: Vec<&String> = declares
         .iter()
         .flat_map(|held| held.satisfies.iter())
@@ -1632,7 +1400,7 @@ fn measured(
             1 => "declares",
             _ => "declare",
         },
-        crate::set::cost(&measured, list.audit_enforce),
+        cost(&measured, list.audit_enforce),
     );
     let options: Vec<Choice> = profiles
         .iter()
@@ -1644,14 +1412,223 @@ fn measured(
     Ok(images
         .iter()
         .map(|image| {
-            crate::set::Conforms::declaring(image, profiles[chosen].name(), brought.to_vec())
+            crate::import::Conforms::declaring(image, profiles[chosen].name(), brought.to_vec())
         })
         .collect())
+}
+
+/// A `conforms` is the scan gate, so writing one costs a scan on every build,
+/// and in an enforcing repository it costs the build itself. `measured` is the
+/// subject already quoted, since an offer elsewhere may name more than one image.
+pub(crate) fn cost(measured: &str, enforce: bool) -> String {
+    match enforce {
+        false => format!(
+            "A `conforms` turns the scan on: every build measures {measured} against the profile \
+             and publishes the score."
+        ),
+        true => format!(
+            "A `conforms` turns the scan on, and this repository enforces: every build measures \
+             {measured} against the profile, and a rule it fails fails the build."
+        ),
+    }
+}
+
+/// The benchmark profile one image is measured against, and whatever claiming
+/// components the offer alongside it brought.
+pub struct Conforms {
+    /// The image file, as the image was read from.
+    pub(crate) file: PathBuf,
+    /// The image's `name`, which is what the writer walks to.
+    pub(crate) image: String,
+    pub(crate) profile: String,
+    pub(crate) brought: Vec<String>,
+    pub(crate) bring: Option<crate::import::Component>,
+}
+
+impl Conforms {
+    /// The same declaration made out of an offer somewhere else: one image, one
+    /// profile already chosen, and the names the tree says arrived with it.
+    pub(crate) fn declaring(
+        image: &crate::model::image::Image,
+        profile: &str,
+        brought: Vec<String>,
+    ) -> Self {
+        Self {
+            file: PathBuf::from(image.src.name()),
+            image: image.name.clone(),
+            profile: profile.to_string(),
+            brought,
+            bring: None,
+        }
+    }
+
+    /// Which image, then which profile out of the content a scan of it would
+    /// read, then whether to bring the components claiming its rules. Leaving
+    /// either picker is `None` and writes nothing.
+    pub fn collect(
+        root: &Path,
+        named: Option<String>,
+        datastream: Option<PathBuf>,
+        prompt: &Prompt,
+    ) -> Result<Option<Self>, Error> {
+        let crate::Loaded { list, .. } = crate::load(root);
+        // The offer may bring a library component, so it reads the libraries
+        // already on this machine. Resolution reads none.
+        let disk = crate::parse::disk::Disk::scan(root);
+        let index = crate::provider::Index::scan(root, &list.sources, &disk, false);
+        if list.images.is_empty() {
+            return Err(
+                "`set conforms` needs an image; run `tect create image <name>` first"
+                    .to_string()
+                    .into(),
+            );
+        }
+        let ids: Vec<&str> = list.images.iter().map(|image| image.id.as_str()).collect();
+        let at = match named {
+            Some(name) => list
+                .images
+                .iter()
+                .position(|image| image.id == name)
+                .ok_or_else(|| {
+                    Error::Invocation(format!(
+                        "`{name}` is not a declared image; there is {}",
+                        ids.join(", ")
+                    ))
+                })?,
+            None if list.images.len() == 1 => 0,
+            None => {
+                let options: Vec<Choice> = list
+                    .images
+                    .iter()
+                    .map(|image| match image.name == image.id {
+                        true => Choice::new(&image.id, ""),
+                        false => Choice::new(&image.id, &image.name),
+                    })
+                    .collect();
+                match prompt.choose(copy::MEASURED_IMAGE, &options)? {
+                    Some(at) => at,
+                    None => return Ok(None),
+                }
+            }
+        };
+        let image = &list.images[at];
+
+        let (named, family) = crate::scap::named_by(image.base.as_ref());
+        let path = crate::scap::content_path(named, family, datastream.as_deref())?;
+        let content = crate::scap::content_of(&path)?;
+        if content.profiles.is_empty() {
+            return Err(format!(
+                "{} carries no profile to be measured against",
+                path.display()
+            )
+            .into());
+        }
+
+        println!("{}\n", cost(&format!("`{}`", image.id), list.audit_enforce));
+        let options = crate::flow::profile_options(&content);
+        let Some(chosen) = prompt.choose(copy::WHICH_PROFILE, &options)? else {
+            return Ok(None);
+        };
+        let profile = &content.profiles[chosen];
+
+        let bring = offer(image, &content, profile, &index, prompt)?;
+        let bring = match bring.is_empty() {
+            true => None,
+            false => Some(crate::import::bring(
+                root,
+                &list.sources,
+                list.audit_enforce,
+                &bring,
+                &image.id,
+            )?),
+        };
+        Ok(Some(Self {
+            file: PathBuf::from(image.src.name()),
+            image: image.name.clone(),
+            profile: profile.name().to_string(),
+            brought: bring
+                .as_ref()
+                .map(crate::import::Component::brought)
+                .unwrap_or_default(),
+            bring,
+        }))
+    }
+
+    /// The import first, since it writes into the same file, then the
+    /// declaration over whatever is there now.
+    pub fn apply(&self, root: &Path) -> Result<Vec<(PathBuf, Change)>, String> {
+        let mut wrote = match &self.bring {
+            Some(bring) => bring.write(root, &crate::model::image::List::load(root).0.sources)?,
+            None => Vec::new(),
+        };
+        let text = std::fs::read_to_string(&self.file)
+            .map_err(|err| format!("{}: {err}", self.file.display()))?;
+        let spliced = self.spliced(&text)?;
+        std::fs::write(&self.file, spliced)
+            .map_err(|err| format!("{}: {err}", self.file.display()))?;
+        // Last, so the one line the tree draws for the file says both edits.
+        wrote.push((
+            self.file.clone(),
+            Change::Updated(match self.brought.is_empty() {
+                true => format!("measured against `{}`", self.profile),
+                false => format!(
+                    "measured against `{}`, and {} added to components",
+                    self.profile,
+                    crate::said(&self.brought)
+                ),
+            }),
+        ));
+        Ok(wrote)
+    }
+
+    /// In place of the declaration that was there, else in front of the first
+    /// path segment.
+    pub(crate) fn spliced(&self, text: &str) -> Result<String, String> {
+        let was = parse::image::conforms_span(text, &self.image)
+            .ok_or_else(|| format!("{} declares no image `{}`", self.file.display(), self.image))?;
+        let indent = &text[text[..was.offset].rfind('\n').map_or(0, |at| at + 1)..was.offset];
+        let mut out = text.to_string();
+        out.replace_range(
+            was.offset..was.offset + was.len,
+            &match was.len {
+                0 => format!("conforms \"{}\"\n\n{indent}", self.profile),
+                _ => format!("conforms \"{}\"", self.profile),
+            },
+        );
+        Ok(out)
+    }
+}
+
+/// Which components elsewhere claim rules the profile selects that the image does
+/// not have, as the question whether to bring them. A claimant the repository
+/// owns needs a line, which `check`'s conformance notice already says.
+fn offer(
+    image: &crate::model::image::Image,
+    content: &Content,
+    profile: &crate::scap::Profile,
+    index: &crate::provider::Index,
+    prompt: &Prompt,
+) -> Result<Vec<String>, String> {
+    let owed = crate::scap::owed(image, content, profile, index);
+    let named: Vec<String> = owed
+        .helping
+        .iter()
+        .filter(|provider| provider.owner.is_some())
+        .map(|provider| provider.qualified())
+        .collect();
+    if named.is_empty() {
+        return Ok(Vec::new());
+    }
+    match prompt.confirm(copy::IMPORT_CLAIMING, copy::YES, copy::NO)? {
+        true => Ok(named),
+        false => Ok(Vec::new()),
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::remote::At;
 
     fn collection(name: &str, path: &str) -> Collection {
         Collection {
