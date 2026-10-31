@@ -10,6 +10,10 @@
 /// line, a flag or a diagnostic prefix, and a title or a sentence says this.
 pub const PRODUCT: &str = "Tectonic";
 
+/// One host feeds the origin and image URLs because the tool has no second
+/// forge model.
+pub const HOST: &str = "github.com";
+
 // The repository
 
 pub const REPO_NAME: &str = "What will the repo be called?";
@@ -23,7 +27,7 @@ pub const NO_GH: &str = "Install the Github CLI now?";
 /// what the user typed.
 pub fn username(host: &str) -> String {
     match host {
-        crate::create::HOST => "Github username?".to_string(),
+        HOST => "Github username?".to_string(),
         host => format!("Username on {host}?"),
     }
 }

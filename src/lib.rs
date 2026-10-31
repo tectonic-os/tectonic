@@ -2,13 +2,17 @@
 
 pub mod base;
 pub mod build;
+pub mod collection;
 pub mod command;
 pub mod copy;
 pub mod create;
+pub mod declaration;
 pub mod diag;
 pub mod dispatch;
 pub mod emit;
+pub mod error;
 pub mod fetch;
+pub mod flow;
 #[cfg(feature = "fuzzing")]
 pub mod fuzzing;
 pub mod import;

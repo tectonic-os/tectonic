@@ -67,6 +67,64 @@ if grep -rnE '^[[:space:]]*pub(\(crate\))? use common::ui( as [A-Za-z_][A-Za-z0-
     exit 1
 fi
 
+# The command modules keep one direction. `flow` holds the setup questions the
+# commands share, `declaration` writes the text edits below them, `collection`
+# holds a declared collection's tree and cache, `provider` reads the collection,
+# and the command error is its own leaf. Each guard names the move that cut the
+# edge it protects. A renaming import is refused too, because
+# `use crate::import as source` restores the edge without the `crate::import::`
+# path. A module that becomes a directory stops the guard, which then names the
+# file to update.
+forbidden() {
+    local file=$1
+    local pattern=$2
+    local message=$3
+    if [ ! -f "$file" ]; then
+        echo "lint: $file is gone or is now a directory, so the command-edge check cannot run" >&2
+        exit 1
+    fi
+    if grep -nE "$pattern" "$file"; then
+        echo "lint: $message" >&2
+        exit 1
+    fi
+}
+
+forbidden src/provider.rs \
+    'crate::import::|use crate::import( as [A-Za-z_][A-Za-z0-9_]*)?;' \
+    "provider reads import, and the provider index sits below the import flow"
+
+forbidden src/import.rs \
+    'crate::(set|create)::|use crate::(set|create)( as [A-Za-z_][A-Za-z0-9_]*)?;' \
+    "import reads a setup command, and the shared setup lives in flow"
+
+forbidden src/create.rs \
+    'crate::set::|use crate::set( as [A-Za-z_][A-Za-z0-9_]*)?;' \
+    "create reads set, and the shared setup lives in flow"
+
+forbidden src/set.rs \
+    'crate::create::|use crate::create( as [A-Za-z_][A-Za-z0-9_]*)?;' \
+    "set reads create, and the shared setup lives in flow"
+
+forbidden src/copy.rs \
+    'crate::create::|use crate::create( as [A-Za-z_][A-Za-z0-9_]*)?;' \
+    "copy reads create, and the host constant moved into copy"
+
+forbidden src/import.rs \
+    'crate::dispatch::|use crate::dispatch( as [A-Za-z_][A-Za-z0-9_]*)?;' \
+    "a command reads dispatch, and the command error is error.rs"
+
+forbidden src/set.rs \
+    'crate::dispatch::|use crate::dispatch( as [A-Za-z_][A-Za-z0-9_]*)?;' \
+    "a command reads dispatch, and the command error is error.rs"
+
+forbidden src/declaration.rs \
+    'crate::(create|import|set|dispatch|flow|provider)::|use crate::(create|import|set|dispatch|flow|provider)( as [A-Za-z_][A-Za-z0-9_]*)?;' \
+    "declaration writes text and sits below every command and flow"
+
+forbidden src/flow.rs \
+    'crate::(create|import|set|dispatch|provider)::|use crate::(create|import|set|dispatch|provider)( as [A-Za-z_][A-Za-z0-9_]*)?;' \
+    "flow holds the shared setup and sits below every command"
+
 # `install.sh` is what a stranger pipes into `sh`, so it is checked as the
 # shell it declares. Every other script here is bash.
 mapfile -t posix < <(grep -lx '#!/bin/sh' "${scripts[@]}")

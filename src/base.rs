@@ -88,7 +88,7 @@ pub fn catalog(root: &Path, sources: &[Collection]) -> Vec<Base> {
         .iter()
         .filter(|collection| collection.kind == SourceKind::Components)
     {
-        if let Some(dir) = crate::import::cached(root, collection) {
+        if let Some(dir) = crate::collection::cached(root, collection) {
             trees.push((
                 Some(collection.name.clone()),
                 dir.join(collection.subtree().unwrap_or("")),
@@ -117,8 +117,8 @@ pub fn catalog(root: &Path, sources: &[Collection]) -> Vec<Base> {
 /// calling command's to report: what is already cached stays readable.
 pub fn fetch(root: &Path, sources: &[Collection]) -> Result<(), String> {
     for collection in sources {
-        if crate::import::cached(root, collection).is_none() {
-            crate::import::tree(root, collection)?;
+        if crate::collection::cached(root, collection).is_none() {
+            crate::collection::tree(root, collection)?;
         }
     }
     Ok(())

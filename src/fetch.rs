@@ -38,7 +38,7 @@ pub fn components(
                 )
             })?;
         crate::import::verified(library, enforce)?;
-        let upstream = crate::import::tree(root, library)?
+        let upstream = crate::collection::tree(root, library)?
             .join(library.subtree().unwrap_or(""))
             .join(&record.upstream);
         if !upstream.join(layout::MANIFEST_FILE).is_file() {

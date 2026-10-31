@@ -573,7 +573,7 @@ fn datastream() -> String {
 /// The `sources` block `create repo` writes when every default library is
 /// chosen, which a fixture strips before declaring its own collections.
 fn scaffolded_sources() -> String {
-    tect::init::sources_block(&tect::create::Libraries::every())
+    tect::init::sources_block(&tect::flow::Libraries::every())
 }
 
 fn import_sshd(stream: &str) -> [&str; 7] {
@@ -822,7 +822,7 @@ fn setup_component_in_flavour(flow: &Flow) {
     );
     let listed = |at: &str| {
         let (list, _, _) = tect::declarations(&root);
-        tect::create::Listing::collect(&root, vec![at.into()], &common::prompt::Prompt::silent())
+        tect::flow::Listing::collect(&root, vec![at.into()], &common::prompt::Prompt::silent())
             .and_then(|listing| listing.refuse_duplicate(&list, "dev-tools"))
             .err()
             .unwrap_or_default()
