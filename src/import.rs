@@ -6,11 +6,9 @@ use crate::error::Error;
 use crate::flow::{report, Listing};
 use crate::layout;
 use crate::model::remote::{Collection, Kind as SourceKind};
-use crate::parse;
 use crate::provenance::lock;
 use crate::provider::Provider;
 use crate::said;
-use crate::scap::Content;
 use common::prompt::Prompt;
 use common::ui::tree::Change;
 use common::ui::Choice;
@@ -577,7 +575,7 @@ pub struct Component {
     workflows: Option<crate::flow::Workflows>,
     /// The profile the images it is listed in are measured against, where the
     /// set claims rules one selects and that offer was taken.
-    conforms: Vec<crate::import::Conforms>,
+    conforms: Vec<crate::flow::Conforms>,
     /// Holds the components that the set imports. Each is copied in where the
     /// repository lacks it. None is listed.
     imported: Vec<Member>,
@@ -1329,7 +1327,7 @@ fn measured(
     datastream: Option<&Path>,
     brought: &[String],
     prompt: &Prompt,
-) -> Result<Vec<crate::import::Conforms>, String> {
+) -> Result<Vec<crate::flow::Conforms>, String> {
     let claims: Vec<&String> = declares
         .iter()
         .flat_map(|held| held.satisfies.iter())
@@ -1400,7 +1398,7 @@ fn measured(
             1 => "declares",
             _ => "declare",
         },
-        cost(&measured, list.audit_enforce),
+        crate::flow::cost(&measured, list.audit_enforce),
     );
     let options: Vec<Choice> = profiles
         .iter()
@@ -1412,217 +1410,9 @@ fn measured(
     Ok(images
         .iter()
         .map(|image| {
-            crate::import::Conforms::declaring(image, profiles[chosen].name(), brought.to_vec())
+            crate::flow::Conforms::declaring(image, profiles[chosen].name(), brought.to_vec())
         })
         .collect())
-}
-
-/// A `conforms` is the scan gate, so writing one costs a scan on every build,
-/// and in an enforcing repository it costs the build itself. `measured` is the
-/// subject already quoted, since an offer elsewhere may name more than one image.
-pub(crate) fn cost(measured: &str, enforce: bool) -> String {
-    match enforce {
-        false => format!(
-            "A `conforms` turns the scan on: every build measures {measured} against the profile \
-             and publishes the score."
-        ),
-        true => format!(
-            "A `conforms` turns the scan on, and this repository enforces: every build measures \
-             {measured} against the profile, and a rule it fails fails the build."
-        ),
-    }
-}
-
-/// The benchmark profile one image is measured against, and whatever claiming
-/// components the offer alongside it brought.
-pub struct Conforms {
-    /// The image file, as the image was read from.
-    pub(crate) file: PathBuf,
-    /// The image's `name`, which is what the writer walks to.
-    pub(crate) image: String,
-    pub(crate) profile: String,
-    pub(crate) brought: Vec<String>,
-    pub(crate) bring: Option<crate::import::Component>,
-}
-
-impl Conforms {
-    /// The same declaration made out of an offer somewhere else: one image, one
-    /// profile already chosen, and the names the tree says arrived with it.
-    pub(crate) fn declaring(
-        image: &crate::model::image::Image,
-        profile: &str,
-        brought: Vec<String>,
-    ) -> Self {
-        Self {
-            file: PathBuf::from(image.src.name()),
-            image: image.name.clone(),
-            profile: profile.to_string(),
-            brought,
-            bring: None,
-        }
-    }
-
-    /// Which image, then which profile out of the content a scan of it would
-    /// read, then whether to bring the components claiming its rules. Leaving
-    /// either picker is `None` and writes nothing.
-    pub fn collect(
-        root: &Path,
-        named: Option<String>,
-        datastream: Option<PathBuf>,
-        prompt: &Prompt,
-    ) -> Result<Option<Self>, Error> {
-        let crate::Loaded { list, .. } = crate::load(root);
-        // The offer may bring a library component, so it reads the libraries
-        // already on this machine. Resolution reads none.
-        let disk = crate::parse::disk::Disk::scan(root);
-        let index = crate::provider::Index::scan(root, &list.sources, &disk, false);
-        if list.images.is_empty() {
-            return Err(
-                "`set conforms` needs an image; run `tect create image <name>` first"
-                    .to_string()
-                    .into(),
-            );
-        }
-        let ids: Vec<&str> = list.images.iter().map(|image| image.id.as_str()).collect();
-        let at = match named {
-            Some(name) => list
-                .images
-                .iter()
-                .position(|image| image.id == name)
-                .ok_or_else(|| {
-                    Error::Invocation(format!(
-                        "`{name}` is not a declared image; there is {}",
-                        ids.join(", ")
-                    ))
-                })?,
-            None if list.images.len() == 1 => 0,
-            None => {
-                let options: Vec<Choice> = list
-                    .images
-                    .iter()
-                    .map(|image| match image.name == image.id {
-                        true => Choice::new(&image.id, ""),
-                        false => Choice::new(&image.id, &image.name),
-                    })
-                    .collect();
-                match prompt.choose(copy::MEASURED_IMAGE, &options)? {
-                    Some(at) => at,
-                    None => return Ok(None),
-                }
-            }
-        };
-        let image = &list.images[at];
-
-        let (named, family) = crate::scap::named_by(image.base.as_ref());
-        let path = crate::scap::content_path(named, family, datastream.as_deref())?;
-        let content = crate::scap::content_of(&path)?;
-        if content.profiles.is_empty() {
-            return Err(format!(
-                "{} carries no profile to be measured against",
-                path.display()
-            )
-            .into());
-        }
-
-        println!("{}\n", cost(&format!("`{}`", image.id), list.audit_enforce));
-        let options = crate::flow::profile_options(&content);
-        let Some(chosen) = prompt.choose(copy::WHICH_PROFILE, &options)? else {
-            return Ok(None);
-        };
-        let profile = &content.profiles[chosen];
-
-        let bring = offer(image, &content, profile, &index, prompt)?;
-        let bring = match bring.is_empty() {
-            true => None,
-            false => Some(crate::import::bring(
-                root,
-                &list.sources,
-                list.audit_enforce,
-                &bring,
-                &image.id,
-            )?),
-        };
-        Ok(Some(Self {
-            file: PathBuf::from(image.src.name()),
-            image: image.name.clone(),
-            profile: profile.name().to_string(),
-            brought: bring
-                .as_ref()
-                .map(crate::import::Component::brought)
-                .unwrap_or_default(),
-            bring,
-        }))
-    }
-
-    /// The import first, since it writes into the same file, then the
-    /// declaration over whatever is there now.
-    pub fn apply(&self, root: &Path) -> Result<Vec<(PathBuf, Change)>, String> {
-        let mut wrote = match &self.bring {
-            Some(bring) => bring.write(root, &crate::model::image::List::load(root).0.sources)?,
-            None => Vec::new(),
-        };
-        let text = std::fs::read_to_string(&self.file)
-            .map_err(|err| format!("{}: {err}", self.file.display()))?;
-        let spliced = self.spliced(&text)?;
-        std::fs::write(&self.file, spliced)
-            .map_err(|err| format!("{}: {err}", self.file.display()))?;
-        // Last, so the one line the tree draws for the file says both edits.
-        wrote.push((
-            self.file.clone(),
-            Change::Updated(match self.brought.is_empty() {
-                true => format!("measured against `{}`", self.profile),
-                false => format!(
-                    "measured against `{}`, and {} added to components",
-                    self.profile,
-                    crate::said(&self.brought)
-                ),
-            }),
-        ));
-        Ok(wrote)
-    }
-
-    /// In place of the declaration that was there, else in front of the first
-    /// path segment.
-    pub(crate) fn spliced(&self, text: &str) -> Result<String, String> {
-        let was = parse::image::conforms_span(text, &self.image)
-            .ok_or_else(|| format!("{} declares no image `{}`", self.file.display(), self.image))?;
-        let indent = &text[text[..was.offset].rfind('\n').map_or(0, |at| at + 1)..was.offset];
-        let mut out = text.to_string();
-        out.replace_range(
-            was.offset..was.offset + was.len,
-            &match was.len {
-                0 => format!("conforms \"{}\"\n\n{indent}", self.profile),
-                _ => format!("conforms \"{}\"", self.profile),
-            },
-        );
-        Ok(out)
-    }
-}
-
-/// Which components elsewhere claim rules the profile selects that the image does
-/// not have, as the question whether to bring them. A claimant the repository
-/// owns needs a line, which `check`'s conformance notice already says.
-fn offer(
-    image: &crate::model::image::Image,
-    content: &Content,
-    profile: &crate::scap::Profile,
-    index: &crate::provider::Index,
-    prompt: &Prompt,
-) -> Result<Vec<String>, String> {
-    let owed = crate::scap::owed(image, content, profile, index);
-    let named: Vec<String> = owed
-        .helping
-        .iter()
-        .filter(|provider| provider.owner.is_some())
-        .map(|provider| provider.qualified())
-        .collect();
-    if named.is_empty() {
-        return Ok(Vec::new());
-    }
-    match prompt.confirm(copy::IMPORT_CLAIMING, copy::YES, copy::NO)? {
-        true => Ok(named),
-        false => Ok(Vec::new()),
-    }
 }
 
 #[cfg(test)]

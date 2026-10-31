@@ -545,8 +545,7 @@ pub fn dispatch(
             if !prompt.asks() {
                 return Err(Error::Invocation(crate::flow::CONFORMS_BY_HAND.to_string()));
             }
-            let Some(set) = crate::import::Conforms::collect(&root, name, datastream, prompt)?
-            else {
+            let Some(set) = crate::set::Conforms::collect(&root, name, datastream, prompt)? else {
                 return Ok(ExitCode::SUCCESS);
             };
             let wrote = set.apply(&root)?;
