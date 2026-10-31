@@ -68,12 +68,13 @@ if grep -rnE '^[[:space:]]*pub(\(crate\))? use common::ui( as [A-Za-z_][A-Za-z0-
 fi
 
 # The command modules keep one direction. `flow` holds the setup questions the
-# commands share, `collection` holds a declared collection's tree and cache,
-# `provider` reads the collection, and the command error is its own leaf. Each
-# guard names the move that cut the edge it protects. A renaming import is
-# refused too, because `use crate::import as source` restores the edge without
-# the `crate::import::` path. A module that becomes a directory stops the
-# guard, which then names the file to update.
+# commands share, `declaration` writes the text edits below them, `collection`
+# holds a declared collection's tree and cache, `provider` reads the collection,
+# and the command error is its own leaf. Each guard names the move that cut the
+# edge it protects. A renaming import is refused too, because
+# `use crate::import as source` restores the edge without the `crate::import::`
+# path. A module that becomes a directory stops the guard, which then names the
+# file to update.
 forbidden() {
     local file=$1
     local pattern=$2
@@ -115,6 +116,10 @@ forbidden src/import.rs \
 forbidden src/set.rs \
     'crate::dispatch::|use crate::dispatch( as [A-Za-z_][A-Za-z0-9_]*)?;' \
     "a command reads dispatch, and the command error is error.rs"
+
+forbidden src/declaration.rs \
+    'crate::(create|import|set|dispatch|flow|provider)::|use crate::(create|import|set|dispatch|flow|provider)( as [A-Za-z_][A-Za-z0-9_]*)?;' \
+    "declaration writes text and sits below every command and flow"
 
 # `install.sh` is what a stranger pipes into `sh`, so it is checked as the
 # shell it declares. Every other script here is bash.

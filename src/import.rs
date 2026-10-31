@@ -795,7 +795,7 @@ impl Component {
                     edits.len() - 1
                 }
             };
-            edits[at].1 = crate::flow::unlisting(
+            edits[at].1 = crate::declaration::unlisting(
                 &file,
                 &edits[at].1,
                 &gone.image,

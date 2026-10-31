@@ -2,7 +2,8 @@
 //! `Prompt`.
 
 use crate::copy;
-use crate::flow::{append, named_after_root, report, under, Field, Libraries, Listing, Workflows};
+use crate::declaration::append;
+use crate::flow::{named_after_root, report, under, Field, Libraries, Listing, Workflows};
 use crate::layout;
 use common::prompt::Prompt;
 pub use common::ui::tree::Change;
@@ -1534,7 +1535,7 @@ fn create_remote(owner: &str, id: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::flow::{placed, unlisting};
+    use crate::declaration::{placed, unlisting};
 
     /// One component fills both roles, so the offer names it once.
     #[test]

@@ -4,8 +4,9 @@
 //! Collect-then-apply like every other flow, so an apply takes no prompt.
 
 use crate::copy;
+use crate::declaration::{line_indent, splice};
 use crate::error::Error;
-use crate::flow::{claim_options, claimable_rules, line_indent, profile_options, splice};
+use crate::flow::{claim_options, claimable_rules, profile_options};
 use crate::scap::ordinal;
 use crate::{layout, parse};
 use common::prompt::Prompt;

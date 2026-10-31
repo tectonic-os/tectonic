@@ -72,7 +72,7 @@ pub fn repository_kdl(kind: u8, text: &str) {
 }
 
 pub fn kdl_rewrites(text: &str) {
-    crate::flow::fuzz_rewrites(text);
+    crate::declaration::fuzz_rewrites(text);
     let root = root("rewrite");
     let file = root.path().join("image.kdl");
     write(&file, text);

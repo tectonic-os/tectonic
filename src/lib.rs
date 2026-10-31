@@ -6,6 +6,7 @@ pub mod collection;
 pub mod command;
 pub mod copy;
 pub mod create;
+pub mod declaration;
 pub mod diag;
 pub mod dispatch;
 pub mod emit;
