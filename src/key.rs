@@ -390,7 +390,7 @@ fn common_name(
     profile: Option<&str>,
     prompt: &Prompt,
 ) -> Result<String, String> {
-    let named = crate::flow::named_after_root(root).unwrap_or_else(|| "tectonic".to_string());
+    let named = crate::layout::named_after_root(root).unwrap_or_else(|| "tectonic".to_string());
     // The subject says what the certificate is for. Without this both profiles
     // suggest `Secure Boot`, and a repository holding each gets two
     // certificates with one subject.

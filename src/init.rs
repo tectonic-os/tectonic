@@ -97,7 +97,7 @@ pub fn drifted(root: &Path) -> Vec<String> {
 
 /// The `sources` block a new repo.kdl starts with, holding the libraries the
 /// user chose. Answering with none scaffolds no block.
-pub fn sources_block(chosen: &[&crate::base::DefaultLibrary]) -> String {
+pub fn sources_block(chosen: &[&crate::collection::DefaultLibrary]) -> String {
     if chosen.is_empty() {
         return String::new();
     }
@@ -109,7 +109,7 @@ pub fn sources_block(chosen: &[&crate::base::DefaultLibrary]) -> String {
                 "    {} \"{}\" {{\n        url \"{}\"\n        path \"{}\"\n    }}\n",
                 library.kind.as_str(),
                 library.alias,
-                crate::base::LIBRARY_URL,
+                crate::collection::LIBRARY_URL,
                 library.path
             ),
         );
@@ -341,8 +341,7 @@ mod tests {
         use std::os::unix::fs::PermissionsExt as _;
         // Root ignores the directory mode, so the failure cannot be forced as
         // root.
-        // SAFETY: geteuid takes no argument and always succeeds.
-        if unsafe { libc::geteuid() } == 0 {
+        if crate::sys::privileged() {
             return;
         }
         let root = std::env::temp_dir().join(format!("tect-held-{}", std::process::id()));

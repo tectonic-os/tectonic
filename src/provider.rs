@@ -280,7 +280,7 @@ fn own(root: &Path, disk: &Disk) -> Vec<Provider> {
     disk.components()
         .map(|dir| Provider {
             owner: None,
-            name: dir.clone(),
+            name: dir.to_string(),
             here: true,
             declares: parse::component::summary(&layout::manifest(root, dir)),
         })

@@ -356,9 +356,13 @@ pub fn dispatch(
             };
             // Every image in a repository shares its URL, so the id in one is
             // the repository's, which is what the tree it sits in is called.
-            let repo = crate::flow::named_after_root(&root).unwrap_or_default();
-            let url =
-                owner.map(|owner| format!("{}/{repo}", crate::create::origin(copy::HOST, &owner)));
+            let repo = crate::layout::named_after_root(&root).unwrap_or_default();
+            let url = owner.map(|owner| {
+                format!(
+                    "{}/{repo}",
+                    crate::forge::origin(crate::forge::HOST, &owner)
+                )
+            });
             let wrote = crate::create::Image::collect(
                 crate::create::Home {
                     root: &root,
@@ -369,12 +373,12 @@ pub fn dispatch(
                 name,
                 base,
                 "a name argument",
-                crate::flow::Field::Image,
+                crate::setup::Field::Image,
                 None,
                 prompt,
             )?
             .apply(&root)?;
-            crate::flow::report(&root, &wrote);
+            crate::report::report(&root, &wrote);
             Ok(ExitCode::SUCCESS)
         }
         Verb::CreateFlavour => {
@@ -384,7 +388,7 @@ pub fn dispatch(
             };
             let wrote =
                 crate::create::Flavour::collect(&root, name, images, prompt)?.apply(&root)?;
-            crate::flow::report(&root, &wrote);
+            crate::report::report(&root, &wrote);
             Ok(ExitCode::SUCCESS)
         }
         Verb::CreateModule => {
@@ -394,7 +398,7 @@ pub fn dispatch(
             };
             let wrote = crate::create::Component::collect(&root, name, pkgs, with, images, prompt)?
                 .apply(&root)?;
-            crate::flow::report(&root, &wrote);
+            crate::report::report(&root, &wrote);
             Ok(ExitCode::SUCCESS)
         }
         Verb::CreateKey => {
@@ -411,7 +415,7 @@ pub fn dispatch(
             };
             let scripts = crate::create::Scripts::collect(&root, rest, &[], prompt)?;
             let wrote = scripts.apply(&root)?;
-            crate::flow::report(&root, &wrote);
+            crate::report::report(&root, &wrote);
             if !wrote.is_empty() {
                 println!("{}", crate::copy::SCRIPTS_NEXT);
             }
@@ -429,6 +433,7 @@ pub fn dispatch(
         Verb::ImportModule => {
             let name = one_name(rest, name)?;
             let (root, list) = collection_repo(here)?;
+            let mut say = |text: &str| print!("{text}");
             let component = crate::import::Component::collect(
                 crate::import::Request {
                     name,
@@ -440,6 +445,7 @@ pub fn dispatch(
                 &list.sources,
                 list.audit_enforce,
                 prompt,
+                &mut say,
             )?;
             component.apply(&root, &list.sources)?;
             Ok(ExitCode::SUCCESS)
@@ -453,7 +459,7 @@ pub fn dispatch(
                 .iter()
                 .any(|record| record.tracked);
             match (wrote.is_empty(), tracks) {
-                (false, _) => crate::flow::report(&root, &wrote),
+                (false, _) => crate::report::report(&root, &wrote),
                 (true, true) => eprintln!("tect: every tracked component matches its library"),
                 (true, false) => eprintln!("tect: no component tracks its library"),
             }
@@ -480,7 +486,7 @@ pub fn dispatch(
                 }
             }
             match crate::provenance::lock::untrack(&root, key)? {
-                true => crate::flow::report(
+                true => crate::report::report(
                     &root,
                     &[(
                         PathBuf::from(crate::layout::COMPONENTS).join(crate::layout::LOCK_FILE),
@@ -502,26 +508,28 @@ pub fn dispatch(
                 return Ok(ExitCode::from(REPO_ERROR));
             };
             if !prompt.asks() {
-                return Err(Error::Invocation(crate::flow::BY_HAND.to_string()));
+                return Err(Error::Invocation(crate::setup::BY_HAND.to_string()));
             }
             // The declaration remains readable when other repository
             // declarations are invalid, so `check` owns those issues.
             let list = crate::load(&root).list;
             let on: Vec<&str> = list.workflows.iter().map(|w| w.name.as_str()).collect();
-            let Some(set) = crate::flow::Workflows::collect(
+            let mut say = |text: &str| print!("{text}");
+            let Some(set) = crate::setup::Workflows::collect(
                 &crate::resolve::workflow::Basis::of(&list),
                 &on,
                 list.workflows_at,
                 list.publishes_scheduled,
                 list.scans_scheduled,
-                crate::flow::Field::Workflows,
+                crate::setup::Field::Workflows,
                 prompt,
+                &mut say,
             )?
             else {
                 return Ok(ExitCode::SUCCESS);
             };
             let wrote = set.apply(&root)?;
-            crate::flow::report(&root, &wrote);
+            crate::report::report(&root, &wrote);
             println!("\nnext, in {}:\n\x20 tect generate\n", root.display());
             Ok(ExitCode::SUCCESS)
         }
@@ -534,7 +542,7 @@ pub fn dispatch(
                 return Ok(ExitCode::SUCCESS);
             };
             let wrote = set.apply(&root)?;
-            crate::flow::report(&root, &wrote);
+            crate::report::report(&root, &wrote);
             Ok(ExitCode::SUCCESS)
         }
         Verb::SetConforms => {
@@ -543,13 +551,19 @@ pub fn dispatch(
                 return Ok(ExitCode::from(REPO_ERROR));
             };
             if !prompt.asks() {
-                return Err(Error::Invocation(crate::flow::CONFORMS_BY_HAND.to_string()));
+                return Err(Error::Invocation(
+                    crate::conformance::CONFORMS_BY_HAND.to_string(),
+                ));
             }
-            let Some(set) = crate::set::Conforms::collect(&root, name, datastream, prompt)? else {
+            let Some(set) =
+                crate::set::Conforms::collect(&root, name, datastream, prompt, &mut |text| {
+                    print!("{text}");
+                })?
+            else {
                 return Ok(ExitCode::SUCCESS);
             };
             let wrote = set.apply(&root)?;
-            crate::flow::report(&root, &wrote);
+            crate::report::report(&root, &wrote);
             Ok(ExitCode::SUCCESS)
         }
         Verb::SetClaims => {
@@ -560,13 +574,17 @@ pub fn dispatch(
                 return Ok(ExitCode::from(REPO_ERROR));
             };
             if !prompt.asks() {
-                return Err(Error::Invocation(crate::flow::CLAIMS_BY_HAND.to_string()));
+                return Err(Error::Invocation(crate::set::CLAIMS_BY_HAND.to_string()));
             }
-            let Some(set) = crate::set::Claims::collect(&root, &named, datastream, prompt)? else {
+            let Some(set) =
+                crate::set::Claims::collect(&root, &named, datastream, prompt, &mut |text| {
+                    print!("{text}");
+                })?
+            else {
                 return Ok(ExitCode::SUCCESS);
             };
             let wrote = set.apply(&root)?;
-            crate::flow::report(&root, &wrote);
+            crate::report::report(&root, &wrote);
             Ok(ExitCode::SUCCESS)
         }
         Verb::Build => {
@@ -618,7 +636,12 @@ pub fn dispatch(
             }
             println!(
                 "{}",
-                crate::registry::reference(&list, &root, target.as_deref(), tags.last())?
+                crate::registry::reference(
+                    &list,
+                    &root,
+                    target.as_deref(),
+                    tags.last().map(String::as_str)
+                )?
             );
             Ok(ExitCode::SUCCESS)
         }
@@ -641,11 +664,16 @@ pub fn dispatch(
                     .ok_or_else(|| "no default image to take a target from".to_string())?,
             }
             .to_string();
-            let imgref = crate::registry::reference(&list, &root, Some(&selected), tags.last())?;
+            let imgref = crate::registry::reference(
+                &list,
+                &root,
+                Some(&selected),
+                tags.last().map(String::as_str),
+            )?;
             // The media carries the local build, while the installed machine
             // tracks the published reference.
-            let image = images.last().cloned().unwrap_or_else(|| imgref.clone());
-            let recipe = crate::emit::recipe::build(&list, &selected, &image, &imgref, &[])
+            let image = images.last().map_or(imgref.as_str(), String::as_str);
+            let recipe = crate::emit::recipe::build(&list, &selected, image, &imgref, &[])
                 .ok_or_else(|| Error::Invocation(crate::emit::recipe::refusal(&list, &selected)))?;
             print!("{}", recipe.render());
             Ok(ExitCode::SUCCESS)
@@ -769,17 +797,17 @@ fn coverage(
 
     let image = match arg {
         // An argument naming no image is already an issue on the run.
-        Some(id) => match run.list.images.iter().find(|image| image.id == id) {
+        Some(id) => match run.reading.list.images.iter().find(|image| image.id == id) {
             Some(image) => image,
             None => return Ok(()),
         },
-        None => match run.list.default_image() {
+        None => match run.reading.list.default_image() {
             Some(image) => image,
             None => return Ok(()),
         },
     };
     if image.conforms.is_empty() {
-        run.issues.push(
+        run.problems.issues.push(
             crate::diag::Issue::new(format!("`{}` declares no `conforms`", image.id), &image.src)
                 .at(image.span, "this image is measured against nothing")
                 .help(
@@ -789,8 +817,8 @@ fn coverage(
         );
         return Ok(());
     }
-    let Some(read_out) = crate::emit::coverage::of(image, &content, &run.index) else {
-        run.issues.push(
+    let Some(read_out) = crate::emit::coverage::of(image, &content, &run.reading.index) else {
+        run.problems.issues.push(
             crate::diag::Issue::new(
                 format!(
                     "`{}` conforms to `{}`, which is none of the profiles this datastream carries",
@@ -810,8 +838,8 @@ fn coverage(
         true => (read_out.json().render(), read_out.parts()),
         false => (read_out.markdown(), read_out.parts()),
     };
-    run.stdout = stdout;
-    run.parts = parts;
+    run.report.stdout = stdout;
+    run.report.parts = parts;
     Ok(())
 }
 
@@ -910,7 +938,8 @@ fn reading(
         // The `Would claim` column offers library components too, so it reads the
         // libraries already on this machine. Resolution reads none.
         let disk = crate::parse::disk::Disk::scan(&root);
-        run.index = crate::provider::Index::scan(&root, &run.list.sources, &disk, false);
+        run.reading.index =
+            crate::provider::Index::scan(&root, &run.reading.list.sources, &disk, false);
         coverage(
             &mut run,
             command == Command::CoverageJson,
@@ -920,9 +949,9 @@ fn reading(
                 .expect("coverage checked its datastream"),
         )?;
     }
-    let problems = run.issues.report(&run.context);
+    let problems = run.problems.report();
     if command == Command::Check {
-        for name in &run.unpinned {
+        for name in &run.problems.unpinned {
             eprintln!(
                 "tect: `{name}` is unpinned, so a fetch from it takes whatever its ref holds \
                  then, unverified"
@@ -934,7 +963,7 @@ fn reading(
                  is whatever the release holds, unverified"
             );
         }
-        for name in &run.ungoverned {
+        for name in &run.problems.ungoverned {
             eprintln!(
                 "tect: `{name}` ships a Containerfile fragment, and the script rule does not \
                  reach a fragment's own RUN lines"
@@ -943,7 +972,9 @@ fn reading(
         for line in crate::init::drifted(&root) {
             eprintln!("tect: {line}");
         }
-        for line in crate::scap::conformance(&run.list, &run.index, datastream.as_deref())? {
+        for line in
+            crate::scap::conformance(&run.reading.list, &run.reading.index, datastream.as_deref())?
+        {
             eprintln!("tect: {line}");
         }
     }
@@ -968,8 +999,8 @@ fn reading(
         if prompt.draws() {
             // Writing commands share one tree view. A pipe keeps the flat path
             // list because a tree would be harder to consume there.
-            crate::flow::report(&root, &wrote);
-            run.stdout.clear();
+            crate::report::report(&root, &wrote);
+            run.report.stdout.clear();
         }
     }
     // A terminal gets the read-out and nothing else, and only while it is wide
@@ -979,21 +1010,21 @@ fn reading(
         "{}",
         match matches!(command, Command::Graph | Command::Why | Command::Coverage)
             && prompt.draws()
-            && fits(&run.parts)
+            && fits(&run.report.parts)
         {
-            false => run.stdout,
-            true => rendered(&run.parts),
+            false => run.report.stdout,
+            true => rendered(&run.report.parts),
         }
     );
     if command == Command::Check {
-        match run.images {
+        match run.counts.images {
             0 => eprintln!("tect: no image yet; `tect create image <name>` writes one"),
             _ => eprintln!(
                 "tect: {} images, {} components, {} flavours{}",
-                run.images,
-                run.components,
-                run.flavours,
-                match run.suppressed {
+                run.counts.images,
+                run.counts.components,
+                run.counts.flavours,
+                match run.counts.suppressed {
                     0 => String::new(),
                     n => format!(", {n} the base already provides"),
                 }
@@ -1001,7 +1032,7 @@ fn reading(
         }
     }
     if matches!(command, Command::Coverage | Command::CoverageJson) {
-        if let Some(table) = run.parts.iter().find_map(|part| match part {
+        if let Some(table) = run.report.parts.iter().find_map(|part| match part {
             crate::emit::Part::Table(table) => Some(table),
             crate::emit::Part::Heading(_) | crate::emit::Part::Text(_) => None,
         }) {
@@ -1013,7 +1044,7 @@ fn reading(
         }
         // The `Would claim` column concludes from what was read, so it says
         // what was not.
-        match run.index.unsearched() {
+        match run.reading.index.unsearched() {
             clause if clause.is_empty() => {}
             clause => eprintln!("tect: {clause}"),
         }

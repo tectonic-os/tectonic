@@ -11,6 +11,7 @@ use tect::copy;
 use tect::dispatch::{self, USAGE_ERROR};
 use tect::error::Error;
 use tect::model::image::TECT_VERSION;
+use tect::sys;
 
 /// The pointer printed after an operation error. The whole surface is too much
 /// to print.
@@ -167,8 +168,7 @@ fn main() -> ExitCode {
     // Rust ignores SIGPIPE, so `tect plan | head` panics on the write. The
     // default handler ends the run quietly. Every print here is the user's or a
     // script's.
-    // SAFETY: no thread exists yet, and SIG_DFL installs no handler code.
-    unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
+    sys::restore_sigpipe();
 
     match run() {
         Ok(code) => code,

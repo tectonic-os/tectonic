@@ -26,8 +26,8 @@ pub struct Disk {
 
 impl Disk {
     /// Every component directory on disk, whether or not an image lists it.
-    pub fn components(&self) -> impl Iterator<Item = &String> {
-        self.overlays.keys()
+    pub fn components(&self) -> impl Iterator<Item = &str> {
+        self.overlays.keys().map(String::as_str)
     }
 
     /// Whether the directory under `components/` is a component.

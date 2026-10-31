@@ -10,10 +10,6 @@
 /// line, a flag or a diagnostic prefix, and a title or a sentence says this.
 pub const PRODUCT: &str = "Tectonic";
 
-/// One host feeds the origin and image URLs because the tool has no second
-/// forge model.
-pub const HOST: &str = "github.com";
-
 // The repository
 
 pub const REPO_NAME: &str = "What will the repo be called?";
@@ -27,7 +23,7 @@ pub const NO_GH: &str = "Install the Github CLI now?";
 /// what the user typed.
 pub fn username(host: &str) -> String {
     match host {
-        HOST => "Github username?".to_string(),
+        crate::forge::HOST => "Github username?".to_string(),
         host => format!("Username on {host}?"),
     }
 }
@@ -51,7 +47,6 @@ pub const BASE_IMAGE: &str = "base image";
 pub const OTHER_BASE: &str = "Another base image";
 pub const IS_BASE: &str = "a base, which an image lists once as its base";
 pub const OTHER_BASE_ABOUT: &str = "Type an image reference that no base component names";
-pub const BASE_FAMILY: &str = "base family";
 pub const IMAGE_BOOTLOADER: &str = "Which bootloader does it install?";
 pub const BOOTLOADER_GRUB2: &str = "GRUB";
 pub const BOOTLOADER_SYSTEMD: &str = "systemd-boot";

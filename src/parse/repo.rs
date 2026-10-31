@@ -604,7 +604,7 @@ impl List {
     fn load_bases(&mut self, root: &Path, issues: &mut Issues) {
         let disk = crate::parse::disk::Disk::default();
         let version = self.schema_version;
-        let repo_src = self.repo_src.clone();
+        let repo_src = &self.repo_src;
         check_keyword_dirs(root, issues);
         for image in &mut self.images {
             // A segment that only organises lists nothing where no component
@@ -620,7 +620,7 @@ impl List {
                     root,
                     &disk,
                     version,
-                    &repo_src,
+                    repo_src,
                     issues,
                 );
                 let base = component
@@ -1289,11 +1289,11 @@ fn take_base(
     let bases: Vec<usize> = (0..image.entries.len())
         .filter(|at| declares_base(&image.entries[*at], &image.src, root))
         .collect();
-    let src = image.src.clone();
+    let src = &image.src;
     match bases[..] {
         [] => {
             issues.push(
-                Issue::new(format!("`{}` lists no base", image.id), &src)
+                Issue::new(format!("`{}` lists no base", image.id), src)
                     .at(image.span, "nothing to build on")
                     .help(
                         "list a base component, such as `base-image { fedora-bootc { version \
@@ -1303,7 +1303,7 @@ fn take_base(
             return None;
         }
         [_, _, ..] => {
-            let mut issue = Issue::new(format!("`{}` lists two bases", image.id), &src)
+            let mut issue = Issue::new(format!("`{}` lists two bases", image.id), src)
                 .help("an image builds on one base; a second base is a second image");
             for at in &bases {
                 issue = issue.at(image.entries[*at].span, "a base");
@@ -1320,7 +1320,7 @@ fn take_base(
     let mut entry = image.entries.remove(bases[0]);
     if entry.flavour.is_some() {
         issues.push(
-            Issue::new(format!("the base `{}` sits in a flavour", entry.path), &src)
+            Issue::new(format!("the base `{}` sits in a flavour", entry.path), src)
                 .at(entry.span, "gated to one flavour")
                 .help("a base builds every target, so it is listed outside `flavour`"),
         );
@@ -1337,7 +1337,7 @@ fn take_base(
     for found in [&digests, &signs] {
         if let [(name, _, first), (_, _, again), ..] = &found[..] {
             issues.push(
-                Issue::new(format!("`{name}` is declared twice"), &src)
+                Issue::new(format!("`{name}` is declared twice"), src)
                     .at(*first, "first here")
                     .at(*again, "and again here"),
             );
@@ -1349,7 +1349,7 @@ fn take_base(
             [Value::String(digest)] => Some(digest.clone()),
             _ => {
                 issues.push(
-                    Issue::new("`digest` needs a digest", &src)
+                    Issue::new("`digest` needs a digest", src)
                         .at(*span, "not one digest")
                         .help("`digest \"sha256:...\"`, the digest of the base image reference"),
                 );
@@ -1363,7 +1363,7 @@ fn take_base(
             [Value::Bool(signed)] => *signed,
             _ => {
                 issues.push(
-                    Issue::new("`signed` needs #true or #false", &src)
+                    Issue::new("`signed` needs #true or #false", src)
                         .at(*span, "not a boolean")
                         .help(
                             "`signed #false` records that this base publishes no cosign \

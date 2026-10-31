@@ -155,9 +155,9 @@ fn staged(root: &Path, opts: &Options) -> Result<(String, Documents), String> {
     let target = target(&list, opts)
         .ok_or("no target to build an installer iso for; name one with `--target`")?;
     let published = target.published();
-    let tag = crate::registry::tag(opts.tag.as_ref());
+    let tag = crate::registry::tag(opts.tag.as_deref());
     let imgref =
-        crate::registry::reference(&list, root, opts.target.as_deref(), opts.tag.as_ref())?;
+        crate::registry::reference(&list, root, opts.target.as_deref(), opts.tag.as_deref())?;
     // What the script computes for itself on every other path: an `--image`
     // names the bytes, and the published reference above stays the origin.
     let image = match &opts.image {
