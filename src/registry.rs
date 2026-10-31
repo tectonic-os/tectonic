@@ -33,7 +33,7 @@ pub fn reference(
     list: &List,
     root: &Path,
     target: Option<&str>,
-    tag: Option<&String>,
+    tag: Option<&str>,
 ) -> Result<String, String> {
     let target = match target {
         Some(name) => list.find_target(name)?,
@@ -46,9 +46,9 @@ pub fn reference(
 
 /// The tag `--tag` gave, else `$DEFAULT_TAG`, else latest. Lifted out so the
 /// local build and the published reference cannot resolve it differently.
-pub fn tag(given: Option<&String>) -> String {
+pub fn tag(given: Option<&str>) -> String {
     match given {
-        Some(tag) => tag.clone(),
+        Some(tag) => tag.to_string(),
         None => std::env::var("DEFAULT_TAG")
             .ok()
             .filter(|t| !t.is_empty())

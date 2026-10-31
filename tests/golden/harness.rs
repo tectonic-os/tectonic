@@ -95,7 +95,7 @@ pub(super) fn copy(from: &Path, to: &Path) {
 /// would put them, so a sealed run offers bases instead of reaching the
 /// network.
 pub(super) fn seed_bases(root: &Path) {
-    let keyed = tect::collection::cache_path(root, tect::base::LIBRARY_URL, "HEAD")
+    let keyed = tect::collection::cache_path(root, tect::collection::LIBRARY_URL, "HEAD")
         .expect("the default library URL hashes");
     let collections = crate_dir().join("tests/collections/upstream");
     copy(
@@ -112,7 +112,7 @@ pub(super) fn seed_bases(root: &Path) {
 /// The same, with the fixture component tree as well, for a flow whose offer has
 /// to read what the default components library holds.
 pub(super) fn seed_library(root: &Path) {
-    let keyed = tect::collection::cache_path(root, tect::base::LIBRARY_URL, "HEAD")
+    let keyed = tect::collection::cache_path(root, tect::collection::LIBRARY_URL, "HEAD")
         .expect("the default library URL hashes");
     let collections = crate_dir().join("tests/collections/upstream");
     copy(&collections, &keyed.join("components"));

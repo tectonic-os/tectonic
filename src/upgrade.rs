@@ -27,23 +27,24 @@ pub struct Plan {
     pub assets: PathBuf,
 }
 
-/// The pair euid chooses, and the download that fills it. There is no fallback
-/// between the pairs: an unwritable destination names the other. A guess
-/// between them is the guess this command exists not to make.
+/// The privilege test chooses the pair.
+/// The download fills it.
+/// There is no fallback between the pairs: an unwritable destination names the
+/// other. A guess between them is the guess this command exists not to make.
 fn plan(
     version: &str,
     arch: &str,
-    euid: u32,
+    privileged: bool,
     home: Option<PathBuf>,
     data: Option<PathBuf>,
 ) -> Result<Plan, String> {
     let unset = "HOME is not set, so there is no per-user pair to move to";
-    let (bindir, assets) = match euid {
-        0 => (
+    let (bindir, assets) = match privileged {
+        true => (
             PathBuf::from("/usr/local/bin"),
             PathBuf::from("/usr/local/share/tectonic/assets"),
         ),
-        _ => (
+        false => (
             home.ok_or(unset)?.join(".local/bin"),
             data.ok_or(unset)?.join("tectonic/assets"),
         ),
@@ -59,11 +60,12 @@ fn plan(
     })
 }
 
-/// The other pair, which a refusal names so a person knows where else it goes.
-fn instead(euid: u32) -> &'static str {
-    match euid {
-        0 => "the per-user pair is ~/.local/bin with $XDG_DATA_HOME/tectonic/assets",
-        _ => "run as root to move /usr/local/bin and /usr/local/share/tectonic/assets",
+/// A refusal names the pair the command does not use, so a person knows where
+/// else the move goes.
+fn instead(privileged: bool) -> &'static str {
+    match privileged {
+        true => "the per-user pair is ~/.local/bin with $XDG_DATA_HOME/tectonic/assets",
+        false => "run as root to move /usr/local/bin and /usr/local/share/tectonic/assets",
     }
 }
 
@@ -167,12 +169,11 @@ pub fn run() -> Result<(), String> {
         Ordering::Less => println!("tect: running {running}, at {}", here.display()),
     }
 
-    // SAFETY: geteuid takes no argument and always succeeds.
-    let euid = unsafe { libc::geteuid() };
+    let privileged = crate::sys::privileged();
     let plan = plan(
         &latest,
         arch,
-        euid,
+        privileged,
         std::env::var_os("HOME").map(PathBuf::from),
         init::data_home(),
     )?;
@@ -208,12 +209,12 @@ pub fn run() -> Result<(), String> {
 
     for dir in [bindir, parent] {
         fs::create_dir_all(dir)
-            .map_err(|err| format!("{}: {err}\n\n{}", dir.display(), instead(euid)))?;
+            .map_err(|err| format!("{}: {err}\n\n{}", dir.display(), instead(privileged)))?;
     }
 
     let work = init::Scratch(parent.join(format!(".upgrade.{}", std::process::id())));
     fs::create_dir(&work.0)
-        .map_err(|err| format!("{}: {err}\n\n{}", work.0.display(), instead(euid)))?;
+        .map_err(|err| format!("{}: {err}\n\n{}", work.0.display(), instead(privileged)))?;
     let sha256 = digest(&format!("{}.sha256", plan.url))?;
     crate::runtime::extract(&plan.url, Some(&sha256), &work.0, &[])?;
 
@@ -232,7 +233,7 @@ pub fn run() -> Result<(), String> {
     // download is a rename and not a copy begun after the old copy is gone.
     let ready = init::Scratch(bindir.join(format!(".tect.{}", std::process::id())));
     fs::copy(&came, &ready.0)
-        .map_err(|err| format!("{}: {err}\n\n{}", ready.0.display(), instead(euid)))?;
+        .map_err(|err| format!("{}: {err}\n\n{}", ready.0.display(), instead(privileged)))?;
     fs::set_permissions(&ready.0, fs::Permissions::from_mode(0o755))
         .map_err(|err| format!("{}: {err}", ready.0.display()))?;
 
@@ -287,7 +288,7 @@ mod tests {
 
     #[test]
     fn root_and_a_person_take_different_pairs_and_never_each_others() {
-        let root = plan("0.3.8", "x86_64", 0, None, None).unwrap();
+        let root = plan("0.3.8", "x86_64", true, None, None).unwrap();
         assert_eq!(root.bin, PathBuf::from("/usr/local/bin/tect"));
         assert_eq!(
             root.assets,
@@ -306,7 +307,7 @@ mod tests {
         let user = plan(
             "0.3.8",
             "x86_64",
-            1000,
+            false,
             Some(home.clone()),
             Some(PathBuf::from("/elsewhere/data")),
         )
@@ -316,6 +317,10 @@ mod tests {
             user.assets,
             PathBuf::from("/elsewhere/data/tectonic/assets")
         );
+
+        // A refusal names the other pair, so each arm is read here.
+        assert!(instead(true).contains("per-user"));
+        assert!(instead(false).contains("run as root"));
     }
 
     /// The asset is named for the architecture, so an aarch64 host never
@@ -323,7 +328,7 @@ mod tests {
     #[test]
     fn the_asset_is_named_for_the_architecture() {
         for arch in PUBLISHED {
-            let url = plan("0.3.8", arch, 0, None, None).unwrap().url;
+            let url = plan("0.3.8", arch, true, None, None).unwrap().url;
             assert!(
                 url.ends_with(&format!("tect-v0.3.8-{arch}-linux-musl.tar.gz")),
                 "{url}"
@@ -333,11 +338,11 @@ mod tests {
 
     #[test]
     fn a_person_with_no_home_is_refused_rather_than_sent_to_usr_local() {
-        assert!(plan("0.3.8", "x86_64", 1000, None, None).is_err());
+        assert!(plan("0.3.8", "x86_64", false, None, None).is_err());
         assert!(plan(
             "0.3.8",
             "x86_64",
-            1000,
+            false,
             Some(PathBuf::from("/home/x")),
             None
         )

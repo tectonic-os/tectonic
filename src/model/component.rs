@@ -60,6 +60,7 @@ impl Copr {
         )
     }
 }
+
 /// A benchmark and the rules within it this component claims to satisfy. The
 /// tool records the claim; a later phase verifies it with `oscap`.
 pub struct Coverage {
@@ -98,6 +99,37 @@ pub struct BaseFacts {
     /// first.
     pub bootloaders: Vec<String>,
     pub scap_content: String,
+}
+
+/// A component that declares a `base` node, as `create image` offers it.
+pub struct BaseComponent {
+    /// Holds the component's path, which is what the image lists the base by.
+    pub name: String,
+    /// Names the library that holds the component. It is None for a base
+    /// component the repository already holds.
+    pub owner: Option<String>,
+    /// Holds the image reference, with the default `version` written in.
+    pub image: String,
+    pub family: String,
+    /// Lists the capabilities the upstream image already ships, which suppress
+    /// a component providing only these.
+    pub provides: Vec<String>,
+    /// Lists the capabilities the base is not usable without, which a component
+    /// in the image has to provide.
+    pub requires: Vec<String>,
+    /// Lists the components that the base imports.
+    pub imports: Vec<String>,
+    /// Holds what the user needs to see to pick between this and the rest.
+    pub about: String,
+    /// Holds the default of the base's `version` option. `create image`
+    /// writes it on the base entry, so Renovate keeps it current.
+    pub version: Option<String>,
+    /// The SSG datastream file an image on this base is measured against, as a
+    /// bare filename under the content directory.
+    pub scap_content: String,
+    /// Lists the bootloaders an image on this base can install, its default
+    /// first.
+    pub bootloaders: Vec<String>,
 }
 
 /// A provided name and the absolute path that witnesses it.
@@ -178,24 +210,6 @@ pub enum Position {
     /// whose work runs over the finished rootfs needs a stage to bind it from,
     /// and the lineage stage is only nameable once it has ended.
     Tail,
-}
-
-impl Component {
-    /// Answers whether this component removes a name or a name above it.
-    pub fn withdraws(&self, name: &str) -> bool {
-        self.removes
-            .iter()
-            .any(|decl| crate::resolve::meets(name, &decl.name))
-    }
-
-    /// Answers whether this component meets a requirement.
-    pub fn answers(&self, required: &str) -> bool {
-        crate::resolve::answers(
-            &self.path,
-            self.provides.iter().map(|decl| decl.name.as_str()),
-            required,
-        )
-    }
 }
 
 pub struct Component {
@@ -289,6 +303,24 @@ pub struct Component {
     /// The network each step of this component's layer runs with, once the
     /// repository rule is applied.
     pub access: Access,
+}
+
+impl Component {
+    /// Answers whether this component removes a name or a name above it.
+    pub fn withdraws(&self, name: &str) -> bool {
+        self.removes
+            .iter()
+            .any(|decl| crate::resolve::meets(name, &decl.name))
+    }
+
+    /// Answers whether this component meets a requirement.
+    pub fn answers(&self, required: &str) -> bool {
+        crate::resolve::answers(
+            &self.path,
+            self.provides.iter().map(|decl| decl.name.as_str()),
+            required,
+        )
+    }
 }
 
 /// The network each step of one component layer runs with. A `true` step keeps

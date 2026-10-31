@@ -6,8 +6,39 @@
 //! stamp matches.
 
 use crate::layout;
-use crate::model::remote::{At, Collection};
+use crate::model::remote::{At, Collection, Kind as SourceKind};
 use std::path::{Path, PathBuf};
+
+/// The repository every default library is read from.
+pub const LIBRARY_URL: &str = "https://github.com/tectonic-os/library";
+
+/// One library this repository reads by default.
+/// `create repo` offers it.
+/// `set library` adds it by its kind alone.
+pub struct DefaultLibrary {
+    pub kind: SourceKind,
+    /// The alias the source is declared under.
+    pub alias: &'static str,
+    /// The directory inside the library's repository that holds this kind.
+    pub path: &'static str,
+    /// What a person picks it by, in the `create repo` question.
+    pub about: &'static str,
+}
+
+pub const DEFAULT_LIBRARIES: [DefaultLibrary; 1] = [DefaultLibrary {
+    kind: SourceKind::Components,
+    alias: "tectonic-components",
+    path: "components",
+    about: "Feature components and base images for many use cases",
+}];
+
+/// The default library of one kind, which every kind has.
+pub fn default_library(kind: SourceKind) -> &'static DefaultLibrary {
+    DEFAULT_LIBRARIES
+        .iter()
+        .find(|library| library.kind == kind)
+        .expect("every source kind has a default library")
+}
 
 /// Answers every member of a collection by its path in the tree.
 pub(crate) fn members(tree: &Path) -> Vec<String> {
@@ -42,6 +73,18 @@ pub fn cached(root: &Path, collection: &Collection) -> Option<PathBuf> {
         }
     };
     dir.is_dir().then_some(dir)
+}
+
+/// Brings every declared library that is not on this machine onto it, for a
+/// command that reads the bases while the user can wait. A failure is the
+/// calling command's to report: what is already cached stays readable.
+pub fn fetch(root: &Path, sources: &[Collection]) -> Result<(), String> {
+    for collection in sources {
+        if cached(root, collection).is_none() {
+            tree(root, collection)?;
+        }
+    }
+    Ok(())
 }
 
 /// The source's tree on this machine: the directory it already is, or the
