@@ -6,8 +6,8 @@
 use crate::copy;
 use crate::declaration::{line_indent, splice};
 use crate::error::Error;
-use crate::flow::{claim_options, claimable_rules, profile_options};
-use crate::scap::ordinal;
+use crate::flow::profile_options;
+use crate::scap::{ordinal, rule_name, Content};
 use crate::{layout, parse};
 use common::prompt::Prompt;
 use common::ui::tree::Change;
@@ -150,6 +150,53 @@ impl Library {
             self.alias
         )
     }
+}
+
+/// The branch a benchmark number sits in: its dotted prefix, and one flat
+/// branch for a number with no dot to group it by, since a STIG ident nests
+/// nowhere.
+fn group(number: &str) -> &str {
+    number.rsplit_once('.').map_or("other", |(head, _)| head)
+}
+
+fn claimable_rules<'a>(
+    content: &'a Content,
+    selected: &'a BTreeSet<String>,
+) -> Vec<(&'a String, &'a BTreeSet<String>)> {
+    let mut rules: Vec<_> = selected
+        .iter()
+        .filter_map(|rule| content.numbers.get(rule).map(|numbers| (rule, numbers)))
+        .collect();
+    rules.sort_by_key(|(rule, numbers)| {
+        (
+            numbers
+                .iter()
+                .next()
+                .map(|number| ordinal(number))
+                .unwrap_or_default(),
+            (*rule).clone(),
+        )
+    });
+    rules
+}
+
+fn claim_options(content: &Content, rules: &[(&String, &BTreeSet<String>)]) -> Vec<Choice> {
+    rules
+        .iter()
+        .map(|(rule, numbers)| {
+            let first = numbers.iter().next().expect("a number reaches the rule");
+            Choice::new(
+                format!(
+                    "{}  {}  {}",
+                    first,
+                    content.titles.get(*rule).unwrap_or(*rule),
+                    rule_name(rule)
+                ),
+                content.descriptions.get(*rule).cloned().unwrap_or_default(),
+            )
+            .within(group(first))
+        })
+        .collect()
 }
 
 /// The benchmark numbers one component claims, chosen out of the rules a profile
@@ -314,7 +361,7 @@ impl Claims {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::flow::{group, workflow_options, Field, Workflows};
+    use crate::flow::{workflow_options, Field, Workflows};
     use crate::import::Conforms;
     use crate::resolve::workflow::{Basis, DEFAULT_AT};
 

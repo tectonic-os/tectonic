@@ -9,11 +9,10 @@ use crate::declaration::{append, placed, splice, wrap};
 use crate::layout;
 use crate::parse;
 use crate::resolve::workflow::{Basis, Shipped, DEFAULT_AT, SHIPPED};
-use crate::scap::{ordinal, rule_name, Content};
+use crate::scap::Content;
 use common::prompt::Prompt;
 use common::ui::tree::Change;
 use common::ui::{Answer, Choice};
-use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 pub fn named_after_root(root: &Path) -> Option<String> {
@@ -740,61 +739,11 @@ pub(crate) fn workflow_options(basis: &Basis) -> Vec<Choice> {
         .collect()
 }
 
-/// The branch a benchmark number sits in: its dotted prefix, and one flat
-/// branch for a number with no dot to group it by, since a STIG ident nests
-/// nowhere.
-pub(crate) fn group(number: &str) -> &str {
-    number.rsplit_once('.').map_or("other", |(head, _)| head)
-}
-
 pub(crate) fn profile_options(content: &Content) -> Vec<Choice> {
     content
         .profiles
         .iter()
         .map(|profile| Choice::new(profile.name(), &profile.title))
-        .collect()
-}
-
-pub(crate) fn claimable_rules<'a>(
-    content: &'a Content,
-    selected: &'a BTreeSet<String>,
-) -> Vec<(&'a String, &'a BTreeSet<String>)> {
-    let mut rules: Vec<_> = selected
-        .iter()
-        .filter_map(|rule| content.numbers.get(rule).map(|numbers| (rule, numbers)))
-        .collect();
-    rules.sort_by_key(|(rule, numbers)| {
-        (
-            numbers
-                .iter()
-                .next()
-                .map(|number| ordinal(number))
-                .unwrap_or_default(),
-            (*rule).clone(),
-        )
-    });
-    rules
-}
-
-pub(crate) fn claim_options(
-    content: &Content,
-    rules: &[(&String, &BTreeSet<String>)],
-) -> Vec<Choice> {
-    rules
-        .iter()
-        .map(|(rule, numbers)| {
-            let first = numbers.iter().next().expect("a number reaches the rule");
-            Choice::new(
-                format!(
-                    "{}  {}  {}",
-                    first,
-                    content.titles.get(*rule).unwrap_or(*rule),
-                    rule_name(rule)
-                ),
-                content.descriptions.get(*rule).cloned().unwrap_or_default(),
-            )
-            .within(group(first))
-        })
         .collect()
 }
 
