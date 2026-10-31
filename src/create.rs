@@ -3,8 +3,11 @@
 
 use crate::copy;
 use crate::declaration::append;
-use crate::flow::{named_after_root, report, under, Field, Libraries, Listing, Workflows};
+use crate::forge;
 use crate::layout;
+use crate::layout::{named_after_root, under};
+use crate::report::report;
+use crate::setup::{Field, Libraries, Listing, Workflows};
 use common::prompt::Prompt;
 pub use common::ui::tree::Change;
 use common::ui::{Answer, Choice};
@@ -21,10 +24,6 @@ const BUILD_ENVIRONMENT: &str = "build-environment";
 /// time. Without it, the booted system keeps the name of the upstream image.
 const OS_RELEASE: &str = "os-release";
 
-pub fn origin(host: &str, owner: &str) -> String {
-    format!("https://{host}/{owner}")
-}
-
 /// Flags seed only the first pass. A repeated field opens on its current
 /// answer. The root flag persists because it alone locates the tree.
 #[derive(Default)]
@@ -37,9 +36,34 @@ struct Given {
     root: Option<PathBuf>,
 }
 
+/// `parse` refuses a blank repository name, repository id, image name,
+/// image base or base family.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct NonEmpty(String);
+
+impl NonEmpty {
+    fn parse(value: impl Into<String>, what: &str) -> Result<Self, String> {
+        let value = value.into();
+        if value.trim().is_empty() {
+            return Err(format!("{what} is empty"));
+        }
+        Ok(Self(value))
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for NonEmpty {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
 pub struct Repo {
-    name: String,
-    id: String,
+    name: NonEmpty,
+    id: NonEmpty,
     root: PathBuf,
     host: String,
     /// Ownership is absent when the user declines scheduled builds and no
@@ -68,8 +92,8 @@ impl Repo {
     ) -> Result<Option<Self>, String> {
         let mut given = Given {
             name,
-            host,
-            owner,
+            host: host.filter(|host| !host.trim().is_empty()),
+            owner: owner.filter(|owner| !owner.trim().is_empty()),
             image: image_name,
             base,
             root: root_arg,
@@ -113,19 +137,25 @@ impl Repo {
     ) -> Result<Self, String> {
         let name = match prev {
             Some(prev) if from > Field::Name => prev.name.clone(),
-            _ => prompt.line(
-                given
-                    .name
-                    .clone()
-                    .or_else(|| given.root.as_deref().and_then(named_after_root)),
-                copy::REPO_NAME,
-                "a name argument",
-                "",
-                prev.map(|prev| prev.name.as_str()),
+            _ => NonEmpty::parse(
+                prompt.line(
+                    given
+                        .name
+                        .clone()
+                        .or_else(|| given.root.as_deref().and_then(named_after_root)),
+                    copy::REPO_NAME,
+                    "a name argument",
+                    "",
+                    prev.map(|prev| prev.name.as_str()),
+                )?,
+                "the repository name",
             )?,
         };
-        let id = crate::init::id(&name)?;
-        let root = given.root.clone().unwrap_or_else(|| PathBuf::from(&id));
+        let id = NonEmpty::parse(crate::init::id(name.as_str())?, "the repository id")?;
+        let root = given
+            .root
+            .clone()
+            .unwrap_or_else(|| PathBuf::from(id.as_str()));
         refuse_nesting(&root)?;
         let assets = crate::init::assets()?;
         if prev.is_none() {
@@ -150,7 +180,7 @@ impl Repo {
                     };
                 let host = match (configure, given.host.clone()) {
                     (true, None) => choose_host(prev.map(|prev| prev.host.as_str()), prompt)?,
-                    (_, given) => given.unwrap_or_else(|| copy::HOST.to_string()),
+                    (_, given) => given.unwrap_or_else(|| forge::HOST.to_string()),
                 };
                 let owner = match configure {
                     true => Some(prompt.line(
@@ -176,7 +206,7 @@ impl Repo {
                 _ => {
                     // The `gh` command supports GitHub, so only a GitHub origin
                     // can offer remote repository creation.
-                    let offering = host == copy::HOST && prompt.asks();
+                    let offering = host == forge::HOST && prompt.asks();
                     // The origin line belongs to the question above it, which a
                     // re-entry at this row did not ask.
                     if from <= Field::Provider {
@@ -216,7 +246,7 @@ impl Repo {
         }
         let url = owner
             .as_deref()
-            .map(|owner| format!("{}/{id}", origin(&host, owner)));
+            .map(|owner| format!("{}/{id}", forge::origin(&host, owner)));
         let libraries = match prev {
             Some(prev) if from > Field::Libraries => prev.libraries.clone(),
             _ => Libraries::collect(prev.map(|prev| &prev.libraries), prompt)?,
@@ -242,7 +272,7 @@ impl Repo {
                     true => Some(Image::collect(
                         Home {
                             root: &root,
-                            repo: &name,
+                            repo: name.as_str(),
                             url,
                             sources_text: &crate::init::sources_block(&libraries.chosen),
                         },
@@ -262,10 +292,14 @@ impl Repo {
             true => {
                 // The family the base belongs to is what makes a workflow row
                 // reachable, so an edited base re-words the rows below it.
-                let family = image.as_ref().map_or("", |image| image.family.as_str());
+                let family = image
+                    .as_ref()
+                    .and_then(|image| image.family.as_ref())
+                    .map_or("", NonEmpty::as_str);
                 let basis = crate::resolve::workflow::Basis::scaffolding(family);
+                let mut say = |text: &str| print!("{text}");
                 match prev.and_then(|prev| prev.workflows.as_ref()) {
-                    Some(held) => held.again(&basis, from, prompt)?,
+                    Some(held) => held.again(&basis, from, prompt, &mut say)?,
                     None => Workflows::collect(
                         &basis,
                         &Workflows::every(&basis),
@@ -274,6 +308,7 @@ impl Repo {
                         false,
                         from,
                         prompt,
+                        &mut say,
                     )?,
                 }
             }
@@ -305,7 +340,7 @@ impl Repo {
     /// `none` row that can re-enter the gate.
     fn rows(&self) -> Vec<(Field, &'static str, String)> {
         let mut rows = vec![
-            (Field::Name, copy::ROW_NAME, self.name.clone()),
+            (Field::Name, copy::ROW_NAME, self.name.to_string()),
             (
                 Field::Provider,
                 copy::ROW_PROVIDER,
@@ -317,7 +352,7 @@ impl Repo {
         ];
         // The action says what will happen because no other screen text says
         // a remote will be made.
-        if self.owner.is_some() && self.host == copy::HOST {
+        if self.owner.is_some() && self.host == forge::HOST {
             rows.push((
                 Field::Remote,
                 copy::ROW_REMOTE,
@@ -331,8 +366,8 @@ impl Repo {
         rows.push(self.libraries.row());
         match &self.image {
             Some(image) => {
-                rows.push((Field::Image, copy::ROW_IMAGE, image.name.clone()));
-                rows.push((Field::Base, copy::ROW_BASE, image.base.clone()));
+                rows.push((Field::Image, copy::ROW_IMAGE, image.name.to_string()));
+                rows.push((Field::Base, copy::ROW_BASE, image.base.to_string()));
             }
             None => rows.push((Field::Image, copy::ROW_IMAGE, copy::NONE.to_string())),
         }
@@ -352,7 +387,7 @@ impl Repo {
     pub fn apply(&self) -> Result<(), String> {
         let mut wrote: Vec<(PathBuf, Change)> = crate::init::write(
             &self.root,
-            &self.name,
+            self.name.as_str(),
             &self.assets,
             &crate::init::sources_block(&self.libraries.chosen),
         )?
@@ -369,7 +404,7 @@ impl Repo {
         }
         wrote.extend(self.scripts.apply(&self.root)?);
         if let (true, Some(owner)) = (self.remote, &self.owner) {
-            create_remote(owner, &self.id)?;
+            create_remote(owner, self.id.as_str())?;
             println!("created {}/{} on github", owner, self.id);
         }
         report(&self.root, &wrote);
@@ -387,10 +422,10 @@ impl Repo {
             next.push(GH_INSTALL.to_string());
         }
         if let Some(owner) = &self.owner {
-            next.push(match self.remote || host != copy::HOST {
+            next.push(match self.remote || host != forge::HOST {
                 true => format!(
                     "git remote add origin {}/{id} && git push -u origin main",
-                    origin(host, owner)
+                    forge::origin(host, owner)
                 ),
                 false => format!("gh repo create {owner}/{id} --source=. --push"),
             });
@@ -527,22 +562,22 @@ impl Scripts {
 /// The host catalog is limited to the forges supported by generated workflows.
 fn choose_host(current: Option<&str>, prompt: &Prompt) -> Result<String, String> {
     let options = host_options();
-    let at = current.map(|held| usize::from(held != copy::HOST));
+    let at = current.map(|held| usize::from(held != forge::HOST));
     match ask_one(prompt, copy::REPO_HOST, &options, at)? {
-        Some(0) | None => Ok(copy::HOST.to_string()),
+        Some(0) | None => Ok(forge::HOST.to_string()),
         _ => prompt.line(
             None,
             copy::FORGEJO_ADDRESS,
             "`--host`",
             "",
-            current.filter(|held| *held != copy::HOST),
+            current.filter(|held| *held != forge::HOST),
         ),
     }
 }
 
 fn host_options() -> [Choice; 2] {
     [
-        Choice::new(copy::HOST, copy::host_github()),
+        Choice::new(forge::HOST, copy::host_github()),
         Choice::new("forgejo", copy::HOST_FORGEJO),
     ]
 }
@@ -565,10 +600,11 @@ fn ask_one(
 pub struct Image {
     file: PathBuf,
     text: String,
-    pub name: String,
-    pub base: String,
-    /// The base family decides which CI workflows can run.
-    pub family: String,
+    name: NonEmpty,
+    base: NonEmpty,
+    /// The base family decides which CI workflows can run and which base
+    /// providers are offered. It is absent when no base component declares one.
+    family: Option<NonEmpty>,
     /// The recorded choice keeps the base-provider offer stable on re-entry.
     took: bool,
     /// An uncatalogued base has no installer bootloader default.
@@ -599,6 +635,10 @@ pub struct Home<'a> {
 impl Image {
     /// A missing image name falls back to the repository name. Existing images
     /// already carry the repository URL.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the image answers one question at a time before it writes its file"
+    )]
     pub fn collect(
         home: Home,
         name: Option<String>,
@@ -616,17 +656,23 @@ impl Image {
         } = home;
         let name = match prev {
             Some(prev) if from > Field::Image => prev.name.clone(),
-            _ => prompt.line(
-                name,
-                copy::IMAGE_NAME,
-                flag,
-                "",
-                prev.map(|prev| prev.name.as_str())
-                    .or_else(|| crate::init::id(repo).is_ok().then_some(repo)),
+            _ => NonEmpty::parse(
+                prompt.line(
+                    name,
+                    copy::IMAGE_NAME,
+                    flag,
+                    "",
+                    prev.map(|prev| prev.name.as_str())
+                        .or_else(|| crate::init::id(repo).is_ok().then_some(repo)),
+                )?,
+                "the image name",
             )?,
         };
         let took = prev.is_none_or(|prev| prev.took);
-        let id = crate::init::id(&name)?;
+        if base.as_deref().is_some_and(|base| base.trim().is_empty()) {
+            return Err("`--base` is empty; name a base image or a base component".to_string());
+        }
+        let id = crate::init::id(name.as_str())?;
         let file = root.join(format!("{id}{}", layout::IMAGE_SUFFIX));
         if file.exists() {
             return Err(format!("{} is already there", file.display()));
@@ -653,10 +699,10 @@ impl Image {
             }
             false => list.sources.as_slice(),
         };
-        if let Err(why) = crate::base::fetch(root, sources) {
+        if let Err(why) = crate::collection::fetch(root, sources) {
             eprintln!("tect: {why}; the bases offered are only what is already on this machine");
         }
-        let bases = crate::base::catalog(root, sources);
+        let bases = crate::bases::catalog(root, sources);
         let base = match base {
             Some(given) => given,
             None => choose_base(&bases, prev.map(|prev| prev.base.as_str()), prompt)?,
@@ -665,32 +711,37 @@ impl Image {
         // The image names a base component by its path.
         // A path that names no component is a typo.
         // Written as a reference, it would fail only when the build pulls it.
-        if crate::base::find(&bases, &base).is_none() && crate::model::image::is_local_path(&base) {
+        if crate::bases::find(&bases, &base).is_none() && crate::model::image::is_local_path(&base)
+        {
             return Err(format!(
                 "`{base}` names no base component in the repository or a library; give an image \
                  reference with a tag, such as `quay.io/fedora/fedora-bootc:44`"
             ));
         }
-        let family = match crate::base::find(&bases, &base) {
-            Some(known) => known.family.clone(),
-            None => prompt.text(
-                None,
-                copy::BASE_FAMILY,
-                "`--base`, naming a base component the repository or a library holds",
-                bases.first().map(|base| base.family.as_str()),
-            )?,
-        };
+        let known = crate::bases::find(&bases, &base);
+        let family = known
+            .filter(|known| !known.family.trim().is_empty())
+            .and_then(|known| NonEmpty::parse(known.family.clone(), "the base family").ok());
         let disk = crate::parse::disk::Disk::scan(root);
-        let known = crate::base::find(&bases, &base);
         let index = crate::provider::Index::scan(root, sources, &disk, false);
-        let roles = roles(known, &index);
-        let mut wanted = wanted(&index, &family, &roles);
+        let roles = match family {
+            Some(_) => roles(known, &index),
+            None => Vec::new(),
+        };
+        let mut wanted = match &family {
+            Some(family) => wanted(&index, family.as_str(), &roles),
+            None => Vec::new(),
+        };
         // Network is used only while the user can answer the provider question
         // and the local collections leave a required role unresolved. The
         // fetch lands in the repository's own source cache, because a library
         // the answer names is one the repository reads from then on.
         let fetched;
-        if wanted.len() < roles.len() && prompt.asks() && !index.unread().is_empty() {
+        if !roles.is_empty()
+            && wanted.len() < roles.len()
+            && prompt.asks()
+            && !index.unread().is_empty()
+        {
             fetched = crate::provider::Index::scan(root, sources, &disk, true);
             // One line in this tool's voice precedes the offer it narrows. The
             // fetcher's own `curl: (6) Could not resolve host` does not explain
@@ -700,7 +751,9 @@ impl Image {
                     "tect: {why}; what is offered below is only what is already on this machine"
                 );
             }
-            wanted = self::wanted(&fetched, &family, &roles);
+            if let Some(family) = &family {
+                wanted = self::wanted(&fetched, family.as_str(), &roles);
+            }
         }
         let take_wanted = match wanted.is_empty() {
             true => true,
@@ -789,16 +842,16 @@ impl Image {
                     manifest,
                     version,
                     digest,
-                } = own_base(root, &base, &family)?;
+                } = own_base(root, &base)?;
                 (path.clone(), Some((path, manifest)), version, digest)
             }
         };
         let held = prev
-            .filter(|prev| prev.base == base)
+            .filter(|prev| prev.base.as_str() == base)
             .and_then(|prev| prev.bootloader.as_deref());
         let bootloader = choose_bootloader(known, held, prompt)?;
         let text = image_kdl(
-            &name,
+            name.as_str(),
             url.as_deref(),
             &BaseLine {
                 path: &component,
@@ -812,7 +865,7 @@ impl Image {
             text,
             file,
             name,
-            base,
+            base: NonEmpty::parse(base, "the base")?,
             family,
             took: wanted.is_empty() || !seed.is_empty(),
             bootloader,
@@ -963,7 +1016,7 @@ impl Flavour {
 
         Ok(Self {
             name,
-            image: image.name.clone(),
+            image: image.name.to_string(),
             file: PathBuf::from(image.src.name()),
         })
     }
@@ -980,8 +1033,8 @@ impl Flavour {
 /// What a typed `--base` stands for: the path of the base component it names
 /// by its path or its image reference, and the typed reference itself where
 /// no base component names it.
-fn catalogued(bases: &[crate::base::Base], base: String) -> String {
-    crate::base::find(bases, &base).map_or(base, |known| known.name.clone())
+fn catalogued(bases: &[crate::model::component::BaseComponent], base: String) -> String {
+    crate::bases::find(bases, &base).map_or(base, |known| known.name.clone())
 }
 
 /// Holds a base component that `create image` writes for a typed reference
@@ -998,7 +1051,7 @@ struct OwnBase {
 
 /// Writes the base component for a typed reference. Its path comes from the
 /// reference's last part. A tag becomes the component's `version` option.
-fn own_base(root: &Path, image: &str, family: &str) -> Result<OwnBase, String> {
+fn own_base(root: &Path, image: &str) -> Result<OwnBase, String> {
     let (undigested, digest) = match image.split_once('@') {
         Some((before, digest)) => (before, Some(digest.to_string())),
         None => (image, None),
@@ -1027,15 +1080,11 @@ fn own_base(root: &Path, image: &str, family: &str) -> Result<OwnBase, String> {
             "components/{path} is already there and names another base; `--base {path}` builds on it"
         ));
     }
-    let block = match family.is_empty() {
-        true => String::new(),
-        false => format!(" {{\n    family \"{family}\"\n}}"),
-    };
     let reference = match &version {
         Some(tag) => format!(
-            "base \"{repository}:$version\"{block}\n\noption \"version\" type=\"string\" {{\n    default \"{tag}\"\n}}\n"
+            "base \"{repository}:$version\"\n\noption \"version\" type=\"string\" {{\n    default \"{tag}\"\n}}\n"
         ),
-        None => format!("base \"{repository}\"{block}\n"),
+        None => format!("base \"{repository}\"\n"),
     };
     let manifest = format!(
         "schema-version {}\n\n{reference}",
@@ -1052,7 +1101,7 @@ fn own_base(root: &Path, image: &str, family: &str) -> Result<OwnBase, String> {
 /// An unknown base stays available because the catalog cannot constrain a base
 /// it does not describe.
 fn choose_base(
-    bases: &[crate::base::Base],
+    bases: &[crate::model::component::BaseComponent],
     current: Option<&str>,
     prompt: &Prompt,
 ) -> Result<String, String> {
@@ -1082,17 +1131,26 @@ fn choose_base(
     }
 }
 
-fn base_options(bases: &[crate::base::Base]) -> Vec<Choice> {
+fn base_options(bases: &[crate::model::component::BaseComponent]) -> Vec<Choice> {
     bases
         .iter()
-        .map(|base| Choice::new(base.label(), &base.about))
+        .map(|base| Choice::new(base_label(base), &base.about))
         .collect()
+}
+
+/// Says how the picker shows the base: its image reference, and where it
+/// comes from.
+fn base_label(base: &crate::model::component::BaseComponent) -> String {
+    match &base.owner {
+        Some(owner) => format!("{} ({owner}/{})", base.image, base.name),
+        None => format!("{} ({})", base.image, base.name),
+    }
 }
 
 /// A single bootloader uses the base default. Multiple bootloaders require the
 /// user's choice and open on that default.
 fn choose_bootloader(
-    known: Option<&crate::base::Base>,
+    known: Option<&crate::model::component::BaseComponent>,
     held: Option<&str>,
     prompt: &Prompt,
 ) -> Result<Option<String>, String> {
@@ -1284,7 +1342,10 @@ fn wanted<'a>(
 
 /// A provider list shorter than these roles means an unread collection may
 /// still supply an answer.
-fn roles<'a>(base: Option<&'a crate::base::Base>, index: &crate::provider::Index) -> Vec<&'a str> {
+fn roles<'a>(
+    base: Option<&'a crate::model::component::BaseComponent>,
+    index: &crate::provider::Index,
+) -> Vec<&'a str> {
     // The image lists a provider of each role that the base's imports leave
     // unfilled. A base written from an image reference imports nothing.
     let lacks = |role: &str| {
@@ -1641,8 +1702,8 @@ image {
         image: &str,
         version: Option<&str>,
         bootloaders: &[&str],
-    ) -> crate::base::Base {
-        crate::base::Base {
+    ) -> crate::model::component::BaseComponent {
+        crate::model::component::BaseComponent {
             name: name.to_string(),
             owner: Some("ublue".to_string()),
             image: image.to_string(),
@@ -1819,21 +1880,50 @@ image {
     #[test]
     fn an_unknown_reference_gets_a_base_component() {
         let root = std::env::temp_dir().join(format!("tect-own-base-{}", std::process::id()));
-        let own = own_base(&root, "ghcr.io/other/Unknown_Base:1.2@sha256:abc", "fedora")
+        let own = own_base(&root, "ghcr.io/other/Unknown_Base:1.2@sha256:abc")
             .expect("nothing is in the way");
         assert_eq!(own.path, "base-image/unknown-base");
         assert_eq!(own.version.as_deref(), Some("1.2"));
         assert_eq!(own.digest.as_deref(), Some("sha256:abc"));
         assert_eq!(
             own.manifest,
-            "schema-version 1\n\nbase \"ghcr.io/other/Unknown_Base:$version\" {\n    family \"fedora\"\n}\n\noption \"version\" type=\"string\" {\n    default \"1.2\"\n}\n"
+            "schema-version 1\n\nbase \"ghcr.io/other/Unknown_Base:$version\"\n\noption \"version\" type=\"string\" {\n    default \"1.2\"\n}\n"
         );
-        let untagged = own_base(&root, "localhost:5000/own", "").expect("nothing is in the way");
+        let untagged = own_base(&root, "localhost:5000/own").expect("nothing is in the way");
         assert_eq!(untagged.version, None);
         assert_eq!(
             untagged.manifest,
             "schema-version 1\n\nbase \"localhost:5000/own\"\n"
         );
+    }
+
+    /// A blank `--base` names no image and no component, so it is refused
+    /// before a file is written.
+    #[test]
+    fn an_empty_base_is_refused_before_a_file_is_written() {
+        let root = std::env::temp_dir().join(format!("tect-empty-base-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let said = match Image::collect(
+            Home {
+                root: &root,
+                repo: "example",
+                url: None,
+                sources_text: "",
+            },
+            Some("Example".into()),
+            Some("  ".into()),
+            "`--image`",
+            Field::Base,
+            None,
+            &Prompt::silent(),
+        ) {
+            Ok(_) => panic!("an empty base was accepted"),
+            Err(said) => said,
+        };
+        assert!(said.contains("`--base` is empty"), "{said}");
+        assert!(!root.join("example.image.kdl").exists());
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// A capability the library misspells is a name a generated graph cannot
@@ -1852,7 +1942,7 @@ image {
                 span: crate::diag::Span::default(),
             })
             .collect();
-        let bases = crate::base::catalog(Path::new("/nonexistent"), &sources);
+        let bases = crate::bases::catalog(Path::new("/nonexistent"), &sources);
         assert_eq!(bases.len(), 3);
         for base in bases {
             assert!(is_name(&base.family), "{}", base.image);
@@ -2091,7 +2181,7 @@ image {
         );
         assert_screen(
             "create-repo-owner",
-            screen().line(&copy::username(copy::HOST), "github.com/", "someone", None),
+            screen().line(&copy::username(forge::HOST), "github.com/", "someone", None),
         );
         let yes_no = yes_no_options();
         assert_screen(
@@ -2186,10 +2276,6 @@ image {
                 0,
             ),
         );
-        assert_screen(
-            "create-image-family",
-            screen().line(copy::BASE_FAMILY, "", "fedora", None),
-        );
     }
 
     #[test]
@@ -2197,10 +2283,10 @@ image {
         use crate::screen_tests::{assert_screen, assert_style_at, screen};
 
         let repo = Repo {
-            name: "Example".to_string(),
-            id: "example".to_string(),
+            name: NonEmpty("Example".to_string()),
+            id: NonEmpty("example".to_string()),
             root: PathBuf::from("example"),
-            host: copy::HOST.to_string(),
+            host: forge::HOST.to_string(),
             owner: Some("someone".to_string()),
             assets: PathBuf::from("assets"),
             libraries: Libraries {

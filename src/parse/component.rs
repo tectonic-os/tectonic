@@ -1193,10 +1193,9 @@ impl Component {
 
         // Every batch outside a gate resolved against `targets`, which is only
         // whole now, and the dnf-only nodes held to what they resolved to.
-        let targets = component.targets.clone();
         spread(
             &mut component.packages,
-            &targets,
+            &component.targets,
             "packages",
             false,
             src,
@@ -1204,7 +1203,7 @@ impl Component {
         );
         spread(
             &mut component.groups,
-            &targets,
+            &component.targets,
             "package-groups",
             true,
             src,
@@ -1250,7 +1249,6 @@ impl Component {
         fragment_seen: &mut bool,
     ) {
         let component = self;
-        let path = component.path.clone();
         {
             match node.name().value() {
                 "description" => {
@@ -1291,7 +1289,10 @@ impl Component {
                     if component.fragment.is_none() {
                         issues.push(
                             Issue::new(
-                                format!("`{path}` declares `fragment` but ships no Containerfile.inc"),
+                                format!(
+                                    "`{}` declares `fragment` but ships no Containerfile.inc",
+                                    component.path
+                                ),
                                 src,
                             )
                             .at(node.name().span(), "nothing to place")
@@ -1417,11 +1418,10 @@ impl Component {
             .collect();
         // COPR is Fedora's: the adapter enables one on a Fedora base alone, so
         // anywhere else it would be skipped and its installs would fail.
-        let targets = component.targets.clone();
         for copr in &component.coprs {
-            let reach: Vec<&str> = match (copr.family.is_empty(), targets.is_empty()) {
+            let reach: Vec<&str> = match (copr.family.is_empty(), component.targets.is_empty()) {
                 (false, _) => copr.family.iter().map(String::as_str).collect(),
-                (true, false) => targets.iter().map(String::as_str).collect(),
+                (true, false) => component.targets.iter().map(String::as_str).collect(),
                 (true, true) => FAMILIES.to_vec(),
             };
             if let Some(stray) = reach.iter().find(|family| **family != "fedora") {
@@ -2265,7 +2265,11 @@ pub fn summary(file: &Path) -> Summary {
 /// Reads one component's manifest as a base, or None where it declares no
 /// `base`. The reference is written with the default `version`, which
 /// is what an image that sets none builds from.
-pub fn offered_base(dir: &Path, name: String, owner: Option<String>) -> Option<crate::base::Base> {
+pub fn offered_base(
+    dir: &Path,
+    name: String,
+    owner: Option<String>,
+) -> Option<crate::model::component::BaseComponent> {
     let manifest = std::fs::read_to_string(dir.join(crate::layout::MANIFEST_FILE)).ok()?;
     let doc: KdlDocument = manifest.parse().ok()?;
     let nodes = doc.nodes();
@@ -2289,7 +2293,7 @@ pub fn offered_base(dir: &Path, name: String, owner: Option<String>) -> Option<c
         "version" => version.clone().unwrap_or_default(),
         _ => String::new(),
     });
-    Some(crate::base::Base {
+    Some(crate::model::component::BaseComponent {
         name,
         owner,
         image,

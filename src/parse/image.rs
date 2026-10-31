@@ -539,8 +539,8 @@ impl Image {
     /// Half an answer is the one state that would reach `bootc install` on a
     /// default nobody chose. An image that declares no layout at all is left
     /// alone: it publishes, and it builds no install media.
-    pub(super) fn check_layout(&mut self, issues: &mut Issues) {
-        let src = &self.src.clone();
+    pub(super) fn check_layout(&self, issues: &mut Issues) {
+        let src = &self.src;
         let (Some(layout), Some(base)) = (&self.layout, &self.base) else {
             return;
         };
@@ -617,7 +617,7 @@ impl Image {
     /// The id derives from `name` when it is not declared, and either way has to
     /// survive being an image tag.
     fn check_id(&mut self, issues: &mut Issues) {
-        let src = &self.src.clone();
+        let src = &self.src;
         if self.id.is_empty() {
             self.id = self.name.to_lowercase().replace(' ', "-");
             if !self.name.is_empty() && !is_name(&self.id) {
@@ -653,7 +653,7 @@ impl Image {
     }
 
     fn parse_flavours(&mut self, block: &KdlNode, issues: &mut Issues) {
-        let src = &self.src.clone();
+        let src = &self.src;
         for node in kids(block) {
             let flavour = Flavour {
                 name: node.name().value().to_string(),

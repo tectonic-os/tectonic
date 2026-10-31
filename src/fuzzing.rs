@@ -65,18 +65,30 @@ pub fn repository_kdl(kind: u8, text: &str) {
             );
             write(&root.path().join("image.kdl"), IMAGE);
             write(&root.path().join(BASE), text);
-            let _ = crate::base::catalog(root.path(), &[]);
+            let _ = crate::bases::catalog(root.path(), &[]);
             let _ = crate::load(root.path());
         }
     }
 }
 
 pub fn kdl_rewrites(text: &str) {
-    crate::declaration::fuzz_rewrites(text);
+    fuzz_rewrites(text);
     let root = root("rewrite");
     let file = root.path().join("image.kdl");
     write(&file, text);
     crate::create::fuzz_rewrite(&file);
+}
+
+fn fuzz_rewrites(text: &str) {
+    let spans = [
+        crate::parse::repo::workflows_span(text),
+        crate::parse::image::conforms_span(text, "fuzz"),
+        crate::parse::component::satisfies_span(text),
+    ];
+    for span in spans {
+        let _ = crate::declaration::splice(text, span, "fuzz \"value\"");
+        let _ = crate::declaration::splice(text, span, "");
+    }
 }
 
 pub fn provenance_record(text: &str) {

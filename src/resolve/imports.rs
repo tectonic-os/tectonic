@@ -124,42 +124,50 @@ fn bring(
             // A listed entry that reaches its importer is on a cycle, which
             // `cycles` reports. Dropping the entry would not break the cycle.
             Some(held) if reaches(&image.entries, held, &by) => {}
-            Some(held) => match image.entries[held].imported_by.clone() {
-                None => issues.push(
-                    Issue::new(
-                        format!("`{}` is listed in the image, and `{by}` imports it", want.path),
-                        &image.src,
-                    )
-                    .at(image.entries[held].span, "listed here")
-                    .help(format!(
-                        "drop this entry: the import brings `{}` into the image, so it has one source",
-                        want.path
-                    )),
-                ),
-                Some(held_by) => {
-                    if let Some(first) = disagrees(&image.entries[held], &want.options) {
-                        issues.push(
+            Some(held) => {
+                if image.entries[held].imported_by.is_none() {
+                    issues.push(
                         Issue::new(
-                            format!(
-                                "`{by}` and `{held_by}` pass different values for option `{first}` of `{}`",
-                                want.path
-                            ),
-                            &src,
+                            format!("`{}` is listed in the image, and `{by}` imports it", want.path),
+                            &image.src,
                         )
-                        .at(want.span, "a second value")
-                        .help("one component builds once with one value per option; make the two imports pass the same value"),
+                        .at(image.entries[held].span, "listed here")
+                        .help(format!(
+                            "drop this entry: the import brings `{}` into the image, so it has one source",
+                            want.path
+                        )),
                     );
-                    }
-                    let entry = &mut image.entries[held];
-                    if entry.flavour.is_some() && entry.flavour != flavour {
-                        entry.flavour = None;
-                        if let Some(component) = entry.component.as_mut() {
-                            component.flavour = None;
-                        }
-                        queue.push_back(held);
-                    }
+                    continue;
                 }
-            },
+                let held_by = image.entries[held]
+                    .imported_by
+                    .as_deref()
+                    .unwrap_or_default();
+                let conflict = disagrees(&image.entries[held], &want.options).map(|first| {
+                    format!(
+                        "`{by}` and `{held_by}` pass different values for option `{first}` of `{}`",
+                        want.path
+                    )
+                });
+                let entry = &mut image.entries[held];
+                if entry.flavour.is_some() && entry.flavour != flavour {
+                    entry.flavour = None;
+                    if let Some(component) = entry.component.as_mut() {
+                        component.flavour = None;
+                    }
+                    queue.push_back(held);
+                }
+                if let Some(message) = conflict {
+                    issues.push(
+                        Issue::new(message, &src)
+                            .at(want.span, "a second value")
+                            .help(
+                            "one component builds once with one value per option; make the two \
+                                 imports pass the same value",
+                        ),
+                    );
+                }
+            }
             None if !disk.is_component(&want.path) => {
                 issues.push(
                     Issue::new(

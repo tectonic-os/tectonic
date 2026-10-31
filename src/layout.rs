@@ -491,6 +491,21 @@ pub const COMPONENT_DIR: Tree = Tree {
     ],
 };
 
+/// Derives the repository name from the directory's basename, when the
+/// basename is usable.
+pub fn named_after_root(root: &Path) -> Option<String> {
+    std::fs::canonicalize(root)
+        .ok()
+        .as_deref()
+        .and_then(Path::file_name)
+        .map(|name| name.to_string_lossy().into_owned())
+}
+
+/// Strips the repository root so the path reads as the written tree shows it.
+pub(crate) fn under(root: &Path, path: &Path) -> PathBuf {
+    path.strip_prefix(root).unwrap_or(path).to_path_buf()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

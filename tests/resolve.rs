@@ -56,7 +56,10 @@ image {
     )
     .unwrap();
 
-    let issues = tect::run(Command::Check, None, &root).issues.plain();
+    let issues = tect::run(Command::Check, None, &root)
+        .problems
+        .issues
+        .plain();
     assert!(
         issues.contains("`consumer` builds after `tool`, which only `provider` on the `dev`"),
         "{issues}"
@@ -115,6 +118,7 @@ image {
 /// whether the table marks that row as a defect.
 fn capability_row(root: &std::path::Path, name: &str) -> (Vec<String>, bool) {
     tect::run(Command::Graph, None, root)
+        .report
         .parts
         .into_iter()
         .find_map(|part| match part {
@@ -137,8 +141,14 @@ fn key_row_is_a_defect(root: &std::path::Path) -> bool {
 #[test]
 fn after_with_no_provider_orders_nothing() {
     let root = unprovided("after-no-provider", "after");
-    assert_eq!(tect::run(Command::Check, None, &root).issues.plain(), "");
-    let plan = tect::run(Command::Plan, None, &root).stdout;
+    assert_eq!(
+        tect::run(Command::Check, None, &root)
+            .problems
+            .issues
+            .plain(),
+        ""
+    );
+    let plan = tect::run(Command::Plan, None, &root).report.stdout;
     let at = |name: &str| plan.find(&format!("\"path\": \"{name}\"")).unwrap();
     assert!(at("signed") < at("plain"), "{plan}");
     let _ = std::fs::remove_dir_all(root);
@@ -203,12 +213,18 @@ image {
     .unwrap();
     std::fs::write(root.join("components/yubikey/apparmor/usr.sbin.pcscd"), "").unwrap();
 
-    let plan = tect::run(Command::Plan, None, &root).stdout;
+    let plan = tect::run(Command::Plan, None, &root).report.stdout;
     let at = |name: &str| plan.find(&format!("\"path\": \"{name}\"")).unwrap();
     assert!(at("apparmor") < at("yubikey"), "{plan}");
     // An ordering edge is not a requirement, so nothing is owed and nothing is
     // said.
-    assert_eq!(tect::run(Command::Check, None, &root).issues.plain(), "");
+    assert_eq!(
+        tect::run(Command::Check, None, &root)
+            .problems
+            .issues
+            .plain(),
+        ""
+    );
 
     // And with no MAC in the image at all, the profile is never installed, so
     // there is nothing to order after and still nothing to report.
@@ -219,7 +235,13 @@ image {
             .replace("        apparmor\n", ""),
     )
     .unwrap();
-    assert_eq!(tect::run(Command::Check, None, &root).issues.plain(), "");
+    assert_eq!(
+        tect::run(Command::Check, None, &root)
+            .problems
+            .issues
+            .plain(),
+        ""
+    );
     let _ = std::fs::remove_dir_all(root);
 }
 
@@ -250,7 +272,10 @@ fn a_capability_conflicts_only_where_a_provider_declares_it_exclusive() {
     };
     provider("one", "provides \"tool\" witness=\"/usr/share/tool\"");
     provider("two", "provides \"tool\" witness=\"/usr/share/tool\"");
-    let issues = tect::run(Command::Check, None, &root).issues.plain();
+    let issues = tect::run(Command::Check, None, &root)
+        .problems
+        .issues
+        .plain();
     assert!(
         !issues.contains("more than one enabled component"),
         "{issues}"
@@ -260,7 +285,10 @@ fn a_capability_conflicts_only_where_a_provider_declares_it_exclusive() {
         "two",
         "provides \"tool\" witness=\"/usr/share/tool\" exclusive=#true",
     );
-    let issues = tect::run(Command::Check, None, &root).issues.plain();
+    let issues = tect::run(Command::Check, None, &root)
+        .problems
+        .issues
+        .plain();
     assert!(
         issues.contains("`tool` is provided by more than one enabled component"),
         "{issues}"
@@ -311,7 +339,10 @@ fn written_on(name: &str, base: &str, components: &str, manifests: &[(&str, &str
 /// Answers what `check` says of the repository `written` makes.
 fn checked(name: &str, components: &str, manifests: &[(&str, &str)]) -> String {
     let root = written(name, components, manifests);
-    let issues = tect::run(Command::Check, None, &root).issues.plain();
+    let issues = tect::run(Command::Check, None, &root)
+        .problems
+        .issues
+        .plain();
     let _ = std::fs::remove_dir_all(root);
     issues
 }
@@ -319,7 +350,10 @@ fn checked(name: &str, components: &str, manifests: &[(&str, &str)]) -> String {
 /// Answers what `check` says of the repository `written_on` makes.
 fn checked_on(name: &str, base: &str, components: &str, manifests: &[(&str, &str)]) -> String {
     let root = written_on(name, base, components, manifests);
-    let issues = tect::run(Command::Check, None, &root).issues.plain();
+    let issues = tect::run(Command::Check, None, &root)
+        .problems
+        .issues
+        .plain();
     let _ = std::fs::remove_dir_all(root);
     issues
 }
@@ -336,7 +370,7 @@ fn a_component_builds_after_every_provider_of_what_it_requires() {
             ("two", provider),
         ],
     );
-    let plan = tect::run(Command::Plan, None, &root).stdout;
+    let plan = tect::run(Command::Plan, None, &root).report.stdout;
     let at = |name: &str| plan.find(&format!("\"path\": \"{name}\"")).unwrap();
     assert!(at("one") < at("consumer"), "{plan}");
     assert!(at("two") < at("consumer"), "{plan}");
@@ -474,7 +508,7 @@ fn a_requirement_is_met_by_any_provider_that_reaches_it() {
 /// Answers what `plan` prints for the repository `written_on` makes.
 fn planned(name: &str, base: &str, components: &str, manifests: &[(&str, &str)]) -> String {
     let root = written_on(name, base, components, manifests);
-    let plan = tect::run(Command::Plan, None, &root).stdout;
+    let plan = tect::run(Command::Plan, None, &root).report.stdout;
     let _ = std::fs::remove_dir_all(root);
     plan
 }
@@ -489,8 +523,11 @@ fn an_imported_component_builds_and_records_its_importer() {
             ("provider", "provides \"tool\" witness=\"/usr/share/tool\""),
         ],
     );
-    let plan = tect::run(Command::Plan, None, &root).stdout;
-    let issues = tect::run(Command::Check, None, &root).issues.plain();
+    let plan = tect::run(Command::Plan, None, &root).report.stdout;
+    let issues = tect::run(Command::Check, None, &root)
+        .problems
+        .issues
+        .plain();
     let _ = std::fs::remove_dir_all(root);
     let at = |name: &str| plan.find(&format!("\"path\": \"{name}\"")).unwrap();
     assert!(at("provider") < at("consumer"), "{plan}");
@@ -519,8 +556,11 @@ fn an_unmet_requirement_fails_while_its_provider_sits_unlisted() {
             ("provider", "provides \"tool\" witness=\"/usr/share/tool\""),
         ],
     );
-    let plan = tect::run(Command::Plan, None, &root).stdout;
-    let issues = tect::run(Command::Check, None, &root).issues.plain();
+    let plan = tect::run(Command::Plan, None, &root).report.stdout;
+    let issues = tect::run(Command::Check, None, &root)
+        .problems
+        .issues
+        .plain();
     let _ = std::fs::remove_dir_all(root);
     assert!(!plan.contains("\"path\": \"provider\""), "{plan}");
     assert!(
@@ -562,8 +602,11 @@ fn a_base_with_no_family_imports_a_component_that_names_one() {
     assert!(text.contains(" { family \"fedora\"; }"), "{text}");
     std::fs::write(&base, text.replace(" { family \"fedora\"; }", ""))
         .expect("the test repository is writable");
-    let plan = tect::run(Command::Plan, None, &root).stdout;
-    let issues = tect::run(Command::Check, None, &root).issues.plain();
+    let plan = tect::run(Command::Plan, None, &root).report.stdout;
+    let issues = tect::run(Command::Check, None, &root)
+        .problems
+        .issues
+        .plain();
     let _ = std::fs::remove_dir_all(root);
     assert!(plan.contains("\"path\": \"provider\""), "{plan}");
     assert!(!issues.contains("requires `tool`"), "{issues}");
@@ -582,7 +625,10 @@ fn a_component_required_by_its_path_is_not_suppressed() {
             ("helper", "provides \"flatpak\""),
         ],
     );
-    let issues = tect::run(Command::Check, None, &root).issues.plain();
+    let issues = tect::run(Command::Check, None, &root)
+        .problems
+        .issues
+        .plain();
     let _ = std::fs::remove_dir_all(root);
     assert!(!issues.contains("requires `helper`"), "{issues}");
 }
@@ -639,7 +685,7 @@ fn two_unlisted_candidates_fail_naming_both() {
     );
     let run = tect::run(Command::Generate, None, &root);
     let _ = std::fs::remove_dir_all(root);
-    let issues = run.issues.plain();
+    let issues = run.problems.issues.plain();
     assert!(
         issues.contains("`consumer` requires `tool`, which nothing enabled provides"),
         "{issues}"
@@ -862,8 +908,8 @@ fn the_graph_draws_every_importer_and_met_by_names_one() {
             ("runtime", "provides \"driver\""),
         ],
     );
-    let graph = squashed(&tect::run(Command::GraphJson, None, &root).stdout);
-    let plan = squashed(&tect::run(Command::Plan, None, &root).stdout);
+    let graph = squashed(&tect::run(Command::GraphJson, None, &root).report.stdout);
+    let plan = squashed(&tect::run(Command::Plan, None, &root).report.stdout);
     let _ = std::fs::remove_dir_all(root);
     assert!(
         graph.contains(r#"{"component":"runtime","by":"one"}"#)
@@ -958,7 +1004,10 @@ fn an_imported_component_off_the_family_names_its_importer() {
         text.replace("targets \"fedora\"", "targets \"debian\""),
     )
     .expect("the test repository is writable");
-    let issues = tect::run(Command::Check, None, &root).issues.plain();
+    let issues = tect::run(Command::Check, None, &root)
+        .problems
+        .issues
+        .plain();
     let _ = std::fs::remove_dir_all(root);
     assert!(
         issues.contains("`deb-only` does not support the `fedora` base family"),
@@ -1109,7 +1158,7 @@ fn an_image_entry_version_reaches_the_package_line() {
         .iter()
         .find(|(path, _)| path.ends_with("components/browser.sh"))
         .map(|(_, text)| text.as_str())
-        .unwrap_or_else(|| panic!("{}", run.issues.plain()));
+        .unwrap_or_else(|| panic!("{}", run.problems.issues.plain()));
     assert!(
         script.contains("install_packages 'firefox-130.0'"),
         "{script}"
@@ -1199,7 +1248,10 @@ fn a_removed_base_name_is_no_longer_claimed() {
         "        remover",
         &[("remover", "removes \"bootupctl\"")],
     );
-    let issues = tect::run(Command::Check, None, &root).issues.plain();
+    let issues = tect::run(Command::Check, None, &root)
+        .problems
+        .issues
+        .plain();
     let _ = std::fs::remove_dir_all(root);
     assert!(
         !issues.contains("nothing in the image provides"),
@@ -1249,7 +1301,11 @@ fn bare_component(name: &str, files: &[&str]) -> PathBuf {
 /// Generates the repository and returns every file it writes, joined.
 fn generated(root: &std::path::Path) -> String {
     let run = tect::run(Command::Generate, None, root);
-    assert!(run.issues.is_empty(), "{}", run.issues.plain());
+    assert!(
+        run.problems.issues.is_empty(),
+        "{}",
+        run.problems.issues.plain()
+    );
     run.files.into_iter().map(|(_, text)| text).collect()
 }
 
@@ -1264,7 +1320,11 @@ fn the_generated_build_job_follows_the_declared_backend() {
     .expect("the test repository is writable");
     let run = tect::run(Command::Generate, None, &root);
     let _ = std::fs::remove_dir_all(&root);
-    assert!(run.issues.is_empty(), "{}", run.issues.plain());
+    assert!(
+        run.problems.issues.is_empty(),
+        "{}",
+        run.problems.issues.plain()
+    );
     let (_, workflow) = run
         .files
         .iter()
@@ -1335,8 +1395,12 @@ fn why_names_the_component_that_imported_this_one() {
         "        consumer",
         &[("consumer", "imports \"provider\""), ("provider", "")],
     );
-    let imported = tect::run(Command::Why, Some("provider"), &root).stdout;
-    let listed = tect::run(Command::Why, Some("consumer"), &root).stdout;
+    let imported = tect::run(Command::Why, Some("provider"), &root)
+        .report
+        .stdout;
+    let listed = tect::run(Command::Why, Some("consumer"), &root)
+        .report
+        .stdout;
     let _ = std::fs::remove_dir_all(root);
     assert!(
         imported.contains("`consumer` imports it into `checked`."),
@@ -1353,8 +1417,11 @@ fn listing_a_child_includes_the_component_that_holds_it() {
         "        desktop { kde }\n        group {\n            tool\n        }",
         &[("desktop", ""), ("desktop/kde", ""), ("group/tool", "")],
     );
-    let plan = tect::run(Command::Plan, None, &root).stdout;
-    let issues = tect::run(Command::Check, None, &root).issues.plain();
+    let plan = tect::run(Command::Plan, None, &root).report.stdout;
+    let issues = tect::run(Command::Check, None, &root)
+        .problems
+        .issues
+        .plain();
     let parent = tect::run(Command::Plan, None, &{
         std::fs::write(
             root.join("image.kdl"),
@@ -1363,7 +1430,7 @@ fn listing_a_child_includes_the_component_that_holds_it() {
         .expect("the test repository is writable");
         root.clone()
     })
-    .stdout;
+    .report.stdout;
     let _ = std::fs::remove_dir_all(&root);
     assert!(issues.is_empty(), "{issues}");
     let at = |name: &str| plan.find(&format!("\"path\": \"{name}\"")).unwrap();
@@ -1386,8 +1453,11 @@ fn a_base_component_resolves_its_reference_from_the_entry() {
         "schema-version 1\n\nimage {\n    name \"Checked\"\n    base-image {\n        example {\n            version \"45\"\n            digest \"sha256:abc\"\n            signed #true\n        }\n    }\n}\n",
     )
     .expect("the test repository is writable");
-    let plan = tect::run(Command::Plan, None, &root).stdout;
-    let issues = tect::run(Command::Check, None, &root).issues.plain();
+    let plan = tect::run(Command::Plan, None, &root).report.stdout;
+    let issues = tect::run(Command::Check, None, &root)
+        .problems
+        .issues
+        .plain();
     let _ = std::fs::remove_dir_all(&root);
     assert!(issues.is_empty(), "{issues}");
     let flat = squashed(&plan);
@@ -1406,7 +1476,10 @@ fn an_image_that_lists_no_component_declaring_base_fails() {
         "schema-version 1\n\nimage {\n    name \"Checked\"\n    plain\n}\n",
     )
     .expect("the test repository is writable");
-    let issues = tect::run(Command::Check, None, &root).issues.plain();
+    let issues = tect::run(Command::Check, None, &root)
+        .problems
+        .issues
+        .plain();
     let _ = std::fs::remove_dir_all(&root);
     assert!(issues.contains("`checked` lists no base"), "{issues}");
 }
@@ -1448,7 +1521,10 @@ fn a_base_that_ships_a_script_is_refused() {
         "true\n",
     )
     .expect("the test repository is writable");
-    let issues = tect::run(Command::Check, None, &root).issues.plain();
+    let issues = tect::run(Command::Check, None, &root)
+        .problems
+        .issues
+        .plain();
     let _ = std::fs::remove_dir_all(&root);
     assert!(
         issues.contains("`base-image/example` is a base, and a base builds no layer"),
@@ -1500,7 +1576,10 @@ fn a_reference_is_checked_in_a_gate_an_image_and_an_import() {
     assert!(issues.contains("`$passed` names no option"), "{issues}");
     let root = written("reference-image", "", &[]);
     write_base(&root, "fedora", "base \"x:$tag\"");
-    let issues = tect::run(Command::Check, None, &root).issues.plain();
+    let issues = tect::run(Command::Check, None, &root)
+        .problems
+        .issues
+        .plain();
     let _ = std::fs::remove_dir_all(&root);
     assert!(issues.contains("`$tag` names no option"), "{issues}");
 }
@@ -1538,7 +1617,10 @@ fn removing_the_only_lower_name_leaves_the_broader_requirement_unmet() {
             ("consumer", "requires \"rpm\""),
         ],
     );
-    let issues = tect::run(Command::Check, None, &root).issues.plain();
+    let issues = tect::run(Command::Check, None, &root)
+        .problems
+        .issues
+        .plain();
     let _ = std::fs::remove_dir_all(root);
     assert!(
         issues.contains("`consumer` requires `rpm`, which nothing enabled provides"),
@@ -1684,7 +1766,10 @@ fn a_base_that_ships_files_or_packages_is_refused() {
             std::fs::create_dir_all(root.join("components/base-image/example/files/etc"))
                 .expect("the test repository is writable");
         }
-        let issues = tect::run(Command::Check, None, &root).issues.plain();
+        let issues = tect::run(Command::Check, None, &root)
+            .problems
+            .issues
+            .plain();
         let _ = std::fs::remove_dir_all(&root);
         assert!(
             issues.contains("`base-image/example` is a base, and a base builds no layer"),
@@ -1748,7 +1833,10 @@ fn an_inline_provider_answers_only_its_own_image() {
         "schema-version 1\n\nimage {\n    name \"a\"\n    base-image { example }\n    tools {\n        provides \"tool\"\n    }\n}\n\nimage {\n    name \"b\"\n    base-image { example }\n    needs\n}\n",
     )
     .expect("the test repository is writable");
-    let issues = tect::run(Command::Check, None, &root).issues.plain();
+    let issues = tect::run(Command::Check, None, &root)
+        .problems
+        .issues
+        .plain();
     let _ = std::fs::remove_dir_all(&root);
     assert!(
         issues.contains("no component in the repository declares `provides \"tool\"`"),

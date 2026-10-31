@@ -504,7 +504,7 @@ fn coprs(component: Option<&Component>, family: &str) -> Json {
 /// An unresolved manifest contributes no capability declarations.
 fn decls(
     component: Option<&Component>,
-    of: impl Fn(&Component) -> &Vec<crate::model::component::Decl>,
+    of: impl Fn(&Component) -> &[crate::model::component::Decl],
 ) -> Vec<String> {
     component
         .map(|m| of(m).iter().map(|d| d.name.clone()).collect())
@@ -571,11 +571,14 @@ pub(crate) fn contract_files(image: &Image, components: &[&Component]) -> Vec<St
 }
 
 pub(crate) fn provides(image: &Image, entries: &[&Entry], name: &str) -> bool {
-    let mut components = entries.iter().filter_map(|entry| entry.component.as_ref());
-    !components
-        .clone()
-        .any(|component| component.withdraws(name))
-        && (image.base_answers(name) || components.any(|component| component.answers(name)))
+    let mut answered = image.base_answers(name);
+    for component in entries.iter().filter_map(|entry| entry.component.as_ref()) {
+        if component.withdraws(name) {
+            return false;
+        }
+        answered |= component.answers(name);
+    }
+    answered
 }
 
 /// The base probe measures each name that a provider in the image witnesses.

@@ -83,20 +83,22 @@ name derives from the image name, so "My Desktop" writes
 It asks, in order:
 
 1. Name the image. The repository name is the default.
-2. Choose the base from the catalog. If `--base` names a base outside the
-   catalog, then choose its family.
-3. If the base imports no build environment, choose whether to add the
-   family adapter. If the base requires a component that the image does not
-   list, choose whether to add its providers. Each one comes from the declared
-   collections, is copied into `components/` and is recorded in
-   `components/components.lock.kdl`. A component the repository already holds
-   is listed as it is.
+2. Choose the base from the catalog, or name one with `--base`.
+
+If the base is a catalogued component that imports no build environment,
+choose whether to add its family adapter. If the base requires a component
+that the image does not list, choose whether to add its providers. Each one
+comes from the declared collections, is copied into `components/` and is
+recorded in `components/components.lock.kdl`. A component the repository
+already holds is listed as it is. A base outside the catalog declares no
+family, so the tool offers no adapter and asks no family question.
 
 The components a library base imports are copied into `components/` beside
 it, and the image file lists none of them."#;
 
 pub(super) const CREATE_IMAGE_NOTES: &str = r#"> [!NOTE]
-> A base outside the catalog asks for its family and writes no `provides`.
+> A base outside the catalog writes a base component with no `family` block.
+> The tool asks no family question, and it offers no family adapter.
 > `tect check` then reports each capability that no component provides.
 >
 > If the repository declares no `default-image`, then a second image adds one
@@ -107,9 +109,9 @@ pub(super) const CREATE_IMAGE_NOTES: &str = r#"> [!NOTE]
 > collection that is not on this machine. With no terminal, it fetches
 > nothing.
 >
-> The base's components are the family adapter and a provider of each capability
-> that the base requires. The family adapter is the component that `targets` the
-> family and `provides "build-environment"`."#;
+> When the base declares a family, its components are the family adapter and a
+> provider of each capability that the base requires. The family adapter is the
+> component that `targets` the family and `provides "build-environment"`."#;
 
 pub(super) const CREATE_FLAVOUR: &str = r#"Adds a flavour to an image. A flavour is a second build of the image with more
 components, published as `<image>-<flavour>` beside the image. This command

@@ -15,12 +15,15 @@ fn capture(name: &str, root: &Path) {
         (Command::Summary, "summary.md"),
         (Command::Sbom, "sbom.json"),
     ] {
-        assert_golden(name, file, &tect::run(command, None, &here).stdout);
+        assert_golden(name, file, &tect::run(command, None, &here).report.stdout);
     }
     assert_golden(
         name,
         "issues.txt",
-        &tect::run(Command::Check, None, &here).issues.plain(),
+        &tect::run(Command::Check, None, &here)
+            .problems
+            .issues
+            .plain(),
     );
 
     // `generate` writes nothing here: what it produced is on the run.
@@ -78,7 +81,12 @@ fn verify(name: &str, root: &Path) {
         std::fs::create_dir_all(path.parent().expect("a file under generated/")).unwrap();
         std::fs::write(path, body).unwrap();
     }
-    let issues = || tect::run(Command::Verify, None, &here).issues.plain();
+    let issues = || {
+        tect::run(Command::Verify, None, &here)
+            .problems
+            .issues
+            .plain()
+    };
 
     let mut out = format!("==== as generated\n{}", issues());
 
@@ -136,7 +144,7 @@ fn create_into(name: &str, root: &Path) {
         Some("Server".into()),
         Some("quay.io/fedora/fedora-bootc:44".into()),
         "a name argument",
-        tect::flow::Field::Image,
+        tect::setup::Field::Image,
         None,
         &silent,
     )
@@ -180,7 +188,10 @@ fn create_into(name: &str, root: &Path) {
     }
     out.push_str(&format!(
         "==== check\n{}",
-        tect::run(Command::Check, None, &here).issues.plain()
+        tect::run(Command::Check, None, &here)
+            .problems
+            .issues
+            .plain()
     ));
     assert_golden(name, "create.txt", &out);
 }
@@ -239,6 +250,7 @@ fn copied(name: &str, root: &Path) {
             &sources,
             false,
             &common::prompt::Prompt::silent(),
+            &mut |_| {},
         )
         .map_err(|err| err.message().to_string())
         .and_then(|component| component.apply(&here, &sources));
@@ -262,7 +274,10 @@ fn copied(name: &str, root: &Path) {
     ));
     out.push_str(&format!(
         "==== check\n{}",
-        tect::run(Command::Check, None, &here).issues.plain()
+        tect::run(Command::Check, None, &here)
+            .problems
+            .issues
+            .plain()
     ));
 
     // The silent import tracks its library.
@@ -274,7 +289,10 @@ fn copied(name: &str, root: &Path) {
     .unwrap();
     out.push_str(&format!(
         "==== check after an edit\n{}",
-        tect::run(Command::Check, None, &here).issues.plain()
+        tect::run(Command::Check, None, &here)
+            .problems
+            .issues
+            .plain()
     ));
     assert_golden(name, "import.txt", &out);
 }
@@ -288,7 +306,12 @@ fn edited_component(root: &Path) {
         std::fs::create_dir_all(path.parent().expect("a file under generated/")).unwrap();
         std::fs::write(path, body).unwrap();
     }
-    let issues = || tect::run(Command::Verify, None, &here).issues.plain();
+    let issues = || {
+        tect::run(Command::Verify, None, &here)
+            .problems
+            .issues
+            .plain()
+    };
     let clean = issues();
     assert!(
         clean.is_empty(),
@@ -317,18 +340,23 @@ fn why(name: &str, root: &Path, component: &str) {
 
     for (command, heading) in [(Command::Why, "markdown"), (Command::WhyJson, "json")] {
         out.push_str(&format!("==== {heading}\n"));
-        out.push_str(&tect::run(command, component.rsplit('/').next(), &here).stdout);
+        out.push_str(
+            &tect::run(command, component.rsplit('/').next(), &here)
+                .report
+                .stdout,
+        );
     }
 
     out.push_str("==== unknown\n");
     out.push_str(
         &tect::run(Command::Why, Some("nosuch"), &here)
+            .problems
             .issues
             .plain(),
     );
 
     // The same answer with no repository at all, off what a build bakes.
-    let manifest = common::json::Json::parse(&tect::run(Command::Plan, None, &here).stdout)
+    let manifest = common::json::Json::parse(&tect::run(Command::Plan, None, &here).report.stdout)
         .expect("the plan is a document");
     let host = tect::emit::why::on_host(&manifest, None, component).expect("the manifest names it");
     out.push_str("==== from the baked manifest, with no repository\n");
@@ -366,7 +394,7 @@ fn why(name: &str, root: &Path, component: &str) {
 /// target the two have to be the same document. Every fixture target is walked.
 fn summary_on_host(root: &Path) {
     let here = given(root);
-    let manifest = common::json::Json::parse(&tect::run(Command::Plan, None, &here).stdout)
+    let manifest = common::json::Json::parse(&tect::run(Command::Plan, None, &here).report.stdout)
         .expect("the plan is a document");
 
     let (every, _) = tect::emit::why::built_as(&manifest, None);
@@ -387,6 +415,7 @@ fn summary_on_host(root: &Path) {
                 common::json::text(target, "name").as_deref(),
                 &here
             )
+            .report
             .stdout,
             tect::emit::summary::on_host(scoped),
             "{} disagrees with itself",
@@ -408,12 +437,16 @@ fn why_unbuilt(root: &Path) {
     // Suppressed: everything it provides, the base ships, so no layer builds
     // it. `why` still answers, and says which of the two it is.
     out.push_str("==== a component the base suppresses\n");
-    let bare = tect::run(Command::Why, Some("flatpak"), &here).stdout;
+    let bare = tect::run(Command::Why, Some("flatpak"), &here)
+        .report
+        .stdout;
     out.push_str(&bare);
 
     // A full path names it too, and names it the same. Worth an assertion; a
     // second copy of the read-out only repeats it.
-    let full = tect::run(Command::Why, Some("apps/flatpak"), &here).stdout;
+    let full = tect::run(Command::Why, Some("apps/flatpak"), &here)
+        .report
+        .stdout;
     assert_eq!(bare, full, "the full path is a name like any other");
 
     // Suppressed by one image is not suppressed by the other. A second image on
@@ -427,6 +460,7 @@ fn why_unbuilt(root: &Path) {
     out.push_str("==== and the same component in an image that does build it\n");
     out.push_str(
         tect::run(Command::Why, Some("flatpak"), &here)
+            .report
             .stdout
             .split("## What it exchanges")
             .next()
@@ -440,7 +474,8 @@ fn why_unbuilt(root: &Path) {
     out.push_str("==== and one whose manifest never loaded\n");
     let run = tect::run(Command::Why, Some("flatpak"), &here);
     out.push_str(
-        run.issues
+        run.problems
+            .issues
             .plain()
             .split("`apps/flatpak` is listed")
             .nth(1)
@@ -466,7 +501,10 @@ fn unenforced(root: &Path) {
     std::fs::write(&repo, format!("{before}{after}")).unwrap();
 
     let here = given(&temp);
-    let issues = tect::run(Command::Check, None, &here).issues.plain();
+    let issues = tect::run(Command::Check, None, &here)
+        .problems
+        .issues
+        .plain();
     assert!(
         issues.is_empty(),
         "the same repository has to check clean unenforced: {issues}"
@@ -494,10 +532,13 @@ fn unpinned_import(root: &Path) {
 /// generated files, so `verify` also reports them missing.
 fn refused_everywhere(root: &Path) {
     let here = given(root);
-    let checked = tect::run(Command::Check, None, &here).issues.plain();
+    let checked = tect::run(Command::Check, None, &here)
+        .problems
+        .issues
+        .plain();
     assert!(checked.contains("tracks its library"), "{checked}");
     for command in [Command::Generate, Command::Verify] {
-        let said = tect::run(command, None, &here).issues.plain();
+        let said = tect::run(command, None, &here).problems.issues.plain();
         assert!(said.starts_with(&checked), "{command:?}: {said}");
     }
 }
@@ -507,11 +548,14 @@ fn refused_everywhere(root: &Path) {
 fn assert_no_default(root: &Path) {
     let here = given(root);
     for quiet in [Command::Check, Command::Generate] {
-        let issues = tect::run(quiet, None, &here).issues.plain();
+        let issues = tect::run(quiet, None, &here).problems.issues.plain();
         assert!(issues.is_empty(), "{quiet:?} reported {issues}");
     }
     for quiet in [Command::Section, Command::Graph] {
-        let issues = tect::run(quiet, Some("server"), &here).issues.plain();
+        let issues = tect::run(quiet, Some("server"), &here)
+            .problems
+            .issues
+            .plain();
         assert!(issues.is_empty(), "{quiet:?} reported {issues}");
     }
     for loud in [
@@ -521,7 +565,7 @@ fn assert_no_default(root: &Path) {
         Command::Summary,
         Command::Sbom,
     ] {
-        let issues = tect::run(loud, None, &here).issues.plain();
+        let issues = tect::run(loud, None, &here).problems.issues.plain();
         assert!(
             issues.contains("2 images are declared and none is the default"),
             "{loud:?} reported {issues}"
@@ -642,7 +686,10 @@ fn the_library_cache_changes_no_output() {
     seed_library(&root);
     let run = || {
         (
-            tect::run(Command::Check, None, &root).issues.plain(),
+            tect::run(Command::Check, None, &root)
+                .problems
+                .issues
+                .plain(),
             tect::run(Command::Generate, None, &root).files,
         )
     };
